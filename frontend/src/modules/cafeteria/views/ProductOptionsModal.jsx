@@ -1,30 +1,22 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { MODIFIERS } from '../models/productsModel';
 import clsx from 'clsx';
 
 export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
-  // Estado para guardar las selecciones { size: 'm', milk: 'almendra', extras: ['shot'] }
   const [selections, setSelections] = useState({});
 
   if (!product) return null;
 
-  // Detectar qué modificadores aplican según la categoría del producto
   const availableModifiers = MODIFIERS[product.categoria] || [];
-
-  // Si el producto no tiene opciones, agregarlo directo (esto se podría manejar antes)
-  // Pero visualmente queremos mostrarlo.
 
   const handleToggle = (modId, optId, type) => {
     setSelections(prev => {
       const current = prev[modId];
-      
       if (type === 'single') {
-        // Si es selección única, reemplazamos el valor
         return { ...prev, [modId]: optId };
       } else {
-        // Si es múltiple, agregamos o quitamos del array
         const currentArray = Array.isArray(current) ? current : [];
         if (currentArray.includes(optId)) {
           return { ...prev, [modId]: currentArray.filter(id => id !== optId) };
@@ -35,13 +27,11 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
     });
   };
 
-  // Calcular precio total dinámico
   const calculateTotal = () => {
     let total = product.precio;
     availableModifiers.forEach(mod => {
       const selected = selections[mod.id];
       if (!selected) return;
-
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
         if (opt) total += opt.price;
@@ -56,16 +46,13 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
   };
 
   const handleConfirm = () => {
-    // Generar descripción de las opciones para el ticket
-    // Ej: "Mediano, Almendra, Shot Extra"
     const details = [];
     availableModifiers.forEach(mod => {
       const selected = selections[mod.id];
       if (!selected) return;
-
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
-        if (opt && opt.id !== 's' && opt.id !== 'entera') details.push(opt.label); // Omitimos los default
+        if (opt && opt.id !== 's' && opt.id !== 'entera') details.push(opt.label);
       } else {
         selected.forEach(sId => {
           const opt = mod.options.find(o => o.id === sId);
@@ -76,30 +63,28 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
 
     onConfirm({
       ...product,
-      precioFinal: calculateTotal(), // Nuevo precio calculado
-      detalles: details.join(', '), // String para mostrar en ticket
-      uniqueId: Date.now() // Importante: ID único para diferenciar dos lattes distintos
+      precioFinal: calculateTotal(),
+      detalles: details.length > 0 ? { tamano: details[0] || 'Estándar', extras: details.slice(1) } : { tamano: 'Estándar' },
+      uniqueId: Date.now()
     });
   };
 
  return (
     <div className="absolute inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
       
-      {/* Backdrop transparente pero bloqueante */}
       <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose}
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto"
       />
 
-      {/* Ventana Modal */}
       <motion.div
         initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-        // CORRECCIÓN AQUÍ: Agregado 'relative z-10' para evitar que el fondo tape el modal
-        className="relative z-10 bg-white w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh]"
+        // CAMBIO: dark:bg-gray-800
+        className="relative z-10 bg-white dark:bg-gray-800 w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh] transition-colors"
       >
         {/* Header con Foto */}
-        <div className="relative h-40 bg-gray-100 shrink-0">
+        <div className="relative h-40 bg-gray-100 dark:bg-gray-700 shrink-0">
           <img src={product.imagen} className="w-full h-full object-cover opacity-90" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
           <div className="absolute bottom-4 left-4 text-white">
@@ -118,9 +103,9 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
           ) : (
             availableModifiers.map(mod => (
               <div key={mod.id}>
-                <h4 className="font-bold text-gray-800 mb-3 flex justify-between">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-3 flex justify-between">
                   {mod.title}
-                  {mod.type === 'multiple' && <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded">Elige varios</span>}
+                  {mod.type === 'multiple' && <span className="text-xs font-normal text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Elige varios</span>}
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {mod.options.map(opt => {
@@ -135,8 +120,10 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
                         className={clsx(
                           "px-4 py-3 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 active:scale-95",
                           isSelected 
+                            // Seleccionado (Brand Color)
                             ? "border-brand-primary bg-brand-primary/5 text-brand-primary shadow-sm ring-1 ring-brand-primary" 
-                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                            // No seleccionado (Dark Mode Adaptado)
+                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
                         )}
                       >
                         {isSelected && <Check size={14} strokeWidth={3} />}
@@ -152,10 +139,10 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
         </div>
 
         {/* Footer Confirmar */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 shrink-0">
           <button 
             onClick={handleConfirm}
-            className="w-full bg-brand-dark text-white py-4 rounded-xl font-bold text-lg hover:bg-black transition-colors flex justify-between px-8 items-center shadow-lg active:scale-95"
+            className="w-full bg-brand-dark dark:bg-brand-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 dark:hover:bg-brand-secondary transition-colors flex justify-between px-8 items-center shadow-lg active:scale-95"
           >
             <span>Agregar a la Orden</span>
             <span>${calculateTotal().toFixed(2)}</span>

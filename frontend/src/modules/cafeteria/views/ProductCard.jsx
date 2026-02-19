@@ -1,12 +1,12 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 
-// Recibimos 'qty' (cantidad actual en carrito)
 export const ProductCard = ({ producto, onAdd, qty }) => {
   return (
     <div 
       onClick={() => onAdd(producto)}
-      className="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden cursor-pointer border border-gray-100 relative h-48 flex flex-col active:scale-95"
+      // CAMBIO: bg-white -> dark:bg-gray-800, border-gray-100 -> dark:border-gray-700
+      className="group bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden cursor-pointer border border-gray-100 dark:border-gray-700 relative h-48 flex flex-col active:scale-95"
     >
       <div className="h-32 overflow-hidden relative">
         <img 
@@ -21,23 +21,23 @@ export const ProductCard = ({ producto, onAdd, qty }) => {
           ${producto.precio}
         </span>
 
-        {/* --- NUEVO: BADGE DE CANTIDAD --- */}
+        {/* Badge de Cantidad */}
         {qty > 0 && (
-          <div className="absolute top-2 right-2 bg-brand-primary text-white w-7 h-7 flex items-center justify-center rounded-full font-bold text-xs shadow-lg border-2 border-white animate-bounce-in">
+          <div className="absolute top-2 right-2 bg-brand-primary text-white w-7 h-7 flex items-center justify-center rounded-full font-bold text-xs shadow-lg border-2 border-white dark:border-gray-800 animate-bounce-in">
             {qty}
           </div>
         )}
       </div>
 
       <div className="p-3 flex-1 flex items-center justify-between">
-        <h3 className="font-bold text-gray-700 text-sm leading-tight line-clamp-2">
+        {/* CAMBIO: Texto oscuro/claro */}
+        <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm leading-tight line-clamp-2">
           {producto.nombre}
         </h3>
         
-        {/* Botón visual de + */}
         <div className={`
           p-1 rounded-full transition-all shadow-lg transform
-          ${qty > 0 ? 'bg-brand-primary text-white opacity-100' : 'bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}
+          ${qty > 0 ? 'bg-brand-primary text-white opacity-100' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-300 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}
         `}>
           <Plus size={16} />
         </div>

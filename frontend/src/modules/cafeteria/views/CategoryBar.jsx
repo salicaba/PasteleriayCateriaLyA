@@ -25,8 +25,10 @@ export const CategoryBar = ({ active, onSelect }) => {
             className={clsx(
               "flex items-center gap-2 px-4 py-2 rounded-full border transition-all whitespace-nowrap text-sm font-bold active:scale-95",
               isActive 
+                // Activo: Se mantiene igual (Brand Color)
                 ? "bg-brand-dark text-white border-brand-dark shadow-md" 
-                : "bg-white text-gray-500 border-gray-200 hover:border-brand-primary hover:text-brand-primary"
+                // Inactivo: Adaptado a Dark Mode
+                : "bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-brand-primary hover:text-brand-primary dark:hover:text-white"
             )}
           >
             <Icon size={16} />

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Users, Clock, Receipt } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Users, DollarSign, Clock } from 'lucide-react';
 import clsx from 'clsx';
 
 export const MesaCard = ({ mesa, onClick }) => {
@@ -8,74 +8,79 @@ export const MesaCard = ({ mesa, onClick }) => {
 
   return (
     <motion.div
-      layout // ¡Magia! Esto hace que se muevan suavemente al cambiar de zona
-      initial={{ opacity: 0, scale: 0.8 }}
+      layout
+      // --- ANIMACIONES DE ENTRADA Y SALIDA ---
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
+      exit={{ opacity: 0, scale: 0.5 }}
+      // --- LA ANIMACIÓN QUE FALTABA (HOVER) ---
+      whileHover={{ 
+        scale: 1.03, // Crece un poco
+        y: -5,       // Se levanta hacia arriba
+        transition: { type: "spring", stiffness: 300 } 
+      }}
+      whileTap={{ scale: 0.95 }} // Efecto de clic
       onClick={() => onClick(mesa)}
-      whileHover={{ y: -5, boxShadow: "0px 10px 20px rgba(0,0,0,0.1)" }}
-      whileTap={{ scale: 0.95 }}
       className={clsx(
-        "relative p-4 rounded-2xl border-2 cursor-pointer select-none h-40 flex flex-col justify-between overflow-hidden transition-colors bg-white",
+        "relative p-4 rounded-2xl cursor-pointer border transition-colors duration-300 shadow-sm hover:shadow-xl flex flex-col justify-between h-40",
+        // ESTILOS DE ESTADO
         isOcupada 
-          ? "border-orange-200" 
-          : "border-gray-100 hover:border-brand-primary/30"
+          ? "bg-orange-50 border-orange-200 dark:bg-gray-800 dark:border-orange-500/50" 
+          : "bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 hover:border-brand-primary/50 dark:hover:border-brand-primary/50"
       )}
     >
-      {/* Fondo animado (Latido) solo si está ocupada */}
-      {isOcupada && (
-        <motion.div 
-          animate={{ opacity: [0.05, 0.15, 0.05] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute inset-0 bg-orange-500 pointer-events-none"
-        />
-      )}
-
-      {/* Header */}
-      <div className="flex justify-between items-start z-10 relative">
-        <span className={clsx("text-3xl font-black font-lya", isOcupada ? "text-orange-600" : "text-gray-300")}>
-          {mesa.numero}
-        </span>
-        <div className={clsx(
-          "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shadow-sm",
-          isOcupada ? "bg-orange-100 text-orange-700 border-orange-200" : "bg-gray-50 text-gray-400 border-gray-200"
-        )}>
-          {isOcupada ? "Ocupada" : "Libre"}
+      {/* Header de la Mesa */}
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-2">
+            {/* Badge del Número */}
+            <div className={clsx(
+                "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm transition-colors",
+                isOcupada 
+                    ? "bg-orange-100 text-orange-600 dark:bg-orange-500 dark:text-white" 
+                    : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+            )}>
+                {mesa.numero}
+            </div>
+            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 tracking-wider">
+                {mesa.zona}
+            </span>
         </div>
-      </div>
 
-      {/* Info Central */}
-      <div className="z-10 mt-2 relative">
-        {isOcupada ? (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-gray-800">
-              <Receipt size={16} className="text-orange-500"/>
-              <span className="text-2xl font-bold">${mesa.total.toFixed(0)}</span>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <Clock size={12} />
-                <span>{mesa.horaInicio}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Users size={12} />
-                <span>{mesa.personas}p</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center items-center h-full opacity-10">
-            <Users size={40} className="text-gray-400" />
-          </div>
+        {/* Indicador de Estado (Onda expansiva / Radar) */}
+        {isOcupada && (
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+            </span>
         )}
       </div>
 
-      {/* Texto hover */}
-      {!isOcupada && (
-        <div className="absolute inset-x-0 bottom-3 text-center text-xs font-bold text-brand-primary opacity-0 group-hover:opacity-100 transition-opacity">
-          ABRIR MESA
-        </div>
-      )}
+      {/* Contenido Central */}
+      <div className="flex-1 flex flex-col justify-center items-center py-2">
+         {isOcupada ? (
+             <div className="text-center">
+                 <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-1 flex items-center gap-1 justify-center">
+                    <Clock size={12}/> 
+                    <span>24 min</span>
+                 </p>
+                 <p className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">
+                    ${mesa.total?.toFixed(0) || '0'}
+                 </p>
+             </div>
+         ) : (
+             <div className="text-center opacity-40 dark:opacity-20 group-hover:opacity-60 transition-opacity">
+                <Users size={32} className="mx-auto mb-1 text-gray-400 dark:text-gray-500" />
+                <span className="text-xs font-medium text-gray-400">Disponible</span>
+             </div>
+         )}
+      </div>
+
+      {/* Footer: Capacidad */}
+      <div className="flex justify-between items-center text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2 mt-1">
+        <span>Capacidad: {mesa.capacidad}</span>
+        {isOcupada && <span className="text-orange-500 dark:text-orange-400 font-bold">Ver Cuenta →</span>}
+      </div>
+
     </motion.div>
   );
 };

@@ -4,14 +4,20 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class', // <--- ESTO ES LA CLAVE
   theme: {
     extend: {
       fontFamily: {
-        'lya': ['"Dancing Script"', 'cursive'], 
-        'sans': ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
+        lya: ['Pacifico', 'cursive'], // Fuente para el logo
       },
       colors: {
-        brand: { primary: '#D946EF', secondary: '#F472B6', dark: '#1F2937' }
+        brand: {
+          primary: '#D946EF', // Fuchsia-500
+          secondary: '#A855F7', // Purple-500
+          dark: '#1F2937',    // Gray-800
+          light: '#F3F4F6',   // Gray-100
+        }
       }
     },
   },

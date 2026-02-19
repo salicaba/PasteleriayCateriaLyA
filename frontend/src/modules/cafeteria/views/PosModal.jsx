@@ -7,7 +7,7 @@ import { ProductCard } from './ProductCard';
 import { TicketSidebar } from './TicketSidebar'; 
 import { CategoryBar } from './CategoryBar';
 import { SuccessScreen } from './SuccessScreen';
-import { ProductOptionsModal } from './ProductOptionsModal'; // Importante
+import { ProductOptionsModal } from './ProductOptionsModal';
 
 // --- ANIMACIONES ---
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
@@ -19,9 +19,8 @@ const modalVariants = {
 
 export const PosModal = ({ isOpen, onClose, mesa }) => {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null); // Producto que se está editando
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // Traemos todo del controlador
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     filtroTexto, setFiltroTexto, 
@@ -32,16 +31,14 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
     isSuccess
   } = usePosController();
 
-  // Función puente: Del modal de opciones -> Al carrito real
   const handleConfirmOption = (productWithOptions) => {
     addToCart(productWithOptions);
-    setSelectedProduct(null); // Cerrar modal de opciones
+    setSelectedProduct(null);
   };
 
-  // Función para confirmar la orden completa (Botón Verde)
   const onConfirmOrder = () => {
     handleCheckout(() => {
-      onClose(); // Se cierra al terminar la animación
+      onClose();
     });
   };
 
@@ -67,10 +64,11 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row"
+          // CAMBIO: dark:bg-gray-900
+          className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 dark:bg-gray-900 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors duration-300"
         >
           
-          {/* --- 1. PANTALLA DE ÉXITO (Overlay Global) --- */}
+          {/* OVERLAYS */}
           <AnimatePresence>
             {isSuccess && (
               <motion.div
@@ -82,8 +80,6 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
             )}
           </AnimatePresence>
 
-          {/* --- 2. MODAL DE OPCIONES (Overlay de Producto) --- */}
-          {/* FALTABA ESTO: Renderizar el modal cuando hay un producto seleccionado */}
           <AnimatePresence>
             {selectedProduct && (
               <ProductOptionsModal 
@@ -99,35 +95,36 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
           <div className="flex-1 flex flex-col h-full relative z-0">
             
             {/* Header: Buscador + Categorías */}
-            <div className="bg-white p-4 pb-2 border-b border-gray-100 sticky top-0 z-20 shadow-sm">
+            {/* CAMBIO: dark:bg-gray-800 dark:border-gray-700 */}
+            <div className="bg-white dark:bg-gray-800 p-4 pb-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-20 shadow-sm transition-colors">
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                  {/* CAMBIO: Input oscuro */}
                   <input 
                     type="text" 
                     placeholder="Buscar producto..." 
                     value={filtroTexto}
                     onChange={(e) => setFiltroTexto(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
+                    className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 transition-colors">
                   <X size={24} />
                 </button>
               </div>
 
-              {/* Barra de Categorías */}
               <CategoryBar active={categoriaActiva} onSelect={setCategoriaActiva} />
             </div>
 
             {/* Grid de Productos */}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-32 md:pb-4">
+            {/* CAMBIO: Fondo oscuro en el grid */}
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 pb-32 md:pb-4 transition-colors">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredProducts.map(product => (
                   <ProductCard 
                     key={product.id} 
                     producto={product} 
-                    // CAMBIO IMPORTANTE: Abrimos el modal de opciones en vez de agregar directo
                     onAdd={setSelectedProduct} 
                     qty={getProductQty(product.id)}
                   />
@@ -144,22 +141,22 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
                     animate={{ y: 0 }}
                     exit={{ y: "100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                    className="absolute inset-0 z-50 bg-white shadow-xl flex flex-col"
+                    className="absolute inset-0 z-50 bg-white dark:bg-gray-800 shadow-xl flex flex-col"
                   >
                     <div 
-                      className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-100 shadow-sm cursor-pointer"
+                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 shadow-sm cursor-pointer"
                       onClick={() => setShowMobileTicket(false)}
                     >
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <button className="p-2 bg-white rounded-full border border-gray-200 shadow-sm active:scale-90 transition-transform">
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                        <button className="p-2 bg-white dark:bg-gray-700 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm active:scale-90 transition-transform">
                           <ChevronDown size={20} />
                         </button>
-                        <span className="font-bold text-gray-700">Tu Pedido</span>
+                        <span className="font-bold text-gray-700 dark:text-white">Tu Pedido</span>
                       </div>
                       <span className="text-xs text-gray-400">Toca para cerrar</span>
                     </div>
 
-                    <div className="flex-1 overflow-hidden relative bg-white">
+                    <div className="flex-1 overflow-hidden relative bg-white dark:bg-gray-800">
                       <TicketSidebar 
                         cart={cart} 
                         total={total} 
@@ -174,13 +171,13 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
               </AnimatePresence>
 
               {/* Barra Inferior Móvil */}
-              <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex items-center justify-between gap-4 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]">
+              <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between gap-4 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] transition-colors">
                 <div onClick={() => setShowMobileTicket(true)} className="flex flex-col cursor-pointer">
-                  <div className="flex items-center gap-1 text-xs text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <span>Total</span>
                     <ChevronUp size={14}/>
                   </div>
-                  <span className="text-2xl font-black text-brand-dark">${total.toFixed(2)}</span>
+                  <span className="text-2xl font-black text-brand-dark dark:text-white transition-colors">${total.toFixed(2)}</span>
                 </div>
                 <button 
                   onClick={() => setShowMobileTicket(true)}
@@ -194,10 +191,11 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
           </div>
 
           {/* --- PC SIDEBAR --- */}
-          <div className="hidden md:flex w-96 border-l border-gray-200 bg-white h-full shadow-xl z-20 flex-col">
-            <div className="p-4 bg-brand-primary/5 border-b border-brand-primary/10">
-              <h3 className="font-bold text-brand-dark text-lg">Mesa #{mesa.numero}</h3>
-              <p className="text-xs text-gray-500">#{mesa.id} • Nueva Orden</p>
+          {/* CAMBIO: Colores de sidebar */}
+          <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col transition-colors">
+            <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border-b border-brand-primary/10 dark:border-brand-primary/20">
+              <h3 className="font-bold text-brand-dark dark:text-brand-primary text-lg">Mesa #{mesa.numero}</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">#{mesa.id} • Nueva Orden</p>
             </div>
             
             <div className="flex-1 overflow-hidden h-full">

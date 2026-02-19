@@ -4,49 +4,59 @@ import { MOCK_PRODUCTS } from '../models/productsModel';
 export const usePosController = () => {
   const [cart, setCart] = useState([]);
   const [filtroTexto, setFiltroTexto] = useState('');
-  // Nuevo estado para la categoría activa
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
   const [isSuccess, setIsSuccess] = useState(false);
 
   const addToCart = (productWithDetails) => {
     setCart(prev => {
-      // Buscamos si existe un producto idéntico (Mismo ID y Mismos detalles)
-      // Usamos el 'uniqueId' que generamos en el modal si queremos que sean items separados
-      // O comparamos los detalles. Para simplificar, si viene del modal, lo tratamos como nuevo item si tiene detalles.
-      
-      const existingItem = prev.find(p => 
+      // Determinamos el precio que efectivamente se va a cobrar
+      const precioACobrar = productWithDetails.precioFinal || productWithDetails.precio;
+
+      // Buscamos si existe un producto con mismo ID y MISMO PRECIO
+      const existingItemIndex = prev.findIndex(p => 
         p.id === productWithDetails.id && 
-        p.detalles === productWithDetails.detalles
+        (p.precioFinal || p.precio) === precioACobrar
       );
 
-      if (existingItem) {
-        return prev.map(p => 
-          (p.id === productWithDetails.id && p.detalles === productWithDetails.detalles)
-            ? { ...p, qty: p.qty + 1 } 
-            : p
-        );
+      if (existingItemIndex !== -1) {
+        // Si coinciden en ID y Precio, los agrupamos
+        const newCart = [...prev];
+        const itemExistente = newCart[existingItemIndex];
+
+        newCart[existingItemIndex] = {
+          ...itemExistente,
+          qty: itemExistente.qty + 1,
+          // Guardamos un historial de preparaciones para la comanda de cocina
+          preparaciones: [
+            ...(itemExistente.preparaciones || [itemExistente.detalles]),
+            productWithDetails.detalles
+          ]
+        };
+        return newCart;
       }
       
-      // Si es nuevo, usamos el precioFinal calculado
+      // Si el precio es distinto (por un extra caro), se crea una línea nueva
       return [...prev, { 
         ...productWithDetails, 
-        precio: productWithDetails.precioFinal || productWithDetails.precio, // Usar el precio calculado
-        qty: 1 
+        precio: precioACobrar,
+        qty: 1,
+        preparaciones: [productWithDetails.detalles] // Primera preparación
       }];
     });
   };
 
-  const removeFromCart = (id) => {
-    setCart(prev => prev.map(p => p.id === id ? { ...p, qty: p.qty - 1 } : p).filter(p => p.qty > 0));
+  const removeFromCart = (id, precio) => {
+    setCart(prev => prev.map(p => 
+      (p.id === id && p.precio === precio) ? { ...p, qty: p.qty - 1 } : p
+    ).filter(p => p.qty > 0));
   };
 
-  const deleteLine = (id) => {
-    setCart(prev => prev.filter(p => p.id !== id));
+  const deleteLine = (id, precio) => {
+    setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio)));
   };
 
   const total = useMemo(() => cart.reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   
-  // Lógica de filtrado doble (Categoría + Texto)
   const filteredProducts = useMemo(() => {
     return MOCK_PRODUCTS.filter(p => {
       const matchCategoria = categoriaActiva === 'todas' || p.categoria === categoriaActiva;
@@ -55,38 +65,24 @@ export const usePosController = () => {
     });
   }, [filtroTexto, categoriaActiva]);
 
-  // Función para obtener la cantidad de un producto específico en el carrito
   const getProductQty = (id) => {
-    const item = cart.find(p => p.id === id);
-    return item ? item.qty : 0;
+    return cart.filter(p => p.id === id).reduce((acc, item) => acc + item.qty, 0);
   };
 
   const handleCheckout = (onComplete) => {
     if (cart.length === 0) return;
-
-    // 1. Mostrar pantalla de éxito
     setIsSuccess(true);
-
-    // 2. Simular proceso de envío a Firebase (aquí irá la llamada real luego)
     setTimeout(() => {
-      // 3. Limpiar todo
       setCart([]);
       setIsSuccess(false);
-      
-      // 4. Cerrar el modal (ejecutamos la función que nos pasen)
       if (onComplete) onComplete();
-      
-    }, 2500); // Esperamos 2.5 segundos para que el usuario disfrute la animación
+    }, 2500);
   };
 
   return { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     filtroTexto, setFiltroTexto, 
-    categoriaActiva, setCategoriaActiva, // Exportamos esto
-    filteredProducts,
-    getProductQty, // Exportamos esto para el badge
-    handleCheckout, // Exportamos la función
-    isSuccess,
-    addToCart
+    categoriaActiva, setCategoriaActiva,
+    filteredProducts, getProductQty, handleCheckout, isSuccess
   };
 };
