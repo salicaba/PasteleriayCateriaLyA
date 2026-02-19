@@ -6,8 +6,8 @@ import { PosModal } from './PosModal'; // 1. Importamos el Modal
 import clsx from 'clsx';
 
 export const MesasPage = () => { // Ya no necesitamos props externas para selección
-  // 2. Extraemos 'liberarMesa' del hook
-  const { zonas, zonaActiva, setZonaActiva, mesasFiltradas, stats, liberarMesa } = useMesasController();
+  // 2. Extraemos 'liberarMesa' y 'actualizarEstadoMesa' del hook
+  const { zonas, zonaActiva, setZonaActiva, mesasFiltradas, stats, liberarMesa, actualizarEstadoMesa } = useMesasController();
   
   // 3. Estado local para controlar qué mesa se está editando
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
@@ -82,11 +82,14 @@ export const MesasPage = () => { // Ya no necesitamos props externas para selecc
             isOpen={!!mesaSeleccionada}
             mesa={mesaSeleccionada}
             onClose={() => setMesaSeleccionada(null)}
-            // AQUÍ CONECTAMOS LA LÓGICA DE LIBERACIÓN
+            // LÓGICA DE LIBERACIÓN DE MESA (Al Cobrar)
             onTableRelease={(id) => {
               liberarMesa(id);
-              // Opcional: Si quieres cerrar el modal inmediatamente después de liberar (aunque PosModal ya lo hace)
-              // setMesaSeleccionada(null); 
+              setMesaSeleccionada(null); // Aseguramos que se cierre el modal
+            }}
+            // LÓGICA DE ACTUALIZACIÓN (Al enviar a Cocina)
+            onUpdateTable={(id, monto) => {
+              actualizarEstadoMesa(id, monto);
             }}
           />
         )}

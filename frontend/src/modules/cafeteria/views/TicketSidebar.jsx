@@ -1,12 +1,12 @@
 import React from 'react';
-import { Trash2, Minus, Plus, ShoppingBag } from 'lucide-react';
+import { Trash2, Minus, Plus, ShoppingBag, ChefHat, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const TicketSidebar = ({ cart, total, onAdd, onRemove, onDelete, onConfirm }) => {
+export const TicketSidebar = ({ cart, total, onAdd, onRemove, onDelete, onSendToKitchen, onCheckout }) => {
   return (
-    // CAMBIO: Fondo principal
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 transition-colors">
       
+      {/* Lista de productos */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-300 dark:text-gray-600 opacity-60">
@@ -15,15 +15,13 @@ export const TicketSidebar = ({ cart, total, onAdd, onRemove, onDelete, onConfir
           </div>
         ) : (
           <AnimatePresence initial={false} mode="popLayout"> 
-            {cart.map((item, index) => (
+            {cart.map((item) => (
               <motion.div 
-                // Usamos ID compuesto por si implementaste la lógica de agrupación
                 key={`${item.id}-${item.precio}`}
                 layout
                 initial={{ opacity: 0, x: -20, scale: 0.9 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 20, scale: 0.5, transition: { duration: 0.2 } }}
-                // CAMBIO: Fondo de item y bordes
                 className="flex justify-between items-start pb-3 border-b border-gray-50 dark:border-gray-700 last:border-0 group bg-white dark:bg-gray-800"
               >
                 <div className="flex-1 pr-2">
@@ -32,20 +30,18 @@ export const TicketSidebar = ({ cart, total, onAdd, onRemove, onDelete, onConfir
                     <motion.span 
                       key={item.qty}
                       initial={{ scale: 1.2, color: "#D946EF" }}
-                      animate={{ scale: 1, color: "currentColor" }} // Hereda color
+                      animate={{ scale: 1, color: "currentColor" }}
                     >
                         ${(item.precio * item.qty).toFixed(2)}
                     </motion.span>
                   </div>
                   
-                  {/* Preparaciones / Detalles */}
                   <div className="mt-1 space-y-0.5">
                      {item.preparaciones?.map((prep, idx) => (
                        <div key={idx} className="text-[10px] text-gray-400 dark:text-gray-500 italic">
                          {prep.tamano} {prep.leche && `• ${prep.leche}`}
                        </div>
                      ))}
-                     {/* Fallback si no hay preparaciones (legacy) */}
                      {!item.preparaciones && item.detalles && (
                         <div className="text-[10px] text-brand-primary dark:text-brand-secondary font-medium uppercase">
                            {item.detalles}
@@ -82,8 +78,7 @@ export const TicketSidebar = ({ cart, total, onAdd, onRemove, onDelete, onConfir
         )}
       </div>
 
-      {/* Footer Fijo */}
-      {/* CAMBIO: Fondo oscuro */}
+      {/* FOOTER CON LOS DOS BOTONES */}
       <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10 transition-colors">
         <div className="flex justify-between items-end mb-4">
           <span className="text-gray-500 dark:text-gray-400 font-medium text-sm uppercase tracking-wide">Total a Pagar</span>
@@ -96,13 +91,26 @@ export const TicketSidebar = ({ cart, total, onAdd, onRemove, onDelete, onConfir
               ${total.toFixed(2)}
           </motion.span>
         </div>
-        <button 
-            onClick={onConfirm}
+        
+        {/* AQUÍ ESTÁN LOS DOS BOTONES */}
+        <div className="grid grid-cols-2 gap-3">
+          <button 
+            onClick={onSendToKitchen}
             disabled={cart.length === 0}
-            className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold shadow-lg shadow-green-200 dark:shadow-none transition-all active:scale-95 flex justify-center gap-2 items-center"
-        >
-          <span>CONFIRMAR PEDIDO</span>
-        </button>
+            className="flex items-center justify-center gap-2 w-full bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/40 dark:hover:bg-orange-900/60 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed text-orange-700 dark:text-orange-400 py-3.5 rounded-xl font-bold transition-all active:scale-95"
+          >
+            <ChefHat size={18} />
+            <span>COCINA</span>
+          </button>
+
+          <button 
+            onClick={onCheckout}
+            className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-green-200 dark:shadow-none transition-all active:scale-95"
+          >
+            <CreditCard size={18} />
+            <span>COBRAR</span>
+          </button>
+        </div>
       </div>
     </div>
   );

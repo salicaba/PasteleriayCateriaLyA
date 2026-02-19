@@ -19,8 +19,8 @@ const modalVariants = {
   exit: { y: "100%", opacity: 0 } 
 };
 
-// 2. AÑADIMOS PROP onTableRelease (Opcional si el padre lo pasa, si no, usaremos lógica local)
-export const PosModal = ({ isOpen, onClose, mesa, onTableRelease }) => {
+// 2. AÑADIMOS PROP onTableRelease y onUpdateTable
+export const PosModal = ({ isOpen, onClose, mesa, onTableRelease, onUpdateTable }) => {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   // 3. ESTADO PARA EL CHECKOUT
@@ -41,10 +41,23 @@ export const PosModal = ({ isOpen, onClose, mesa, onTableRelease }) => {
     setSelectedProduct(null);
   };
 
-  // 4. MODIFICAMOS LA ACCIÓN DEL BOTÓN "CONFIRMAR PEDIDO"
-  const onConfirmOrder = () => {
+  // ACCIÓN 1: ENVIAR A COCINA
+  const handleSendToKitchen = () => {
     if (cart.length === 0) return;
-    setShowCheckout(true); // Abrir modal de cobro en lugar de cerrar directo
+    
+    // Mostramos la animación de "Enviado a cocina" y limpiamos carrito
+    handleCheckout(() => {
+      // Le decimos al controlador de mesas que sume este dinero a la cuenta de la mesa
+      if (onUpdateTable) {
+        onUpdateTable(mesa.id, total);
+      }
+    });
+  };
+
+  // ACCIÓN 2: ABRIR COBRO
+  const handleOpenCheckout = () => {
+    if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
+    setShowCheckout(true); 
   };
 
   // 5. NUEVA FUNCIÓN DE FINALIZACIÓN
@@ -114,7 +127,8 @@ export const PosModal = ({ isOpen, onClose, mesa, onTableRelease }) => {
               <CheckoutModal 
                 isOpen={showCheckout}
                 onClose={() => setShowCheckout(false)}
-                total={total}
+                // Si la mesa ya tiene cuenta previa, se suma al total actual del carrito
+                total={(mesa.total || 0) + total}
                 onConfirmPayment={handleFinalizePayment}
               />
             )}
@@ -186,7 +200,8 @@ export const PosModal = ({ isOpen, onClose, mesa, onTableRelease }) => {
                         onAdd={addToCart} 
                         onRemove={removeFromCart}
                         onDelete={deleteLine}
-                        onConfirm={onConfirmOrder}
+                        onSendToKitchen={handleSendToKitchen}
+                        onCheckout={handleOpenCheckout}
                       />
                     </div>
                   </motion.div>
@@ -227,7 +242,8 @@ export const PosModal = ({ isOpen, onClose, mesa, onTableRelease }) => {
                 onAdd={addToCart} 
                 onRemove={removeFromCart} 
                 onDelete={deleteLine}
-                onConfirm={onConfirmOrder}
+                onSendToKitchen={handleSendToKitchen}
+                onCheckout={handleOpenCheckout}
               />
             </div>
           </div>
