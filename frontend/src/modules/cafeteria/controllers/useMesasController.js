@@ -15,11 +15,20 @@ export const useMesasController = () => {
     return { ocupadas, libres };
   }, [mesas]);
 
-  // Función para sincronizar el estado de la mesa tras una venta
+  // Actualizar estado (Ocupar / Agregar venta)
   const actualizarEstadoMesa = useCallback((mesaId, montoVenta) => {
     setMesas(prev => prev.map(m => 
       m.id === mesaId 
         ? { ...m, estado: 'ocupada', total: (m.total || 0) + montoVenta }
+        : m
+    ));
+  }, []);
+
+  // NUEVO: Liberar mesa (Resetear)
+  const liberarMesa = useCallback((mesaId) => {
+    setMesas(prev => prev.map(m => 
+      m.id === mesaId
+        ? { ...m, estado: 'libre', total: 0 } // Reseteamos estado y total
         : m
     ));
   }, []);
@@ -30,6 +39,7 @@ export const useMesasController = () => {
     setZonaActiva,
     mesasFiltradas,
     stats,
-    actualizarEstadoMesa
+    actualizarEstadoMesa,
+    liberarMesa // Exportamos la nueva función
   };
 };

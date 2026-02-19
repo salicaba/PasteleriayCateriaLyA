@@ -8,6 +8,8 @@ import { TicketSidebar } from './TicketSidebar';
 import { CategoryBar } from './CategoryBar';
 import { SuccessScreen } from './SuccessScreen';
 import { ProductOptionsModal } from './ProductOptionsModal';
+// 1. IMPORTAR CHECKOUT
+import { CheckoutModal } from './CheckoutModal'; 
 
 // --- ANIMACIONES ---
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
@@ -17,9 +19,12 @@ const modalVariants = {
   exit: { y: "100%", opacity: 0 } 
 };
 
-export const PosModal = ({ isOpen, onClose, mesa }) => {
+// 2. AÑADIMOS PROP onTableRelease (Opcional si el padre lo pasa, si no, usaremos lógica local)
+export const PosModal = ({ isOpen, onClose, mesa, onTableRelease }) => {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  // 3. ESTADO PARA EL CHECKOUT
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
@@ -36,9 +41,27 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
     setSelectedProduct(null);
   };
 
+  // 4. MODIFICAMOS LA ACCIÓN DEL BOTÓN "CONFIRMAR PEDIDO"
   const onConfirmOrder = () => {
+    if (cart.length === 0) return;
+    setShowCheckout(true); // Abrir modal de cobro en lugar de cerrar directo
+  };
+
+  // 5. NUEVA FUNCIÓN DE FINALIZACIÓN
+  const handleFinalizePayment = (paymentDetails) => {
+    console.log("Pago procesado:", paymentDetails);
+    
+    // Cerramos el modal de cobro
+    setShowCheckout(false);
+
+    // Ejecutamos la lógica de éxito del controlador (muestra SuccessScreen y limpia carrito)
     handleCheckout(() => {
-      onClose();
+      // Callback después de la animación de éxito (2.5s)
+      
+      // Si el padre pasó la función para liberar la mesa, la llamamos
+      if (onTableRelease) onTableRelease(mesa.id);
+      
+      onClose(); // Cerramos el POS completo
     });
   };
 
@@ -51,9 +74,7 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
         {/* Fondo Oscuro */}
         <motion.div
           variants={backdropVariants}
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
+          initial="hidden" animate="visible" exit="hidden"
           onClick={onClose}
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         />
@@ -61,14 +82,11 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
         {/* Modal Principal */}
         <motion.div
           variants={modalVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          // CAMBIO: dark:bg-gray-900
+          initial="hidden" animate="visible" exit="exit"
           className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 dark:bg-gray-900 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors duration-300"
         >
           
-          {/* OVERLAYS */}
+          {/* OVERLAYS DE ÉXITO Y OPCIONES */}
           <AnimatePresence>
             {isSuccess && (
               <motion.div
@@ -90,17 +108,26 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
             )}
           </AnimatePresence>
 
+          {/* 6. AÑADIMOS EL MODAL DE CHECKOUT AQUÍ */}
+          <AnimatePresence>
+            {showCheckout && (
+              <CheckoutModal 
+                isOpen={showCheckout}
+                onClose={() => setShowCheckout(false)}
+                total={total}
+                onConfirmPayment={handleFinalizePayment}
+              />
+            )}
+          </AnimatePresence>
+
 
           {/* --- COLUMNA IZQUIERDA (Menú) --- */}
           <div className="flex-1 flex flex-col h-full relative z-0">
-            
             {/* Header: Buscador + Categorías */}
-            {/* CAMBIO: dark:bg-gray-800 dark:border-gray-700 */}
             <div className="bg-white dark:bg-gray-800 p-4 pb-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-20 shadow-sm transition-colors">
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  {/* CAMBIO: Input oscuro */}
                   <input 
                     type="text" 
                     placeholder="Buscar producto..." 
@@ -113,12 +140,10 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
                   <X size={24} />
                 </button>
               </div>
-
               <CategoryBar active={categoriaActiva} onSelect={setCategoriaActiva} />
             </div>
 
             {/* Grid de Productos */}
-            {/* CAMBIO: Fondo oscuro en el grid */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 pb-32 md:pb-4 transition-colors">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredProducts.map(product => (
@@ -137,9 +162,7 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
               <AnimatePresence>
                 {showMobileTicket && (
                   <motion.div
-                    initial={{ y: "100%" }}
-                    animate={{ y: 0 }}
-                    exit={{ y: "100%" }}
+                    initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 300 }}
                     className="absolute inset-0 z-50 bg-white dark:bg-gray-800 shadow-xl flex flex-col"
                   >
@@ -191,7 +214,6 @@ export const PosModal = ({ isOpen, onClose, mesa }) => {
           </div>
 
           {/* --- PC SIDEBAR --- */}
-          {/* CAMBIO: Colores de sidebar */}
           <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col transition-colors">
             <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border-b border-brand-primary/10 dark:border-brand-primary/20">
               <h3 className="font-bold text-brand-dark dark:text-brand-primary text-lg">Mesa #{mesa.numero}</h3>

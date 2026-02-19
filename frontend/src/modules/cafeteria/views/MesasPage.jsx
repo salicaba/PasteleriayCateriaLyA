@@ -1,25 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMesasController } from '../controllers/useMesasController';
 import { MesaCard } from './MesaCard';
+import { PosModal } from './PosModal'; // 1. Importamos el Modal
 import clsx from 'clsx';
 
-export const MesasPage = ({ onSelectMesa }) => {
-  const { zonas, zonaActiva, setZonaActiva, mesasFiltradas, stats } = useMesasController();
+export const MesasPage = () => { // Ya no necesitamos props externas para selección
+  // 2. Extraemos 'liberarMesa' del hook
+  const { zonas, zonaActiva, setZonaActiva, mesasFiltradas, stats, liberarMesa } = useMesasController();
+  
+  // 3. Estado local para controlar qué mesa se está editando
+  const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
 
   return (
-    // CAMBIO: Fondo gris claro en Light, Gris muy oscuro (casi negro) en Dark
     <div className="flex-1 flex flex-col h-full bg-gray-50/50 dark:bg-gray-900 transition-colors duration-300">
       
       {/* Header */}
       <div className="px-6 pt-6 pb-2">
-        {/* CAMBIO: Texto oscuro en Light, Blanco en Dark */}
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white transition-colors">
             Mapa de Mesas
         </h1>
         
         <p className="text-sm text-gray-400 dark:text-gray-500 flex gap-2 mt-1">
-          {/* Badges de estado adaptados */}
           <span className="text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md border border-orange-100 dark:border-orange-900/50 transition-colors">
             {stats.ocupadas} Ocupadas
           </span> 
@@ -30,7 +32,6 @@ export const MesasPage = ({ onSelectMesa }) => {
       </div>
 
       {/* Tabs de Zonas */}
-      {/* CAMBIO: Borde inferior ajustado para Dark Mode */}
       <div className="px-6 flex gap-6 border-b border-gray-200 dark:border-gray-800 overflow-x-auto hide-scrollbar transition-colors">
         {zonas.map(zona => (
           <button
@@ -39,8 +40,8 @@ export const MesasPage = ({ onSelectMesa }) => {
             className={clsx(
               "pb-3 px-1 text-sm font-medium transition-colors relative outline-none",
               zonaActiva === zona.id 
-                ? "text-brand-primary dark:text-brand-primary" // Activo
-                : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" // Inactivo
+                ? "text-brand-primary dark:text-brand-primary" 
+                : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             )}
           >
             {zona.label}
@@ -55,7 +56,7 @@ export const MesasPage = ({ onSelectMesa }) => {
       </div>
 
       {/* Grid de Mesas */}
-      <div className="p-6 overflow-y-auto flex-1">
+      <div className="p-6 overflow-y-auto flex-1 pb-24"> {/* pb-24 para dar espacio si hay elementos flotantes */}
         <motion.div 
           layout
           className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
@@ -65,12 +66,32 @@ export const MesasPage = ({ onSelectMesa }) => {
               <MesaCard 
                 key={mesa.id} 
                 mesa={mesa} 
-                onClick={onSelectMesa} 
+                // 4. Al hacer clic, guardamos la mesa en el estado local
+                onClick={() => setMesaSeleccionada(mesa)} 
               />
             ))}
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* 5. Renderizado Condicional del POS Modal */}
+      {/* Al estar aquí dentro, comparte el estado del 'useMesasController' de arriba */}
+      <AnimatePresence>
+        {mesaSeleccionada && (
+          <PosModal 
+            isOpen={!!mesaSeleccionada}
+            mesa={mesaSeleccionada}
+            onClose={() => setMesaSeleccionada(null)}
+            // AQUÍ CONECTAMOS LA LÓGICA DE LIBERACIÓN
+            onTableRelease={(id) => {
+              liberarMesa(id);
+              // Opcional: Si quieres cerrar el modal inmediatamente después de liberar (aunque PosModal ya lo hace)
+              // setMesaSeleccionada(null); 
+            }}
+          />
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
