@@ -75,9 +75,8 @@ export const MesaCard = ({ mesa, onClick }) => {
          )}
       </div>
 
-      {/* Footer: Capacidad */}
-      <div className="flex justify-between items-center text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2 mt-1">
-        <span>Capacidad: {mesa.capacidad}</span>
+      {/* Footer: Modificado para ocultar la capacidad y alinear a la derecha */}
+      <div className="flex justify-end items-center text-xs border-t border-gray-100 dark:border-gray-700/50 pt-2 mt-1 min-h-[28px]">
         {isOcupada && <span className="text-orange-500 dark:text-orange-400 font-bold">Ver Cuenta →</span>}
       </div>
 
