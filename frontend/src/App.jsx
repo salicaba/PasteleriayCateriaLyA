@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Menu, PieChart, Settings, Clock, LogOut } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, Settings, Clock, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from './hooks/useTheme';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -8,6 +8,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
 import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
+import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard'; // <-- NUEVA IMPORTACIÓN
 
 function App() {
   // --- ESTADOS DE AUTENTICACIÓN ---
@@ -50,15 +51,16 @@ function App() {
     year: 'numeric' 
   });
 
+  // --- MENÚ PRINCIPAL ---
   const menuItems = [
     { id: 'mesas', label: 'Salón', icon: LayoutGrid },
     { id: 'cocina', label: 'Cocina', icon: ChefHat },
+    { id: 'pasteleria', label: 'Pastelería', icon: Cake }, // <-- NUEVO MÓDULO AGREGADO
     { id: 'reportes', label: 'Reportes', icon: PieChart },
     { id: 'ajustes', label: 'Ajustes', icon: Settings },
   ];
 
   // --- BARRERA DE AUTENTICACIÓN ---
-  // Si no hay un usuario logueado, se muestra la pantalla de Login
   if (!user) {
     return <LoginScreen onLogin={(userData) => setUser(userData)} />;
   }
@@ -220,6 +222,7 @@ function App() {
         <main className="flex-1 overflow-hidden relative bg-gray-50/50 dark:bg-gray-900 transition-colors">
           {activeTab === 'mesas' && <MesasPage />}
           {activeTab === 'cocina' && <KitchenPage />}
+          {activeTab === 'pasteleria' && <PasteleriaDashboard />} {/* <-- NUEVO RENDERIZADO */}
           
           {activeTab === 'reportes' && (
             <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 font-medium text-center p-4">
