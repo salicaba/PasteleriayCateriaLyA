@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Menu, PieChart, Settings, Clock } from 'lucide-react';
+import { LayoutGrid, ChefHat, Menu, PieChart, Settings, Clock, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from './hooks/useTheme';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -7,16 +7,21 @@ import { ThemeToggle } from './components/ThemeToggle';
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
 import { KitchenPage } from './modules/kitchen/views/KitchenPage';
+import { LoginScreen } from './modules/auth/views/LoginScreen';
 
 function App() {
+  // --- ESTADOS DE AUTENTICACIÓN ---
+  const [user, setUser] = useState(null);
+
+  // --- ESTADOS DE INTERFAZ ---
   const [activeTab, setActiveTab] = useState('mesas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
   const { theme, toggleTheme } = useTheme();
 
+  // Reloj en tiempo real
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -24,6 +29,7 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Escalado de interfaz (rem)
   useEffect(() => {
     const root = document.documentElement;
     if (uiSize === 'large') root.style.fontSize = '16px'; 
@@ -38,7 +44,7 @@ function App() {
   });
   
   const formattedDate = currentTime.toLocaleDateString('es-MX', { 
-    weekday: 'short', // 'short' para que ocupe menos espacio en móvil
+    weekday: 'short', 
     day: 'numeric', 
     month: 'short', 
     year: 'numeric' 
@@ -50,6 +56,12 @@ function App() {
     { id: 'reportes', label: 'Reportes', icon: PieChart },
     { id: 'ajustes', label: 'Ajustes', icon: Settings },
   ];
+
+  // --- BARRERA DE AUTENTICACIÓN ---
+  // Si no hay un usuario logueado, se muestra la pantalla de Login
+  if (!user) {
+    return <LoginScreen onLogin={(userData) => setUser(userData)} />;
+  }
 
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans overflow-hidden transition-colors duration-300">
@@ -112,38 +124,30 @@ function App() {
                 Tamaño de Pantalla
               </span>
               <div className="flex bg-gray-200/50 dark:bg-gray-900 rounded-lg p-1">
-                <button
-                  onClick={() => setUiSize('small')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    uiSize === 'small' 
-                      ? 'bg-white dark:bg-gray-700 text-brand-dark dark:text-white shadow-sm' 
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Chica
-                </button>
-                <button
-                  onClick={() => setUiSize('medium')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    uiSize === 'medium' 
-                      ? 'bg-white dark:bg-gray-700 text-brand-dark dark:text-white shadow-sm' 
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Media
-                </button>
-                <button
-                  onClick={() => setUiSize('large')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    uiSize === 'large' 
-                      ? 'bg-white dark:bg-gray-700 text-brand-dark dark:text-white shadow-sm' 
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Grande
-                </button>
+                {['small', 'medium', 'large'].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setUiSize(size)}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
+                      uiSize === size 
+                        ? 'bg-white dark:bg-gray-700 text-brand-dark dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    {size === 'small' ? 'Chica' : size === 'medium' ? 'Media' : 'Grande'}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {/* Botón de Cerrar Sesión */}
+            <button 
+              onClick={() => setUser(null)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold"
+            >
+              <LogOut size={16} />
+              Cerrar Sesión
+            </button>
           </div>
 
         </div>
@@ -188,13 +192,12 @@ function App() {
              </h2>
           </div>
 
-          {/* CENTRO: Reloj visible en móviles, ajustando tamaño con clases 'sm:' */}
+          {/* CENTRO: Reloj */}
           <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none w-max">
              <div className="flex items-center gap-1 sm:gap-1.5 text-brand-dark dark:text-gray-100">
                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-brand-primary" />
                <span className="text-sm sm:text-lg font-bold leading-none">{formattedTime}</span>
              </div>
-             {/* La fecha se oculta en celulares extremadamente estrechos, pero se ve en casi todos */}
              <span className="text-[9px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 capitalize mt-0.5 hidden min-[380px]:block">
                {formattedDate}
              </span>
@@ -203,11 +206,11 @@ function App() {
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-3 bg-white dark:bg-gray-700/50 px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 shadow-sm transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-gray-700 dark:text-gray-200 leading-none">Cajero Principal</p>
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-200 leading-none">{user.name}</p>
                 <p className="text-[10px] text-gray-400 dark:text-gray-500">Sucursal Centro</p>
               </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 bg-brand-dark rounded-full overflow-hidden border-2 border-white dark:border-gray-600 shadow-sm shrink-0">
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" className="w-full h-full object-cover" />
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt="User" className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
