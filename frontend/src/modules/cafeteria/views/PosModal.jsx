@@ -26,7 +26,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
-    categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, handleCheckout, isSuccess
+    categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
+    handleCheckout, isSuccess,
+    unsentTotal, hasUnsentItems, simulateKitchenSend 
   } = usePosController();
 
   const handleConfirmOption = (productWithOptions) => {
@@ -35,9 +37,11 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   const handleSendToKitchen = () => {
-    if (cart.length === 0) return;
-    handleCheckout(() => {
-      if (onUpdateTable) onUpdateTable(mesa.id, total);
+    if (!hasUnsentItems) return; 
+    simulateKitchenSend(() => {
+      if (onUpdateTable && unsentTotal > 0) {
+        onUpdateTable(mesa.id, unsentTotal);
+      }
     });
   };
 
@@ -46,39 +50,27 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     setShowCheckout(true); 
   };
 
-  // ==========================================
-  // LA MAGIA DEL PAGO OCURRE AQUÍ
-  // ==========================================
   const handleFinalizePayment = (paymentDetails) => {
-    // Extraemos cuánto pagaron realmente (puede ser el total o una fracción)
     const { amountPaid } = paymentDetails;
-    const deudaTotal = (mesa.total || 0) + total; 
+    const deudaTotal = (mesa.total || 0) + unsentTotal; 
     
-    // Cerramos la ventana de cobro
     setShowCheckout(false);
 
-    // 1. Si había productos nuevos en el carrito, los sumamos a la cuenta de la mesa
-    if (total > 0 && onUpdateTable) {
-        onUpdateTable(mesa.id, total);
+    if (unsentTotal > 0 && onUpdateTable) {
+        onUpdateTable(mesa.id, unsentTotal);
     }
 
-    // 2. Descontamos el dinero que acaban de pagar de la mesa
     if (onPagoParcial) {
         onPagoParcial(mesa.id, amountPaid);
     }
 
-    // Ejecutamos la animación de la palomita verde
     handleCheckout(() => {
-        // 3. Verificamos si ya pagaron todo (dejamos un margen de 0.01 por los decimales)
         const saldoRestante = deudaTotal - amountPaid;
         
         if (saldoRestante <= 0.01) {
-            // Ya no deben nada, liberamos la mesa y cerramos el POS
             if (onTableRelease) onTableRelease(mesa.id);
             onClose();
         } 
-        // Si aún deben dinero (porque dividieron cuenta), no hacemos nada más,
-        // la pantalla se queda abierta mostrando el nuevo saldo para cobrarle al siguiente amigo.
     });
   };
 
@@ -121,7 +113,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                         <button className="p-2 bg-white dark:bg-gray-700 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
                         <div>
                           <span className="font-bold text-gray-700 dark:text-white block leading-tight">Mesa #{mesa.numero}</span>
-                          <span className="text-[10px] text-gray-400 block">${mesa.total?.toFixed(2) || '0.00'} en cuenta</span>
+                          <span className="text-[10px] text-gray-400 block">{mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden'}</span>
                         </div>
                       </div>
                       {mesa.estado === 'ocupada' && (
@@ -129,7 +121,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       )}
                     </div>
                     <div className="flex-1 overflow-hidden relative bg-white dark:bg-gray-800">
-                      <TicketSidebar cart={cart} total={total} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
+                      {/* PASAMOS mesaTotal A LA BARRA */}
+                      <TicketSidebar cart={cart} total={total} hasUnsentItems={hasUnsentItems} unsentTotal={unsentTotal} mesaTotal={mesa.total || 0} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
                     </div>
                   </motion.div>
                 )}
@@ -137,10 +130,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
               <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between gap-4 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] transition-colors">
                 <div onClick={() => setShowMobileTicket(true)} className="flex flex-col cursor-pointer">
-                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider"><span>Total</span><ChevronUp size={14}/></div>
-                  <span className="text-2xl font-black text-brand-dark dark:text-white transition-colors">${total.toFixed(2)}</span>
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider"><span>Gran Total</span><ChevronUp size={14}/></div>
+                  <span className="text-2xl font-black text-brand-dark dark:text-white transition-colors">${((mesa.total || 0) + unsentTotal).toFixed(2)}</span>
                 </div>
-                <button onClick={() => setShowMobileTicket(true)} className="bg-brand-dark text-white font-bold py-3 px-6 rounded-xl shadow-lg active:scale-95 transition-transform">Ver Orden ({cart.reduce((acc, item) => acc + (item.qty || item.cantidad || 0), 0)})</button>
+                <button onClick={() => setShowMobileTicket(true)} className="bg-brand-dark text-white font-bold py-3 px-6 rounded-xl shadow-lg active:scale-95 transition-transform">Ver Orden</button>
               </div>
             </div>
           </div>
@@ -152,7 +145,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                      Mesa #{mesa.numero}
                      {mesa.estado === 'ocupada' && <span className="px-2 py-0.5 bg-brand-primary text-white text-[10px] font-black rounded-full uppercase tracking-wider">Ocupada</span>}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Total en cuenta: ${mesa.total?.toFixed(2) || '0.00'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden'}</p>
                </div>
                {mesa.estado === 'ocupada' && (
                   <button onClick={() => setShowOpcionesMesa(true)} className="p-2 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-brand-primary dark:hover:text-brand-primary transition-colors active:scale-95" title="Opciones Avanzadas">
@@ -161,7 +154,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                )}
             </div>
             <div className="flex-1 overflow-hidden h-full">
-              <TicketSidebar cart={cart} total={total} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
+              {/* PASAMOS mesaTotal A LA BARRA */}
+              <TicketSidebar cart={cart} total={total} hasUnsentItems={hasUnsentItems} unsentTotal={unsentTotal} mesaTotal={mesa.total || 0} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
             </div>
           </div>
         </motion.div>
@@ -169,7 +163,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         <AnimatePresence>
           {isSuccess && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]"><SuccessScreen /></motion.div>)}
           {selectedProduct && (<ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />)}
-          {showCheckout && (<CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={(mesa.total || 0) + total} onConfirmPayment={handleFinalizePayment} />)}
+          
+          {showCheckout && (<CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={(mesa.total || 0) + unsentTotal} onConfirmPayment={handleFinalizePayment} />)}
           
           {showOpcionesMesa && (
             <OpcionesMesaModal
