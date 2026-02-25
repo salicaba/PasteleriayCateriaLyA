@@ -16,7 +16,6 @@ export const ThemeToggle = ({ theme, toggleTheme }) => {
     <motion.button
       onClick={toggleTheme}
       // 1. El Contenedor (Píldora)
-      // Cambia de color de fondo suavemente entre naranja claro e índigo profundo
       animate={{
         backgroundColor: isDark ? '#1e1b4b' : '#ffedd5', // indigo-950 vs orange-100
       }}
@@ -32,19 +31,17 @@ export const ThemeToggle = ({ theme, toggleTheme }) => {
 
       {/* 2. La Gota Líquida (El orbe que se mueve) */}
       <motion.div
-        // Se mueve a la derecha (x: 32) si es dark, izquierda (x: 0) si es light
         animate={{
-            x: isDark ? 32 : 0,
-            // Cambia el color de la gota: Naranja brillante vs Índigo suave
+            // SOLUCIÓN AQUÍ: Usamos '2rem' en lugar de 32 píxeles fijos
+            // Así la distancia de movimiento escala automáticamente con el tamaño de la interfaz
+            x: isDark ? '2rem' : '0rem',
             backgroundColor: isDark ? '#818cf8' : '#fb923c', // indigo-400 vs orange-400
         }}
-        // La magia: mientras se mueve, se "estira" horizontalmente (scaleX: 1.2)
-        // para dar sensación de velocidad y liquidez.
         whileTap={{ scaleX: 0.9, scaleY: 0.9 }} // Efecto al hacer clic
         transition={spring}
         className="w-6 h-6 rounded-full shadow-md relative z-10 flex items-center justify-center"
       >
-        {/* Icono activo dentro de la gota (aparece/desaparece suavemente) */}
+        {/* Icono activo dentro de la gota */}
         <motion.div
             initial={false}
             animate={{

@@ -5,8 +5,10 @@ export const usePedidosController = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modales
+  // Vistas y Modales
+  const [viewMode, setViewMode] = useState('grid'); 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [fechaPredefinida, setFechaPredefinida] = useState(null); // NUEVO ESTADO
   const [abonoModal, setAbonoModal] = useState({ isOpen: false, pedidoId: null, cliente: '' });
   const [ticketModal, setTicketModal] = useState({ isOpen: false, pedido: null });
 
@@ -36,6 +38,17 @@ export const usePedidosController = () => {
     return { totalPagado, deuda, estaLiquidado, requiereLiquidacionUrgente };
   };
 
+  // NUEVAS FUNCIONES PARA EL MODAL DE NUEVO PEDIDO
+  const abrirModalNuevoPedido = (fecha = null) => {
+    setFechaPredefinida(fecha);
+    setIsModalOpen(true);
+  };
+
+  const cerrarModalNuevoPedido = () => {
+    setIsModalOpen(false);
+    setFechaPredefinida(null);
+  };
+
   const agregarNuevoPedido = (nuevoPedido) => {
     const anticipoNum = parseFloat(nuevoPedido.anticipo) || 0;
     const pedidoFormateado = {
@@ -46,7 +59,7 @@ export const usePedidosController = () => {
       estado: 'pendiente'
     };
     setPedidos([pedidoFormateado, ...pedidos]);
-    setIsModalOpen(false);
+    cerrarModalNuevoPedido(); // Usamos la nueva función para limpiar
   };
 
   const registrarAbono = (pedidoId, montoAbono) => {
@@ -66,12 +79,13 @@ export const usePedidosController = () => {
   };
 
   const abrirModalAbono = (pedido) => setAbonoModal({ isOpen: true, pedidoId: pedido.id, cliente: pedido.cliente });
-  
   const abrirTicket = (pedido) => setTicketModal({ isOpen: true, pedido });
   const cerrarTicket = () => setTicketModal({ isOpen: false, pedido: null });
 
   return {
-    pedidos, loading, isModalOpen, setIsModalOpen, 
+    pedidos, loading, 
+    viewMode, setViewMode, 
+    isModalOpen, abrirModalNuevoPedido, cerrarModalNuevoPedido, fechaPredefinida, // Exportamos lo nuevo
     abonoModal, setAbonoModal, abrirModalAbono, 
     ticketModal, abrirTicket, cerrarTicket,
     calcularFinanzas, agregarNuevoPedido, registrarAbono

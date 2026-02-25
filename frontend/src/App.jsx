@@ -107,7 +107,7 @@ function App() {
                   {isActive && (
                     <motion.div
                       layoutId="activeIndicator"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-brand-primary rounded-r-full"
+                      className="absolute left-0 top-0 bottom-0 my-auto w-1 h-[70%] bg-brand-primary rounded-r-full"
                     />
                   )}
                 </button>

@@ -5,19 +5,16 @@ import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal'; 
 
 export const MesasPage = () => {
-  // Ya solo extraemos lo que realmente usamos (quitamos zonas, zonaActiva, etc.)
-  const { mesasFiltradas, stats, liberarMesa, actualizarEstadoMesa } = useMesasController();
+  const { mesasFiltradas, stats, liberarMesa, actualizarEstadoMesa, unirMesas, pagoParcialMesa } = useMesasController();
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50/50 dark:bg-gray-900 transition-colors duration-300">
       
-      {/* Header */}
       <div className="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white transition-colors">
             Mapa de Mesas
         </h1>
-        
         <p className="text-sm text-gray-400 dark:text-gray-500 flex gap-2 mt-1">
           <span className="text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md border border-orange-100 dark:border-orange-900/50 transition-colors">
             {stats.ocupadas} Ocupadas
@@ -28,30 +25,22 @@ export const MesasPage = () => {
         </p>
       </div>
 
-      {/* Grid de Mesas (Ahora empieza justo debajo del header) */}
       <div className="p-6 overflow-y-auto flex-1 pb-24">
-        <motion.div 
-          layout
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-        >
+        <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <AnimatePresence mode='popLayout'>
             {mesasFiltradas.map(mesa => (
-              <MesaCard 
-                key={mesa.id} 
-                mesa={mesa} 
-                onClick={() => setMesaSeleccionada(mesa)} 
-              />
+              <MesaCard key={mesa.id} mesa={mesa} onClick={() => setMesaSeleccionada(mesa)} />
             ))}
           </AnimatePresence>
         </motion.div>
       </div>
 
-      {/* POS Modal */}
       <AnimatePresence>
         {mesaSeleccionada && (
           <PosModal 
             isOpen={!!mesaSeleccionada}
             mesa={mesaSeleccionada}
+            todasLasMesas={mesasFiltradas} // NUEVO: Para saber a qué mesa mover la cuenta
             onClose={() => setMesaSeleccionada(null)}
             onTableRelease={(id) => {
               liberarMesa(id);
@@ -60,10 +49,18 @@ export const MesasPage = () => {
             onUpdateTable={(id, monto) => {
               actualizarEstadoMesa(id, monto);
             }}
+            onUnirMesas={(origen, destino) => {
+              unirMesas(origen, destino);
+              setMesaSeleccionada(null); // Cerramos POS porque la mesa de origen se vació
+            }}
+            onPagoParcial={(id, monto) => {
+              pagoParcialMesa(id, monto);
+              // Cerramos el POS para que la UI se actualice limpiamente
+              setMesaSeleccionada(null); 
+            }}
           />
         )}
       </AnimatePresence>
-
     </div>
   );
 };
