@@ -1,23 +1,39 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { MOCK_ORDERS } from '../models/kitchenModel';
 
 export const useKitchenController = () => {
   const [orders, setOrders] = useState(MOCK_ORDERS);
 
-  const completeOrder = (orderId) => {
-    // En la vida real, esto haría una petición a la API
-    // Aquí lo animamos sacándolo de la lista
-    setOrders(prev => prev.filter(o => o.id !== orderId));
-  };
+  // Marcar/Desmarcar una PREPARACIÓN ESPECÍFICA (ej. el latte deslactosado)
+  const toggleItemReady = useCallback((orderId, itemId, idPrep) => {
+    setOrders(prevOrders => {
+      return prevOrders.map(order => {
+        if (order.id !== orderId) return order;
+        
+        const updatedItems = order.items.map(item => {
+          if (item.id !== itemId) return item;
+          
+          // Actualizamos solo la preparación específica de este item
+          const updatedPreps = item.preparaciones.map(prep => 
+            prep.idPrep === idPrep ? { ...prep, isReady: !prep.isReady } : prep
+          );
+          
+          return { ...item, preparaciones: updatedPreps };
+        });
+        
+        return { ...order, items: updatedItems };
+      });
+    });
+  }, []);
 
-  const markItemReady = (orderId, itemIndex) => {
-    // Lógica futura: Tachar items individuales
-    console.log(`Item ${itemIndex} de orden ${orderId} listo`);
-  };
+  // Despachar la comanda completa
+  const completeOrder = useCallback((orderId) => {
+    setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+  }, []);
 
   return {
     orders,
-    completeOrder,
-    markItemReady
+    toggleItemReady,
+    completeOrder
   };
 };

@@ -1,64 +1,70 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useKitchenController } from '../controllers/useKitchenController';
 import { KitchenOrderCard } from './KitchenOrderCard';
-import { ChefHat, RefreshCw } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { Flame, UtensilsCrossed } from 'lucide-react';
 
 export const KitchenPage = () => {
-  const { orders, completeOrder } = useKitchenController();
+  const { orders, toggleItemReady, completeOrder } = useKitchenController();
 
   return (
-    // CAMBIO: Fondo gris claro en Light, Gris 900 (Casi negro) en Dark
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col transition-colors duration-300">
-      
-      {/* Header KDS */}
-      {/* CAMBIO: El header se mantiene oscuro por identidad, pero ajustamos el borde y sombra para Dark Mode */}
-      <header className="bg-gray-900 dark:bg-gray-800 text-white p-4 shadow-lg dark:shadow-gray-950/50 sticky top-0 z-10 transition-colors border-b border-transparent dark:border-gray-700">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-primary rounded-lg shadow-lg shadow-brand-primary/20">
-              <ChefHat className="text-white" size={24} />
-            </div>
-            <div>
-              <h1 className="font-bold text-xl leading-none tracking-tight">Cocina LyA</h1>
-              <span className="text-xs text-gray-400 font-medium">Sistema de Comandas (KDS)</span>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-6 flex flex-col transition-colors duration-300">
+      {/* Header Premium */}
+      <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative z-10">
+        <div className="flex items-center space-x-4">
+          <div className="bg-orange-500/10 dark:bg-orange-500/20 p-3.5 rounded-xl text-orange-500 border border-orange-500/20">
+            <Flame size={32} className="animate-pulse" />
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="flex gap-4 text-sm font-medium">
-              <span className="px-3 py-1 bg-gray-800 dark:bg-gray-700 rounded-full text-orange-400 border border-orange-400/20 transition-colors">
-                Pendientes: {orders.length}
-              </span>
-            </div>
-            <button className="p-2 hover:bg-gray-800 dark:hover:bg-gray-700 rounded-full transition-colors">
-              <RefreshCw size={20} className="text-gray-400 hover:text-white" />
-            </button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white tracking-tight">
+              KDS Cocina <span className="text-orange-500">LyA</span>
+            </h1>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+              Pijijiapan, Chis. — Sistema Inteligente de Despacho
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center">
+          <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-5 py-2.5 rounded-xl font-bold shadow-sm">
+            <UtensilsCrossed size={20} />
+            <span>{orders.length} Órdenes Activas</span>
           </div>
         </div>
       </header>
 
-      {/* Grid de Comandas */}
-      <main className="flex-1 p-4 md:p-6 overflow-x-auto">
+      {/* Grid de Tickets con Animaciones */}
+      <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
         {orders.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-600 transition-colors">
-            <ChefHat size={64} className="mb-4 opacity-20" />
-            <p className="text-xl font-medium">Todo limpio por ahora, Chef.</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 space-y-5"
+          >
+            <div className="p-8 rounded-full bg-gray-100 dark:bg-gray-900">
+              <UtensilsCrossed size={72} className="opacity-40" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-600 dark:text-gray-300">La cocina está al día</h2>
+            <p className="text-lg font-medium">Esperando nuevas tandas de comandas...</p>
+          </motion.div>
         ) : (
-          <div className="flex flex-wrap gap-4 items-start content-start">
-            <AnimatePresence>
+          <motion.div
+            layout
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start auto-rows-max"
+          >
+            <AnimatePresence mode="popLayout">
               {orders.map(order => (
-                <KitchenOrderCard 
-                  key={order.id} 
-                  order={order} 
-                  onComplete={completeOrder} 
+                <KitchenOrderCard
+                  key={order.id}
+                  order={order}
+                  onToggleItem={toggleItemReady}
+                  onComplete={completeOrder}
                 />
               ))}
             </AnimatePresence>
-          </div>
+          </motion.div>
         )}
-      </main>
+      </div>
     </div>
   );
 };
