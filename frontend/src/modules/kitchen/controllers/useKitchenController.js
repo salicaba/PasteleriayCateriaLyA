@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { MOCK_ORDERS } from '../models/kitchenModel';
 
 export const useKitchenController = () => {
@@ -31,8 +31,14 @@ export const useKitchenController = () => {
     setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
   }, []);
 
+  // ORDENAMIENTO CRONOLÓGICO: Del más antiguo (primero en entrar) al más nuevo
+  // Usamos useMemo para que la app no recalcule esto a menos que haya un nuevo pedido
+  const sortedOrders = useMemo(() => {
+    return [...orders].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [orders]);
+
   return {
-    orders,
+    orders: sortedOrders, // Exportamos la lista ya ordenada
     toggleItemReady,
     completeOrder
   };

@@ -8,9 +8,16 @@ export const KitchenPage = () => {
   const { orders, toggleItemReady, completeOrder } = useKitchenController();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-6 flex flex-col transition-colors duration-300">
-      {/* Header Premium */}
-      <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative z-10">
+    // ANIMACIÓN SUAVIZADA DE ENTRADA
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 p-4 md:p-6 transition-colors duration-300"
+    >
+      
+      {/* Header Premium (Fijo) */}
+      <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative z-10 shrink-0">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500/10 dark:bg-orange-500/20 p-3.5 rounded-xl text-orange-500 border border-orange-500/20">
             <Flame size={32} className="animate-pulse" />
@@ -33,8 +40,8 @@ export const KitchenPage = () => {
         </div>
       </header>
 
-      {/* Grid de Tickets con Animaciones */}
-      <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
+      {/* Grid de Tickets con SCROLL independiente */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 pr-2">
         {orders.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -65,6 +72,6 @@ export const KitchenPage = () => {
           </motion.div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };

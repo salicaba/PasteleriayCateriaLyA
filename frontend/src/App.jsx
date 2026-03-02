@@ -54,7 +54,7 @@ function App() {
 
   // --- MENÚ PRINCIPAL ---
   const menuItems = [
-    { id: 'mesas', label: 'Salón', icon: LayoutGrid },
+    { id: 'mesas', label: 'Mesas', icon: LayoutGrid },
     { id: 'cocina', label: 'Cocina', icon: ChefHat },
     { id: 'pasteleria', label: 'Pastelería', icon: Cake },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
