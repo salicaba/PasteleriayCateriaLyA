@@ -11,6 +11,13 @@ import { ProductOptionsModal } from './ProductOptionsModal';
 import { CheckoutModal } from './CheckoutModal'; 
 import { OpcionesMesaModal } from './OpcionesMesaModal';
 
+const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
+const modalVariants = { 
+  hidden: { y: "100%", opacity: 0 }, 
+  visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } },
+  exit: { y: "100%", opacity: 0 } 
+};
+
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial }) => {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -18,31 +25,53 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
 
   const { 
-    cart, total, addToCart, removeFromCart, filtroTexto, setFiltroTexto, 
+    cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
     categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
-    isSuccess, unsentTotal, hasUnsentItems, simulateKitchenSend,
-    cuentas, agregarCuenta, eliminarCuenta, moverItemACuenta
+    handleCheckout, isSuccess,
+    unsentTotal, hasUnsentItems, simulateKitchenSend 
   } = usePosController();
+
+  const handleConfirmOption = (productWithOptions) => {
+    addToCart(productWithOptions);
+    setSelectedProduct(null);
+  };
 
   const handleSendToKitchen = () => {
     if (!hasUnsentItems) return; 
     simulateKitchenSend(() => {
-      if (onUpdateTable && unsentTotal > 0) onUpdateTable(mesa.id, unsentTotal);
+      if (onUpdateTable && unsentTotal > 0) {
+        onUpdateTable(mesa.id, unsentTotal);
+      }
     });
+  };
+
+  const handleOpenCheckout = () => {
+    if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
+    setShowCheckout(true); 
   };
 
   const handleFinalizePayment = (paymentDetails) => {
     const { amountPaid } = paymentDetails;
+    const deudaTotal = (mesa.total || 0) + unsentTotal; 
+    
     setShowCheckout(false);
 
-    if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
-
-    // Si la mesa se queda en $0, la liberamos
-    const deudaTotal = (mesa.total || 0) + unsentTotal;
-    if (deudaTotal - amountPaid <= 0.01) {
-      if (onTableRelease) onTableRelease(mesa.id);
-      onClose();
+    if (unsentTotal > 0 && onUpdateTable) {
+        onUpdateTable(mesa.id, unsentTotal);
     }
+
+    if (onPagoParcial) {
+        onPagoParcial(mesa.id, amountPaid);
+    }
+
+    handleCheckout(() => {
+        const saldoRestante = deudaTotal - amountPaid;
+        
+        if (saldoRestante <= 0.01) {
+            if (onTableRelease) onTableRelease(mesa.id);
+            onClose();
+        } 
+    });
   };
 
   if (!isOpen || !mesa) return null;
@@ -50,51 +79,105 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        
+        <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 dark:bg-gray-900 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors">
+        <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 dark:bg-gray-900 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors duration-300">
           
           <div className="flex-1 flex flex-col h-full relative z-0">
-            {/* Header del Buscador */}
-            <div className="bg-white dark:bg-gray-800 p-4 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-20">
+            <div className="bg-white dark:bg-gray-800 p-4 pb-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-20 shadow-sm transition-colors">
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  <input type="text" placeholder="Buscar producto..." value={filtroTexto} onChange={(e) => setFiltroTexto(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm outline-none text-gray-800 dark:text-white" />
+                  <input type="text" placeholder="Buscar producto..." value={filtroTexto} onChange={(e) => setFiltroTexto(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500" />
                 </div>
-                <button onClick={onClose} className="p-2 text-gray-500"><X size={24} /></button>
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 transition-colors"><X size={24} /></button>
               </div>
               <CategoryBar active={categoriaActiva} onSelect={setCategoriaActiva} />
             </div>
 
-            {/* Grid de Productos */}
-            <div className="flex-1 overflow-y-auto p-4 pb-32 md:pb-4">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 pb-32 md:pb-4 transition-colors">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredProducts.map(product => (
                   <ProductCard key={product.id} producto={product} onAdd={setSelectedProduct} qty={getProductQty(product.id)} />
                 ))}
               </div>
             </div>
+
+            <div className="md:hidden">
+              <AnimatePresence>
+                {showMobileTicket && (
+                  <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 300 }} className="absolute inset-0 z-50 bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 shadow-sm cursor-pointer" onClick={() => setShowMobileTicket(false)}>
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                        <button className="p-2 bg-white dark:bg-gray-700 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
+                        <div>
+                          <span className="font-bold text-gray-700 dark:text-white block leading-tight">Mesa #{mesa.numero}</span>
+                          <span className="text-[10px] text-gray-400 block">{mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden'}</span>
+                        </div>
+                      </div>
+                      {mesa.estado === 'ocupada' && (
+                        <button onClick={(e) => { e.stopPropagation(); setShowOpcionesMesa(true); }} className="text-brand-primary font-bold text-xs bg-brand-primary/10 px-3 py-1.5 rounded-lg active:scale-95 transition-transform">OPCIONES</button>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-hidden relative bg-white dark:bg-gray-800">
+                      <TicketSidebar cart={cart} total={total} hasUnsentItems={hasUnsentItems} unsentTotal={unsentTotal} mesaTotal={mesa.total || 0} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between gap-4 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] transition-colors">
+                <div onClick={() => setShowMobileTicket(true)} className="flex flex-col cursor-pointer">
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider"><span>Gran Total</span><ChevronUp size={14}/></div>
+                  <span className="text-2xl font-black text-brand-dark dark:text-white transition-colors">${((mesa.total || 0) + unsentTotal).toFixed(2)}</span>
+                </div>
+                <button onClick={() => setShowMobileTicket(true)} className="bg-brand-dark text-white font-bold py-3 px-6 rounded-xl shadow-lg active:scale-95 transition-transform">Ver Orden</button>
+              </div>
+            </div>
           </div>
 
-          {/* Barra Lateral (Ticket) - Desktop */}
-          <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-full flex-col shadow-xl">
-            <TicketSidebar 
-              cart={cart} total={total} 
-              cuentas={cuentas} agregarCuenta={agregarCuenta} 
-              moverItemACuenta={moverItemACuenta} eliminarCuenta={eliminarCuenta}
-              onRemove={removeFromCart} onSendToKitchen={handleSendToKitchen} 
-              onCheckout={() => setShowCheckout(true)} 
-              unsentTotal={unsentTotal} hasUnsentItems={hasUnsentItems} 
-            />
+          <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col transition-colors">
+            <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border-b border-brand-primary/10 dark:border-brand-primary/20 flex justify-between items-center">
+               <div>
+                  <h3 className="font-bold text-brand-dark dark:text-brand-primary text-lg flex items-center gap-2">
+                     Mesa #{mesa.numero}
+                     {mesa.estado === 'ocupada' && <span className="px-2 py-0.5 bg-brand-primary text-white text-[10px] font-black rounded-full uppercase tracking-wider">Ocupada</span>}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden'}</p>
+               </div>
+               {mesa.estado === 'ocupada' && (
+                  <button onClick={() => setShowOpcionesMesa(true)} className="p-2 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-brand-primary dark:hover:text-brand-primary transition-colors active:scale-95" title="Opciones Avanzadas">
+                     <MoreVertical size={20} />
+                  </button>
+               )}
+            </div>
+            <div className="flex-1 overflow-hidden h-full">
+              <TicketSidebar cart={cart} total={total} hasUnsentItems={hasUnsentItems} unsentTotal={unsentTotal} mesaTotal={mesa.total || 0} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
+            </div>
           </div>
         </motion.div>
 
         <AnimatePresence>
-          {isSuccess && <SuccessScreen />}
-          {selectedProduct && <ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={addToCart} />}
-          {showCheckout && <CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} cart={cart} cuentas={cuentas} onConfirmPayment={handleFinalizePayment} />}
+          {isSuccess && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]"><SuccessScreen /></motion.div>)}
+          {selectedProduct && (<ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />)}
+          
+          {showCheckout && (<CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={(mesa.total || 0) + unsentTotal} onConfirmPayment={handleFinalizePayment} />)}
+          
+          {showOpcionesMesa && (
+            <OpcionesMesaModal
+               isOpen={showOpcionesMesa}
+               onClose={() => setShowOpcionesMesa(false)}
+               mesa={mesa}
+               todasLasMesas={todasLasMesas}
+               onUnir={(origen, destino) => {
+                  setShowOpcionesMesa(false);
+                  onUnirMesas(origen, destino);
+               }}
+            />
+          )}
         </AnimatePresence>
+
       </div>
     </AnimatePresence>
   );
