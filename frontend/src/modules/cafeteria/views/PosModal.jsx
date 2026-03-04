@@ -23,12 +23,18 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
+  
+  // NUEVO: Estado para saber si estamos cobrando toda la mesa o solo una sub-cuenta
+  const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
     categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
     handleCheckout, isSuccess,
-    unsentTotal, hasUnsentItems, simulateKitchenSend 
+    unsentTotal, hasUnsentItems, simulateKitchenSend,
+    // NUEVAS EXTRACCIONES DEL CONTROLADOR
+    cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
+    moveItemToCuenta
   } = usePosController();
 
   const handleConfirmOption = (productWithOptions) => {
@@ -45,28 +51,44 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     });
   };
 
+  // COBRO TOTAL DE LA MESA
   const handleOpenCheckout = () => {
     if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
+    setCheckoutTarget({ type: 'full', cuentaName: null, amount: (mesa.total || 0) + unsentTotal });
     setShowCheckout(true); 
   };
 
+  // NUEVO: ABRIR MODAL PARA COBRO DE SUB-CUENTA
+  const handleOpenPayCuenta = (cuentaName) => {
+    const subtotal = getSubtotalByCuenta(cuentaName);
+    if (subtotal > 0) {
+      setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal });
+      setShowCheckout(true);
+    }
+  };
+
   const handleFinalizePayment = (paymentDetails) => {
-    const { amountPaid } = paymentDetails;
-    const deudaTotal = (mesa.total || 0) + unsentTotal; 
-    
+    // NUEVO: Ahora extraemos targetType y cuentaName que nos envía el nuevo CheckoutModal
+    const { amountPaid, targetType, cuentaName } = paymentDetails;
     setShowCheckout(false);
 
-    if (unsentTotal > 0 && onUpdateTable) {
-        onUpdateTable(mesa.id, unsentTotal);
+    // LÓGICA DE PAGO PARCIAL (Sub-cuenta nominal)
+    if (targetType === 'partial' && cuentaName) {
+       payCuenta(cuentaName, () => {
+           if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
+       });
+       return;
     }
 
-    if (onPagoParcial) {
-        onPagoParcial(mesa.id, amountPaid);
-    }
+    // LÓGICA DE PAGO TOTAL (Mesa Completa o Partes Iguales)
+    const deudaTotal = (mesa.total || 0) + unsentTotal; 
+    
+    if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
+    if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
 
     handleCheckout(() => {
         const saldoRestante = deudaTotal - amountPaid;
-        
+        // Si el saldo es casi cero (considerando decimales), liberamos mesa
         if (saldoRestante <= 0.01) {
             if (onTableRelease) onTableRelease(mesa.id);
             onClose();
@@ -75,6 +97,17 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   if (!isOpen || !mesa) return null;
+
+  // Propiedades unificadas para pasar al Sidebar (evitamos repetición)
+  const sidebarProps = {
+    cart, total, hasUnsentItems, unsentTotal, mesaTotal: mesa.total || 0,
+    onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
+    onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
+    // Props de Cuentas Separadas
+    cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
+    onPayCuenta: handleOpenPayCuenta,
+    onMoveItem: moveItemToCuenta
+  };
 
   return (
     <AnimatePresence>
@@ -121,7 +154,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       )}
                     </div>
                     <div className="flex-1 overflow-hidden relative bg-white dark:bg-gray-800">
-                      <TicketSidebar cart={cart} total={total} hasUnsentItems={hasUnsentItems} unsentTotal={unsentTotal} mesaTotal={mesa.total || 0} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
+                      {/* INTEGRACIÓN SIDEBAR MÓVIL */}
+                      <TicketSidebar {...sidebarProps} />
                     </div>
                   </motion.div>
                 )}
@@ -153,7 +187,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                )}
             </div>
             <div className="flex-1 overflow-hidden h-full">
-              <TicketSidebar cart={cart} total={total} hasUnsentItems={hasUnsentItems} unsentTotal={unsentTotal} mesaTotal={mesa.total || 0} onAdd={addToCart} onRemove={removeFromCart} onDelete={deleteLine} onSendToKitchen={handleSendToKitchen} onCheckout={handleOpenCheckout} />
+              {/* INTEGRACIÓN SIDEBAR ESCRITORIO */}
+              <TicketSidebar {...sidebarProps} />
             </div>
           </div>
         </motion.div>
@@ -162,7 +197,21 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           {isSuccess && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]"><SuccessScreen /></motion.div>)}
           {selectedProduct && (<ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />)}
           
-          {showCheckout && (<CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={(mesa.total || 0) + unsentTotal} onConfirmPayment={handleFinalizePayment} />)}
+          {/* MODAL DE CHECKOUT ACTUALIZADO: Le pasamos el monto dinámico (total o parcial) */}
+          {showCheckout && (
+            <CheckoutModal 
+              isOpen={showCheckout} 
+              onClose={() => setShowCheckout(false)} 
+              total={(mesa.total || 0) + unsentTotal} 
+              initialTarget={checkoutTarget} 
+              // NUEVO: Generamos y le pasamos el resumen de todas las cuentas al vuelo
+              cuentasResumen={cuentasDisponibles.map(nombre => ({
+                nombre,
+                subtotal: getSubtotalByCuenta(nombre)
+              })).filter(c => c.subtotal > 0)}
+              onConfirmPayment={handleFinalizePayment} 
+            />
+          )}
           
           {showOpcionesMesa && (
             <OpcionesMesaModal
