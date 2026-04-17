@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, Power, LayoutGrid } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { ProductFormModal } from './ProductFormModal';
 
@@ -60,7 +60,7 @@ export const MenuManagerPage = () => {
             return (
               <div key={category} className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200 flex items-center space-x-2 border-b border-gray-200 dark:border-gray-800 pb-2">
-                  <span>{category}</span>
+                  <span className="capitalize">{category}</span>
                   <span className="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-2 py-1 rounded-full">
                     {categoryProducts.length}
                   </span>
@@ -80,27 +80,56 @@ export const MenuManagerPage = () => {
                             : 'border-red-200 dark:border-red-900/50 opacity-75'
                         }`}
                       >
-                        {/* El resto del contenido de la tarjeta se mantiene igual... */}
-                        {/* [Icono, Nombre, Precio, Opciones y Controles Admin] */}
+                        {/* --- ENCABEZADO DE LA TARJETA (FOTO, NOMBRE, PRECIO, STOCK) --- */}
                         <div className="flex items-center space-x-4 mb-4">
-                          <div className="text-4xl bg-gray-50 dark:bg-gray-800 h-16 w-16 flex items-center justify-center rounded-2xl shadow-inner">
-                            {product.imagen}
+                          
+                          {/* Contenedor de la Imagen Real o Emoji */}
+                          <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-inner flex items-center justify-center">
+                            {product.image ? (
+                              <img src={product.image} alt={product.nombre} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="text-3xl">
+                                {product.imagen || <ImageIcon size={24} className="text-gray-300 dark:text-gray-600" />}
+                              </div>
+                            )}
                           </div>
+                          
+                          {/* Detalles Principales */}
                           <div className="flex-1 min-w-0">
                             <h3 className={`font-bold text-lg leading-tight truncate ${!product.disponible ? 'text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
                               {product.nombre}
                             </h3>
-                            <p className="text-orange-500 dark:text-orange-400 font-black mt-1">
-                              ${product.precioBase.toFixed(2)}
-                            </p>
+                            
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                              <p className="text-orange-500 dark:text-orange-400 font-black">
+                                ${product.precioBase?.toFixed(2) || '0.00'}
+                              </p>
+                              
+                              {/* INDICADOR DE STOCK (Con colores semánticos) */}
+                              {product.controlarStock ? (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                  product.stock > 10 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 
+                                  product.stock > 0 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400' : 
+                                  'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400'
+                                }`}>
+                                  Stock: {product.stock}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                                  Ilimitado
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
+                        {/* --- OPCIONES (TAMAÑOS Y LECHES) --- */}
                         <div className="text-xs text-gray-500 dark:text-gray-400 flex-1 mb-4 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl overflow-hidden">
-                          <p className="truncate"><strong>Tamaños:</strong> {product.opciones.tamanos.join(', ') || 'N/A'}</p>
-                          <p className="truncate"><strong>Leches:</strong> {product.opciones.leches.join(', ') || 'N/A'}</p>
+                          <p className="truncate"><strong>Tamaños:</strong> {product.opciones?.tamanos?.join(', ') || 'N/A'}</p>
+                          <p className="truncate mt-1"><strong>Leches:</strong> {product.opciones?.leches?.join(', ') || 'N/A'}</p>
                         </div>
 
+                        {/* --- CONTROLES DE ADMINISTRACIÓN --- */}
                         <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
                           <button
                             onClick={() => toggleAvailability(product.id)}
@@ -133,6 +162,7 @@ export const MenuManagerPage = () => {
         </div>
       </div>
 
+      {/* MODAL DE FORMULARIO (Donde se sube la imagen y edita el stock) */}
       <AnimatePresence>
         {isModalOpen && (
           <ProductFormModal

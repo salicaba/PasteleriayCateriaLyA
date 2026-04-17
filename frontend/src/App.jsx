@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, Settings, Clock, LogOut } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from './hooks/useTheme';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -9,13 +9,10 @@ import { MesasPage } from './modules/cafeteria/views/MesasPage';
 import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
 import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard';
-import { MenuManagerPage } from './modules/admin/views/MenuManagerPage'; // <-- NUEVA IMPORTACIÓN DEL GESTOR
+import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 
 function App() {
-  // --- ESTADOS DE AUTENTICACIÓN ---
   const [user, setUser] = useState(null);
-
-  // --- ESTADOS DE INTERFAZ ---
   const [activeTab, setActiveTab] = useState('mesas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -23,7 +20,6 @@ function App() {
   
   const { theme, toggleTheme } = useTheme();
 
-  // Reloj en tiempo real
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -31,7 +27,6 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Escalado de interfaz (rem)
   useEffect(() => {
     const root = document.documentElement;
     if (uiSize === 'large') root.style.fontSize = '16px'; 
@@ -54,22 +49,19 @@ function App() {
 
   // --- MENÚ PRINCIPAL ---
   const menuItems = [
-    { id: 'mesas', label: 'Mesas', icon: LayoutGrid },
-    { id: 'cocina', label: 'Cocina', icon: ChefHat },
-    { id: 'pasteleria', label: 'Pastelería', icon: Cake },
-    { id: 'reportes', label: 'Reportes', icon: PieChart },
-    { id: 'ajustes', label: 'Gestor Menú', icon: Settings }, // <-- NOMBRE ACTUALIZADO
-  ];
+  { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
+  { id: 'cocina', label: 'Cocina', icon: ChefHat },
+  { id: 'pasteleria', label: 'Pastelería', icon: Cake },
+  { id: 'reportes', label: 'Reportes', icon: PieChart },
+  { id: 'ajustes', label: 'Gestor Menú', icon: BookOpenCheck }, // <-- Ícono más semántico
+];
 
-  // --- BARRERA DE AUTENTICACIÓN ---
   if (!user) {
     return <LoginScreen onLogin={(userData) => setUser(userData)} />;
   }
 
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans overflow-hidden transition-colors duration-300">
-
-      {/* --- SIDEBAR LATERAL --- */}
       <motion.aside
         initial={false}
         animate={{ width: isSidebarOpen ? 240 : 0 }}
@@ -77,7 +69,6 @@ function App() {
         className="h-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-800 shadow-xl z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
       >
         <div className="w-[240px] flex flex-col h-full">
-          
           <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 shrink-0">
             <div className="w-8 h-8 bg-gradient-to-tr from-orange-500 to-orange-400 rounded-lg flex items-center justify-center text-white font-lya font-bold text-lg shadow-md shrink-0">
               L
@@ -143,7 +134,6 @@ function App() {
               </div>
             </div>
 
-            {/* Botón de Cerrar Sesión */}
             <button 
               onClick={() => setUser(null)}
               className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold"
@@ -152,13 +142,10 @@ function App() {
               Cerrar Sesión
             </button>
           </div>
-
         </div>
       </motion.aside>
 
-      {/* --- ÁREA PRINCIPAL --- */}
       <div className="flex flex-col h-full relative min-w-0 w-full shrink-0 md:w-auto md:flex-1 md:shrink">
-        
         <AnimatePresence>
           {isSidebarOpen && (
             <motion.div
@@ -171,9 +158,7 @@ function App() {
           )}
         </AnimatePresence>
 
-        {/* Header Superior */}
         <header className="h-16 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 sm:px-6 shrink-0 z-10 transition-colors duration-300 relative">
-          
           <div className="flex items-center gap-2 sm:gap-4">
              <button
                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -195,7 +180,6 @@ function App() {
              </h2>
           </div>
 
-          {/* CENTRO: Reloj */}
           <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none w-max">
              <div className="flex items-center gap-1 sm:gap-1.5 text-gray-900 dark:text-gray-100">
                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
@@ -219,13 +203,10 @@ function App() {
           </div>
         </header>
 
-        {/* Contenedor de Vistas */}
         <main className="flex-1 overflow-hidden relative bg-gray-50/50 dark:bg-gray-950 transition-colors">
           {activeTab === 'mesas' && <MesasPage />}
           {activeTab === 'cocina' && <KitchenPage />}
           {activeTab === 'pasteleria' && <PasteleriaDashboard />}
-          
-          {/* AQUÍ RENDERIZAMOS EL NUEVO MÓDULO DE GESTIÓN DE MENÚ */}
           {activeTab === 'ajustes' && <MenuManagerPage />} 
           
           {activeTab === 'reportes' && (

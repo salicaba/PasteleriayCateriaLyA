@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutGrid, Search, Utensils, X, ShoppingBag, Plus } from 'lucide-react';
+import { LayoutGrid, Search, X, ShoppingBag, Plus } from 'lucide-react';
 import { useMesasController } from '../controllers/useMesasController';
 import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal'; 
@@ -14,7 +14,6 @@ export const MesasPage = () => {
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [busqueda, setBusqueda] = useState('');
 
-  // Lógica de filtrado solo por búsqueda (Número de mesa o pedido)
   const mesasVisibles = useMemo(() => {
     return mesasFiltradas.filter(mesa => 
       mesa.numero.toString().toLowerCase().includes(busqueda.toLowerCase())
@@ -22,7 +21,6 @@ export const MesasPage = () => {
   }, [mesasFiltradas, busqueda]);
 
   return (
-    // ANIMACIÓN DE ENTRADA SUAVIZADA (Consistente con toda la App)
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -30,26 +28,39 @@ export const MesasPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 p-4 md:p-8 transition-colors duration-300"
     >
       
-      {/* HEADER SIMPLIFICADO Y FIJO */}
+      {/* HEADER DINÁMICO */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 text-white p-3 rounded-2xl shadow-md shadow-orange-500/20">
-            <LayoutGrid size={28} />
+            {/* Ícono dinámico */}
+            {zonaActiva === 'salon' ? <LayoutGrid size={28} /> : <ShoppingBag size={28} />}
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white tracking-tight">Mesas</h1>
+            {/* Título dinámico */}
+            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white tracking-tight">
+              {zonaActiva === 'salon' ? 'Mesas' : 'Para Llevar'}
+            </h1>
+            
+            {/* Badges dinámicos */}
             <div className="flex items-center gap-3 mt-1">
-              <span className="flex items-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-lg">
-                {stats.ocupadas} Ocupadas
-              </span>
-              <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-lg">
-                {stats.libres} Libres
-              </span>
+              {zonaActiva === 'salon' ? (
+                <>
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-lg">
+                    {stats.ocupadas} Ocupadas
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-lg">
+                    {stats.libres} Libres
+                  </span>
+                </>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded-lg">
+                  {mesasFiltradas.length} Pedidos Activos
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Buscador Rápido */}
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
@@ -67,7 +78,6 @@ export const MesasPage = () => {
         </div>
       </header>
 
-      {/* SELECTOR DE ZONAS (Pestañas) Y BOTÓN DE NUEVO PEDIDO */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 shrink-0">
         <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 p-1 rounded-2xl overflow-x-auto">
           {zonas && zonas.map(zona => (
@@ -86,14 +96,10 @@ export const MesasPage = () => {
           ))}
         </div>
 
-        {/* Botón dinámico si estamos en "Para Llevar" */}
         {zonaActiva === 'llevar' && (
           <button 
             onClick={() => {
-              // Preguntamos el nombre del cliente usando un prompt rápido del navegador
               const nombreCliente = window.prompt("Ingresa el nombre del cliente para este pedido:");
-              
-              // Verificamos que el cajero no haya cancelado el prompt (presionado 'Cancelar' o 'Esc')
               if (nombreCliente !== null) {
                  const nuevo = nuevoPedidoLlevar(nombreCliente); 
                  setMesaSeleccionada(nuevo);       
@@ -107,7 +113,6 @@ export const MesasPage = () => {
         )}
       </div>
 
-      {/* MAPA DE MESAS CON SCROLL INDEPENDIENTE */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24">
         <motion.div 
           layout 
@@ -124,7 +129,6 @@ export const MesasPage = () => {
           </AnimatePresence>
         </motion.div>
 
-        {/* Estado vacío si no hay resultados en la búsqueda */}
         {mesasVisibles.length === 0 && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -137,7 +141,6 @@ export const MesasPage = () => {
         )}
       </div>
 
-      {/* POS MODAL */}
       <AnimatePresence>
         {mesaSeleccionada && (
           <PosModal 
