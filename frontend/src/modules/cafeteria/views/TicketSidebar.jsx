@@ -31,7 +31,6 @@ export const TicketSidebar = ({
   const handleRemove = (item) => onRemove(item.id, item.precio, item.enviadoCocina, item.cuenta || 'General');
   const handleDelete = (item) => onDelete(item.id, item.precio, item.enviadoCocina, item.cuenta || 'General');
 
-  // Ahora mapeamos todas las cuentas disponibles, garantizando que aparezcan vacías
   const groupedCart = availableAccs.map(cuentaName => {
     const items = cart.filter(item => (item.cuenta || 'General') === cuentaName);
     return { cuentaName, items };
@@ -64,7 +63,6 @@ export const TicketSidebar = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 transition-colors">
       
-      {/* CABECERA: FORMULARIO TÁCTIL PARA AÑADIR PERSONA */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-sm z-20 shrink-0 sticky top-0">
         <form onSubmit={handleAddCuenta} className="flex gap-2">
           <div className="relative flex-1">
@@ -176,14 +174,25 @@ export const TicketSidebar = ({
                                 <span>${(item.precio * item.qty).toFixed(2)}</span>
                               </div>
                               
-                              <div className="mt-1 space-y-0.5 pl-2 border-l-2 border-gray-200 dark:border-gray-600 ml-1">
+                              {/* RENDERIZADO CORREGIDO DE EXTRAS Y TAMAÑOS */}
+                              <div className="mt-1 space-y-1 pl-2 border-l-2 border-gray-200 dark:border-gray-600 ml-1">
                                  {item.preparaciones?.map((prep, idx) => (
-                                   <div key={idx} className="text-[10px] text-gray-500 dark:text-gray-400 italic">
-                                     {prep.tamano} {prep.leche && `• ${prep.leche}`}
+                                   <div key={idx} className="flex flex-col">
+                                     <span className="text-[10px] text-gray-500 dark:text-gray-400 italic">
+                                       {prep.tamano} {prep.leche && `• ${prep.leche}`}
+                                     </span>
+                                     {/* AQUÍ ESTÁ LA MAGIA QUE FALTABA */}
+                                     {prep.extras && prep.extras.length > 0 && (
+                                       <span className="text-[10px] text-brand-primary dark:text-brand-secondary font-medium">
+                                         + {prep.extras.join(', ')}
+                                       </span>
+                                     )}
                                    </div>
                                  ))}
                                  {!item.preparaciones && item.detalles && (
-                                    <div className="text-[10px] text-brand-primary dark:text-brand-secondary font-medium uppercase">{item.detalles}</div>
+                                    <div className="text-[10px] text-brand-primary dark:text-brand-secondary font-medium uppercase">
+                                       {typeof item.detalles === 'string' ? item.detalles : item.detalles.tamano}
+                                    </div>
                                  )}
                               </div>
 

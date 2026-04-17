@@ -24,7 +24,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
   
-  // NUEVO: Estado para saber si estamos cobrando toda la mesa o solo una sub-cuenta
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
   const { 
@@ -32,7 +31,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
     handleCheckout, isSuccess,
     unsentTotal, hasUnsentItems, simulateKitchenSend,
-    // NUEVAS EXTRACCIONES DEL CONTROLADOR
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta
   } = usePosController();
@@ -51,14 +49,12 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     });
   };
 
-  // COBRO TOTAL DE LA MESA
   const handleOpenCheckout = () => {
     if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
     setCheckoutTarget({ type: 'full', cuentaName: null, amount: (mesa.total || 0) + unsentTotal });
     setShowCheckout(true); 
   };
 
-  // NUEVO: ABRIR MODAL PARA COBRO DE SUB-CUENTA
   const handleOpenPayCuenta = (cuentaName) => {
     const subtotal = getSubtotalByCuenta(cuentaName);
     if (subtotal > 0) {
@@ -68,11 +64,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   const handleFinalizePayment = (paymentDetails) => {
-    // NUEVO: Ahora extraemos targetType y cuentaName que nos envía el nuevo CheckoutModal
     const { amountPaid, targetType, cuentaName } = paymentDetails;
     setShowCheckout(false);
 
-    // LÓGICA DE PAGO PARCIAL (Sub-cuenta nominal)
     if (targetType === 'partial' && cuentaName) {
        payCuenta(cuentaName, () => {
            if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
@@ -80,7 +74,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
        return;
     }
 
-    // LÓGICA DE PAGO TOTAL (Mesa Completa o Partes Iguales)
     const deudaTotal = (mesa.total || 0) + unsentTotal; 
     
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
@@ -88,7 +81,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
     handleCheckout(() => {
         const saldoRestante = deudaTotal - amountPaid;
-        // Si el saldo es casi cero (considerando decimales), liberamos mesa
         if (saldoRestante <= 0.01) {
             if (onTableRelease) onTableRelease(mesa.id);
             onClose();
@@ -98,16 +90,22 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   if (!isOpen || !mesa) return null;
 
-  // Propiedades unificadas para pasar al Sidebar (evitamos repetición)
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: mesa.total || 0,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
-    // Props de Cuentas Separadas
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta,
     onMoveItem: moveItemToCuenta
   };
+
+  // =================================================================
+  // NUEVA LÓGICA: Separamos el número (L-01) del nombre (Emmanuel)
+  // =================================================================
+  const isLlevar = mesa.zona === 'llevar';
+  const partesNumero = mesa.numero.toString().split(' - ');
+  const numeroReal = partesNumero[0]; // Se queda con "L-01" o "1"
+  const nombreCliente = partesNumero[1] || 'MOSTRADOR'; // Si hay nombre lo usa, si no dice Mostrador
 
   return (
     <AnimatePresence>
@@ -117,6 +115,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
         <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 dark:bg-gray-900 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors duration-300">
           
+          {/* SECCIÓN IZQUIERDA: PRODUCTOS */}
           <div className="flex-1 flex flex-col h-full relative z-0">
             <div className="bg-white dark:bg-gray-800 p-4 pb-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-20 shadow-sm transition-colors">
               <div className="flex items-center gap-3 mb-3">
@@ -137,6 +136,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
               </div>
             </div>
 
+            {/* VISTA MÓVIL (TICKET) */}
             <div className="md:hidden">
               <AnimatePresence>
                 {showMobileTicket && (
@@ -145,16 +145,25 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                         <button className="p-2 bg-white dark:bg-gray-700 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
                         <div>
-                          <span className="font-bold text-gray-700 dark:text-white block leading-tight">Mesa #{mesa.numero}</span>
-                          <span className="text-[10px] text-gray-400 block">{mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden'}</span>
+                          <span className="font-bold text-gray-700 dark:text-white block leading-tight flex items-center gap-2">
+                            <span>{isLlevar ? 'Ticket' : 'Mesa'} #{numeroReal}</span>
+                            {/* AQUI APARECE EL NOMBRE EN EL GLOBO EN MÓVIL */}
+                            {isLlevar && (
+                               <span className="px-2 py-0.5 bg-orange-500 text-white text-[10px] font-black rounded-full uppercase tracking-wider">
+                                  {nombreCliente}
+                               </span>
+                            )}
+                          </span>
+                          <span className="text-[10px] text-gray-400 block">
+                            {isLlevar ? 'Pedido en curso' : (mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden')}
+                          </span>
                         </div>
                       </div>
-                      {mesa.estado === 'ocupada' && (
+                      {mesa.estado === 'ocupada' && !isLlevar && (
                         <button onClick={(e) => { e.stopPropagation(); setShowOpcionesMesa(true); }} className="text-brand-primary font-bold text-xs bg-brand-primary/10 px-3 py-1.5 rounded-lg active:scale-95 transition-transform">OPCIONES</button>
                       )}
                     </div>
                     <div className="flex-1 overflow-hidden relative bg-white dark:bg-gray-800">
-                      {/* INTEGRACIÓN SIDEBAR MÓVIL */}
                       <TicketSidebar {...sidebarProps} />
                     </div>
                   </motion.div>
@@ -171,40 +180,46 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
             </div>
           </div>
 
+          {/* SECCIÓN DERECHA: SIDEBAR (ESCRITORIO) */}
           <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col transition-colors">
             <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border-b border-brand-primary/10 dark:border-brand-primary/20 flex justify-between items-center">
                <div>
                   <h3 className="font-bold text-brand-dark dark:text-brand-primary text-lg flex items-center gap-2">
-                     Mesa #{mesa.numero}
-                     {mesa.estado === 'ocupada' && <span className="px-2 py-0.5 bg-brand-primary text-white text-[10px] font-black rounded-full uppercase tracking-wider">Ocupada</span>}
+                     <span>{isLlevar ? 'Ticket' : 'Mesa'} #{numeroReal}</span>
+                     {mesa.estado === 'ocupada' && (
+                       /* AQUI APARECE EL NOMBRE EN EL GLOBO EN ESCRITORIO (reemplazando "ACTIVO") */
+                       <span className={`px-2 py-0.5 text-white text-[10px] font-black rounded-full uppercase tracking-wider ${isLlevar ? 'bg-orange-500' : 'bg-brand-primary'}`}>
+                          {isLlevar ? nombreCliente : 'OCUPADA'}
+                       </span>
+                     )}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {isLlevar ? 'Venta de mostrador' : (mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden')}
+                  </p>
                </div>
-               {mesa.estado === 'ocupada' && (
+               {mesa.estado === 'ocupada' && !isLlevar && (
                   <button onClick={() => setShowOpcionesMesa(true)} className="p-2 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-brand-primary dark:hover:text-brand-primary transition-colors active:scale-95" title="Opciones Avanzadas">
                      <MoreVertical size={20} />
                   </button>
                )}
             </div>
             <div className="flex-1 overflow-hidden h-full">
-              {/* INTEGRACIÓN SIDEBAR ESCRITORIO */}
               <TicketSidebar {...sidebarProps} />
             </div>
           </div>
         </motion.div>
 
+        {/* MODALES ADICIONALES */}
         <AnimatePresence>
           {isSuccess && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]"><SuccessScreen /></motion.div>)}
           {selectedProduct && (<ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />)}
           
-          {/* MODAL DE CHECKOUT ACTUALIZADO: Le pasamos el monto dinámico (total o parcial) */}
           {showCheckout && (
             <CheckoutModal 
               isOpen={showCheckout} 
               onClose={() => setShowCheckout(false)} 
               total={(mesa.total || 0) + unsentTotal} 
               initialTarget={checkoutTarget} 
-              // NUEVO: Generamos y le pasamos el resumen de todas las cuentas al vuelo
               cuentasResumen={cuentasDisponibles.map(nombre => ({
                 nombre,
                 subtotal: getSubtotalByCuenta(nombre)

@@ -45,18 +45,37 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
     return total;
   };
 
+  // NUEVA LÓGICA: Clasificación Inteligente de Modificadores
   const handleConfirm = () => {
-    const details = [];
+    let tamanoStr = 'Estándar';
+    let lecheStr = null;
+    let extrasArr = [];
+
     availableModifiers.forEach(mod => {
       const selected = selections[mod.id];
       if (!selected) return;
+
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
-        if (opt && opt.id !== 's' && opt.id !== 'entera') details.push(opt.label);
+        if (opt && opt.id !== 's' && opt.id !== 'entera') {
+           const idLower = String(mod.id).toLowerCase();
+           const titleLower = String(mod.title).toLowerCase();
+           
+           // Detectar si es tipo de leche
+           if (idLower.includes('leche') || titleLower.includes('leche')) {
+               lecheStr = opt.label;
+           // Detectar si es tamaño
+           } else if (idLower.includes('taman') || idLower.includes('tamañ') || titleLower.includes('tamañ')) {
+               tamanoStr = opt.label;
+           // Cualquier otra cosa single (ej. temperatura) es un extra
+           } else {
+               extrasArr.push(opt.label);
+           }
+        }
       } else {
         selected.forEach(sId => {
           const opt = mod.options.find(o => o.id === sId);
-          if (opt) details.push(opt.label);
+          if (opt) extrasArr.push(opt.label);
         });
       }
     });
@@ -64,7 +83,11 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
     onConfirm({
       ...product,
       precioFinal: calculateTotal(),
-      detalles: details.length > 0 ? { tamano: details[0] || 'Estándar', extras: details.slice(1) } : { tamano: 'Estándar' },
+      detalles: {
+         tamano: tamanoStr,
+         ...(lecheStr && { leche: lecheStr }),
+         ...(extrasArr.length > 0 && { extras: extrasArr })
+      },
       uniqueId: Date.now()
     });
   };
@@ -80,10 +103,8 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
 
       <motion.div
         initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-        // CAMBIO: dark:bg-gray-800
         className="relative z-10 bg-white dark:bg-gray-800 w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh] transition-colors"
       >
-        {/* Header con Foto */}
         <div className="relative h-40 bg-gray-100 dark:bg-gray-700 shrink-0">
           <img src={product.imagen} className="w-full h-full object-cover opacity-90" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
@@ -96,7 +117,6 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
           </button>
         </div>
 
-        {/* Opciones Scrollables */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           {availableModifiers.length === 0 ? (
             <p className="text-center text-gray-400 py-4">Este producto no tiene opciones adicionales.</p>
@@ -120,9 +140,7 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
                         className={clsx(
                           "px-4 py-3 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 active:scale-95",
                           isSelected 
-                            // Seleccionado (Brand Color)
                             ? "border-brand-primary bg-brand-primary/5 text-brand-primary shadow-sm ring-1 ring-brand-primary" 
-                            // No seleccionado (Dark Mode Adaptado)
                             : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
                         )}
                       >
@@ -138,7 +156,6 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
           )}
         </div>
 
-        {/* Footer Confirmar */}
         <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 shrink-0">
           <button 
             onClick={handleConfirm}

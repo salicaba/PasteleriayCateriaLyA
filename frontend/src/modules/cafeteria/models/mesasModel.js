@@ -1,5 +1,6 @@
 export const ZONAS = [
-  { id: 'salon', label: 'Salón Principal' }
+  { id: 'salon', label: 'Salón Principal' },
+  { id: 'llevar', label: 'Para Llevar' }
 ];
 
 export const MOCK_MESAS = [
@@ -13,4 +14,8 @@ export const MOCK_MESAS = [
   { id: 8, numero: '8', zona: 'salon', estado: 'libre', total: 0, horaInicio: null, personas: 0 },
   { id: 9, numero: '9', zona: 'salon', estado: 'libre', total: 0, horaInicio: null, personas: 0 },
   { id: 10, numero: '10', zona: 'salon', estado: 'libre', total: 0, horaInicio: null, personas: 0 },
+
+
+// Agregamos un pedido de prueba "Para Llevar"
+  { id: 101, numero: 'L-01', zona: 'llevar', estado: 'ocupada', total: 85.00, horaInicio: '11:20 AM', personas: 1 },
 ];

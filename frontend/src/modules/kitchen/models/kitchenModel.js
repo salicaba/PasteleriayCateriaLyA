@@ -2,9 +2,10 @@ export const MOCK_ORDERS = [
   {
     id: 'ORD-101',
     mesa: 'Mesa 4',
+    tipo: 'mesa', // <-- Propiedad clave agregada
     mesero: 'Juan P.',
-    batch: 1, // Tanda 1
-    createdAt: new Date(Date.now() - 3 * 60000).toISOString(), // Hace 3 minutos (Verde)
+    batch: 1, 
+    createdAt: new Date(Date.now() - 3 * 60000).toISOString(), 
     estado: 'pendiente',
     items: [
       {
@@ -13,7 +14,6 @@ export const MOCK_ORDERS = [
         qty: 1,
         precio: 45,
         preparaciones: [
-          // Añadimos idPrep e isReady a cada preparación individual
           { idPrep: 'p1-1', tamano: 'Estándar', extras: [], isReady: false } 
         ]
       }
@@ -22,9 +22,10 @@ export const MOCK_ORDERS = [
   {
     id: 'ORD-102',
     mesa: 'Terraza 2',
+    tipo: 'mesa', // <-- Propiedad clave agregada
     mesero: 'Ana G.',
     batch: 1,
-    createdAt: new Date(Date.now() - 8 * 60000).toISOString(), // Hace 8 minutos (Amarillo)
+    createdAt: new Date(Date.now() - 8 * 60000).toISOString(), 
     estado: 'pendiente',
     items: [
       {
@@ -51,9 +52,10 @@ export const MOCK_ORDERS = [
   {
     id: 'ORD-103',
     mesa: 'Mesa 4',
+    tipo: 'mesa', // <-- Propiedad clave agregada
     mesero: 'Juan P.',
-    batch: 2, // ¡Tanda 2! La mesa 4 pidió algo más tarde
-    createdAt: new Date(Date.now() - 11 * 60000).toISOString(), // Hace 11 minutos (Rojo)
+    batch: 2, 
+    createdAt: new Date(Date.now() - 11 * 60000).toISOString(), 
     estado: 'pendiente',
     items: [
       {
@@ -63,6 +65,30 @@ export const MOCK_ORDERS = [
         precio: 75,
         preparaciones: [
           { idPrep: 'p8-1', tamano: 'Grande', extras: ['Extra Crema'], isReady: false }
+        ]
+      }
+    ]
+  },
+  // =========================================================
+  // NUEVO PEDIDO "PARA LLEVAR" PARA FORZAR LA VISTA EN COCINA
+  // =========================================================
+  {
+    id: 'ORD-104',
+    mesa: 'L-01 (Mostrador)',
+    tipo: 'llevar', // <-- ESTO ES LO QUE BUSCA EL FILTRO EN LA VISTA
+    mesero: 'Caja',
+    batch: 1,
+    createdAt: new Date(Date.now() - 1 * 60000).toISOString(), // Hace 1 minuto
+    estado: 'pendiente',
+    items: [
+      {
+        id: 9,
+        nombre: 'Rebanada Tres Leches',
+        qty: 2,
+        precio: 50,
+        preparaciones: [
+          { idPrep: 'p9-1', tamano: 'Estándar', extras: [], isReady: false },
+          { idPrep: 'p9-2', tamano: 'Estándar', extras: [], isReady: false }
         ]
       }
     ]

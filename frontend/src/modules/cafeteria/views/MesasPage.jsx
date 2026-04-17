@@ -1,20 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutGrid, Search, Utensils, X } from 'lucide-react';
+import { LayoutGrid, Search, Utensils, X, ShoppingBag, Plus } from 'lucide-react';
 import { useMesasController } from '../controllers/useMesasController';
 import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal'; 
 
 export const MesasPage = () => {
-  const { mesasFiltradas, stats, liberarMesa, actualizarEstadoMesa, unirMesas, pagoParcialMesa } = useMesasController();
+  const { 
+    mesasFiltradas, stats, liberarMesa, actualizarEstadoMesa, unirMesas, pagoParcialMesa,
+    zonas, zonaActiva, setZonaActiva, nuevoPedidoLlevar 
+  } = useMesasController();
   
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [busqueda, setBusqueda] = useState('');
 
-  // Lógica de filtrado solo por búsqueda (Número de mesa)
+  // Lógica de filtrado solo por búsqueda (Número de mesa o pedido)
   const mesasVisibles = useMemo(() => {
     return mesasFiltradas.filter(mesa => 
-      mesa.numero.toString().includes(busqueda)
+      mesa.numero.toString().toLowerCase().includes(busqueda.toLowerCase())
     );
   }, [mesasFiltradas, busqueda]);
 
@@ -28,13 +31,12 @@ export const MesasPage = () => {
     >
       
       {/* HEADER SIMPLIFICADO Y FIJO */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 shrink-0 z-10 relative">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 text-white p-3 rounded-2xl shadow-md shadow-orange-500/20">
             <LayoutGrid size={28} />
           </div>
           <div>
-            {/* Título cambiado de "Salón & Mesas" a solo "Mesas" */}
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white tracking-tight">Mesas</h1>
             <div className="flex items-center gap-3 mt-1">
               <span className="flex items-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-lg">
@@ -47,12 +49,12 @@ export const MesasPage = () => {
           </div>
         </div>
 
-        {/* Buscador Rápido (Se queda como única herramienta de control) */}
+        {/* Buscador Rápido */}
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             type="text"
-            placeholder="Buscar por número de mesa..."
+            placeholder="Buscar por número..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
@@ -64,6 +66,46 @@ export const MesasPage = () => {
           )}
         </div>
       </header>
+
+      {/* SELECTOR DE ZONAS (Pestañas) Y BOTÓN DE NUEVO PEDIDO */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 shrink-0">
+        <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 p-1 rounded-2xl overflow-x-auto">
+          {zonas && zonas.map(zona => (
+            <button
+              key={zona.id}
+              onClick={() => setZonaActiva(zona.id)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+                zonaActiva === zona.id 
+                  ? 'bg-white dark:bg-gray-700 text-orange-500 shadow-sm' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              {zona.id === 'salon' ? <LayoutGrid size={18} /> : <ShoppingBag size={18} />}
+              {zona.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Botón dinámico si estamos en "Para Llevar" */}
+        {zonaActiva === 'llevar' && (
+          <button 
+            onClick={() => {
+              // Preguntamos el nombre del cliente usando un prompt rápido del navegador
+              const nombreCliente = window.prompt("Ingresa el nombre del cliente para este pedido:");
+              
+              // Verificamos que el cajero no haya cancelado el prompt (presionado 'Cancelar' o 'Esc')
+              if (nombreCliente !== null) {
+                 const nuevo = nuevoPedidoLlevar(nombreCliente); 
+                 setMesaSeleccionada(nuevo);       
+              }
+            }}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 dark:bg-orange-600 dark:hover:bg-orange-500 text-white px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md"
+          >
+            <Plus size={20} />
+            <span>Nuevo Pedido</span>
+          </button>
+        )}
+      </div>
 
       {/* MAPA DE MESAS CON SCROLL INDEPENDIENTE */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24">
@@ -89,8 +131,8 @@ export const MesasPage = () => {
             className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600"
           >
             <Search size={64} className="mb-4 opacity-10" />
-            <p className="text-xl font-bold">No se encontró la mesa "{busqueda}"</p>
-            <button onClick={() => setBusqueda('')} className="mt-2 text-orange-500 font-bold hover:underline">Ver todas las mesas</button>
+            <p className="text-xl font-bold">No se encontró el registro "{busqueda}"</p>
+            <button onClick={() => setBusqueda('')} className="mt-2 text-orange-500 font-bold hover:underline">Ver todo</button>
           </motion.div>
         )}
       </div>

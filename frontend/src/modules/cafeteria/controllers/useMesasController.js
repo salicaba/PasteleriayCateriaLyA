@@ -38,7 +38,7 @@ export const useMesasController = () => {
     ));
   }, []);
 
-  // NUEVO: Cambiar de Mesa o Unir Cuentas
+  // Cambiar de Mesa o Unir Cuentas
   const unirMesas = useCallback((origenId, destinoId) => {
     setMesas(prev => {
       const origen = prev.find(m => m.id === origenId);
@@ -63,7 +63,7 @@ export const useMesasController = () => {
     });
   }, []);
 
-  // NUEVO: Pago Parcial (Separar cuenta)
+  // Pago Parcial (Separar cuenta)
   const pagoParcialMesa = useCallback((mesaId, montoPagado) => {
     setMesas(prev => prev.map(m => {
       if (m.id === mesaId) {
@@ -79,6 +79,36 @@ export const useMesasController = () => {
     }));
   }, []);
 
+  // NUEVO: Función para crear un nuevo ticket para llevar con NOMBRE
+  const nuevoPedidoLlevar = useCallback((nombreCliente) => {
+    const pedidosLlevar = mesas.filter(m => m.zona === 'llevar');
+    const nuevoId = Math.max(...mesas.map(m => m.id), 100) + 1;
+    
+    // Generamos el número secuencial (ej. 01, 02)
+    const secuencial = String(pedidosLlevar.length + 1).padStart(2, '0');
+    
+    // Si pasaron un nombre, lo concatenamos, si no, lo dejamos solo como L-XX
+    const nuevoNumero = nombreCliente && nombreCliente.trim() !== '' 
+          ? `L-${secuencial} - ${nombreCliente.trim()}` 
+          : `L-${secuencial}`;
+    
+    const nuevoPedido = {
+      id: nuevoId,
+      numero: nuevoNumero,
+      zona: 'llevar',
+      // CORRECCIÓN CLAVE: Debe nacer como 'ocupada' para que sea un ticket activo y no desaparezca
+      estado: 'ocupada', 
+      total: 0,
+      horaInicio: new Date().toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'}),
+      personas: 1
+    };
+
+    setMesas(prev => [...prev, nuevoPedido]);
+    
+    return nuevoPedido; // Retornamos para abrir el modal
+  }, [mesas]);
+
+  // UN SOLO RETURN AL FINAL CON TODAS LAS FUNCIONES EXPORTADAS
   return {
     zonas: ZONAS,
     zonaActiva,
@@ -87,7 +117,8 @@ export const useMesasController = () => {
     stats,
     actualizarEstadoMesa,
     liberarMesa,
-    unirMesas,        // Exportamos la función
-    pagoParcialMesa   // Exportamos la función
+    unirMesas,
+    pagoParcialMesa,
+    nuevoPedidoLlevar 
   };
 };

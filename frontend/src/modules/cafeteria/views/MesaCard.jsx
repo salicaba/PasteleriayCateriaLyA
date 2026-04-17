@@ -1,85 +1,96 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users, DollarSign, Clock } from 'lucide-react';
-import clsx from 'clsx';
+import { Users, Clock, ShoppingBag } from 'lucide-react';
 
 export const MesaCard = ({ mesa, onClick }) => {
+  // 1. Separamos el texto que viene guardado (Ej: "L-01 - Emmanuel")
+  const isLlevar = mesa.zona === 'llevar';
+  const partesNumero = mesa.numero.toString().split(' - ');
+  const numeroReal = partesNumero[0]; // Se queda con "L-01" o "1"
+  const nombreCliente = partesNumero[1]; // Se queda con "Emmanuel" (si existe)
+
+  // 2. Decidimos qué decir en el letrero chiquito de arriba
+  // Si es para llevar y tiene nombre, muestra el nombre. Si no, muestra "Llevar" o "Mesa"
+  const etiquetaSuperior = isLlevar 
+    ? (nombreCliente ? nombreCliente : 'Para Llevar') 
+    : 'Mesa';
+
   const isOcupada = mesa.estado === 'ocupada';
 
   return (
     <motion.div
       layout
-      // --- ANIMACIONES DE ENTRADA Y SALIDA ---
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.5 }}
-      // --- LA ANIMACIÓN QUE FALTABA (HOVER) ---
-      whileHover={{ 
-        scale: 1.03, // Crece un poco
-        y: -5,       // Se levanta hacia arriba
-        transition: { type: "spring", stiffness: 300 } 
-      }}
-      whileTap={{ scale: 0.95 }} // Efecto de clic
-      onClick={() => onClick(mesa)}
-      className={clsx(
-        "relative p-4 rounded-2xl cursor-pointer border transition-colors duration-300 shadow-sm hover:shadow-xl flex flex-col justify-between h-40",
-        // ESTILOS DE ESTADO
-        isOcupada 
-          ? "bg-orange-50 border-orange-200 dark:bg-gray-800 dark:border-orange-500/50" 
-          : "bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 hover:border-brand-primary/50 dark:hover:border-brand-primary/50"
-      )}
+      exit={{ opacity: 0, scale: 0.8 }}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      // Clases dinámicas de Tailwind dependiendo del estado (Libre / Salón / Llevar)
+      className={`
+        relative p-4 md:p-5 rounded-3xl cursor-pointer shadow-sm border-2 transition-all duration-200 flex flex-col justify-between h-36 md:h-40
+        ${isOcupada 
+          ? (isLlevar 
+              ? 'bg-orange-500 border-orange-600 text-white' // Color para Llevar activo
+              : 'bg-brand-primary border-brand-dark text-white' // Color para Mesa ocupada
+            ) 
+          : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'
+        }
+      `}
     >
-      {/* Header de la Mesa */}
+      {/* ---------------- ENCABEZADO DE LA TARJETA ---------------- */}
       <div className="flex justify-between items-start">
-        <div className="flex items-center gap-2">
-            {/* Badge del Número */}
-            <div className={clsx(
-                "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm transition-colors",
-                isOcupada 
-                    ? "bg-orange-100 text-orange-600 dark:bg-orange-500 dark:text-white" 
-                    : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300"
-            )}>
-                {mesa.numero}
-            </div>
-            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 tracking-wider">
-                {mesa.zona}
-            </span>
+        <div className="flex flex-col overflow-hidden pr-2">
+          {/* Etiqueta superior (Aquí aparece el NOMBRE truncado para no romper el cuadro) */}
+          <span className={`text-xs font-bold uppercase tracking-wider truncate flex items-center gap-1.5 ${isOcupada ? 'text-white/80' : 'text-gray-400'}`}>
+            {isLlevar && <ShoppingBag size={14} />}
+            <span className="truncate max-w-[100px]">{etiquetaSuperior}</span>
+          </span>
+          
+          {/* Número grande principal */}
+          <span className="text-3xl md:text-4xl font-black leading-none mt-1 tracking-tight">
+            {numeroReal}
+          </span>
         </div>
-
-        {/* Indicador de Estado (Onda expansiva / Radar) */}
+        
+        {/* BADGE DE ESTADO (Esquina superior derecha) */}
         {isOcupada && (
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
-            </span>
+          <span className="px-2.5 py-1 bg-white/20 rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md">
+            {isLlevar ? 'Activo' : 'Ocupada'}
+          </span>
         )}
       </div>
 
-      {/* Contenido Central */}
-      <div className="flex-1 flex flex-col justify-center items-center py-2">
-         {isOcupada ? (
-             <div className="text-center">
-                 <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-1 flex items-center gap-1 justify-center">
-                    <Clock size={12}/> 
-                    <span>24 min</span>
-                 </p>
-                 <p className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">
-                    ${mesa.total?.toFixed(0) || '0'}
-                 </p>
-             </div>
-         ) : (
-             <div className="text-center opacity-40 dark:opacity-20 group-hover:opacity-60 transition-opacity">
-                <Users size={32} className="mx-auto mb-1 text-gray-400 dark:text-gray-500" />
-                <span className="text-xs font-medium text-gray-400">Disponible</span>
-             </div>
-         )}
+      {/* ---------------- PIE DE LA TARJETA (Tiempo y Total) ---------------- */}
+      <div className="flex justify-between items-end mt-2">
+        <div className={`flex flex-col gap-1 text-xs font-bold ${isOcupada ? 'text-white/90' : 'text-gray-400'}`}>
+          {/* Mostrar personas solo si NO es para llevar */}
+          {!isLlevar && (
+            <div className="flex items-center gap-1.5">
+              <Users size={12} />
+              <span>{mesa.personas || 0}</span>
+            </div>
+          )}
+          {/* Mostrar hora de inicio si está ocupada/activa */}
+          {isOcupada && mesa.horaInicio && (
+            <div className="flex items-center gap-1.5">
+              <Clock size={12} />
+              <span>{mesa.horaInicio}</span>
+            </div>
+          )}
+        </div>
+        
+        {/* Total monetario */}
+        <div className="text-right">
+          {isOcupada ? (
+            <span className="text-xl md:text-2xl font-black tracking-tight drop-shadow-sm">
+              ${(mesa.total || 0).toFixed(2)}
+            </span>
+          ) : (
+            <span className="text-sm font-bold text-gray-400 dark:text-gray-500">Libre</span>
+          )}
+        </div>
       </div>
-
-      {/* Footer: Modificado para ocultar la capacidad y alinear a la derecha */}
-      <div className="flex justify-end items-center text-xs border-t border-gray-100 dark:border-gray-700/50 pt-2 mt-1 min-h-[28px]">
-        {isOcupada && <span className="text-orange-500 dark:text-orange-400 font-bold">Ver Cuenta →</span>}
-      </div>
-
     </motion.div>
   );
 };
