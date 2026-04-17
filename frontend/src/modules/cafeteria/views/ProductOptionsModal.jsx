@@ -9,6 +9,8 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
 
   if (!product) return null;
 
+  // Lógica de seguridad para el stock
+  const isAgotado = product.controlarStock === true && product.stock <= 0;
   const availableModifiers = MODIFIERS[product.categoria] || [];
 
   const handleToggle = (modId, optId, type) => {
@@ -28,7 +30,9 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
   };
 
   const calculateTotal = () => {
-    let total = product.precio;
+    // CORRECCIÓN: Soporte para 'precioBase' del nuevo gestor y 'precio' antiguo
+    let total = product.precioBase || product.precio || 0;
+    
     availableModifiers.forEach(mod => {
       const selected = selections[mod.id];
       if (!selected) return;
@@ -45,8 +49,10 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
     return total;
   };
 
-  // NUEVA LÓGICA: Clasificación Inteligente de Modificadores
   const handleConfirm = () => {
+    // Bloqueo de seguridad a nivel función
+    if (isAgotado) return;
+
     let tamanoStr = 'Estándar';
     let lecheStr = null;
     let extrasArr = [];
@@ -61,13 +67,10 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
            const idLower = String(mod.id).toLowerCase();
            const titleLower = String(mod.title).toLowerCase();
            
-           // Detectar si es tipo de leche
            if (idLower.includes('leche') || titleLower.includes('leche')) {
                lecheStr = opt.label;
-           // Detectar si es tamaño
            } else if (idLower.includes('taman') || idLower.includes('tamañ') || titleLower.includes('tamañ')) {
                tamanoStr = opt.label;
-           // Cualquier otra cosa single (ej. temperatura) es un extra
            } else {
                extrasArr.push(opt.label);
            }
@@ -106,11 +109,16 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
         className="relative z-10 bg-white dark:bg-gray-800 w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh] transition-colors"
       >
         <div className="relative h-40 bg-gray-100 dark:bg-gray-700 shrink-0">
-          <img src={product.imagen} className="w-full h-full object-cover opacity-90" />
+          {product.image ? (
+            <img src={product.image} className="w-full h-full object-cover opacity-90" />
+          ) : (
+            <img src={product.imagen} className="w-full h-full object-cover opacity-90" />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
           <div className="absolute bottom-4 left-4 text-white">
             <h3 className="text-2xl font-bold">{product.nombre}</h3>
-            <p className="opacity-80">${product.precio} Base</p>
+            {/* CORRECCIÓN VISUAL */}
+            <p className="opacity-80">${(product.precioBase || product.precio || 0).toFixed(2)} Base</p>
           </div>
           <button onClick={onClose} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-md transition-colors">
             <X size={20} />
@@ -140,7 +148,7 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
                         className={clsx(
                           "px-4 py-3 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 active:scale-95",
                           isSelected 
-                            ? "border-brand-primary bg-brand-primary/5 text-brand-primary shadow-sm ring-1 ring-brand-primary" 
+                            ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400 shadow-sm ring-1 ring-orange-500" 
                             : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
                         )}
                       >
@@ -158,10 +166,16 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
 
         <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 shrink-0">
           <button 
+            disabled={isAgotado}
             onClick={handleConfirm}
-            className="w-full bg-brand-dark dark:bg-brand-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 dark:hover:bg-brand-secondary transition-colors flex justify-between px-8 items-center shadow-lg active:scale-95"
+            className={clsx(
+              "w-full py-4 rounded-xl font-bold text-lg flex justify-between px-8 items-center shadow-lg transition-all",
+              isAgotado 
+                ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed"
+                : "bg-gray-900 dark:bg-orange-500 text-white hover:bg-gray-800 dark:hover:bg-orange-600 active:scale-95"
+            )}
           >
-            <span>Agregar a la Orden</span>
+            <span>{isAgotado ? 'Producto Agotado' : 'Agregar a la Orden'}</span>
             <span>${calculateTotal().toFixed(2)}</span>
           </button>
         </div>

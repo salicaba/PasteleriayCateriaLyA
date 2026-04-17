@@ -3,16 +3,15 @@ import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 
 export const ProductCard = ({ product, onClick }) => {
-  // Determinamos matemáticamente si está agotado
-  const isAgotado = product.stock !== undefined && product.stock <= 0;
+  // EL CAMBIO CLAVE: Solo está agotado SI controlamos el stock Y además es 0 o menos.
+  // Si controlarStock es false (ilimitado), isAgotado siempre será false.
+  const isAgotado = product.controlarStock === true && product.stock <= 0;
 
   return (
     <motion.div
       layout
-      // Si está agotado, cancelamos las animaciones de hover y click
       whileHover={!isAgotado ? { y: -5 } : {}}
       whileTap={!isAgotado ? { scale: 0.95 } : {}}
-      // El onClick principal se bloquea si isAgotado es true
       onClick={() => {
         if (!isAgotado) {
           onClick(product);
@@ -24,7 +23,6 @@ export const ProductCard = ({ product, onClick }) => {
           : 'border-transparent shadow-sm hover:shadow-md cursor-pointer'
       }`}
     >
-      {/* --- SUPERPOSICIÓN DE AGOTADO --- */}
       {isAgotado && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-full px-2 pointer-events-none">
           <div className="bg-red-600/90 backdrop-blur-md text-white text-center py-2.5 rounded-xl font-black tracking-[0.2em] uppercase transform -rotate-12 shadow-2xl border border-red-500/50">
@@ -33,7 +31,6 @@ export const ProductCard = ({ product, onClick }) => {
         </div>
       )}
 
-      {/* Imagen / Ícono */}
       <div className="h-32 w-full rounded-2xl bg-gray-50 dark:bg-gray-800 mb-4 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-800">
         {product.image ? (
           <img src={product.image} alt={product.nombre} className="w-full h-full object-cover" />
@@ -42,7 +39,6 @@ export const ProductCard = ({ product, onClick }) => {
         )}
       </div>
 
-      {/* Información del Producto */}
       <div className="flex flex-col flex-1 relative z-0">
         <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg leading-tight mb-1">
           {product.nombre}
@@ -53,7 +49,6 @@ export const ProductCard = ({ product, onClick }) => {
             ${product.precioBase?.toFixed(2)}
           </span>
           
-          {/* Botón de Agregar (Deshabilitado si está agotado) */}
           <button 
             disabled={isAgotado}
             className={`p-2 rounded-xl transition-all ${
