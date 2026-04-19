@@ -112,7 +112,7 @@ export const LoginScreen = ({ onLogin }) => {
                     <Mail size={18} />
                   </div>
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -141,6 +141,13 @@ export const LoginScreen = ({ onLogin }) => {
                   </button>
                 </div>
               </div>
+
+              {/* Mostrar mensaje de error si existe */}
+{error && (
+  <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-500 text-xs text-center font-bold uppercase tracking-widest animate-pulse">
+    {error}
+  </div>
+)}
 
               <button
                 type="submit"

@@ -1,30 +1,42 @@
-// src/modules/auth/controllers/useAuthController.js
 import { useState } from 'react';
 import client from '../../../api/client.js';
 
-export const useAuthController = () => {
-  const [loading, setLoading] = useState(false);
+export const useAuthController = (onLoginCallback) => {
+  // Mantenemos el nombre 'email' para no romper tu diseño, aunque escribamos un usuario
+  const [email, setEmail] = useState(''); 
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const login = async (username, password) => {
-    setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Evita que la página se recargue
+    setIsLoading(true);
     setError(null);
+
     try {
-      const response = await client.post('/auth/login', { username, password });
+      // El backend pide 'username', le pasamos lo que escribiste en el input de email
+      const response = await client.post('/auth/login', { 
+        username: email, 
+        password: password 
+      });
       
       const { token, user } = response.data;
       
-      // Guardar sesión en el navegador
+      // Guardamos la sesión en el navegador
       localStorage.setItem('lya_token', token);
       localStorage.setItem('lya_user', JSON.stringify(user));
 
-      // Aquí puedes actualizar tu contexto global o redirigir
-      return user; 
+      // Le avisamos a App.jsx que el login fue un éxito para cambiar de pantalla
+      if (onLoginCallback) {
+        onLoginCallback(user);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error de conexión con el servidor');
-      throw err;
+      console.error("Error en login:", err);
+      // Extraemos el mensaje de error del backend (ej. "Credenciales inválidas")
+      setError(err.response?.data?.message || 'Error al conectar con el servidor');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -33,5 +45,11 @@ export const useAuthController = () => {
     localStorage.removeItem('lya_user');
   };
 
-  return { login, logout, loading, error };
+  return { 
+    email, setEmail, 
+    password, setPassword, 
+    showPassword, setShowPassword, 
+    error, isLoading, 
+    handleSubmit, logout 
+  };
 };

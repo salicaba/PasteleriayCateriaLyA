@@ -7,6 +7,8 @@ export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    console.log(`Llegó desde React -> Usuario: "${username}" | Contraseña: "${password}"`);
+
     // 1. Buscar al usuario en la base de datos
     const user = await User.findOne({ where: { username } });
     

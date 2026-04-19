@@ -1,115 +1,70 @@
-import { useState, useMemo, useCallback } from 'react';
-import { MOCK_MESAS, ZONAS } from '../models/mesasModel';
+import { useState, useMemo, useEffect } from 'react';
+import { fetchActiveOrders } from '../models/mesasModel.js';
 
 export const useMesasController = () => {
-  const [mesas, setMesas] = useState(MOCK_MESAS);
+  const [mesas, setMesas] = useState([]);
   const [zonaActiva, setZonaActiva] = useState('salon');
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Lista de zonas (para que tu barra superior funcione)
+  const zonas = [
+    { id: 'salon', label: 'Salón' },
+    { id: 'llevar', label: 'Para Llevar' }
+  ];
+
+  // 1. Cargar datos desde MySQL
+  const loadMesas = async () => {
+    setIsLoading(true);
+    try {
+      const activeOrders = await fetchActiveOrders() || [];
+      setMesas(activeOrders);
+    } catch (error) {
+      console.error("Error al cargar las mesas:", error);
+      setMesas([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMesas();
+  }, []);
+
+  // 2. Filtrar mesas según la pestaña seleccionada (Salón o Llevar)
   const mesasFiltradas = useMemo(() => {
     return mesas.filter(mesa => mesa.zona === zonaActiva);
-  }, [zonaActiva, mesas]);
+  }, [mesas, zonaActiva]);
 
-  // CORRECCIÓN: Filtrar estadísticas solo para las mesas físicas del salón
+  // 3. Calcular estadísticas para los "badges" naranjas y verdes
   const stats = useMemo(() => {
-    const mesasSalon = mesas.filter(m => m.zona === 'salon');
-    const ocupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
-    const libres = mesasSalon.length - ocupadas;
-    return { ocupadas, libres };
+    const ocupadas = mesas.filter(m => m.zona === 'salon' && m.estado !== 'libre').length;
+    const libres = 15 - ocupadas; // Asumiendo que tienes 15 mesas físicas
+    return { ocupadas, libres: libres > 0 ? libres : 0 };
   }, [mesas]);
 
-  const actualizarEstadoMesa = useCallback((mesaId, montoVenta) => {
-    setMesas(prev => prev.map(m => 
-      m.id === mesaId 
-        ? { 
-            ...m, 
-            estado: 'ocupada', 
-            total: (m.total || 0) + montoVenta,
-            horaInicio: m.horaInicio || new Date().toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'}) 
-          }
-        : m
-    ));
-  }, []);
+  // 4. Funciones "fantasma" temporales
+  // Tu pantalla necesita estas funciones para no lanzar error al hacer clic en los botones.
+  // Más adelante las conectaremos a tu API real para cobrar y liberar mesas.
+  const liberarMesa = (id) => console.log("Pendiente: Liberar mesa en BD", id);
+  const actualizarEstadoMesa = (id, monto) => console.log("Pendiente: Actualizar", id, monto);
+  const unirMesas = (origen, destino) => console.log("Pendiente: Unir", origen, destino);
+  const pagoParcialMesa = (id, monto) => console.log("Pendiente: Pago parcial", id, monto);
+  const nuevoPedidoLlevar = (cliente) => {
+     console.log("Pendiente: Crear orden para", cliente);
+     return null; 
+  };
 
-  const liberarMesa = useCallback((mesaId) => {
-    setMesas(prev => prev.map(m => 
-      m.id === mesaId
-        ? { ...m, estado: 'libre', total: 0, horaInicio: null } 
-        : m
-    ));
-  }, []);
-
-  const unirMesas = useCallback((origenId, destinoId) => {
-    setMesas(prev => {
-      const origen = prev.find(m => m.id === origenId);
-      if(!origen) return prev;
-      
-      return prev.map(m => {
-        if (m.id === destinoId) {
-          return { 
-             ...m, 
-             estado: 'ocupada', 
-             total: (m.total || 0) + (origen.total || 0),
-             horaInicio: m.estado === 'libre' ? origen.horaInicio : m.horaInicio
-          };
-        }
-        if (m.id === origenId) {
-          return { ...m, estado: 'libre', total: 0, horaInicio: null, personas: 0 };
-        }
-        return m;
-      });
-    });
-  }, []);
-
-  const pagoParcialMesa = useCallback((mesaId, montoPagado) => {
-    setMesas(prev => prev.map(m => {
-      if (m.id === mesaId) {
-        const nuevoTotal = Math.max((m.total || 0) - montoPagado, 0);
-        return {
-          ...m,
-          total: nuevoTotal,
-          estado: nuevoTotal === 0 ? 'libre' : 'ocupada',
-          horaInicio: nuevoTotal === 0 ? null : m.horaInicio
-        };
-      }
-      return m;
-    }));
-  }, []);
-
-  const nuevoPedidoLlevar = useCallback((nombreCliente) => {
-    const pedidosLlevar = mesas.filter(m => m.zona === 'llevar');
-    const nuevoId = Math.max(...mesas.map(m => m.id), 100) + 1;
-    
-    const secuencial = String(pedidosLlevar.length + 1).padStart(2, '0');
-    
-    const nuevoNumero = nombreCliente && nombreCliente.trim() !== '' 
-          ? `L-${secuencial} - ${nombreCliente.trim()}` 
-          : `L-${secuencial}`;
-    
-    const nuevoPedido = {
-      id: nuevoId,
-      numero: nuevoNumero,
-      zona: 'llevar',
-      estado: 'ocupada', 
-      total: 0,
-      horaInicio: new Date().toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'}),
-      personas: 1
-    };
-
-    setMesas(prev => [...prev, nuevoPedido]);
-    
-    return nuevoPedido;
-  }, [mesas]);
-
+  // 5. Devolver EXACTAMENTE lo que MesasPage.jsx está pidiendo en su línea 10
   return {
-    zonas: ZONAS,
-    zonaActiva,
-    setZonaActiva,
     mesasFiltradas,
     stats,
-    actualizarEstadoMesa,
     liberarMesa,
+    actualizarEstadoMesa,
     unirMesas,
     pagoParcialMesa,
-    nuevoPedidoLlevar 
+    zonas,
+    zonaActiva,
+    setZonaActiva,
+    nuevoPedidoLlevar
   };
 };
