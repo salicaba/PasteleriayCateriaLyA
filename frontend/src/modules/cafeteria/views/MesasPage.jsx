@@ -32,16 +32,13 @@ export const MesasPage = () => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 text-white p-3 rounded-2xl shadow-md shadow-orange-500/20">
-            {/* Ícono dinámico */}
             {zonaActiva === 'salon' ? <LayoutGrid size={28} /> : <ShoppingBag size={28} />}
           </div>
           <div>
-            {/* Título dinámico */}
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white tracking-tight">
               {zonaActiva === 'salon' ? 'Mesas' : 'Para Llevar'}
             </h1>
             
-            {/* Badges dinámicos */}
             <div className="flex items-center gap-3 mt-1">
               {zonaActiva === 'salon' ? (
                 <>
@@ -78,6 +75,7 @@ export const MesasPage = () => {
         </div>
       </header>
 
+      {/* CONTROLES DE PESTAÑAS */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 shrink-0">
         <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 p-1 rounded-2xl overflow-x-auto">
           {zonas && zonas.map(zona => (
@@ -113,6 +111,7 @@ export const MesasPage = () => {
         )}
       </div>
 
+      {/* CUADRÍCULA DE MESAS CON ANIMACIÓN "POPLAYOUT" Y "SPRING" */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24">
         <motion.div 
           layout 
@@ -120,27 +119,37 @@ export const MesasPage = () => {
         >
           <AnimatePresence mode='popLayout'>
             {mesasVisibles.map(mesa => (
-              <MesaCard 
-                key={mesa.id} 
-                mesa={mesa} 
-                onClick={() => setMesaSeleccionada(mesa)} 
-              />
+              <motion.div
+                key={mesa.id}
+                layout
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              >
+                <MesaCard 
+                  mesa={mesa} 
+                  onClick={() => setMesaSeleccionada(mesa)} 
+                />
+              </motion.div>
             ))}
           </AnimatePresence>
         </motion.div>
 
+        {/* ESTADO VACÍO */}
         {mesasVisibles.length === 0 && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600"
           >
-            <Search size={64} className="mb-4 opacity-10" />
+            <Search size={64} className="mb-4 opacity-20" />
             <p className="text-xl font-bold">No se encontró el registro "{busqueda}"</p>
             <button onClick={() => setBusqueda('')} className="mt-2 text-orange-500 font-bold hover:underline">Ver todo</button>
           </motion.div>
         )}
       </div>
 
+      {/* MODAL DEL PUNTO DE VENTA */}
       <AnimatePresence>
         {mesaSeleccionada && (
           <PosModal 

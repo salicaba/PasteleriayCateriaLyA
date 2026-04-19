@@ -1,12 +1,16 @@
 import Order from './Order.model.js';
 import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
+import Table from './Table.model.js';
 
-// 1. Crear una nueva orden (Abre una Mesa o un Ticket L-01)
+// ==========================================
+// GESTIÓN DE ÓRDENES
+// ==========================================
+
 export const createOrder = async (req, res) => {
   try {
     const { orderType, ticketId, tableId } = req.body;
-    const employeeId = req.user.id; // El ID lo sacamos del token JWT, gracias a tu middleware
+    const employeeId = req.user.id; 
 
     const newOrder = await Order.create({
       orderType,
@@ -23,39 +27,33 @@ export const createOrder = async (req, res) => {
   }
 };
 
-// 2. Agregar productos a una orden existente
 export const addItemsToOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { items } = req.body; // Array de { productId, variantId, quantity, subtotal, notes }
+    const { items } = req.body; 
 
-    // Verificar que la orden exista y esté abierta
     const order = await Order.findByPk(orderId);
     if (!order || order.status !== 'OPEN') {
       return res.status(400).json({ message: 'La orden no existe o ya está cerrada.' });
     }
 
-    // Preparar los items agregando el orderId
     const itemsToInsert = items.map(item => ({
       ...item,
       orderId,
-      kitchenStatus: 'PENDING' // Se va directo a la cola de la cocina
+      kitchenStatus: 'PENDING' 
     }));
 
-    // Insertar todos los items de golpe
     const createdItems = await OrderItem.bulkCreate(itemsToInsert);
 
-    // Actualizar el gran total de la orden
     const newTotal = Number(order.totalAmount) + items.reduce((sum, item) => sum + Number(item.subtotal), 0);
     await order.update({ totalAmount: newTotal });
 
-    res.status(201).json({ message: 'Productos agregados a la orden', orderItems: createdItems, newTotal });
+    res.status(201).json({ message: 'Productos agregados', orderItems: createdItems, newTotal });
   } catch (error) {
     res.status(500).json({ message: 'Error al agregar productos', error: error.message });
   }
 };
 
-// 3. Obtener órdenes activas (Para el KDS de Cocina y POS)
 export const getActiveOrders = async (req, res) => {
   try {
     const activeOrders = await Order.findAll({
@@ -64,7 +62,7 @@ export const getActiveOrders = async (req, res) => {
         { 
           model: OrderItem, 
           as: 'items',
-          include: [{ model: Product, attributes: ['name'] }] 
+          include: [{ model: Product, as: 'product', attributes: ['name'] }] 
         }
       ]
     });
@@ -72,5 +70,71 @@ export const getActiveOrders = async (req, res) => {
     res.json(activeOrders);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener órdenes', error: error.message });
+  }
+};
+
+// ==========================================
+// GESTIÓN DE MESAS (Auto-Indexado)
+// ==========================================
+
+export const getTables = async (req, res) => {
+  try {
+    // Las ordenamos por ID (orden de creación)
+    const tables = await Table.findAll({ 
+      where: { status: 'active' },
+      order: [['id', 'ASC']]
+    });
+    res.json(tables);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener mesas', error: error.message });
+  }
+};
+
+// Crear mesa con número automático correlativo
+export const createTable = async (req, res) => {
+  try {
+    const { zone } = req.body;
+    
+    // Contamos cuántas mesas activas hay
+    const count = await Table.count({ where: { status: 'active', zone: zone || 'salon' } });
+    const nextNumber = (count + 1).toString();
+
+    const newTable = await Table.create({ 
+      number: nextNumber, 
+      zone: zone || 'salon', 
+      qrToken: `qr-${Date.now()}-${nextNumber}`
+    });
+    
+    res.status(201).json(newTable);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al crear mesa automática', error: error.message });
+  }
+};
+
+// Eliminar y Re-indexar (Para que no queden huecos 1, 3, 4...)
+export const deleteTable = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Ocultamos la mesa eliminada
+    await Table.update({ status: 'inactive' }, { where: { id } });
+
+    // 2. Buscamos las que quedaron activas (ordenadas por antigüedad)
+    const remainingTables = await Table.findAll({
+      where: { status: 'active', zone: 'salon' },
+      order: [['id', 'ASC']]
+    });
+
+    // 3. Renombramos secuencialmente
+    for (let i = 0; i < remainingTables.length; i++) {
+      const newNumber = (i + 1).toString();
+      if (remainingTables[i].number !== newNumber) {
+        await remainingTables[i].update({ number: newNumber });
+      }
+    }
+
+    res.json({ message: 'Mesa eliminada y catálogo re-indexado' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al re-indexar mesas', error: error.message });
   }
 };

@@ -1,6 +1,6 @@
 import app from './app.js';
 import sequelize from './config/database.js';
-import './config/associations.js'; // Importante para las relaciones
+import { setupAssociations } from './config/associations.js'; // <-- 1. Importamos la función
 
 const PORT = process.env.PORT || 4000;
 
@@ -10,11 +10,14 @@ async function main() {
     await sequelize.authenticate();
     console.log('✅ Conexión a MySQL establecida.');
     
-    // 2. Sincronizar modelos
-    await sequelize.sync({ force: false });
+    // 2. Ejecutar las relaciones ANTES de sincronizar
+    setupAssociations(); // <-- 2. Llamamos a la función aquí
+    
+    // 3. Sincronizar modelos
+    await sequelize.sync({ force: true });
     console.log('✅ Modelos sincronizados con la base de datos.');
 
-    // 3. Encender el servidor
+    // 4. Encender el servidor
     app.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
     });

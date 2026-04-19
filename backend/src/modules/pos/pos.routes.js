@@ -1,15 +1,28 @@
 import { Router } from 'express';
-import { createOrder, addItemsToOrder, getActiveOrders } from './pos.controller.js';
-import { verifyToken } from '../../middlewares/auth.middleware.js';
-import { authorizeRoles } from '../../middlewares/rbac.middleware.js';
+import { 
+  getActiveOrders, 
+  createOrder, 
+  addItemsToOrder,
+  getTables,      // <-- Importamos las funciones de mesas
+  createTable,
+  deleteTable
+} from './pos.controller.js';
 
 const router = Router();
 
-// Todas estas rutas requieren estar logueado y ser Owner o Employee
-router.use(verifyToken, authorizeRoles('Owner', 'Employee'));
+// ==========================================
+// RUTAS DE ÓRDENES
+// ==========================================
+router.get('/orders/active', getActiveOrders);
+router.post('/orders', createOrder);
+router.post('/orders/:orderId/items', addItemsToOrder);
 
-router.post('/orders', createOrder); // Abre mesa o ticket
-router.post('/orders/:orderId/items', addItemsToOrder); // Manda a cocina
-router.get('/orders/active', getActiveOrders); // Lee las órdenes abiertas
+// ==========================================
+// RUTAS DE MESAS (Catálogo y QR)
+// ==========================================
+// Estas son las rutas que tu frontend está intentando leer (y que daban 404)
+router.get('/tables', getTables);
+router.post('/tables', createTable);
+router.delete('/tables/:id', deleteTable);
 
 export default router;

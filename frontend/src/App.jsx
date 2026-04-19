@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from './hooks/useTheme';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -10,6 +10,7 @@ import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
 import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard';
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
+import { QrControlPage } from './modules/cafeteria/views/QrControlPage'; // <-- NUEVA IMPORTACIÓN
 
 function App() {
   const [user, setUser] = useState(null);
@@ -47,14 +48,15 @@ function App() {
     year: 'numeric' 
   });
 
-  // --- MENÚ PRINCIPAL ---
+  // --- MENÚ PRINCIPAL ACTUALIZADO ---
   const menuItems = [
-  { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
-  { id: 'cocina', label: 'Cocina', icon: ChefHat },
-  { id: 'pasteleria', label: 'Pastelería', icon: Cake },
-  { id: 'reportes', label: 'Reportes', icon: PieChart },
-  { id: 'ajustes', label: 'Gestor Menú', icon: BookOpenCheck }, // <-- Ícono más semántico
-];
+    { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
+    { id: 'qr', label: 'Control QR', icon: QrCode }, // <-- NUEVO MÓDULO AQUÍ
+    { id: 'cocina', label: 'Cocina', icon: ChefHat },
+    { id: 'pasteleria', label: 'Pastelería', icon: Cake },
+    { id: 'reportes', label: 'Reportes', icon: PieChart },
+    { id: 'ajustes', label: 'Gestor Menú', icon: BookOpenCheck }, 
+  ];
 
   if (!user) {
     return <LoginScreen onLogin={(userData) => setUser(userData)} />;
@@ -205,6 +207,7 @@ function App() {
 
         <main className="flex-1 overflow-hidden relative bg-gray-50/50 dark:bg-gray-950 transition-colors">
           {activeTab === 'mesas' && <MesasPage />}
+          {activeTab === 'qr' && <QrControlPage />} {/* <-- VISTA MONTADA AQUÍ */}
           {activeTab === 'cocina' && <KitchenPage />}
           {activeTab === 'pasteleria' && <PasteleriaDashboard />}
           {activeTab === 'ajustes' && <MenuManagerPage />} 
