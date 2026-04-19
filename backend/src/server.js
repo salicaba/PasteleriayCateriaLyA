@@ -14,7 +14,7 @@ async function main() {
     setupAssociations(); // <-- 2. Llamamos a la función aquí
     
     // 3. Sincronizar modelos
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ alter: true });
     console.log('✅ Modelos sincronizados con la base de datos.');
 
     // 4. Encender el servidor

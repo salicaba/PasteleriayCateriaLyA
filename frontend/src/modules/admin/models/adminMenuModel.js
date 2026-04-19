@@ -1,30 +1,44 @@
-export const MOCK_CATEGORIES = ['Bebidas Calientes', 'Bebidas Frías', 'Postres', 'Comida'];
+import client from '../../../api/client.js';
 
-export const MOCK_ADMIN_PRODUCTS = [
-  {
-    id: 'prod-001',
-    nombre: 'Latte Caliente',
-    categoria: 'Bebidas Calientes',
-    precioBase: 55,
-    disponible: true,
-    imagen: '☕', // En producción será una URL de Firebase Storage
-    opciones: {
-      tamanos: ['Chico', 'Mediano', 'Grande'],
-      leches: ['Entera', 'Deslactosada', 'Almendras', 'Avena'],
-      extras: ['Carga Extra', 'Vainilla', 'Caramelo']
-    }
+export const adminMenuModel = {
+  // --- PRODUCTOS ---
+  getProducts: async () => {
+    const response = await client.get('/menu/products');
+    return response.data;
   },
-  {
-    id: 'prod-002',
-    nombre: 'Rebanada Tres Leches',
-    categoria: 'Postres',
-    precioBase: 65,
-    disponible: false, // Ejemplo de producto "Sold Out"
-    imagen: '🍰',
-    opciones: {
-      tamanos: ['Estándar'],
-      leches: [],
-      extras: ['Vela de Cumpleaños']
-    }
+  createProduct: async (productData) => {
+    const response = await client.post('/menu/products', productData);
+    return response.data;
+  },
+  updateProduct: async (id, productData) => {
+    const response = await client.put(`/menu/products/${id}`, productData);
+    return response.data;
+  },
+  deleteProduct: async (id) => {
+    const response = await client.delete(`/menu/products/${id}`);
+    return response.data;
+  },
+
+  // --- CATEGORÍAS (NUEVO) ---
+  getCategories: async () => {
+    const response = await client.get('/menu/categories');
+    return response.data;
+  },
+  createCategory: async (name) => {
+    const response = await client.post('/menu/categories', { name });
+    return response.data;
+  },
+  updateCategory: async (id, name) => { // <-- NUEVA
+    const response = await client.put(`/menu/categories/${id}`, { name });
+    return response.data;
+  },
+  deleteCategory: async (id) => {
+    const response = await client.delete(`/menu/categories/${id}`);
+    return response.data;
+  },
+  reorderCategories: async (items) => {
+    // items debe ser un array: [{ id: 'uuid', order: 0 }, ...]
+    const response = await client.put('/menu/categories/reorder', { items });
+    return response.data;
   }
-];
+};

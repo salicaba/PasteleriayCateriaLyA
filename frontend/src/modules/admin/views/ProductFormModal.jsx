@@ -1,35 +1,80 @@
+// src/modules/admin/views/ProductFormModal.jsx
 import React, { useState } from 'react';
 import Cropper from 'react-easy-crop';
-import { X, Upload, RotateCw, ZoomIn, Package, Settings2, PlusCircle } from 'lucide-react';
+import { X, Upload, RotateCw, ZoomIn, Package, Settings2, PlusCircle, Folder } from 'lucide-react';
 
-export const ProductFormModal = ({ initialData, onClose, onSave, categories }) => {
-  const [formData, setFormData] = useState(initialData || {
-    nombre: '',
-    precioBase: 0,
-    categoria: categories[0] || 'cafeteria',
-    controlarStock: false, // <-- NUEVO: Por defecto es ilimitado
-    stock: 0,
-    image: null,
-    disponible: true,
-    opciones: {
-      tamanos: [],
-      leches: [],
-      extras: []
-    }
+// ==========================================
+// 🛠️ FUNCIONES PARA EL RECORTE DE IMAGEN
+// ==========================================
+const createImage = (url) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', (error) => reject(error));
+    image.setAttribute('crossOrigin', 'anonymous');
+    image.src = url;
+  });
+
+function getRadianAngle(degreeValue) {
+  return (degreeValue * Math.PI) / 180;
+}
+
+async function getCroppedImg(imageSrc, pixelCrop, rotation = 0) {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const maxSize = Math.max(image.width, image.height);
+  const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+
+  canvas.width = safeArea;
+  canvas.height = safeArea;
+  ctx.translate(safeArea / 2, safeArea / 2);
+  ctx.rotate(getRadianAngle(rotation));
+  ctx.translate(-safeArea / 2, -safeArea / 2);
+  ctx.drawImage(image, safeArea / 2 - image.width / 2, safeArea / 2 - image.height / 2);
+
+  const data = ctx.getImageData(0, 0, safeArea, safeArea);
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  ctx.putImageData(
+    data,
+    Math.round(0 - safeArea / 2 + image.width / 2 - pixelCrop.x),
+    Math.round(0 - safeArea / 2 + image.height / 2 - pixelCrop.y)
+  );
+
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+// ==========================================
+// 🎨 COMPONENTE PRINCIPAL
+// ==========================================
+export const ProductFormModal = ({ initialData, onClose, onSave, categories = [] }) => {
+  const [formData, setFormData] = useState({
+    id: initialData?.id || undefined,
+    name: initialData?.name || initialData?.nombre || '',
+    // Si es nuevo, empieza vacío ('') para mostrar el placeholder. Si estamos editando, muestra su precio.
+    basePrice: initialData ? (initialData.basePrice ?? initialData.precioBase ?? 0) : '',
+    categoryId: initialData?.categoryId || (categories.length > 0 ? categories[0].id : ''),
+    controlarStock: initialData?.controlarStock || false,
+    // Igual para el stock: vacío si es nuevo
+    stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? 0) : '',
+    imageUrl: initialData?.imageUrl || initialData?.image || null,
+    isActive: initialData?.isActive !== undefined ? initialData.isActive : (initialData?.disponible !== undefined ? initialData.disponible : true),
+    opciones: initialData?.opciones || { tamanos: [], leches: [], extras: [] }
   });
 
   const [imageSrc, setImageSrc] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
   const addOption = (type) => {
     const newValue = window.prompt(`Añadir nuevo ${type.slice(0, -1)}:`);
     if (newValue && newValue.trim() !== '') {
-      setFormData({
-        ...formData,
-        opciones: { ...formData.opciones, [type]: [...formData.opciones[type], newValue.trim()] }
-      });
+      setFormData({ ...formData, opciones: { ...formData.opciones, [type]: [...formData.opciones[type], newValue.trim()] } });
     }
   };
 
@@ -47,9 +92,24 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
     }
   };
 
-  const handleApplyCrop = () => {
-    setFormData({ ...formData, image: imageSrc });
-    setImageSrc(null);
+  const handleApplyCrop = async () => {
+    try {
+      const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels, rotation);
+      setFormData({ ...formData, imageUrl: croppedImage });
+      setImageSrc(null);
+    } catch (e) {
+      console.error('Error al recortar la imagen', e);
+    }
+  };
+
+  // NUEVO: Interceptamos el guardado para asegurar que la BD reciba números, no textos vacíos
+  const handleSaveSubmit = () => {
+    const finalData = {
+      ...formData,
+      basePrice: formData.basePrice === '' ? 0 : formData.basePrice,
+      stockQuantity: formData.stockQuantity === '' ? 0 : formData.stockQuantity
+    };
+    onSave(finalData);
   };
 
   return (
@@ -61,17 +121,18 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
             <Cropper
               image={imageSrc} crop={crop} zoom={zoom} rotation={rotation} aspect={1}
               onCropChange={setCrop} onRotationChange={setRotation} onZoomChange={setZoom}
+              onCropComplete={(croppedArea, croppedAreaPixels) => setCroppedAreaPixels(croppedAreaPixels)}
             />
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/50 p-4 rounded-2xl backdrop-blur-md z-10">
                <button onClick={() => setRotation(rotation + 90)} className="text-white p-2 hover:bg-white/10 rounded-full"><RotateCw size={20}/></button>
                <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(e.target.value)} className="w-32 accent-orange-500" />
-               <button onClick={handleApplyCrop} className="bg-orange-500 text-white px-6 py-2 rounded-xl font-bold">Aplicar Recorte</button>
+               <button onClick={handleApplyCrop} className="bg-orange-500 hover:bg-orange-600 transition-colors text-white px-6 py-2 rounded-xl font-bold">Aplicar Recorte</button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col h-full max-h-[90vh]">
             <header className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-10">
-              <h2 className="text-2xl font-black dark:text-white">Configurar Producto</h2>
+              <h2 className="text-2xl font-black dark:text-white">{initialData ? 'Editar Producto' : 'Nuevo Producto'}</h2>
               <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                 <X size={24} className="text-gray-400" />
               </button>
@@ -82,8 +143,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
                 {/* ZONA DE IMAGEN */}
                 <div className="md:col-span-1">
                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-3xl p-6 hover:border-orange-500 transition-colors bg-gray-50/50 dark:bg-gray-800/30">
-                    {formData.image ? (
-                      <img src={formData.image} className="w-40 h-40 object-cover rounded-2xl mb-4 shadow-md" />
+                    {formData.imageUrl ? (
+                      <img src={formData.imageUrl} className="w-40 h-40 object-cover rounded-2xl mb-4 shadow-md" />
                     ) : (
                       <div className="w-40 h-40 bg-gray-200 dark:bg-gray-800 rounded-2xl mb-4 flex items-center justify-center">
                         <Upload size={48} className="text-gray-400" />
@@ -101,10 +162,30 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
                   <div>
                     <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nombre del Producto</label>
                     <input 
-                      type="text" value={formData.nombre}
-                      onChange={(e) => setFormData({...formData, nombre: e.target.value})}
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none dark:text-white"
+                      type="text" value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-orange-500 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none dark:text-white transition-all font-medium"
+                      placeholder="Ej: Frappé de Moka"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Categoría</label>
+                    <div className="relative">
+                      <Folder className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <select
+                        value={formData.categoryId}
+                        onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
+                        className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-orange-500 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none dark:text-white appearance-none cursor-pointer transition-all font-medium"
+                      >
+                        <option value="" disabled>Selecciona una categoría...</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
@@ -113,18 +194,18 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                         <input 
-                          type="number" value={formData.precioBase}
-                          onChange={(e) => setFormData({...formData, precioBase: parseFloat(e.target.value)})}
-                          className="w-full p-4 pl-8 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none dark:text-white"
+                          type="number" 
+                          value={formData.basePrice}
+                          onChange={(e) => setFormData({...formData, basePrice: e.target.value === '' ? '' : parseFloat(e.target.value)})}
+                          placeholder="Ej: 45.00"
+                          className="w-full p-4 pl-8 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-orange-500 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none dark:text-white transition-all font-medium"
                         />
                       </div>
                     </div>
 
-                    {/* NUEVO: CONTROL DE INVENTARIO */}
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-3 flex flex-col justify-center">
                       <div className="flex items-center justify-between px-1 mb-2">
                         <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Controlar Inventario</label>
-                        {/* TOGGLE SWITCH */}
                         <button 
                           onClick={() => setFormData({...formData, controlarStock: !formData.controlarStock})}
                           className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 ${formData.controlarStock ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`}
@@ -133,15 +214,15 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
                         </button>
                       </div>
                       
-                      {/* INPUT DE STOCK (Aparece o desaparece suavemente) */}
                       {formData.controlarStock ? (
                         <div className="relative animate-in fade-in zoom-in duration-200">
                           <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                           <input 
-                            type="number" value={formData.stock}
-                            onChange={(e) => setFormData({...formData, stock: parseInt(e.target.value)})}
-                            className="w-full p-2 pl-9 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none dark:text-white text-sm"
-                            placeholder="Cant."
+                            type="number" 
+                            value={formData.stockQuantity}
+                            onChange={(e) => setFormData({...formData, stockQuantity: e.target.value === '' ? '' : parseInt(e.target.value)})}
+                            placeholder="Ej: 15"
+                            className="w-full p-2 pl-9 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:border-orange-500 rounded-xl outline-none dark:text-white text-sm transition-all font-medium"
                           />
                         </div>
                       ) : (
@@ -163,15 +244,15 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
                         <Settings2 size={16} className="text-orange-500" />
                         {tipo}
                       </h3>
-                      <button onClick={() => addOption(tipo)} className="text-orange-500 p-1">
+                      <button onClick={() => addOption(tipo)} className="text-orange-500 p-1 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-full transition-colors">
                         <PlusCircle size={20} />
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {formData.opciones[tipo].map((opt, idx) => (
-                        <div key={idx} className="bg-white dark:bg-gray-700 px-3 py-1 rounded-xl flex items-center gap-2">
-                          <span className="text-sm dark:text-gray-200">{opt}</span>
-                          <button onClick={() => removeOption(tipo, idx)} className="text-red-400"><X size={14} /></button>
+                        <div key={idx} className="bg-white dark:bg-gray-700 px-3 py-1 rounded-xl flex items-center gap-2 border border-gray-100 dark:border-gray-600 shadow-sm">
+                          <span className="text-sm dark:text-gray-200 font-medium">{opt}</span>
+                          <button onClick={() => removeOption(tipo, idx)} className="text-red-400 hover:text-red-500"><X size={14} /></button>
                         </div>
                       ))}
                     </div>
@@ -180,10 +261,13 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories }) =
               </div>
             </div>
 
-            <footer className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 flex gap-4">
-              <button onClick={onClose} className="flex-1 py-4 font-bold text-gray-500 rounded-2xl">Cancelar</button>
-              <button onClick={() => onSave(formData)} className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-bold shadow-lg shadow-orange-500/30">
-                Guardar Producto
+            <footer className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex gap-4">
+              <button onClick={onClose} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-2xl transition-colors">
+                Cancelar
+              </button>
+              {/* Llamamos a nuestra nueva función que convierte los campos vacíos a 0 */}
+              <button onClick={handleSaveSubmit} className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-bold shadow-lg shadow-orange-500/30 transition-all transform hover:-translate-y-0.5">
+                {formData.id ? 'Actualizar Producto' : 'Guardar Producto'}
               </button>
             </footer>
           </div>
