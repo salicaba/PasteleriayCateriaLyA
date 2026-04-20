@@ -131,7 +131,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 pb-32 md:pb-4 transition-colors">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredProducts.map(product => (
-                  <ProductCard key={product.id} producto={product} onAdd={setSelectedProduct} qty={getProductQty(product.id)} />
+                  <ProductCard key={product.id} product={product} onClick={setSelectedProduct} />
                 ))}
               </div>
             </div>

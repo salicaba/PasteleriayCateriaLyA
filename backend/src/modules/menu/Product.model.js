@@ -21,12 +21,12 @@ const Product = sequelize.define('Product', {
     allowNull: false,
   },
   imageUrl: {
-    type: DataTypes.STRING, // URL de Firebase Storage
+    type: DataTypes.STRING, 
     allowNull: true,
   },
   controlarStock: {
     type: DataTypes.BOOLEAN,
-    defaultValue: false, // false = Ilimitado
+    defaultValue: false, 
   },
   stockQuantity: {
     type: DataTypes.INTEGER,
@@ -39,6 +39,12 @@ const Product = sequelize.define('Product', {
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
+  },
+  // 🚀 AQUÍ ESTÁ LA SOLUCIÓN: Nueva columna JSON para las opciones
+  opciones: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: { tamanos: [], leches: [], extras: [] }
   }
 }, {
   timestamps: true,

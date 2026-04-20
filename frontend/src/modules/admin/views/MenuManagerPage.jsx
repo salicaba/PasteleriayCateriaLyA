@@ -101,7 +101,7 @@ export const MenuManagerPage = () => {
                             <div className="flex-1 min-w-0">
                               <h3 className={`font-bold text-lg leading-tight truncate ${!(product.disponible || product.isActive) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>{product.nombre || product.name}</h3>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                <p className="text-orange-500 dark:text-orange-400 font-black">${(product.precioBase || product.basePrice)?.toFixed(2) || '0.00'}</p>
+                                <p className="text-orange-500 dark:text-orange-400 font-black">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
