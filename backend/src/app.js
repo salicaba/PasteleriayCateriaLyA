@@ -1,3 +1,4 @@
+// backend/src/app.js
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './modules/auth/auth.routes.js';
@@ -8,7 +9,10 @@ import kitchenRoutes from './modules/kitchen/kitchen.routes.js';
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+
+// 👇 AQUÍ ESTÁ LA MAGIA: Aumentamos el límite a 50mb 👇
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Rutas Base
 app.use('/api/auth', authRoutes);

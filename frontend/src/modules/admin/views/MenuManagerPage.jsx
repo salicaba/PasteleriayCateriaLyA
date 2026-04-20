@@ -3,42 +3,26 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 
 export const MenuManagerPage = () => {
   const {
-    products,
-    categories,
-    setCategories,
-    handleDragEndAPI,
-    isModalOpen,
-    isCategoryManagerOpen,
-    setIsCategoryManagerOpen,
-    editingProduct,
-    toggleAvailability,
-    deleteProduct,
-    openModal,
-    closeModal,
-    saveProduct,
-    saveCategory,
-    // --- VARIABLES DE EDICIÓN DE CATEGORÍAS ---
-    categoryToEdit,
-    setCategoryToEdit,
-    removeCategory
+    products, categories, setCategories, handleDragEndAPI,
+    isModalOpen, isCategoryManagerOpen, setIsCategoryManagerOpen,
+    editingProduct, toggleAvailability, deleteProduct, openModal, closeModal, saveProduct, saveCategory,
+    categoryToEdit, setCategoryToEdit,
+    // Nuevas variables del modal de eliminación
+    categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory
   } = useMenuManagerController();
 
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Efecto para llenar el input cuando seleccionas "Editar" en una categoría
   useEffect(() => {
-    if (categoryToEdit) {
-      setNewCategoryName(categoryToEdit.name);
-    } else {
-      setNewCategoryName('');
-    }
+    if (categoryToEdit) setNewCategoryName(categoryToEdit.name);
+    else setNewCategoryName('');
   }, [categoryToEdit, isCategoryManagerOpen]);
 
   const sensors = useSensors(
@@ -76,27 +60,16 @@ export const MenuManagerPage = () => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white">Gestor de Menú</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
-              Catálogo completo de la Cafetería
-            </p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Catálogo completo de la Cafetería</p>
           </div>
         </div>
         
         <div className="flex space-x-3 w-full md:w-auto">
-          <button
-            onClick={() => setIsCategoryManagerOpen(true)}
-            className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2"
-          >
-            <Settings size={20} />
-            <span className="hidden sm:inline">Categorías</span>
+          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2">
+            <Settings size={20} /> <span className="hidden sm:inline">Categorías</span>
           </button>
-
-          <button
-            onClick={() => openModal()}
-            className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
-          >
-            <Plus size={20} />
-            <span>Nuevo Producto</span>
+          <button onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2">
+            <Plus size={20} /> <span>Nuevo Producto</span>
           </button>
         </div>
       </header>
@@ -105,26 +78,18 @@ export const MenuManagerPage = () => {
         <div className="space-y-10">
           {categories.map((category) => {
             const categoryProducts = products.filter(p => p.categoryId === category.id || p.categoria === category.name);
-            
             return (
               <div key={category.id} className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200 flex items-center space-x-2 border-b border-gray-200 dark:border-gray-800 pb-2">
                   <span className="capitalize">{category.name}</span>
-                  <span className="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-2 py-1 rounded-full">
-                    {categoryProducts.length}
-                  </span>
+                  <span className="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-2 py-1 rounded-full">{categoryProducts.length}</span>
                 </h2>
 
                 {categoryProducts.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <AnimatePresence>
                       {categoryProducts.map((product) => (
-                        <motion.div
-                          key={product.id} layout initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border ${
-                            product.disponible || product.isActive ? 'border-gray-100 dark:border-gray-800' : 'border-red-200 dark:border-red-900/50 opacity-75'
-                          }`}
-                        >
+                        <motion.div key={product.id} layout initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className={`relative flex flex-col bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border ${product.disponible || product.isActive ? 'border-gray-100 dark:border-gray-800' : 'border-red-200 dark:border-red-900/50 opacity-75'}`}>
                           <div className="flex items-center space-x-4 mb-4">
                             <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-inner flex items-center justify-center">
                               {product.image || product.imageUrl ? (
@@ -133,23 +98,15 @@ export const MenuManagerPage = () => {
                                 <div className="text-3xl">{product.imagen || <ImageIcon size={24} className="text-gray-300 dark:text-gray-600" />}</div>
                               )}
                             </div>
-                            
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-bold text-lg leading-tight truncate ${!(product.disponible || product.isActive) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
-                                {product.nombre || product.name}
-                              </h3>
+                              <h3 className={`font-bold text-lg leading-tight truncate ${!(product.disponible || product.isActive) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>{product.nombre || product.name}</h3>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                <p className="text-orange-500 dark:text-orange-400 font-black">
-                                  ${(product.precioBase || product.basePrice)?.toFixed(2) || '0.00'}
-                                </p>
+                                <p className="text-orange-500 dark:text-orange-400 font-black">${(product.precioBase || product.basePrice)?.toFixed(2) || '0.00'}</p>
                               </div>
                             </div>
                           </div>
-
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 mt-auto">
-                            <button onClick={() => toggleAvailability(product.id)} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                              product.disponible || product.isActive ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20' : 'text-red-600 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20'
-                            }`}>
+                            <button onClick={() => toggleAvailability(product.id)} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${product.disponible || product.isActive ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100' : 'text-red-600 bg-red-50 dark:bg-red-500/10 hover:bg-red-100'}`}>
                               <Power size={16} /> <span>{product.disponible || product.isActive ? 'Activo' : 'Apagado'}</span>
                             </button>
                             <div className="flex space-x-2">
@@ -173,82 +130,37 @@ export const MenuManagerPage = () => {
       </div>
 
       <AnimatePresence>
-        {isModalOpen && (
-          <ProductFormModal
-            isOpen={isModalOpen}
-            onClose={closeModal}
-            onSave={saveProduct}
-            initialData={editingProduct}
-            categories={categories} 
-          />
-        )}
+        {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} />}
       </AnimatePresence>
 
       <AnimatePresence>
         {isCategoryManagerOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 flex flex-col max-h-[80vh]"
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 flex flex-col max-h-[80vh]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-extrabold text-gray-800 dark:text-white">Administrar Categorías</h3>
-                <button 
-                  onClick={() => {
-                    setIsCategoryManagerOpen(false);
-                    setCategoryToEdit(null); // Limpiamos al cerrar
-                  }} 
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full transition-colors"
-                >
+                <button onClick={() => { setIsCategoryManagerOpen(false); setCategoryToEdit(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
 
-              {/* Zona de Input con estados dinámicos (Crear vs Actualizar) */}
               <div className="flex space-x-2 mb-6">
-                <input 
-                  type="text" 
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"}
-                  className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 font-medium transition-all ${
-                    categoryToEdit 
-                      ? 'border-blue-200 dark:border-blue-900 focus:ring-blue-500' 
-                      : 'border-gray-200 dark:border-gray-700 focus:ring-orange-500'
-                  }`}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateOrUpdateCategory()}
-                />
-                
-                {categoryToEdit && (
-                  <button onClick={() => setCategoryToEdit(null)} className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 px-3 py-3 rounded-xl font-bold">
-                    <X size={20} />
-                  </button>
-                )}
-                
-                <button 
-                  onClick={handleCreateOrUpdateCategory} 
-                  className={`${categoryToEdit ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} transition-colors text-white px-4 py-3 rounded-xl font-bold`}
-                >
+                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 font-medium transition-all ${categoryToEdit ? 'border-blue-200 dark:border-blue-900 focus:ring-blue-500' : 'border-gray-200 dark:border-gray-700 focus:ring-orange-500'}`} onKeyDown={(e) => e.key === 'Enter' && handleCreateOrUpdateCategory()} />
+                {categoryToEdit && <button onClick={() => setCategoryToEdit(null)} className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 px-3 py-3 rounded-xl font-bold"><X size={20} /></button>}
+                <button onClick={handleCreateOrUpdateCategory} className={`${categoryToEdit ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} transition-colors text-white px-4 py-3 rounded-xl font-bold`}>
                   {categoryToEdit ? <Save size={20} /> : <Plus size={20} />}
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 font-semibold uppercase tracking-wider">Orden del Menú (Arrastra para reordenar)</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 font-semibold uppercase tracking-wider text-center">Orden del Menú (Arrastra para reordenar)</p>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                     {categories.map((cat) => (
                       <SortableCategoryItem 
-                        key={cat.id} 
-                        id={cat.id} 
-                        category={cat} 
-                        isActive={categoryToEdit?.id === cat.id} // Se ilumina si la estás editando
-                        onClick={() => {}}
+                        key={cat.id} id={cat.id} category={cat} isActive={categoryToEdit?.id === cat.id} onClick={() => {}}
                         onEdit={(c) => setCategoryToEdit(c)}
-                        onDelete={(id) => removeCategory(id)}
+                        onDelete={(id) => requestRemoveCategory(id)} // <-- Llama al nuevo modal rojo
                       />
                     ))}
                   </SortableContext>
@@ -258,6 +170,32 @@ export const MenuManagerPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* NUEVO: MODAL HERMOSO PARA ELIMINAR CATEGORÍA */}
+      <AnimatePresence>
+        {categoryToDelete && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 text-center flex flex-col items-center">
+              <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
+                <AlertTriangle size={36} />
+              </div>
+              <h3 className="text-2xl font-extrabold text-gray-800 dark:text-white mb-2">¿Eliminar Categoría?</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed px-2">
+                Esta acción no se puede deshacer. Recuerda que <strong className="text-gray-700 dark:text-gray-300">no puedes eliminar una categoría si aún tiene productos</strong> dentro.
+              </p>
+              <div className="flex w-full gap-3">
+                <button onClick={cancelRemoveCategory} className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl font-bold transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={confirmRemoveCategory} className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5">
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 };

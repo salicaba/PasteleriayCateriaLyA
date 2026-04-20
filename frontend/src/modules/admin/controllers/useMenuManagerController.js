@@ -12,8 +12,10 @@ export const useMenuManagerController = () => {
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   
-  // NUEVO: Estado para saber si estamos editando una categoría
   const [categoryToEdit, setCategoryToEdit] = useState(null); 
+  
+  // NUEVO: Estado para el modal de confirmación de eliminación
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -33,7 +35,6 @@ export const useMenuManagerController = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // --- LÓGICA DE CATEGORÍAS ---
   const saveCategory = async (name) => {
     try {
       if (categoryToEdit) {
@@ -50,16 +51,25 @@ export const useMenuManagerController = () => {
     }
   };
 
-  const removeCategory = async (id) => {
-    if (window.confirm('¿Seguro que deseas eliminar esta categoría? Solo se puede borrar si no tiene productos.')) {
-      try {
-        await adminMenuModel.deleteCategory(id);
-        toast.success('Categoría eliminada');
-        loadData();
-      } catch (error) {
-        // Muestra el mensaje de error del backend (ej: "Mueve los productos primero")
-        toast.error(error.response?.data?.message || 'Error al eliminar categoría');
-      }
+  // NUEVAS FUNCIONES PARA EL MODAL DE ELIMINAR
+  const requestRemoveCategory = (id) => {
+    setCategoryToDelete(id); // Abre el modal
+  };
+
+  const cancelRemoveCategory = () => {
+    setCategoryToDelete(null); // Cierra el modal
+  };
+
+  const confirmRemoveCategory = async () => {
+    if (!categoryToDelete) return;
+    try {
+      await adminMenuModel.deleteCategory(categoryToDelete);
+      toast.success('Categoría eliminada');
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al eliminar categoría');
+    } finally {
+      setCategoryToDelete(null); // Cierra el modal al terminar
     }
   };
 
@@ -74,7 +84,6 @@ export const useMenuManagerController = () => {
     }
   };
 
-  // --- LÓGICA DE PRODUCTOS ---
   const openModal = (product = null) => {
     setEditingProduct(product);
     setIsModalOpen(true);
@@ -98,9 +107,10 @@ export const useMenuManagerController = () => {
   return {
     products, categories, setCategories,
     isModalOpen, isCategoryManagerOpen, setIsCategoryManagerOpen,
-    categoryToEdit, setCategoryToEdit, // Exponemos estos estados
+    categoryToEdit, setCategoryToEdit,
+    categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory, // Exponemos el nuevo modal
     editingProduct, openModal, closeModal: () => setIsModalOpen(false),
-    saveProduct, saveCategory, removeCategory, handleDragEndAPI,
+    saveProduct, saveCategory, handleDragEndAPI,
     deleteProduct: async (id) => { /* tu logica de delete de productos */ },
     toggleAvailability: (id) => { /* tu logica de toggle de productos */ }
   };
