@@ -1,9 +1,12 @@
+// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
-import { fetchProducts } from '../models/productsModel';
+// ¡IMPORTAMOS LA NUEVA FUNCIÓN fetchCategories AQUÍ!
+import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
 
 export const usePosController = () => {
-  const [dbProducts, setDbProducts] = useState([]); // <-- Estado para productos reales
+  const [dbProducts, setDbProducts] = useState([]); 
+  const [dbCategories, setDbCategories] = useState([]); // <-- NUEVO ESTADO
   const [cart, setCart] = useState([]);
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
@@ -11,13 +14,18 @@ export const usePosController = () => {
   const [cuentaActiva, setCuentaActiva] = useState('General');
   const [nombresCuentas, setNombresCuentas] = useState(['General']);
 
-  // --- CARGAR PRODUCTOS DESDE EL BACKEND ---
+  // --- CARGAR PRODUCTOS Y CATEGORÍAS DESDE EL BACKEND AL MISMO TIEMPO ---
   useEffect(() => {
-    const loadProducts = async () => {
-      const data = await fetchProducts();
-      setDbProducts(data);
+    const loadData = async () => {
+      // Promise.all hace que se descarguen más rápido al mismo tiempo
+      const [prods, cats] = await Promise.all([
+        fetchProducts(),
+        fetchCategories()
+      ]);
+      setDbProducts(prods);
+      setDbCategories(cats); // Guardamos las categorías
     };
-    loadProducts();
+    loadData();
   }, []);
 
   // --- LÓGICA DE CARRITO Y CUENTAS (Se mantiene igual) ---
@@ -174,6 +182,7 @@ export const usePosController = () => {
     filtroTexto, setFiltroTexto, categoriaActiva, setCategoriaActiva,
     filteredProducts, getProductQty, 
     handleCheckout, simulateKitchenSend, isSuccess,
-    cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta
+    cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
+    dbCategories // <-- ¡NO OLVIDES EXPORTAR ESTO AL FINAL!
   };
 };

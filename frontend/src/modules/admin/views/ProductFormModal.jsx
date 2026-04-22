@@ -4,9 +4,6 @@ import Cropper from 'react-easy-crop';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, RotateCw, Package, Settings2, PlusCircle, Folder } from 'lucide-react';
 
-// ==========================================
-// 🛠️ FUNCIONES PARA EL RECORTE DE IMAGEN
-// ==========================================
 const createImage = (url) => new Promise((resolve, reject) => {
   const image = new Image();
   image.addEventListener('load', () => resolve(image));
@@ -33,10 +30,23 @@ async function getCroppedImg(imageSrc, pixelCrop, rotation = 0) {
   return canvas.toDataURL('image/jpeg', 0.9);
 }
 
-// ==========================================
-// 🎨 COMPONENTE PRINCIPAL
-// ==========================================
 export const ProductFormModal = ({ initialData, onClose, onSave, categories = [] }) => {
+  // 🔥 FIX: Normalizador para que no se rompan tus productos viejos
+  const normalizeOptions = (ops) => {
+    if (!ops) return { tamanos: [], leches: [], extras: [] };
+    const result = { tamanos: [], leches: [], extras: [] };
+    ['tamanos', 'leches', 'extras'].forEach(tipo => {
+      if (ops[tipo] && Array.isArray(ops[tipo])) {
+        result[tipo] = ops[tipo].map(item => {
+           // Convierte textos viejos en objetos nuevos
+           if (typeof item === 'string') return { nombre: item, precioAdicional: 0 };
+           return item;
+        });
+      }
+    });
+    return result;
+  };
+
   const [formData, setFormData] = useState({
     id: initialData?.id || undefined,
     name: initialData?.name || initialData?.nombre || '',
@@ -46,7 +56,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? 0) : '',
     imageUrl: initialData?.imageUrl || initialData?.image || null,
     isActive: initialData?.isActive !== undefined ? initialData.isActive : (initialData?.disponible !== undefined ? initialData.disponible : true),
-    opciones: initialData?.opciones || { tamanos: [], leches: [], extras: [] }
+    opciones: normalizeOptions(initialData?.opciones)
   });
 
   const [imageSrc, setImageSrc] = useState(null);
@@ -55,7 +65,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
-  // NUEVO: Estado para el modal personalizado de opciones (reemplaza window.prompt)
   const [promptState, setPromptState] = useState({ isOpen: false, type: '', value: '' });
 
   const requestAddOption = (type) => {
@@ -66,7 +75,14 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     if (promptState.value && promptState.value.trim() !== '') {
       setFormData({ 
         ...formData, 
-        opciones: { ...formData.opciones, [promptState.type]: [...formData.opciones[promptState.type], promptState.value.trim()] } 
+        opciones: { 
+          ...formData.opciones, 
+          [promptState.type]: [
+            ...formData.opciones[promptState.type], 
+            // 🔥 FIX: Guardamos como objeto con precioAdicional en lugar de un string pelón
+            { nombre: promptState.value.trim(), precioAdicional: 0 }
+          ] 
+        } 
       });
     }
     setPromptState({ isOpen: false, type: '', value: '' });
@@ -225,7 +241,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                           <Settings2 size={16} className="text-orange-500" />
                           {tipo}
                         </h3>
-                        {/* Llama a nuestra nueva función del modal local */}
                         <button onClick={() => requestAddOption(tipo)} className="text-orange-500 p-1 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-full transition-colors">
                           <PlusCircle size={20} />
                         </button>
@@ -233,7 +248,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       <div className="flex flex-wrap gap-2">
                         {formData.opciones[tipo].map((opt, idx) => (
                           <div key={idx} className="bg-white dark:bg-gray-700 px-3 py-1 rounded-xl flex items-center gap-2 border border-gray-100 dark:border-gray-600 shadow-sm">
-                            <span className="text-sm dark:text-gray-200 font-medium">{opt}</span>
+                            <span className="text-sm dark:text-gray-200 font-medium">{opt.nombre || opt}</span>
                             <button onClick={() => removeOption(tipo, idx)} className="text-red-400 hover:text-red-500"><X size={14} /></button>
                           </div>
                         ))}
@@ -254,7 +269,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
         </div>
       </div>
 
-      {/* NUEVO: MODAL HERMOSO PARA AGREGAR OPCIONES (TAMAÑOS, LECHES, EXTRAS) */}
       <AnimatePresence>
         {promptState.isOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

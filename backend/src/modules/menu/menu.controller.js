@@ -132,7 +132,8 @@ export const createProduct = async (req, res) => {
       imageUrl, 
       controlarStock, 
       stockQuantity, 
-      categoryId 
+      categoryId,
+      opciones // 🔥 AQUÍ ESTÁ EL FIX: Le decimos al backend que reciba las opciones
     } = req.body;
     
     const newProduct = await Product.create({
@@ -142,7 +143,8 @@ export const createProduct = async (req, res) => {
       imageUrl,
       controlarStock,
       stockQuantity,
-      categoryId
+      categoryId,
+      opciones // 🔥 Y que las guarde en MySQL
     });
 
     res.status(201).json({ message: 'Producto creado', product: newProduct });

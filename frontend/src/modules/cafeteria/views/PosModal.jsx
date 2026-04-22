@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Search, ChevronDown, ChevronUp, MoreVertical } from 'lucide-react';
+import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { usePosController } from '../controllers/usePosController';
@@ -32,7 +32,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     handleCheckout, isSuccess,
     unsentTotal, hasUnsentItems, simulateKitchenSend,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    moveItemToCuenta
+    moveItemToCuenta,
+    dbCategories 
   } = usePosController();
 
   const handleConfirmOption = (productWithOptions) => {
@@ -99,13 +100,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onMoveItem: moveItemToCuenta
   };
 
-  // =================================================================
-  // NUEVA LÓGICA: Separamos el número (L-01) del nombre (Emmanuel)
-  // =================================================================
   const isLlevar = mesa.zona === 'llevar';
   const partesNumero = mesa.numero.toString().split(' - ');
-  const numeroReal = partesNumero[0]; // Se queda con "L-01" o "1"
-  const nombreCliente = partesNumero[1] || 'MOSTRADOR'; // Si hay nombre lo usa, si no dice Mostrador
+  const numeroReal = partesNumero[0]; 
+  const nombreCliente = partesNumero[1] || 'MOSTRADOR'; 
 
   return (
     <AnimatePresence>
@@ -115,7 +113,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
         <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl bg-gray-50 dark:bg-gray-900 md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors duration-300">
           
-          {/* SECCIÓN IZQUIERDA: PRODUCTOS */}
           <div className="flex-1 flex flex-col h-full relative z-0">
             <div className="bg-white dark:bg-gray-800 p-4 pb-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-20 shadow-sm transition-colors">
               <div className="flex items-center gap-3 mb-3">
@@ -125,18 +122,37 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 transition-colors"><X size={24} /></button>
               </div>
-              <CategoryBar active={categoriaActiva} onSelect={setCategoriaActiva} />
+              <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 pb-32 md:pb-4 transition-colors">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 pb-32 md:pb-4 transition-colors custom-scrollbar">
+              
+              {/* BANNER DE INFORMACIÓN MEJORADO: Justificado/Centrado y Flex-Col en móviles */}
+              <div className="mb-5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 shadow-sm">
+                <div className="bg-blue-100 dark:bg-blue-800/50 p-2.5 rounded-xl shrink-0 text-blue-600 dark:text-blue-400">
+                  <Info size={20} />
+                </div>
+                <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 font-medium leading-relaxed text-center sm:text-justify">
+                  <strong className="font-black">Tip de venta:</strong> Toca la imagen de los productos con la etiqueta <span className="inline-flex items-center text-[9px] uppercase font-black tracking-wider text-brand-primary dark:text-orange-400 bg-brand-primary/10 dark:bg-orange-500/10 px-1.5 py-0.5 rounded-full mx-1 border border-brand-primary/20 dark:border-orange-500/20">✨ Personalizable</span> para elegir tamaños, leches o extras. O usa el botón <span className="inline-flex items-center justify-center bg-brand-primary dark:bg-orange-500 text-white rounded p-0.5 mx-1 shadow-sm"><Plus size={12} strokeWidth={3} /></span> para agregarlos rápido con las opciones predeterminadas.
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} onClick={setSelectedProduct} />
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    onClick={setSelectedProduct} 
+                    onQuickAdd={(p) => addToCart({ 
+                      ...p, 
+                      precioFinal: Number(p.precioBase || p.precio || 0), 
+                      detalles: {} 
+                    })} 
+                  />
                 ))}
               </div>
             </div>
 
-            {/* VISTA MÓVIL (TICKET) */}
             <div className="md:hidden">
               <AnimatePresence>
                 {showMobileTicket && (
@@ -147,7 +163,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                         <div>
                           <span className="font-bold text-gray-700 dark:text-white block leading-tight flex items-center gap-2">
                             <span>{isLlevar ? 'Ticket' : 'Mesa'} #{numeroReal}</span>
-                            {/* AQUI APARECE EL NOMBRE EN EL GLOBO EN MÓVIL */}
                             {isLlevar && (
                                <span className="px-2 py-0.5 bg-orange-500 text-white text-[10px] font-black rounded-full uppercase tracking-wider">
                                   {nombreCliente}
@@ -180,14 +195,12 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
             </div>
           </div>
 
-          {/* SECCIÓN DERECHA: SIDEBAR (ESCRITORIO) */}
           <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col transition-colors">
             <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border-b border-brand-primary/10 dark:border-brand-primary/20 flex justify-between items-center">
                <div>
                   <h3 className="font-bold text-brand-dark dark:text-brand-primary text-lg flex items-center gap-2">
                      <span>{isLlevar ? 'Ticket' : 'Mesa'} #{numeroReal}</span>
                      {mesa.estado === 'ocupada' && (
-                       /* AQUI APARECE EL NOMBRE EN EL GLOBO EN ESCRITORIO (reemplazando "ACTIVO") */
                        <span className={`px-2 py-0.5 text-white text-[10px] font-black rounded-full uppercase tracking-wider ${isLlevar ? 'bg-orange-500' : 'bg-brand-primary'}`}>
                           {isLlevar ? nombreCliente : 'OCUPADA'}
                        </span>
@@ -209,9 +222,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           </div>
         </motion.div>
 
-        {/* MODALES ADICIONALES */}
         <AnimatePresence>
           {isSuccess && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]"><SuccessScreen /></motion.div>)}
+          
           {selectedProduct && (<ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />)}
           
           {showCheckout && (
