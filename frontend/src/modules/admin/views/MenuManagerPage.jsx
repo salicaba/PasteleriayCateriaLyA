@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
@@ -14,11 +14,16 @@ export const MenuManagerPage = () => {
     isModalOpen, isCategoryManagerOpen, setIsCategoryManagerOpen,
     editingProduct, toggleAvailability, deleteProduct, openModal, closeModal, saveProduct, saveCategory,
     categoryToEdit, setCategoryToEdit,
-    // Nuevas variables del modal de eliminación
-    categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory
+    categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
+    // 🔥 NUEVAS VARIABLES: Eliminar producto
+    productToDelete, confirmRemoveProduct, cancelRemoveProduct,
+    // Opciones globales
+    globalOptions, saveGlobalOption, removeGlobalOption
   } = useMenuManagerController();
 
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [isOptionsManagerOpen, setIsOptionsManagerOpen] = useState(false);
+  const [newOpt, setNewOpt] = useState({ tipo: 'tamanos', nombre: '', precio: 0 });
 
   useEffect(() => {
     if (categoryToEdit) setNewCategoryName(categoryToEdit.name);
@@ -64,10 +69,15 @@ export const MenuManagerPage = () => {
           </div>
         </div>
         
-        <div className="flex space-x-3 w-full md:w-auto">
-          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2">
-            <Settings size={20} /> <span className="hidden sm:inline">Categorías</span>
+        <div className="flex flex-wrap space-x-0 space-y-3 md:space-y-0 md:space-x-3 w-full md:w-auto">
+          <button onClick={() => setIsOptionsManagerOpen(true)} className="w-full md:w-auto flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50">
+            <Settings size={20} /> <span className="hidden sm:inline">Opciones Globales</span>
           </button>
+          
+          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2">
+            <LayoutGrid size={20} /> <span className="hidden sm:inline">Categorías</span>
+          </button>
+          
           <button onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2">
             <Plus size={20} /> <span>Nuevo Producto</span>
           </button>
@@ -129,10 +139,12 @@ export const MenuManagerPage = () => {
         </div>
       </div>
 
+      {/* FORMULARIO DE CREAR/EDITAR PRODUCTO */}
       <AnimatePresence>
-        {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} />}
+        {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} globalOptions={globalOptions} />}
       </AnimatePresence>
 
+      {/* MODAL DE GESTIÓN DE CATEGORÍAS */}
       <AnimatePresence>
         {isCategoryManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -160,7 +172,7 @@ export const MenuManagerPage = () => {
                       <SortableCategoryItem 
                         key={cat.id} id={cat.id} category={cat} isActive={categoryToEdit?.id === cat.id} onClick={() => {}}
                         onEdit={(c) => setCategoryToEdit(c)}
-                        onDelete={(id) => requestRemoveCategory(id)} // <-- Llama al nuevo modal rojo
+                        onDelete={(id) => requestRemoveCategory(id)} 
                       />
                     ))}
                   </SortableContext>
@@ -171,7 +183,7 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* NUEVO: MODAL HERMOSO PARA ELIMINAR CATEGORÍA */}
+      {/* MODAL PARA ELIMINAR CATEGORÍA */}
       <AnimatePresence>
         {categoryToDelete && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -190,6 +202,112 @@ export const MenuManagerPage = () => {
                 <button onClick={confirmRemoveCategory} className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5">
                   Eliminar
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* 🔥 NUEVO: MODAL PARA ELIMINAR PRODUCTO 🔥 */}
+      <AnimatePresence>
+        {productToDelete && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 text-center flex flex-col items-center">
+              <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
+                <AlertTriangle size={36} />
+              </div>
+              <h3 className="text-2xl font-extrabold text-gray-800 dark:text-white mb-2">¿Eliminar Producto?</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed px-2">
+                ¿Estás seguro de que deseas eliminar este producto del menú? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex w-full gap-3">
+                <button onClick={cancelRemoveProduct} className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl font-bold transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={confirmRemoveProduct} className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5">
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE OPCIONES GLOBALES */}
+      <AnimatePresence>
+        {isOptionsManagerOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <div>
+                  <h3 className="text-xl font-black dark:text-gray-100 flex items-center gap-2">
+                    <Settings size={20} className="text-blue-500" />
+                    Catálogo de Opciones
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Crea modificadores globales (Ej: Tamaños, Leches, Extras)</p>
+                </div>
+                <button onClick={() => setIsOptionsManagerOpen(false)} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full transition-colors"><X size={20} /></button>
+              </div>
+
+              <div className="p-6 bg-white dark:bg-gray-900 grid grid-cols-1 md:grid-cols-4 gap-3 border-b border-gray-100 dark:border-gray-800 shadow-sm z-10">
+                <select 
+                  value={newOpt.tipo} 
+                  onChange={e => setNewOpt({...newOpt, tipo: e.target.value})}
+                  className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 dark:text-white border border-gray-200 dark:border-gray-700 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="tamanos">Tamaño</option>
+                  <option value="leches">Leche</option>
+                  <option value="extras">Extra</option>
+                </select>
+                <input 
+                  type="text" placeholder="Nombre (Ej: Deslactosada)" 
+                  value={newOpt.nombre} onChange={e => setNewOpt({...newOpt, nombre: e.target.value})}
+                  className="md:col-span-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 dark:text-white border border-gray-200 dark:border-gray-700 outline-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  onKeyDown={e => {
+                    if(e.key === 'Enter' && newOpt.nombre.trim()){
+                      saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); 
+                      setNewOpt({...newOpt, nombre: ''});
+                    }
+                  }}
+                />
+                <button 
+                  onClick={() => { 
+                    if(newOpt.nombre.trim()){
+                      saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); 
+                      setNewOpt({...newOpt, nombre: ''}); 
+                    }
+                  }}
+                  className="bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+                >
+                  <Plus size={18} /> Añadir
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-gray-50/50 dark:bg-gray-950/20">
+                {['tamanos', 'leches', 'extras'].map(tipo => {
+                  const opcionesDelTipo = globalOptions.filter(o => o.tipo === tipo);
+                  return (
+                    <div key={tipo}>
+                      <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 pb-2">{tipo}</h4>
+                      {opcionesDelTipo.length === 0 ? (
+                        <p className="text-sm text-gray-400 dark:text-gray-600 italic px-2 bg-white/50 dark:bg-gray-900/50 p-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-800">
+                          Aún no has registrado {tipo}.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {opcionesDelTipo.map(opt => (
+                            <div key={opt.id} className="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm group hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors">
+                              <span className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate pr-2">{opt.nombre}</span>
+                              <button onClick={() => removeGlobalOption(opt.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 md:opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all">
+                                <Trash2 size={16}/>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </motion.div>
           </motion.div>

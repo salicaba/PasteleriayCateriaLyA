@@ -6,6 +6,7 @@ import { adminMenuModel } from '../models/adminMenuModel';
 export const useMenuManagerController = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [globalOptions, setGlobalOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,16 +15,21 @@ export const useMenuManagerController = () => {
   
   const [categoryToEdit, setCategoryToEdit] = useState(null); 
   const [categoryToDelete, setCategoryToDelete] = useState(null);
+  
+  // 🔥 NUEVO: Estado para el modal de eliminar producto
+  const [productToDelete, setProductToDelete] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [fetchedCategories, fetchedProducts] = await Promise.all([
+      const [fetchedCategories, fetchedProducts, fetchedOptions] = await Promise.all([
         adminMenuModel.getCategories(),
-        adminMenuModel.getProducts()
+        adminMenuModel.getProducts(),
+        adminMenuModel.getGlobalOptions()
       ]);
       setCategories(fetchedCategories);
       setProducts(fetchedProducts);
+      setGlobalOptions(fetchedOptions);
     } catch (error) {
       toast.error('Error al cargar datos');
     } finally {
@@ -33,6 +39,9 @@ export const useMenuManagerController = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // ==========================================
+  // GESTIÓN DE CATEGORÍAS
+  // ==========================================
   const saveCategory = async (name) => {
     try {
       if (categoryToEdit) {
@@ -49,13 +58,8 @@ export const useMenuManagerController = () => {
     }
   };
 
-  const requestRemoveCategory = (id) => {
-    setCategoryToDelete(id);
-  };
-
-  const cancelRemoveCategory = () => {
-    setCategoryToDelete(null);
-  };
+  const requestRemoveCategory = (id) => setCategoryToDelete(id);
+  const cancelRemoveCategory = () => setCategoryToDelete(null);
 
   const confirmRemoveCategory = async () => {
     if (!categoryToDelete) return;
@@ -81,50 +85,37 @@ export const useMenuManagerController = () => {
     }
   };
 
+  // ==========================================
+  // GESTIÓN DE PRODUCTOS Y CLOUDINARY
+  // ==========================================
   const openModal = (product = null) => {
     setEditingProduct(product);
     setIsModalOpen(true);
   };
 
-  // 🚀 LÓGICA DE CLOUDINARY INTEGRADA AQUÍ
   const saveProduct = async (data) => {
     const toastId = toast.loading('Procesando producto...');
-    
     try {
       let finalImageUrl = data.imageUrl;
-
-      // 1. Detectar si la imagen es un recorte nuevo (empieza con 'data:image')
       if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
         toast.loading('Subiendo imagen a la nube...', { id: toastId });
-        
-        // 2. Preparar el paquete para Cloudinary
         const formData = new FormData();
         formData.append('file', finalImageUrl);
-        // Usamos variables de entorno de Vite para mayor seguridad
         formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET); 
-        
         const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
         
-        // 3. Disparar a la API de Cloudinary
         const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-          method: 'POST',
-          body: formData
+          method: 'POST', body: formData
         });
 
         const cloudData = await cloudRes.json();
-        
-        if (!cloudRes.ok) throw new Error(cloudData.error?.message || 'Error al subir imagen a Cloudinary');
-        
-        // 4. Capturar la URL segura devuelta por la nube
+        if (!cloudRes.ok) throw new Error(cloudData.error?.message || 'Error al subir imagen');
         finalImageUrl = cloudData.secure_url;
       }
 
-      // 5. Armar el payload para tu modelo Hexagonal
       const payload = { ...data, imageUrl: finalImageUrl };
-
       toast.loading('Guardando en base de datos...', { id: toastId });
 
-      // 6. Ejecutar la llamada a tu Node/MySQL
       if (editingProduct) {
         await adminMenuModel.updateProduct(editingProduct.id, payload);
       } else {
@@ -135,8 +126,66 @@ export const useMenuManagerController = () => {
       loadData();
       toast.success('Producto guardado con éxito', { id: toastId });
     } catch (error) {
-      console.error("Error en flujo de guardado:", error);
       toast.error('Ocurrió un error al guardar', { id: toastId });
+    }
+  };
+
+  // 🔥 FIX: Lógica real para eliminar producto
+  const requestRemoveProduct = (id) => setProductToDelete(id);
+  const cancelRemoveProduct = () => setProductToDelete(null);
+  
+  const confirmRemoveProduct = async () => {
+    if (!productToDelete) return;
+    const toastId = toast.loading('Eliminando producto...');
+    try {
+      await adminMenuModel.deleteProduct(productToDelete);
+      toast.success('Producto eliminado', { id: toastId });
+      loadData();
+    } catch (error) {
+      toast.error('Error al eliminar producto', { id: toastId });
+    } finally {
+      setProductToDelete(null);
+    }
+  };
+
+  // 🔥 FIX: Lógica real para Apagar/Encender producto
+  const toggleAvailability = async (id) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    
+    const toastId = toast.loading('Actualizando estado...');
+    try {
+      const currentState = product.isActive !== undefined ? product.isActive : product.disponible;
+      await adminMenuModel.updateProduct(id, { isActive: !currentState });
+      toast.success('Estado actualizado', { id: toastId });
+      loadData();
+    } catch (error) {
+      toast.error('Error al actualizar estado', { id: toastId });
+    }
+  };
+
+  // ==========================================
+  // GESTIÓN DE OPCIONES GLOBALES
+  // ==========================================
+  const saveGlobalOption = async (tipo, nombre, precio) => {
+    const toastId = toast.loading('Guardando opción...');
+    try {
+      const res = await adminMenuModel.createGlobalOption({ tipo, nombre, precioAdicional: Number(precio) });
+      setGlobalOptions(prev => [...prev, res]); 
+      toast.success('Opción añadida correctamente', { id: toastId });
+    } catch (error) {
+      toast.error('Error al guardar la opción', { id: toastId });
+    }
+  };
+
+  const removeGlobalOption = async (id) => {
+    const toastId = toast.loading('Eliminando opción...');
+    try {
+      await adminMenuModel.deleteGlobalOption(id);
+      setGlobalOptions(prev => prev.filter(o => o.id !== id));
+      toast.success('Opción eliminada', { id: toastId });
+    } catch (error) {
+      toast.error('Error al eliminar opción', { id: toastId });
     }
   };
 
@@ -147,7 +196,12 @@ export const useMenuManagerController = () => {
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
     editingProduct, openModal, closeModal: () => setIsModalOpen(false),
     saveProduct, saveCategory, handleDragEndAPI,
-    deleteProduct: async (id) => { /* tu logica de delete de productos */ },
-    toggleAvailability: (id) => { /* tu logica de toggle de productos */ }
+    
+    // 🔥 Exportamos las nuevas funciones arregladas
+    productToDelete, requestRemoveProduct, confirmRemoveProduct, cancelRemoveProduct,
+    deleteProduct: requestRemoveProduct, // Enlazamos el botón del basurero aquí
+    toggleAvailability,
+    
+    globalOptions, saveGlobalOption, removeGlobalOption
   };
 };

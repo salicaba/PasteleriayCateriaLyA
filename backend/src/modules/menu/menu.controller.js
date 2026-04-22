@@ -3,6 +3,7 @@ import Category from './Category.model.js';
 import Product from './Product.model.js';
 import Variant from './Variant.model.js';
 import sequelize from '../../config/database.js';
+import GlobalOption from './GlobalOption.model.js';
 
 // ==========================================
 // 📁 GESTIÓN DE CATEGORÍAS (Drag & Drop)
@@ -188,5 +189,35 @@ export const deleteProduct = async (req, res) => {
     res.json({ message: 'Producto eliminado (desactivado)' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar producto', error: error.message });
+  }
+};
+
+// ==========================================
+// ⚙️ GESTIÓN DE OPCIONES GLOBALES
+// ==========================================
+export const getGlobalOptions = async (req, res) => {
+  try {
+    const options = await GlobalOption.findAll();
+    res.json(options);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener opciones', error: error.message });
+  }
+};
+
+export const createGlobalOption = async (req, res) => {
+  try {
+    const newOption = await GlobalOption.create(req.body);
+    res.status(201).json(newOption);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al crear opción', error: error.message });
+  }
+};
+
+export const deleteGlobalOption = async (req, res) => {
+  try {
+    await GlobalOption.destroy({ where: { id: req.params.id } });
+    res.json({ message: 'Opción eliminada' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar', error: error.message });
   }
 };

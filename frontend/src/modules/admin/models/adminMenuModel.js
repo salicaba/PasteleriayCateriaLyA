@@ -28,7 +28,7 @@ export const adminMenuModel = {
     const response = await client.post('/menu/categories', { name });
     return response.data;
   },
-  updateCategory: async (id, name) => { // <-- NUEVA
+  updateCategory: async (id, name) => {
     const response = await client.put(`/menu/categories/${id}`, { name });
     return response.data;
   },
@@ -37,8 +37,22 @@ export const adminMenuModel = {
     return response.data;
   },
   reorderCategories: async (items) => {
-    // items debe ser un array: [{ id: 'uuid', order: 0 }, ...]
     const response = await client.put('/menu/categories/reorder', { items });
+    return response.data;
+  },
+
+  // --- OPCIONES GLOBALES (NUEVO) ---
+  getGlobalOptions: async () => {
+    const response = await client.get('/menu/options');
+    return response.data;
+  },
+  createGlobalOption: async (data) => {
+    // data espera { tipo, nombre, precioAdicional }
+    const response = await client.post('/menu/options', data);
+    return response.data;
+  },
+  deleteGlobalOption: async (id) => {
+    const response = await client.delete(`/menu/options/${id}`);
     return response.data;
   }
 };

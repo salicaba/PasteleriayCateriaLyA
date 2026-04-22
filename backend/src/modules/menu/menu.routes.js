@@ -1,38 +1,24 @@
-// src/modules/menu/menu.routes.js
 import { Router } from 'express';
-import { 
-  getCategories, 
-  createCategory, 
-  reorderCategories, 
-  deleteCategory,
-  updateCategory, // <-- ¡AQUÍ ESTÁ LA CORRECCIÓN!
-  getProducts, 
-  createProduct,
-  updateProduct,
-  deleteProduct
-} from './menu.controller.js';
-import { verifyToken } from '../../middlewares/auth.middleware.js';
-import { authorizeRoles } from '../../middlewares/rbac.middleware.js';
+import { getCategories, createCategory, updateCategory, reorderCategories, deleteCategory, getProducts, createProduct, updateProduct, deleteProduct, getGlobalOptions, createGlobalOption, deleteGlobalOption } from './menu.controller.js';
 
 const router = Router();
 
-// ==========================================
-// 📁 RUTAS DE CATEGORÍAS
-// ==========================================
+// Rutas de Categorías
+router.get('/categories', getCategories);
+router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
+router.put('/categories/reorder', reorderCategories);
+router.delete('/categories/:id', deleteCategory);
 
-router.get('/categories', verifyToken, authorizeRoles('Owner', 'Employee'), getCategories);
-router.post('/categories', verifyToken, authorizeRoles('Owner'), createCategory);
-router.put('/categories/reorder', verifyToken, authorizeRoles('Owner'), reorderCategories);
-router.put('/categories/:id', verifyToken, authorizeRoles('Owner'), updateCategory); // Ruta de edición
-router.delete('/categories/:id', verifyToken, authorizeRoles('Owner'), deleteCategory);
+// Rutas de Productos
+router.get('/products', getProducts);
+router.post('/products', createProduct);
+router.put('/products/:id', updateProduct);
+router.delete('/products/:id', deleteProduct);
 
-// ==========================================
-// 🍔 RUTAS DE PRODUCTOS
-// ==========================================
-
-router.get('/products', verifyToken, authorizeRoles('Owner', 'Employee'), getProducts);
-router.post('/products', verifyToken, authorizeRoles('Owner'), createProduct);
-router.put('/products/:id', verifyToken, authorizeRoles('Owner'), updateProduct);
-router.delete('/products/:id', verifyToken, authorizeRoles('Owner'), deleteProduct);
+// 👇 NUEVAS RUTAS DE OPCIONES GLOBALES 👇
+router.get('/options', getGlobalOptions);
+router.post('/options', createGlobalOption);
+router.delete('/options/:id', deleteGlobalOption);
 
 export default router;

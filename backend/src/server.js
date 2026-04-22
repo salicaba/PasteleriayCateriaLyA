@@ -1,6 +1,7 @@
 import app from './app.js';
 import sequelize from './config/database.js';
 import { setupAssociations } from './config/associations.js'; // <-- 1. Importamos la función
+import './modules/menu/GlobalOption.model.js'; // <-- Agrega esta línea
 
 const PORT = process.env.PORT || 4000;
 

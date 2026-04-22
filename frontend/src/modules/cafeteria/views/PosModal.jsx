@@ -143,11 +143,49 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                     key={product.id} 
                     product={product} 
                     onClick={setSelectedProduct} 
-                    onQuickAdd={(p) => addToCart({ 
-                      ...p, 
-                      precioFinal: Number(p.precioBase || p.precio || 0), 
-                      detalles: {} 
-                    })} 
+                    onQuickAdd={(p) => {
+                      // 1. Extraemos las opciones del producto
+                      let ops = p.opciones;
+                      if (typeof ops === 'string') {
+                        try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+                      }
+                      if (typeof ops === 'string') {
+                        try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+                      }
+
+                      let precioAdicional = 0;
+                      let detalles = {};
+
+                      // 2. Si tiene configurado valores predeterminados (Defaults), los aplicamos
+                      if (ops && typeof ops === 'object') {
+                         const defs = ops.defaults || {};
+                         
+                         // Aplicar Tamaño por defecto
+                         if (defs.tamano) {
+                            detalles.tamano = defs.tamano;
+                            const tOpt = ops.tamanos?.find(t => (t.nombre || t) === defs.tamano);
+                            if (tOpt && tOpt.precioAdicional) precioAdicional += Number(tOpt.precioAdicional);
+                         } else {
+                            detalles.tamano = 'Estándar';
+                         }
+
+                         // Aplicar Leche por defecto
+                         if (defs.leche) {
+                            detalles.leche = defs.leche;
+                            const lOpt = ops.leches?.find(l => (l.nombre || l) === defs.leche);
+                            if (lOpt && lOpt.precioAdicional) precioAdicional += Number(lOpt.precioAdicional);
+                         }
+                      } else {
+                         detalles.tamano = 'Estándar';
+                      }
+
+                      // 3. Lo mandamos directo al carrito con el precio final calculado
+                      addToCart({ 
+                        ...p, 
+                        precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, 
+                        detalles 
+                      });
+                    }} 
                   />
                 ))}
               </div>
