@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react';
 
 export const useTheme = () => {
   const [theme, setTheme] = useState(() => {
-    // 1. Revisar localStorage
     if (typeof window !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
     }
-    // 2. Revisar preferencia del sistema
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
@@ -15,17 +13,20 @@ export const useTheme = () => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    // Remover la clase anterior
-    root.classList.remove('light', 'dark');
-    // Agregar la nueva
-    root.classList.add(theme);
-    // Guardar en storage
+    // Removemos todos los temas posibles antes de aplicar el nuevo
+    root.classList.remove('light', 'dark', 'theme-lya');
+    
+    // Agregamos la clase correspondiente
+    if (theme === 'lya') {
+      root.classList.add('theme-lya');
+    } else if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.add('light'); 
+    }
+    
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  return { theme, toggleTheme };
+  return { theme, setTheme }; // Exponemos setTheme para el selector
 };

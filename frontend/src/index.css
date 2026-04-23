@@ -1,4 +1,62 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body { @apply bg-gray-50 text-gray-800; }
+
+@layer base {
+  /* 1. TEMA CLARO (Genérico / Default) */
+  :root, .light {
+    --color-bg: #f9fafb;       /* gray-50 */
+    --color-surface: #ffffff;  /* white */
+    --color-text: #1f2937;     /* gray-800 */
+    --color-primary: #3b82f6;  /* blue-500 */
+    --color-secondary: #10b981;/* emerald-500 (Genérico secundario) */
+    --color-border: #e5e7eb;   /* gray-200 */
+  }
+
+  /* 2. TEMA OSCURO (Genérico) */
+  .dark {
+    --color-bg: #111827;       /* gray-900 */
+    --color-surface: #1f2937;  /* gray-800 */
+    --color-text: #f9fafb;     /* gray-50 */
+    --color-primary: #2563eb;  /* blue-600 */
+    --color-secondary: #059669;/* emerald-600 (Genérico secundario) */
+    --color-border: #374151;   /* gray-700 */
+  }
+
+  /* 3. TEMA LYA (Corporativo) */
+  .theme-lya {
+    --color-bg: #FAEDCD;       /* Vainilla/Beige: El fondo cálido de la app */
+    --color-surface: #FFFFFF;  /* Blanco: Para las tarjetas y modales (Limpio) */
+    --color-text: #4A2B29;     /* Café/Marrón: Texto principal y "LyA" */
+    --color-primary: #F49AC2;  /* Rosa: Betún y acentos principales (Botón Cobrar) */
+    --color-secondary: #72CEC3; /* Verde Turquesa: "CUP & CAKES" (Botones secundarios) */
+    --color-border: #D4A373;   /* Beige/Crema oscuro: Bordes de la base del cupcake */
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    @apply antialiased transition-colors duration-300;
+  }
+}
+
+/* Custom Scrollbar - Estilos dinámicos adaptables al tema */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-secondary);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-primary);
+}

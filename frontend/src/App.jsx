@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Toaster } from 'react-hot-toast'; // <-- NUEVA IMPORTACIÓN DEL TOASTER
+import { Toaster } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
-import { ThemeToggle } from './components/ThemeToggle';
+import { ThemeSelector } from './components/ThemeSelector'; // <-- NUEVO SELECTOR DE TEMAS
 
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
@@ -20,7 +20,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -49,7 +49,6 @@ function App() {
     year: 'numeric' 
   });
 
-  // --- MENÚ PRINCIPAL ACTUALIZADO ---
   const menuItems = [
     { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
     { id: 'qr', label: 'Control QR', icon: QrCode },
@@ -64,22 +63,23 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans overflow-hidden transition-colors duration-300">
+    <div className="h-screen flex bg-brand-bg text-brand-text font-sans overflow-hidden transition-colors duration-300">
       
-      {/* 🚀 TOASTER GLOBAL CONFIGURADO CON SOPORTE DARK MODE */}
+      {/* TOASTER CON COLORES DINÁMICOS BASADOS EN EL TEMA */}
       <Toaster 
         position="bottom-right"
         toastOptions={{
           duration: 4000,
           style: {
-            background: theme === 'dark' ? '#1f2937' : '#ffffff',
-            color: theme === 'dark' ? '#f3f4f6' : '#1f2937',
-            borderRadius: '1rem',
+            background: 'var(--color-surface)',
+            color: 'var(--color-text)',
+            borderRadius: '12px',
+            border: '1px solid var(--color-border)',
             fontWeight: 'bold',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
           },
           success: {
-            iconTheme: { primary: '#f97316', secondary: '#fff' }, // Naranja brand
+            iconTheme: { primary: 'var(--color-primary)', secondary: 'var(--color-surface)' }, 
           },
         }}
       />
@@ -88,14 +88,14 @@ function App() {
         initial={false}
         animate={{ width: isSidebarOpen ? 240 : 0 }}
         style={{ borderRightWidth: isSidebarOpen ? '1px' : '0px' }}
-        className="h-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-800 shadow-xl z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
+        className="h-full bg-brand-surface border-brand-border shadow-xl z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
       >
         <div className="w-[240px] flex flex-col h-full">
-          <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 shrink-0">
-            <div className="w-8 h-8 bg-gradient-to-tr from-orange-500 to-orange-400 rounded-lg flex items-center justify-center text-white font-lya font-bold text-lg shadow-md shrink-0">
+          <div className="h-16 flex items-center px-6 border-b border-brand-border shrink-0">
+            <div className="w-8 h-8 bg-brand-primary rounded-lya flex items-center justify-center text-brand-surface font-bold text-lg shadow-md shrink-0">
               L
             </div>
-            <span className="ml-3 font-bold text-gray-700 dark:text-gray-200">Menú Principal</span>
+            <span className="ml-3 font-bold text-brand-text">Menú Principal</span>
           </div>
 
           <nav className="flex-1 py-4 flex flex-col gap-2 px-3 overflow-y-auto custom-scrollbar">
@@ -108,10 +108,10 @@ function App() {
                     setActiveTab(item.id);
                     if (window.innerWidth < 768) setIsSidebarOpen(false);
                   }}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none ${
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lya transition-all relative overflow-hidden outline-none ${
                     isActive
-                      ? 'bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-bold'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-800 dark:hover:text-gray-200'
+                      ? 'bg-brand-bg text-brand-primary font-bold border border-brand-border shadow-sm'
+                      : 'text-brand-text opacity-70 hover:opacity-100 hover:bg-brand-bg'
                   }`}
                 >
                   <div className="shrink-0 flex items-center justify-center w-6">
@@ -121,7 +121,7 @@ function App() {
                   {isActive && (
                     <motion.div
                       layoutId="activeIndicator"
-                      className="absolute left-0 top-0 bottom-0 my-auto w-1 h-[70%] bg-orange-500 rounded-r-full"
+                      className="absolute left-0 top-0 bottom-0 my-auto w-1 h-[70%] bg-brand-primary rounded-r-full"
                     />
                   )}
                 </button>
@@ -129,25 +129,27 @@ function App() {
             })}
           </nav>
 
-          <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/50 space-y-5">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Modo Oscuro</span>
-              <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+          <div className="p-4 border-t border-brand-border bg-brand-surface space-y-5">
+            
+            {/* NUEVO SELECTOR DE TEMAS */}
+            <div className="flex flex-col gap-2 px-1">
+              <span className="text-sm font-medium text-brand-text opacity-80">Apariencia</span>
+              <ThemeSelector />
             </div>
 
             <div>
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300 px-1 mb-2 block">
+              <span className="text-sm font-medium text-brand-text opacity-80 px-1 mb-2 block">
                 Tamaño de Pantalla
               </span>
-              <div className="flex bg-gray-200/50 dark:bg-gray-900 rounded-lg p-1">
+              <div className="flex bg-brand-bg rounded-lya p-1 border border-brand-border">
                 {['small', 'medium', 'large'].map((size) => (
                   <button
                     key={size}
                     onClick={() => setUiSize(size)}
                     className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
                       uiSize === size 
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        ? 'bg-brand-surface text-brand-primary shadow-sm border border-brand-border' 
+                        : 'text-brand-text opacity-60 hover:opacity-100'
                     }`}
                   >
                     {size === 'small' ? 'Chica' : size === 'medium' ? 'Media' : 'Grande'}
@@ -158,7 +160,7 @@ function App() {
 
             <button 
               onClick={() => setUser(null)}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold"
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lya border border-red-200 text-red-500 hover:bg-red-50 transition-colors text-sm font-bold"
             >
               <LogOut size={16} />
               Cerrar Sesión
@@ -175,57 +177,57 @@ function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="absolute inset-0 bg-black/10 dark:bg-black/40 z-20 md:hidden cursor-pointer backdrop-blur-[1px]"
+              className="absolute inset-0 bg-black/40 z-20 md:hidden cursor-pointer backdrop-blur-sm"
             />
           )}
         </AnimatePresence>
 
-        <header className="h-16 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 sm:px-6 shrink-0 z-10 transition-colors duration-300 relative">
+        <header className="h-16 bg-brand-surface border-b border-brand-border flex items-center justify-between px-3 sm:px-6 shrink-0 z-10 transition-colors duration-300 relative">
           <div className="flex items-center gap-2 sm:gap-4">
              <button
                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-               className="p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg transition-colors shadow-sm border border-gray-200 dark:border-gray-700 outline-none active:scale-95"
+               className="p-2 bg-brand-bg hover:bg-brand-surface text-brand-text rounded-lya transition-colors shadow-sm border border-brand-border outline-none active:scale-95"
              >
                <Menu size={20} />
              </button>
 
              <div className="flex items-center ml-1">
-               <span className="text-2xl sm:text-3xl text-gray-900 dark:text-white tracking-wider pb-1 font-bold">
+               <span className="text-2xl sm:text-3xl text-brand-text tracking-wider pb-1 font-bold">
                  LyA
                </span>
              </div>
 
-             <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1"></div>
+             <div className="hidden sm:block h-6 w-px bg-brand-border mx-1"></div>
 
-             <h2 className="text-lg font-medium text-gray-500 dark:text-gray-400 capitalize hidden sm:block">
+             <h2 className="text-lg font-medium text-brand-text opacity-70 capitalize hidden sm:block">
                {menuItems.find(i => i.id === activeTab)?.label}
              </h2>
           </div>
 
           <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none w-max">
-             <div className="flex items-center gap-1 sm:gap-1.5 text-gray-900 dark:text-gray-100">
-               <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
+             <div className="flex items-center gap-1 sm:gap-1.5 text-brand-text">
+               <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-brand-primary" />
                <span className="text-sm sm:text-lg font-bold leading-none">{formattedTime}</span>
              </div>
-             <span className="text-[9px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 capitalize mt-0.5 hidden min-[380px]:block">
+             <span className="text-[9px] sm:text-xs font-medium text-brand-text opacity-60 capitalize mt-0.5 hidden min-[380px]:block">
                {formattedDate}
              </span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center gap-3 bg-white dark:bg-gray-700/50 px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 shadow-sm transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600">
+            <div className="flex items-center gap-3 bg-brand-bg px-2 sm:px-3 py-1.5 rounded-full border border-brand-border shadow-sm transition-colors cursor-pointer hover:opacity-80">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-gray-700 dark:text-gray-200 leading-none">{user?.name || 'Admin'}</p>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500">Sucursal Centro</p>
+                <p className="text-xs font-bold text-brand-text leading-none">{user?.name || 'Admin'}</p>
+                <p className="text-[10px] text-brand-text opacity-60">Sucursal Centro</p>
               </div>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-orange-500 rounded-full overflow-hidden border-2 border-white dark:border-gray-600 shadow-sm shrink-0 flex items-center justify-center text-white text-xs font-bold">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-brand-primary rounded-full overflow-hidden border-2 border-brand-surface shadow-sm shrink-0 flex items-center justify-center text-brand-surface text-xs font-bold">
                 {user?.name?.charAt(0) || 'A'}
               </div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-hidden relative bg-gray-50/50 dark:bg-gray-950 transition-colors">
+        <main className="flex-1 overflow-hidden relative bg-brand-bg transition-colors">
           {activeTab === 'mesas' && <MesasPage />}
           {activeTab === 'qr' && <QrControlPage />}
           {activeTab === 'cocina' && <KitchenPage />}
@@ -233,9 +235,9 @@ function App() {
           {activeTab === 'ajustes' && <MenuManagerPage />} 
           
           {activeTab === 'reportes' && (
-            <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 font-medium text-center p-4">
+            <div className="flex items-center justify-center h-full text-brand-text opacity-50 font-medium text-center p-4">
               <div className="flex flex-col items-center space-y-4">
-                <PieChart size={48} className="opacity-50" />
+                <PieChart size={48} />
                 <p>Módulo de Reportes en construcción...</p>
               </div>
             </div>

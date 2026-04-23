@@ -4,20 +4,21 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class', // <--- ESTO ES LA CLAVE
+  darkMode: 'class',
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        lya: ['Pacifico', 'cursive'], // Fuente para el logo
-      },
       colors: {
         brand: {
-          primary: '#D946EF', // Fuchsia-500
-          secondary: '#A855F7', // Purple-500
-          dark: '#1F2937',    // Gray-800
-          light: '#F3F4F6',   // Gray-100
+          bg: 'var(--color-bg)',
+          surface: 'var(--color-surface)',
+          text: 'var(--color-text)',
+          primary: 'var(--color-primary)',   // Rosa LyA
+          secondary: 'var(--color-secondary)', // Turquesa LyA
+          border: 'var(--color-border)',
         }
+      },
+      borderRadius: {
+        'lya': '12px',
       }
     },
   },

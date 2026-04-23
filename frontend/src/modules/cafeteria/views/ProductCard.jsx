@@ -25,10 +25,10 @@ export const ProductCard = ({ product, onClick, onQuickAdd }) => {
           onClick(product);
         }
       }}
-      className={`relative flex flex-col bg-white dark:bg-gray-800 rounded-3xl p-3 border transition-all overflow-hidden ${
+      className={`relative flex flex-col bg-brand-surface rounded-3xl p-3 border transition-all overflow-hidden ${
         isAgotado 
-          ? 'border-gray-200 dark:border-gray-700 opacity-60 grayscale-[70%] cursor-not-allowed' 
-          : 'border-transparent shadow-sm hover:shadow-xl hover:shadow-brand-primary/5 dark:hover:shadow-black/40 cursor-pointer'
+          ? 'border-brand-border/30 opacity-60 grayscale-[70%] cursor-not-allowed' 
+          : 'border-transparent shadow-sm hover:shadow-xl hover:shadow-brand-primary/10 cursor-pointer'
       }`}
     >
       {isAgotado && (
@@ -40,17 +40,17 @@ export const ProductCard = ({ product, onClick, onQuickAdd }) => {
       )}
 
       {/* CONTENEDOR DE IMAGEN CON EFECTO HOVER */}
-      <div className="h-28 w-full rounded-2xl bg-gray-50 dark:bg-gray-900 mb-3 flex items-center justify-center overflow-hidden p-2 relative group">
+      <div className="h-28 w-full rounded-2xl bg-brand-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group">
         {imageUrl ? (
           <img src={imageUrl} alt={product.nombre} className="w-full h-full object-contain drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
         ) : (
           <span className="text-4xl">☕</span>
         )}
         
-        {/* HINT VISUAL: Efecto de superposición que invita a tocar la tarjeta */}
+        {/* HINT VISUAL: Usando colores corporativos */}
         {!isAgotado && (
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] rounded-2xl">
-            <span className="text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 bg-black/50 rounded-full border border-white/20 text-center">
+          <div className="absolute inset-0 bg-brand-primary/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] rounded-2xl">
+            <span className="text-brand-surface font-bold text-[10px] uppercase tracking-wider px-3 py-1 bg-brand-primary/80 rounded-full border border-brand-surface/20 text-center shadow-lg">
               {hasOptions ? 'Configurar opciones' : 'Ver detalle'}
             </span>
           </div>
@@ -58,23 +58,23 @@ export const ProductCard = ({ product, onClick, onQuickAdd }) => {
       </div>
 
       <div className="flex flex-col flex-1 relative z-0 text-center">
-        {/* TEXTO CENTRADO Y TRUNCADO (Máximo 2 líneas para alinear todas las tarjetas) */}
-        <h3 className="font-bold text-gray-800 dark:text-gray-100 text-[13px] leading-tight line-clamp-2 mb-1 px-1 h-8 flex items-center justify-center">
+        {/* TEXTO CENTRADO Y TRUNCADO */}
+        <h3 className="font-bold text-brand-text text-[13px] leading-tight line-clamp-2 mb-1 px-1 h-8 flex items-center justify-center">
           {product.nombre}
         </h3>
         
-        {/* BADGE DE PERSONALIZABLE */}
+        {/* BADGE DE PERSONALIZABLE CON TONOS LYA */}
         <div className="h-5 mb-1 flex justify-center items-center">
           {hasOptions && (
-             <span className="text-[9px] font-black uppercase tracking-wider text-brand-primary dark:text-orange-400 bg-brand-primary/10 dark:bg-orange-500/10 px-2 py-0.5 rounded-full border border-brand-primary/10 dark:border-orange-500/20">
+             <span className="text-[9px] font-black uppercase tracking-wider text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-full border border-brand-primary/20">
                 ✨ Personalizable
              </span>
           )}
         </div>
         
-        {/* SECCIÓN DE PRECIO Y BOTÓN */}
-        <div className="mt-auto flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/50">
-          <span className={`font-black text-[15px] pl-1 ${isAgotado ? 'text-gray-500 dark:text-gray-500' : 'text-brand-dark dark:text-white'}`}>
+        {/* SECCIÓN DE PRECIO Y BOTÓN DE AÑADIR */}
+        <div className="mt-auto flex items-center justify-between pt-2 border-t border-brand-border/50">
+          <span className={`font-black text-[15px] pl-1 ${isAgotado ? 'text-brand-text opacity-50' : 'text-brand-text'}`}>
             ${Number(product.precioBase || product.precio || 0).toFixed(2)}
           </span>
           
@@ -88,8 +88,8 @@ export const ProductCard = ({ product, onClick, onQuickAdd }) => {
             }}
             className={`p-2 rounded-xl transition-all active:scale-90 ${
               isAgotado 
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400' 
-                : 'bg-brand-primary dark:bg-orange-500 text-white shadow-lg shadow-brand-primary/30 dark:shadow-orange-500/20 hover:bg-brand-dark dark:hover:bg-orange-600'
+                ? 'bg-brand-bg text-brand-text opacity-40' 
+                : 'bg-brand-primary text-brand-surface shadow-lg shadow-brand-primary/30 hover:opacity-90'
             }`}
             title="Añadir directo a la orden"
           >

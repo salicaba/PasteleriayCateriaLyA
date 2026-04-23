@@ -10,7 +10,6 @@ export const MesaCard = ({ mesa, onClick }) => {
   const nombreCliente = partesNumero[1]; // Se queda con "Emmanuel" (si existe)
 
   // 2. Decidimos qué decir en el letrero chiquito de arriba
-  // Si es para llevar y tiene nombre, muestra el nombre. Si no, muestra "Llevar" o "Mesa"
   const etiquetaSuperior = isLlevar 
     ? (nombreCliente ? nombreCliente : 'Para Llevar') 
     : 'Mesa';
@@ -26,23 +25,23 @@ export const MesaCard = ({ mesa, onClick }) => {
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      // Clases dinámicas de Tailwind dependiendo del estado (Libre / Salón / Llevar)
+      // REFACTORIZACIÓN DE COLORES CORPORATIVOS LYA
       className={`
         relative p-4 md:p-5 rounded-3xl cursor-pointer shadow-sm border-2 transition-all duration-200 flex flex-col justify-between h-36 md:h-40
         ${isOcupada 
           ? (isLlevar 
-              ? 'bg-orange-500 border-orange-600 text-white' // Color para Llevar activo
-              : 'bg-brand-primary border-brand-dark text-white' // Color para Mesa ocupada
+              ? 'bg-brand-secondary border-brand-secondary text-brand-surface shadow-lg shadow-brand-secondary/20' // Turquesa para Llevar activo
+              : 'bg-brand-primary border-brand-primary text-brand-surface shadow-lg shadow-brand-primary/20' // Rosa para Mesa ocupada
             ) 
-          : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'
+          : 'bg-brand-surface border-brand-border/20 text-brand-text hover:border-brand-secondary' // Colores base (Marrón y Vainilla)
         }
       `}
     >
       {/* ---------------- ENCABEZADO DE LA TARJETA ---------------- */}
       <div className="flex justify-between items-start">
         <div className="flex flex-col overflow-hidden pr-2">
-          {/* Etiqueta superior (Aquí aparece el NOMBRE truncado para no romper el cuadro) */}
-          <span className={`text-xs font-bold uppercase tracking-wider truncate flex items-center gap-1.5 ${isOcupada ? 'text-white/80' : 'text-gray-400'}`}>
+          {/* Etiqueta superior */}
+          <span className={`text-[10px] font-black uppercase tracking-widest truncate flex items-center gap-1.5 ${isOcupada ? 'text-brand-surface/90' : 'text-brand-text opacity-50'}`}>
             {isLlevar && <ShoppingBag size={14} />}
             <span className="truncate max-w-[100px]">{etiquetaSuperior}</span>
           </span>
@@ -55,7 +54,7 @@ export const MesaCard = ({ mesa, onClick }) => {
         
         {/* BADGE DE ESTADO (Esquina superior derecha) */}
         {isOcupada && (
-          <span className="px-2.5 py-1 bg-white/20 rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md">
+          <span className="px-2.5 py-1 bg-brand-surface/20 rounded-lg text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-brand-surface/10">
             {isLlevar ? 'Activo' : 'Ocupada'}
           </span>
         )}
@@ -63,7 +62,7 @@ export const MesaCard = ({ mesa, onClick }) => {
 
       {/* ---------------- PIE DE LA TARJETA (Tiempo y Total) ---------------- */}
       <div className="flex justify-between items-end mt-2">
-        <div className={`flex flex-col gap-1 text-xs font-bold ${isOcupada ? 'text-white/90' : 'text-gray-400'}`}>
+        <div className={`flex flex-col gap-1 text-[11px] font-bold ${isOcupada ? 'text-brand-surface/90' : 'text-brand-text opacity-40'}`}>
           {/* Mostrar personas solo si NO es para llevar */}
           {!isLlevar && (
             <div className="flex items-center gap-1.5">
@@ -83,11 +82,13 @@ export const MesaCard = ({ mesa, onClick }) => {
         {/* Total monetario */}
         <div className="text-right">
           {isOcupada ? (
-            <span className="text-xl md:text-2xl font-black tracking-tight drop-shadow-sm">
-              ${(mesa.total || 0).toFixed(2)}
+            <span className="text-xl md:text-2xl font-black tracking-tight drop-shadow-md">
+              ${Number(mesa.total || 0).toFixed(2)}
             </span>
           ) : (
-            <span className="text-sm font-bold text-gray-400 dark:text-gray-500">Libre</span>
+            <span className="text-xs font-black uppercase tracking-widest text-brand-text opacity-30">
+              Libre
+            </span>
           )}
         </div>
       </div>
