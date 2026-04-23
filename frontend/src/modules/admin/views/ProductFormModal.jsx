@@ -12,7 +12,11 @@ const createImage = (url) => new Promise((resolve, reject) => {
   image.setAttribute('crossOrigin', 'anonymous');
   image.src = url;
 });
-function getRadianAngle(degreeValue) { return (degreeValue * Math.PI) / 180; }
+
+function getRadianAngle(degreeValue) { 
+  return (degreeValue * Math.PI) / 180; 
+}
+
 async function getCroppedImg(imageSrc, pixelCrop, rotation = 0) {
   const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
@@ -52,8 +56,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     ['tamanos', 'leches', 'extras'].forEach(tipo => {
       if (parsedOps[tipo] && Array.isArray(parsedOps[tipo])) {
         result[tipo] = parsedOps[tipo].map(item => {
-           if (typeof item === 'string') return { nombre: item, precioAdicional: 0 };
-           return item;
+           if (typeof item === 'string') return { nombre: item, precioAdicional: '' };
+           return { ...item, precioAdicional: item.precioAdicional === 0 ? '' : item.precioAdicional };
         });
       }
     });
@@ -63,10 +67,10 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   const [formData, setFormData] = useState({
     id: initialData?.id || undefined,
     name: initialData?.name || initialData?.nombre || '',
-    basePrice: initialData ? (initialData.basePrice ?? initialData.precioBase ?? 0) : '',
+    basePrice: initialData ? (initialData.basePrice ?? initialData.precioBase ?? '') : '',
     categoryId: initialData?.categoryId || (categories.length > 0 ? categories[0].id : ''),
     controlarStock: initialData?.controlarStock || false,
-    stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? 0) : '',
+    stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? '') : '',
     imageUrl: initialData?.imageUrl || initialData?.image || null,
     isActive: initialData?.isActive !== undefined ? initialData.isActive : (initialData?.disponible !== undefined ? initialData.disponible : true),
     opciones: normalizeOptions(initialData?.opciones)
@@ -86,11 +90,13 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     if (exists) {
       newArray = current.filter(opt => opt.nombre !== globalOpt.nombre);
     } else {
-      newArray = [...current, { nombre: globalOpt.nombre, precioAdicional: globalOpt.precioAdicional }];
+      newArray = [...current, { 
+        nombre: globalOpt.nombre, 
+        precioAdicional: globalOpt.precioAdicional === 0 ? '' : globalOpt.precioAdicional 
+      }];
     }
 
     let newDefaults = { ...formData.opciones.defaults };
-    // Si desmarcamos la opción que era la predeterminada, la borramos del default
     if (exists && tipo === 'tamanos' && newDefaults.tamano === globalOpt.nombre) newDefaults.tamano = '';
     if (exists && tipo === 'leches' && newDefaults.leche === globalOpt.nombre) newDefaults.leche = '';
 
@@ -120,10 +126,21 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   };
 
   const handleSaveSubmit = () => {
+    const cleanOpts = (arr) => arr.map(opt => ({
+      ...opt, 
+      precioAdicional: opt.precioAdicional === '' ? 0 : parseFloat(opt.precioAdicional)
+    }));
+
     const finalData = {
       ...formData,
       basePrice: formData.basePrice === '' ? 0 : formData.basePrice,
-      stockQuantity: formData.stockQuantity === '' ? 0 : formData.stockQuantity
+      stockQuantity: formData.stockQuantity === '' ? 0 : formData.stockQuantity,
+      opciones: {
+        tamanos: cleanOpts(formData.opciones.tamanos),
+        leches: cleanOpts(formData.opciones.leches),
+        extras: cleanOpts(formData.opciones.extras),
+        defaults: formData.opciones.defaults
+      }
     };
     onSave(finalData);
   };
@@ -155,12 +172,11 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
             </header>
 
             <div className="p-8 overflow-y-auto custom-scrollbar space-y-8">
-              {/* DATOS BÁSICOS */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-1">
                   <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-3xl p-6 hover:border-orange-500 transition-colors bg-gray-50/50 dark:bg-gray-800/30 h-full">
                     {formData.imageUrl ? (
-                      <img src={formData.imageUrl} className="w-40 h-40 object-cover rounded-2xl mb-4 shadow-md" />
+                      <img src={formData.imageUrl} className="w-40 h-40 object-cover rounded-2xl mb-4 shadow-md" alt="Product" />
                     ) : (
                       <div className="w-40 h-40 bg-gray-200 dark:bg-gray-800 rounded-2xl mb-4 flex items-center justify-center">
                         <Upload size={48} className="text-gray-400" />
@@ -235,13 +251,12 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                 </div>
               </div>
 
-              {/* SECCIÓN DE OPCIONES Y PREDETERMINADOS */}
               <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
                 <h3 className="font-black text-xl text-gray-800 dark:text-white mb-1 flex items-center gap-2">
                   <Settings2 size={24} className="text-blue-500" />
                   Personalización del Producto
                 </h3>
-                <p className="text-gray-500 text-sm mb-6">Marca las opciones disponibles y elige cuál se aplicará en Venta Rápida.</p>
+                <p className="text-gray-500 text-sm mb-6">Marca las opciones disponibles y asigna el precio extra para este producto.</p>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {['tamanos', 'leches', 'extras'].map((tipo) => {
@@ -252,36 +267,85 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       <div key={tipo} className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-3xl border border-gray-100 dark:border-gray-800">
                         <h4 className="font-bold text-gray-700 dark:text-gray-200 capitalize mb-4">{tipo}</h4>
                         
-                        {/* Checkboxes de opciones */}
                         {optsDisponibles.length === 0 ? (
                            <p className="text-xs text-gray-400 italic">No hay {tipo} en el catálogo global.</p>
                         ) : (
-                           <div className="flex flex-col gap-2 mb-4">
+                           <div className="flex flex-col gap-3 mb-4">
                              {optsDisponibles.map((opt) => {
-                               const isSelected = optsSeleccionadas.some(s => s.nombre === opt.nombre);
+                               const selectedOpt = optsSeleccionadas.find(s => s.nombre === opt.nombre);
+                               const isSelected = !!selectedOpt;
+
+                               const handlePriceChange = (e) => {
+                                 const val = e.target.value;
+                                 const newPrice = val === '' ? '' : parseFloat(val);
+                                 
+                                 setFormData(prev => ({
+                                   ...prev,
+                                   opciones: {
+                                     ...prev.opciones,
+                                     [tipo]: prev.opciones[tipo].map(item => 
+                                       item.nombre === opt.nombre ? { ...item, precioAdicional: newPrice } : item
+                                     )
+                                   }
+                                 }));
+                               };
+
                                return (
-                                 <button
+                                 <div
                                    key={opt.id}
-                                   onClick={() => toggleOption(tipo, opt)}
                                    className={clsx(
-                                     "flex items-center justify-between p-3 rounded-xl border text-sm font-bold transition-all text-left",
+                                     "flex flex-col p-3 rounded-xl border transition-all overflow-hidden",
                                      isSelected 
-                                       ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400" 
-                                       : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-blue-300"
+                                       ? "border-orange-500 bg-orange-50 dark:bg-orange-500/10 shadow-sm" 
+                                       : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-orange-300"
                                    )}
                                  >
-                                   <span className="flex items-center gap-2">
-                                     {isSelected && <CheckCircle2 size={16} className="text-blue-500" />}
-                                     {opt.nombre}
-                                   </span>
-                                   {opt.precioAdicional > 0 && <span className="text-xs opacity-70">+${opt.precioAdicional}</span>}
-                                 </button>
+                                   <button
+                                     onClick={() => toggleOption(tipo, opt)}
+                                     className="flex items-start gap-2 text-sm font-bold w-full text-left outline-none"
+                                   >
+                                     <div className="mt-0.5 shrink-0">
+                                       {isSelected ? (
+                                         <CheckCircle2 size={18} className="text-orange-500" />
+                                       ) : (
+                                         <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300 dark:border-gray-600" />
+                                       )}
+                                     </div>
+                                     <span className={clsx("flex-1 whitespace-normal break-words leading-tight", isSelected ? "text-orange-700 dark:text-orange-400" : "text-gray-600 dark:text-gray-400")}>
+                                       {opt.nombre}
+                                     </span>
+                                   </button>
+
+                                   {isSelected ? (
+                                     <div className="mt-3 pt-3 border-t border-orange-200/50 dark:border-orange-500/20 flex items-center justify-between animate-in fade-in slide-in-from-top-1">
+                                       <span className="text-xs font-bold text-orange-600 dark:text-orange-400 opacity-80">Costo extra:</span>
+                                       <div className="flex items-center gap-1">
+                                         <span className="text-xs font-black text-orange-600 dark:text-orange-400 opacity-70">+$</span>
+                                         <input 
+                                           type="number"
+                                           min="0"
+                                           step="1"
+                                           placeholder="0.00"
+                                           value={selectedOpt.precioAdicional}
+                                           onChange={handlePriceChange}
+                                           className="w-20 p-1.5 text-sm bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-500/30 rounded-lg outline-none text-right font-bold text-gray-800 dark:text-gray-200 focus:border-orange-400 transition-colors shadow-inner"
+                                           onClick={(e) => e.stopPropagation()} 
+                                         />
+                                       </div>
+                                     </div>
+                                   ) : (
+                                     opt.precioAdicional > 0 && (
+                                       <div className="mt-2 pl-7 text-[11px] opacity-50 font-bold text-gray-500 dark:text-gray-400">
+                                         Base: +${opt.precioAdicional}
+                                       </div>
+                                     )
+                                   )}
+                                 </div>
                                );
                              })}
                            </div>
                         )}
 
-                        {/* SELECTOR DE PREDETERMINADO (Solo para Tamaños y Leches) */}
                         {(tipo === 'tamanos' || tipo === 'leches') && optsSeleccionadas.length > 0 && (
                           <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-500/10 rounded-2xl border border-orange-100 dark:border-orange-500/20">
                             <label className="text-[11px] font-black text-orange-600 dark:text-orange-400 uppercase flex items-center gap-1 mb-2">

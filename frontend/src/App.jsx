@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Toaster } from 'react-hot-toast'; // <-- NUEVA IMPORTACIÓN DEL TOASTER
 import { useTheme } from './hooks/useTheme';
 import { ThemeToggle } from './components/ThemeToggle';
 
@@ -10,7 +11,7 @@ import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
 import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard';
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
-import { QrControlPage } from './modules/cafeteria/views/QrControlPage'; // <-- NUEVA IMPORTACIÓN
+import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -51,7 +52,7 @@ function App() {
   // --- MENÚ PRINCIPAL ACTUALIZADO ---
   const menuItems = [
     { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
-    { id: 'qr', label: 'Control QR', icon: QrCode }, // <-- NUEVO MÓDULO AQUÍ
+    { id: 'qr', label: 'Control QR', icon: QrCode },
     { id: 'cocina', label: 'Cocina', icon: ChefHat },
     { id: 'pasteleria', label: 'Pastelería', icon: Cake },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
@@ -64,6 +65,25 @@ function App() {
 
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans overflow-hidden transition-colors duration-300">
+      
+      {/* 🚀 TOASTER GLOBAL CONFIGURADO CON SOPORTE DARK MODE */}
+      <Toaster 
+        position="bottom-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: theme === 'dark' ? '#1f2937' : '#ffffff',
+            color: theme === 'dark' ? '#f3f4f6' : '#1f2937',
+            borderRadius: '1rem',
+            fontWeight: 'bold',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          },
+          success: {
+            iconTheme: { primary: '#f97316', secondary: '#fff' }, // Naranja brand
+          },
+        }}
+      />
+
       <motion.aside
         initial={false}
         animate={{ width: isSidebarOpen ? 240 : 0 }}
@@ -207,7 +227,7 @@ function App() {
 
         <main className="flex-1 overflow-hidden relative bg-gray-50/50 dark:bg-gray-950 transition-colors">
           {activeTab === 'mesas' && <MesasPage />}
-          {activeTab === 'qr' && <QrControlPage />} {/* <-- VISTA MONTADA AQUÍ */}
+          {activeTab === 'qr' && <QrControlPage />}
           {activeTab === 'cocina' && <KitchenPage />}
           {activeTab === 'pasteleria' && <PasteleriaDashboard />}
           {activeTab === 'ajustes' && <MenuManagerPage />} 

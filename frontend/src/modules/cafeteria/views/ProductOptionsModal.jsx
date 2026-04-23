@@ -160,9 +160,9 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
               <div key={mod.id}>
                 <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-3 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-2">
                   <span>{mod.title}</span>
-                  {mod.type === 'multiple' && <span className="text-[10px] font-bold uppercase tracking-wider text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded">Elige varios</span>}
+                  {mod.type === 'multiple' && <span className="text-[10px] font-bold uppercase tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded">Elige varios</span>}
                 </h4>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {mod.options.map(opt => {
                     const isSelected = mod.type === 'single' 
                       ? selections[mod.id] === opt.id
@@ -173,15 +173,30 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
                         key={opt.id}
                         onClick={() => handleToggle(mod.id, opt.id, mod.type)}
                         className={clsx(
-                          "px-4 py-2.5 rounded-xl border text-sm font-bold transition-all flex items-center gap-2 active:scale-95",
+                          "px-4 py-3 rounded-2xl border text-sm font-bold transition-all flex items-center justify-between gap-3 active:scale-95 flex-grow sm:flex-grow-0",
                           isSelected 
-                            ? "border-brand-primary bg-brand-primary text-white shadow-md shadow-brand-primary/20" 
-                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
+                            ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30" 
+                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500"
                         )}
                       >
-                        {isSelected && <Check size={16} strokeWidth={3} />}
-                        {opt.label}
-                        {opt.price > 0 && <span className={clsx("text-xs ml-1", isSelected ? "text-white/80" : "text-gray-400")}>+${opt.price}</span>}
+                        <span className="flex items-center gap-2">
+                          {isSelected && <Check size={16} strokeWidth={4} />}
+                          {opt.label}
+                        </span>
+                        
+                        {/* 🔥 VISUALIZACIÓN PREMIUM DEL PRECIO EXTRA */}
+                        {opt.price > 0 && (
+                          <span 
+                            className={clsx(
+                              "text-xs px-2 py-1 rounded-lg ml-auto whitespace-nowrap",
+                              isSelected 
+                                ? "bg-white/25 text-white" 
+                                : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                            )}
+                          >
+                            +${Number(opt.price).toFixed(2)}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
