@@ -8,13 +8,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: {
-          bg: 'var(--color-bg)',
-          surface: 'var(--color-surface)',
-          text: 'var(--color-text)',
-          primary: 'var(--color-primary)',   // Rosa LyA
-          secondary: 'var(--color-secondary)', // Turquesa LyA
-          border: 'var(--color-border)',
+        // Colores exclusivos del corporativo LyA
+        lya: {
+          bg: '#FAEDCD',       // Vainilla
+          surface: '#FFFFFF',  // Blanco para tarjetas
+          text: '#4A2B29',     // Marrón Espresso
+          primary: '#F49AC2',  // Rosa Betún
+          secondary: '#72CEC3',// Verde Turquesa
+          border: '#D4A373',   // Beige oscuro
         }
       },
       borderRadius: {
@@ -22,5 +23,10 @@ export default {
       }
     },
   },
-  plugins: [],
+  plugins: [
+    // Este plugin crea el prefijo lya: (ej. lya:bg-lya-bg)
+    require('tailwindcss/plugin')(function({ addVariant }) {
+      addVariant('lya', '.theme-lya &');
+    })
+  ],
 }

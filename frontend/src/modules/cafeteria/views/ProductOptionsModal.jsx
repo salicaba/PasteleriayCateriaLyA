@@ -130,10 +130,10 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
 
   return (
     <div className="absolute inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/40 lya:bg-black/50 backdrop-blur-[2px] pointer-events-auto" />
 
-      <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative z-10 bg-white dark:bg-gray-800 w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh] transition-colors">
-        <div className="relative h-40 bg-gray-100 dark:bg-gray-700 shrink-0 p-2 border-b border-gray-200 dark:border-gray-600">
+      <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative z-10 bg-white dark:bg-gray-800 lya:bg-lya-surface w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh] transition-colors lya:border lya:border-lya-border/40">
+        <div className="relative h-40 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg shrink-0 p-2 border-b border-gray-200 dark:border-gray-600 lya:border-lya-border/40">
           {product.image || product.imagen ? (
             <img src={product.image || product.imagen} className="w-full h-full object-contain drop-shadow-sm opacity-90" />
           ) : (
@@ -149,18 +149,18 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar lya:bg-lya-bg/30">
           {availableModifiers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center space-y-2">
               <span className="text-4xl">🍽️</span>
-              <p className="text-gray-500 dark:text-gray-400 font-medium">Este producto no tiene opciones adicionales configuradas.</p>
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium">Este producto no tiene opciones adicionales configuradas.</p>
             </div>
           ) : (
             availableModifiers.map(mod => (
               <div key={mod.id}>
-                <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-3 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-2">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-3 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 lya:border-lya-border/30 pb-2">
                   <span>{mod.title}</span>
-                  {mod.type === 'multiple' && <span className="text-[10px] font-bold uppercase tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded">Elige varios</span>}
+                  {mod.type === 'multiple' && <span className="text-[10px] font-bold uppercase tracking-wider text-orange-500 bg-orange-500/10 lya:text-lya-secondary lya:bg-lya-secondary/10 px-2 py-0.5 rounded lya:border lya:border-lya-secondary/20">Elige varios</span>}
                 </h4>
                 <div className="flex flex-wrap gap-3">
                   {mod.options.map(opt => {
@@ -175,8 +175,8 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
                         className={clsx(
                           "px-4 py-3 rounded-2xl border text-sm font-bold transition-all flex items-center justify-between gap-3 active:scale-95 flex-grow sm:flex-grow-0",
                           isSelected 
-                            ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30" 
-                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500"
+                            ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30" 
+                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text lya:hover:border-lya-secondary/50"
                         )}
                       >
                         <span className="flex items-center gap-2">
@@ -184,14 +184,13 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
                           {opt.label}
                         </span>
                         
-                        {/* 🔥 VISUALIZACIÓN PREMIUM DEL PRECIO EXTRA */}
                         {opt.price > 0 && (
                           <span 
                             className={clsx(
                               "text-xs px-2 py-1 rounded-lg ml-auto whitespace-nowrap",
                               isSelected 
-                                ? "bg-white/25 text-white" 
-                                : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                                ? "bg-white/25 text-white lya:bg-white/30" 
+                                : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-primary/10 lya:text-lya-primary"
                             )}
                           >
                             +${Number(opt.price).toFixed(2)}
@@ -206,15 +205,15 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 lya:border-lya-border/30 bg-white dark:bg-gray-800 lya:bg-lya-surface shrink-0 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] transition-colors">
           <button 
             disabled={isAgotado}
             onClick={handleConfirm}
             className={clsx(
-              "w-full py-4 rounded-xl font-black text-lg flex justify-between px-6 items-center shadow-lg transition-all active:scale-95",
+              "w-full py-4 rounded-xl font-black text-lg flex justify-between px-6 items-center shadow-lg transition-all active:scale-95 lya:border-2",
               isAgotado 
-                ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none"
-                : "bg-green-500 hover:bg-green-600 text-white shadow-green-500/30"
+                ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none lya:bg-lya-bg lya:border-lya-border/30 lya:text-lya-text/40"
+                : "bg-green-500 hover:bg-green-600 text-white shadow-green-500/30 lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30"
             )}
           >
             <span>{isAgotado ? 'Agotado' : 'Añadir a la cuenta'}</span>

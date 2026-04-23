@@ -25,8 +25,8 @@ export const CategoryBar = ({ categories = [], active, onSelect }) => {
             className={clsx(
               "flex items-center gap-2 px-5 py-2.5 rounded-full border-2 transition-all whitespace-nowrap text-sm font-bold active:scale-95",
               isActive 
-                ? "bg-brand-secondary text-brand-surface border-brand-secondary shadow-lg shadow-brand-secondary/30" 
-                : "bg-brand-surface text-brand-text border-brand-border/30 hover:border-brand-secondary/50 hover:text-brand-secondary opacity-80 hover:opacity-100"
+                ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/30 lya:bg-lya-secondary lya:border-lya-secondary lya:text-lya-surface lya:shadow-lya-secondary/30" 
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-orange-500/50 hover:text-orange-500 dark:hover:text-orange-400 lya:bg-lya-surface lya:text-lya-text lya:border-lya-border/40 lya:hover:border-lya-secondary/50 lya:hover:text-lya-secondary opacity-80 hover:opacity-100"
             )}
           >
             <Icon size={16} />

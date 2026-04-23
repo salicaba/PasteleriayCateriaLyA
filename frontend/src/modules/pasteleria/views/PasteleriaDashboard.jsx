@@ -30,38 +30,37 @@ export default function PasteleriaDashboard() {
   };
 
   return (
-    // ANIMACIÓN SUAVIZADA: Eliminamos el 'spring' fuerte y la escala
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 p-4 md:p-8 transition-colors duration-300"
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
       
-      {/* HEADER FIJO (ESTILO GESTOR DE MENÚ / COCINA) */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 shrink-0 z-10 relative">
+      {/* HEADER FIJO */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
-          <div className="bg-emerald-500 text-white p-3 rounded-2xl shadow-md shadow-emerald-500/20">
+          <div className="bg-emerald-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-emerald-500/20 lya:shadow-lya-primary/20">
             <CakeSlice size={28} />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white">Pastelería & Agenda</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Gestión de producción y entregas</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">Pastelería & Agenda</h1>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Gestión de producción y entregas</p>
           </div>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
           {/* Selector de Vista */}
-          <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-full sm:w-auto">
+          <div className="flex bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 p-1 rounded-xl w-full sm:w-auto">
             <button 
               onClick={() => setViewMode('grid')} 
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 lya:text-lya-text/60 lya:hover:text-lya-text'}`}
             >
               <LayoutGrid size={16} /> <span className="hidden min-[400px]:inline">Tarjetas</span>
             </button>
             <button 
               onClick={() => setViewMode('calendar')} 
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 lya:text-lya-text/60 lya:hover:text-lya-text'}`}
             >
               <CalendarDays size={16} /> <span className="hidden min-[400px]:inline">Agenda</span>
             </button>
@@ -69,7 +68,7 @@ export default function PasteleriaDashboard() {
 
           <button 
             onClick={() => abrirModalNuevoPedido()}
-            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-emerald-500/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
           >
             <Plus size={20} />
             <span>Nuevo Pedido</span>
@@ -114,65 +113,65 @@ export default function PasteleriaDashboard() {
                       layout 
                       initial={{ opacity: 0, scale: 0.98 }} 
                       animate={{ opacity: 1, scale: 1 }} 
-                      className={`relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 border p-5 shadow-sm transition-all duration-300 flex flex-col justify-between h-full
-                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10' : 'border-gray-100 dark:border-gray-800 hover:border-emerald-400/50'}`}
+                      className={`relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 lya:bg-lya-surface border p-5 shadow-sm transition-all duration-300 flex flex-col justify-between h-full
+                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 hover:border-emerald-400/50 lya:border-lya-border/30 lya:hover:border-lya-secondary/50'}`}
                     >
                       <div>
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex-1 min-w-0">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 inline-block">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-wider mb-2 inline-block lya:border lya:border-lya-border/30">
                               {pedido.id}
                             </span>
-                            <h3 className="text-lg font-bold text-gray-800 dark:text-white truncate">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-white lya:text-lya-text truncate">
                               {pedido.cliente}
                             </h3>
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs font-bold bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-full text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
+                          <div className="flex items-center gap-1.5 text-xs font-bold bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-secondary/10 px-3 py-1.5 rounded-full text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary border border-emerald-500/10 lya:border-lya-secondary/20">
                             <CalendarClock size={14} /> {fecha}
                           </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2 mb-4">
-                          {pedido.porciones?.map((p, idx) => <span key={idx} className="text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 px-2 py-1 rounded-md border border-amber-100 dark:border-amber-900/30">{p}</span>)}
-                          {pedido.saborPan?.map((s, idx) => <span key={idx} className="text-[10px] font-bold bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 px-2 py-1 rounded-md border border-purple-100 dark:border-purple-900/30">{s}</span>)}
+                          {pedido.porciones?.map((p, idx) => <span key={idx} className="text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text px-2 py-1 rounded-md border border-amber-100 dark:border-amber-900/30 lya:border-lya-border/40">{p}</span>)}
+                          {pedido.saborPan?.map((s, idx) => <span key={idx} className="text-[10px] font-bold bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text px-2 py-1 rounded-md border border-purple-100 dark:border-purple-900/30 lya:border-lya-border/40">{s}</span>)}
                         </div>
                         
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 line-clamp-2 min-h-[40px] italic">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 mb-6 line-clamp-2 min-h-[40px] italic">
                           "{pedido.descripcion}"
                         </p>
                       </div>
 
-                      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50">
-                        <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-gray-400">
+                      <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30">
+                        <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-gray-400 lya:text-lya-text/50">
                           <span>Total</span>
-                          <span className="text-gray-800 dark:text-white">${pedido.costoTotal}</span>
+                          <span className="text-gray-800 dark:text-white lya:text-lya-text">${pedido.costoTotal}</span>
                         </div>
                         
-                        <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-4">
+                        <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 rounded-full overflow-hidden mb-4">
                           <motion.div 
                             initial={{ width: 0 }} 
                             animate={{ width: `${Math.min((finanzas.totalPagado / pedido.costoTotal) * 100, 100)}%` }} 
-                            className={`h-full ${finanzas.estaLiquidado ? 'bg-emerald-500' : 'bg-amber-400'}`} 
+                            className={`h-full ${finanzas.estaLiquidado ? 'bg-emerald-500 lya:bg-lya-secondary' : 'bg-amber-400 lya:bg-lya-primary'}`} 
                           />
                         </div>
 
                         <div className="flex justify-between items-center">
                           {finanzas.estaLiquidado ? (
-                            <div className="text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1">
+                            <div className="text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary text-xs font-bold flex items-center gap-1">
                               <CheckCircle2 size={14} /> Liquidado
                             </div>
                           ) : (
-                            <div className={`text-xs font-bold ${finanzas.requiereLiquidacionUrgente ? 'text-red-500 animate-pulse' : 'text-amber-600'}`}>
+                            <div className={`text-xs font-bold ${finanzas.requiereLiquidacionUrgente ? 'text-red-500 animate-pulse' : 'text-amber-600 lya:text-lya-text'}`}>
                               Resta: ${finanzas.deuda}
                             </div>
                           )}
                           
                           <div className="flex gap-2">
-                            <button onClick={() => abrirTicket(pedido)} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
+                            <button onClick={() => abrirTicket(pedido)} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors">
                               <FileText size={18} />
                             </button>
                             {!finanzas.estaLiquidado && (
-                              <button onClick={() => abrirModalAbono(pedido)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
+                              <button onClick={() => abrirModalAbono(pedido)} className="bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
                                 <DollarSign size={14} className="inline mr-1" /> Abonar
                               </button>
                             )}
@@ -194,21 +193,21 @@ export default function PasteleriaDashboard() {
 
       <AnimatePresence>
         {abonoModal.isOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="bg-white dark:bg-gray-900 rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 lya:bg-black/40 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
               <div className="flex justify-between items-center mb-6">
-                <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-500">
+                <div className="bg-emerald-500/10 lya:bg-lya-secondary/10 p-2 rounded-xl text-emerald-500 lya:text-lya-secondary">
                   <DollarSign size={24} />
                 </div>
-                <button onClick={() => setAbonoModal({ isOpen: false, pedidoId: null, cliente: '' })} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-gray-50 dark:bg-gray-800 rounded-full transition-colors">
+                <button onClick={() => setAbonoModal({ isOpen: false, pedidoId: null, cliente: '' })} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:text-lya-text/50 lya:hover:text-lya-text bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-1">Registrar Pago</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">Abono para: <span className="font-bold text-emerald-500">{abonoModal.cliente}</span></p>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-1">Registrar Pago</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8">Abono para: <span className="font-bold text-emerald-500 lya:text-lya-secondary">{abonoModal.cliente}</span></p>
               <form onSubmit={handleAbonar} className="space-y-6">
-                <input type="number" required autoFocus min="1" placeholder="$ 0.00" value={montoIngresado} onChange={(e) => setMontoIngresado(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-4 text-3xl font-black text-gray-800 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all text-center" />
-                <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2">
+                <input type="number" required autoFocus min="1" placeholder="$ 0.00" value={montoIngresado} onChange={(e) => setMontoIngresado(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl px-4 py-4 text-3xl font-black text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-4 focus:ring-emerald-500/10 lya:focus:ring-lya-secondary/30 transition-all text-center" />
+                <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-2xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2">
                   Confirmar Abono
                 </button>
               </form>
