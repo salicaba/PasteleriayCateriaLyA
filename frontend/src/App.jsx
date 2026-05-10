@@ -28,11 +28,13 @@ import PasteleriaCalendar from './modules/pasteleria/views/PasteleriaCalendar';
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 
+// Importa aquí tu logo con la extensión correcta
+import logoLyA from './assets/logo.jpeg'; 
+
 function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('mesas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  // Iniciamos con ambos grupos expandidos para facilitar la navegación inicial
   const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group']); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
@@ -66,7 +68,6 @@ function App() {
     year: 'numeric' 
   });
 
-  // Configuración de Menú con Grupos Anidados
   const menuConfig = [
     {
       id: 'cafeteria_group',
@@ -163,11 +164,16 @@ function App() {
         className="h-full bg-white dark:bg-gray-800 lya:bg-lya-surface border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-xl z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
       >
         <div className="w-[240px] flex flex-col h-full">
+          {/* HEADER DEL SIDEBAR CON EL LOGO */}
           <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
-            <div className="w-8 h-8 bg-gradient-to-tr from-orange-500 to-orange-400 lya:from-lya-primary lya:to-lya-primary rounded-lg flex items-center justify-center text-white font-lya font-bold text-lg shadow-md shrink-0">
-              L
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/20 dark:border-gray-600 lya:border-lya-primary shadow-sm bg-white flex items-center justify-center shrink-0">
+              <img 
+                src={logoLyA} 
+                alt="Logo LyA" 
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="ml-3 font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">Menú Principal</span>
+            <span className="ml-3 font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text uppercase tracking-tight text-sm">Menú Principal</span>
           </div>
 
           <nav className="flex-1 py-4 flex flex-col gap-1.5 px-3 overflow-y-auto custom-scrollbar">
@@ -283,8 +289,11 @@ function App() {
              </button>
 
              <div className="flex items-center ml-1">
-               <span className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text tracking-wider pb-1 font-bold">
-                 尝𝔂𝓐
+               <span 
+                 className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text pb-1 font-bold"
+                 style={{ letterSpacing: '-0.11em', transform: 'scaleX(0.95)' }}
+               >
+                 𝓛𝔂𝓪
                </span>
              </div>
 

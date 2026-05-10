@@ -16,7 +16,6 @@ export const getPedidos = async (req, res) => {
 // Crear un nuevo pedido
 export const createPedido = async (req, res) => {
   try {
-    // Generamos un ID simple como PED-001 basado en la cantidad de registros (puedes mejorarlo luego)
     const count = await PasteleriaOrder.count();
     const newId = `PED-${String(count + 1).padStart(3, '0')}`;
 
@@ -43,7 +42,6 @@ export const addAbono = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    // Obtenemos los abonos actuales, agregamos el nuevo y guardamos
     const abonosActuales = pedido.abonos || [];
     const nuevoAbono = {
       id: Date.now().toString(),
@@ -58,5 +56,27 @@ export const addAbono = async (req, res) => {
   } catch (error) {
     console.error("Error al registrar abono:", error);
     res.status(500).json({ message: "Error al registrar el abono" });
+  }
+};
+
+// Actualizar el estado de un pedido (Ej. Marcar como entregado)
+export const updateEstado = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    const pedido = await PasteleriaOrder.findByPk(id);
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    pedido.estado = estado;
+    // Al guardar, Sequelize actualiza automáticamente el campo 'updatedAt'
+    await pedido.save();
+
+    res.json({ data: pedido });
+  } catch (error) {
+    console.error("Error al actualizar estado:", error);
+    res.status(500).json({ message: "Error al actualizar el estado del pedido" });
   }
 };

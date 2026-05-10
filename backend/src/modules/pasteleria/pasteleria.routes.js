@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { getPedidos, createPedido, addAbono } from './pasteleria.controller.js';
+import { getPedidos, createPedido, addAbono, updateEstado } from './pasteleria.controller.js';
 
 const router = Router();
 
 router.get('/pedidos', getPedidos);
 router.post('/pedidos', createPedido);
 router.post('/pedidos/:id/abonos', addAbono);
+router.put('/pedidos/:id/estado', updateEstado); // NUEVA RUTA
 
 export default router;

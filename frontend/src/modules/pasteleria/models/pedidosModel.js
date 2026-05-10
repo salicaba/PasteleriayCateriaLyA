@@ -1,4 +1,4 @@
-import client from '../../../api/client'; // <- Aquí estaba el error, ya corregido
+import client from '../../../api/client';
 
 export const fetchPedidosPasteleria = async () => {
   try {
@@ -26,6 +26,16 @@ export const registrarAbonoReal = async (pedidoId, monto) => {
     return response.data;
   } catch (error) {
     console.error("Error al registrar el abono en la BD:", error);
+    throw error;
+  }
+};
+
+export const actualizarEstadoPedidoReal = async (pedidoId, estado) => {
+  try {
+    const response = await client.put(`/pasteleria/pedidos/${pedidoId}/estado`, { estado });
+    return response.data.data; // Retorna el pedido actualizado
+  } catch (error) {
+    console.error("Error al actualizar el estado en la BD:", error);
     throw error;
   }
 };
