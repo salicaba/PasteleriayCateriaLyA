@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode } from 'lucide-react';
+import { 
+  LayoutGrid, 
+  ChefHat, 
+  Cake, 
+  Menu, 
+  PieChart, 
+  BookOpenCheck, 
+  Clock, 
+  LogOut, 
+  QrCode, 
+  Coffee, 
+  ChevronDown,
+  Calendar,
+  ShoppingBasket
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -10,6 +24,7 @@ import { MesasPage } from './modules/cafeteria/views/MesasPage';
 import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
 import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard';
+import PasteleriaCalendar from './modules/pasteleria/views/PasteleriaCalendar';
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 
@@ -17,6 +32,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('mesas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+  // Iniciamos con ambos grupos expandidos para facilitar la navegación inicial
+  const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group']); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
@@ -49,14 +66,67 @@ function App() {
     year: 'numeric' 
   });
 
-  const menuItems = [
-    { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
-    { id: 'qr', label: 'Control QR', icon: QrCode },
-    { id: 'cocina', label: 'Cocina', icon: ChefHat },
-    { id: 'pasteleria', label: 'Pastelería', icon: Cake },
+  // Configuración de Menú con Grupos Anidados
+  const menuConfig = [
+    {
+      id: 'cafeteria_group',
+      label: 'Cafetería',
+      icon: Coffee,
+      isGroup: true,
+      children: [
+        { id: 'mesas', label: 'Mesas / Llevar', icon: LayoutGrid },
+        { id: 'qr', label: 'Control QR', icon: QrCode },
+        { id: 'cocina', label: 'Cocina', icon: ChefHat },
+        { id: 'ajustes', label: 'Gestor Menú', icon: BookOpenCheck },
+      ]
+    },
+    {
+      id: 'pasteleria_group',
+      label: 'Pastelería',
+      icon: Cake,
+      isGroup: true,
+      children: [
+        { id: 'pedidos', label: 'Pedidos', icon: ShoppingBasket },
+        { id: 'agenda', label: 'Agenda', icon: Calendar },
+      ]
+    },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
-    { id: 'ajustes', label: 'Gestor Menú', icon: BookOpenCheck }, 
   ];
+
+  const toggleGroup = (groupId) => {
+    setExpandedGroups(prev => 
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+    );
+  };
+
+  const renderMenuItem = (item, isNested = false) => {
+    const isActive = activeTab === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => {
+          setActiveTab(item.id);
+          if (window.innerWidth < 768) setIsSidebarOpen(false);
+        }}
+        className={`flex items-center gap-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none w-full ${isNested ? 'px-3 pl-11' : 'px-3'} ${
+          isActive
+            ? 'bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-secondary/20 text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold'
+            : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:bg-gray-100 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg hover:text-gray-800 dark:hover:text-gray-200 lya:hover:text-lya-text'
+        }`}
+      >
+        <div className="shrink-0 flex items-center justify-center w-6">
+          <item.icon size={isNested ? 18 : 20} className={isActive ? 'stroke-[2.5px]' : 'stroke-2'} />
+        </div>
+        <span className="whitespace-nowrap">{item.label}</span>
+        {isActive && (
+          <motion.div
+            layoutId="activeIndicator"
+            className="absolute left-0 top-0 bottom-0 my-auto w-1 h-[70%] bg-orange-500 lya:bg-lya-secondary rounded-r-full"
+          />
+        )}
+      </button>
+    );
+  };
 
   if (!user) {
     return <LoginScreen onLogin={(userData) => setUser(userData)} />;
@@ -65,7 +135,6 @@ function App() {
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300">
       
-      {/* TOASTER RESTAURADO PERO ADAPTADO */}
       <Toaster 
         position="bottom-right"
         toastOptions={{
@@ -87,7 +156,6 @@ function App() {
         }}
       />
 
-      {/* SIDEBAR ORIGINAL CON SOPORTE LYA */}
       <motion.aside
         initial={false}
         animate={{ width: isSidebarOpen ? 240 : 0 }}
@@ -102,39 +170,59 @@ function App() {
             <span className="ml-3 font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">Menú Principal</span>
           </div>
 
-          <nav className="flex-1 py-4 flex flex-col gap-2 px-3 overflow-y-auto custom-scrollbar">
-            {menuItems.map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    if (window.innerWidth < 768) setIsSidebarOpen(false);
-                  }}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none ${
-                    isActive
-                      ? 'bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-secondary/20 text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold'
-                      : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:bg-gray-100 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg hover:text-gray-800 dark:hover:text-gray-200 lya:hover:text-lya-text'
-                  }`}
-                >
-                  <div className="shrink-0 flex items-center justify-center w-6">
-                    <item.icon size={20} className={isActive ? 'stroke-[2.5px]' : 'stroke-2'} />
+          <nav className="flex-1 py-4 flex flex-col gap-1.5 px-3 overflow-y-auto custom-scrollbar">
+            {menuConfig.map((item) => {
+              if (item.isGroup) {
+                const isExpanded = expandedGroups.includes(item.id);
+                const hasActiveChild = item.children.some(child => child.id === activeTab);
+
+                return (
+                  <div key={item.id} className="flex flex-col w-full">
+                    <button
+                      onClick={() => toggleGroup(item.id)}
+                      className={`flex items-center justify-between px-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none w-full ${
+                        hasActiveChild && !isExpanded
+                          ? 'text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-secondary/10'
+                          : 'text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold hover:bg-gray-100 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="shrink-0 flex items-center justify-center w-6">
+                          <item.icon size={20} className="stroke-2" />
+                        </div>
+                        <span className="whitespace-nowrap">{item.label}</span>
+                      </div>
+                      <motion.div
+                        animate={{ rotate: isExpanded ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <ChevronDown size={16} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/60" />
+                      </motion.div>
+                    </button>
+                    
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="flex flex-col gap-1 mt-1">
+                            {item.children.map(child => renderMenuItem(child, true))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  <span className="whitespace-nowrap">{item.label}</span>
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeIndicator"
-                      className="absolute left-0 top-0 bottom-0 my-auto w-1 h-[70%] bg-orange-500 lya:bg-lya-secondary rounded-r-full"
-                    />
-                  )}
-                </button>
-              );
+                );
+              }
+              return renderMenuItem(item);
             })}
           </nav>
 
           <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
-            
             <div className="flex flex-col gap-2 px-1">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-300 lya:text-lya-text/80">Apariencia</span>
               <ThemeSelector />
@@ -185,7 +273,6 @@ function App() {
           )}
         </AnimatePresence>
 
-        {/* HEADER SUPERIOR ORIGINAL */}
         <header className="h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 z-10 transition-colors duration-300 relative">
           <div className="flex items-center gap-2 sm:gap-4">
              <button
@@ -197,14 +284,16 @@ function App() {
 
              <div className="flex items-center ml-1">
                <span className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text tracking-wider pb-1 font-bold">
-                 LyA
+                 尝𝔂𝓐
                </span>
              </div>
 
              <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-700 lya:bg-lya-border/40 mx-1"></div>
 
              <h2 className="text-lg font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 capitalize hidden sm:block">
-               {menuItems.find(i => i.id === activeTab)?.label}
+               {menuConfig.find(g => g.id === activeTab)?.label || 
+                menuConfig.find(g => g.isGroup)?.children.find(c => c.id === activeTab)?.label ||
+                'Sistema'}
              </h2>
           </div>
 
@@ -235,7 +324,8 @@ function App() {
           {activeTab === 'mesas' && <MesasPage />}
           {activeTab === 'qr' && <QrControlPage />}
           {activeTab === 'cocina' && <KitchenPage />}
-          {activeTab === 'pasteleria' && <PasteleriaDashboard />}
+          {activeTab === 'pedidos' && <PasteleriaDashboard />} 
+          {activeTab === 'agenda' && <PasteleriaCalendar />} 
           {activeTab === 'ajustes' && <MenuManagerPage />} 
           
           {activeTab === 'reportes' && (

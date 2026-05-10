@@ -5,6 +5,7 @@ import Product from '../modules/menu/Product.model.js';
 import Table from '../modules/pos/Table.model.js';
 import Category from '../modules/menu/Category.model.js';
 import Variant from '../modules/menu/Variant.model.js'; // <-- 1. Importamos Variant
+import PasteleriaOrder from '../modules/pasteleria/PasteleriaOrder.model.js';
 
 export const setupAssociations = () => {
   // Relación Orden -> Items
