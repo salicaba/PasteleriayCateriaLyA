@@ -30,7 +30,6 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     type: DataTypes.ENUM('pendiente', 'produccion', 'listo', 'entregado', 'cancelado'),
     defaultValue: 'pendiente',
   },
-  // Usamos JSON para guardar arreglos directamente en la base de datos
   porciones: {
     type: DataTypes.JSON, 
     defaultValue: [],
@@ -48,8 +47,13 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     allowNull: true,
   },
   abonos: {
-    type: DataTypes.JSON, // Guardaremos el arreglo de objetos {id, fecha, monto} aquí
+    type: DataTypes.JSON, 
     defaultValue: [],
+  },
+  // 🚀 ESTA ES LA COLUMNA QUE TE FALTABA
+  imagenReferencia: {
+    type: DataTypes.TEXT('long'), // Usamos long para que quepa el código de la imagen
+    allowNull: true,
   }
 }, {
   timestamps: true,

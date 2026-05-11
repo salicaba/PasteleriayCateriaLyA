@@ -40,7 +40,12 @@ const Product = sequelize.define('Product', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
-  // 🚀 AQUÍ ESTÁ LA SOLUCIÓN: Nueva columna JSON para las opciones
+  // 🚀 AQUÍ ESTÁ LA MAGIA: El nuevo campo para los reportes financieros
+  departamento: {
+    type: DataTypes.ENUM('cafeteria', 'pasteleria'),
+    allowNull: false,
+    defaultValue: 'cafeteria', // Por defecto todo va a cafetería
+  },
   opciones: {
     type: DataTypes.JSON,
     allowNull: true,

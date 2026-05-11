@@ -1,0 +1,160 @@
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera } from 'lucide-react';
+
+export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
+  if (!pedido) return null;
+
+  const finanzas = calcularFinanzas(pedido);
+  const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const hora = new Date(pedido.fechaEntrega).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col"
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
+              <div className="flex items-center gap-4">
+                <div className="bg-emerald-500 p-2 rounded-xl text-white shadow-lg shadow-emerald-500/20">
+                  <ShoppingBasket size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black dark:text-white uppercase tracking-tighter">{pedido.id}</h2>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pedido.estado === 'entregado' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+                    PEDIDO {pedido.estado.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {(pedido.estado !== 'entregado' && pedido.estado !== 'cancelado') && (
+                  <button onClick={() => { onEdit(pedido); onClose(); }} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20">
+                    <Edit3 size={18} /> Editar
+                  </button>
+                )}
+                <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors"><X size={24} /></button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+              {/* Imagen de Referencia */}
+              <div className="space-y-3">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Camera size={14} /> Imagen de Referencia
+                </label>
+                {pedido.imagenReferencia ? (
+                  <div className="w-full h-80 rounded-3xl overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl">
+                    <img src={pedido.imagenReferencia} alt="Referencia" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-full h-40 rounded-3xl bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700">
+                    <CameraOff size={48} className="mb-2 opacity-20" />
+                    <p className="text-sm font-medium">Sin imagen de referencia</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Información del Cliente */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase">Cliente</label>
+                  <div className="flex items-center gap-3 text-gray-800 dark:text-gray-100 font-bold">
+                    <User size={18} className="text-emerald-500" /> {pedido.cliente}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase">Teléfono</label>
+                  <div className="flex items-center gap-3 text-gray-800 dark:text-gray-100 font-bold">
+                    <Phone size={18} className="text-emerald-500" /> {pedido.telefono || 'No registrado'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Logística */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-4 border border-gray-100 dark:border-gray-800">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="text-emerald-500" size={20} />
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Fecha de Entrega</p>
+                      <p className="font-bold dark:text-white capitalize">{fecha}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="text-emerald-500" size={20} />
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Hora Programada</p>
+                      <p className="font-bold dark:text-white">{hora}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="text-emerald-500 mt-1" size={20} />
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Tipo de Entrega</p>
+                      <p className="font-bold dark:text-white uppercase text-sm">{pedido.tipoEntrega}</p>
+                      {pedido.tipoEntrega === 'domicilio' && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{pedido.direccion}</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Especificaciones del Pastel */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2">
+                  <Layers size={18} className="text-emerald-500" /> Especificaciones Técnicas
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase">Porciones / Tamaño</p>
+                    <div className="flex flex-wrap gap-2">
+                      {pedido.porciones?.map((p, i) => <span key={i} className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-xs font-bold border border-amber-200">{p}</span>)}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase">Sabores Elegidos</p>
+                    <div className="flex flex-wrap gap-2">
+                      {pedido.saborPan?.map((s, i) => <span key={i} className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-xs font-bold border border-purple-200">{s}</span>)}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase">Descripción y Notas</p>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm">
+                      "{pedido.descripcion}"
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen de Cuenta */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2">
+                  <DollarSign size={18} className="text-emerald-500" /> Estado de Cuenta
+                </h3>
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl overflow-hidden">
+                  <div className="p-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-sm font-medium text-gray-500">Costo Total</span>
+                    <span className="text-lg font-black dark:text-white">${parseFloat(pedido.costoTotal).toFixed(2)}</span>
+                  </div>
+                  <div className="p-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-black/10">
+                    <span className="text-sm font-medium text-gray-500">Pagado a la fecha</span>
+                    <span className="text-lg font-bold text-emerald-600">${finanzas.totalPagado.toFixed(2)}</span>
+                  </div>
+                  <div className="p-4 flex justify-between items-center bg-rose-50 dark:bg-rose-900/10">
+                    <span className="text-sm font-bold text-rose-600 uppercase tracking-tighter">Deuda Pendiente</span>
+                    <span className="text-2xl font-black text-rose-600">${finanzas.deuda.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}

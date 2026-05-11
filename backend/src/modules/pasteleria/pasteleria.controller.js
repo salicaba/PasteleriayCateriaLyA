@@ -59,7 +59,7 @@ export const addAbono = async (req, res) => {
   }
 };
 
-// Actualizar el estado de un pedido (Ej. Marcar como entregado)
+// Actualizar el estado de un pedido (Ej. entregado, cancelado, pendiente)
 export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
@@ -78,5 +78,23 @@ export const updateEstado = async (req, res) => {
   } catch (error) {
     console.error("Error al actualizar estado:", error);
     res.status(500).json({ message: "Error al actualizar el estado del pedido" });
+  }
+};
+
+// 🚀 Actualizar un pedido completo (Edición desde el formulario)
+export const updatePedido = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pedido = await PasteleriaOrder.findByPk(id);
+    
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    await pedido.update(req.body);
+    res.json({ data: pedido });
+  } catch (error) {
+    console.error("Error al editar pedido:", error);
+    res.status(500).json({ message: "Error al actualizar el pedido" });
   }
 };

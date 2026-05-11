@@ -10,12 +10,16 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   const finanzas = calcularFinanzas(pedido);
   const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute:'2-digit' });
 
+  // 🚀 ARREGLO: Convertimos explícitamente el costoTotal a número para evitar el error .toFixed
+  const costoTotalNum = parseFloat(pedido.costoTotal) || 0;
+
   // Función para enviar por WhatsApp
   const handleWhatsApp = () => {
     // Limpiamos el teléfono de caracteres que no sean números
     const telefonoLimpio = pedido.telefono?.replace(/\D/g, '') || '';
     
-    const mensaje = `¡Hola ${pedido.cliente}! 👋\nAquí tienes el comprobante de tu pedido en *Pastelería LyA* 🎂.\n\n*Folio:* ${pedido.id}\n*Entrega:* ${fecha}\n*Detalles:* ${pedido.descripcion}\n\n*Total:* $${pedido.costoTotal}\n*Abonado:* $${finanzas.totalPagado}\n*Resta por pagar:* $${finanzas.deuda}\n\n¡Gracias por tu preferencia! ✨`;
+    // Usamos costoTotalNum en lugar de pedido.costoTotal directo
+    const mensaje = `¡Hola ${pedido.cliente}! 👋\nAquí tienes el comprobante de tu pedido en *Pastelería LyA* 🎂.\n\n*Folio:* ${pedido.id}\n*Entrega:* ${fecha}\n*Detalles:* ${pedido.descripcion}\n\n*Total:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}\n\n¡Gracias por tu preferencia! ✨`;
     
     // Si hay teléfono usa la API directa a ese número, si no, abre la ventana genérica para elegir contacto
     const url = telefonoLimpio 
@@ -74,7 +78,8 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex justify-between text-base"><span className="text-gray-500">Costo Total:</span> <span className="font-bold">${pedido.costoTotal.toFixed(2)}</span></div>
+                  {/* Aquí también aplicamos el costoTotalNum.toFixed */}
+                  <div className="flex justify-between text-base"><span className="text-gray-500">Costo Total:</span> <span className="font-bold">${costoTotalNum.toFixed(2)}</span></div>
                   <div className="flex justify-between text-base"><span className="text-gray-500">Abonado:</span> <span>${finanzas.totalPagado.toFixed(2)}</span></div>
                   <div className="flex justify-between text-lg mt-2 pt-2 border-t border-gray-200"><span className="font-bold">RESTA:</span> <span className="font-black">${finanzas.deuda.toFixed(2)}</span></div>
                 </div>

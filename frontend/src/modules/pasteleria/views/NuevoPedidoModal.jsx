@@ -1,37 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus } from 'lucide-react';
+import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus, Clock } from 'lucide-react';
 
-export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefinida }) {
+export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefinida, pedidoAEditar }) {
   const [formData, setFormData] = useState({
     cliente: '', telefono: '', descripcion: '',
-    porciones: [], saborPan: [], tipoEntrega: 'sucursal', direccion: '', fechaEntrega: '', costoTotal: '', anticipo: ''
+    porciones: [], saborPan: [], tipoEntrega: 'sucursal', direccion: '', fechaEntrega: '', costoTotal: '', anticipo: '',
+    imagenReferencia: null 
   });
 
   const [porcionInput, setPorcionInput] = useState('');
   const [saborInput, setSaborInput] = useState('');
 
-  // NUEVO: Hook para resetear formulario y auto-completar la fecha
   useEffect(() => {
     if (isOpen) {
-      let defaultDate = '';
-      if (fechaPredefinida) {
-        // Formatear la fecha seleccionada para el input type="datetime-local" (YYYY-MM-DDTHH:mm)
-        const year = fechaPredefinida.getFullYear();
-        const month = String(fechaPredefinida.getMonth() + 1).padStart(2, '0');
-        const day = String(fechaPredefinida.getDate()).padStart(2, '0');
-        defaultDate = `${year}-${month}-${day}T12:00`; // Se le asigna las 12:00 PM por defecto
+      if (pedidoAEditar) {
+        // 🚀 SOLUCIÓN: Formateamos la fecha que viene de la BD para que los inputs la entiendan
+        let fechaFormateada = pedidoAEditar.fechaEntrega;
+        if (fechaFormateada) {
+          const d = new Date(fechaFormateada);
+          if (!isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            // La dejamos exactamente como "YYYY-MM-DDTHH:mm"
+            fechaFormateada = `${year}-${month}-${day}T${hours}:${minutes}`;
+          }
+        }
+        setFormData({ ...pedidoAEditar, fechaEntrega: fechaFormateada });
+      } else {
+        let defaultDate = '';
+        if (fechaPredefinida) {
+          const year = fechaPredefinida.getFullYear();
+          const month = String(fechaPredefinida.getMonth() + 1).padStart(2, '0');
+          const day = String(fechaPredefinida.getDate()).padStart(2, '0');
+          defaultDate = `${year}-${month}-${day}T12:00`; 
+        } else {
+          const hoy = new Date();
+          const year = hoy.getFullYear();
+          const month = String(hoy.getMonth() + 1).padStart(2, '0');
+          const day = String(hoy.getDate()).padStart(2, '0');
+          defaultDate = `${year}-${month}-${day}T12:00`;
+        }
+        
+        setFormData({
+          cliente: '', telefono: '', descripcion: '',
+          porciones: [], saborPan: [], tipoEntrega: 'sucursal', 
+          direccion: '', fechaEntrega: defaultDate, costoTotal: '', anticipo: '',
+          imagenReferencia: null 
+        });
       }
-      
-      setFormData({
-        cliente: '', telefono: '', descripcion: '',
-        porciones: [], saborPan: [], tipoEntrega: 'sucursal', 
-        direccion: '', fechaEntrega: defaultDate, costoTotal: '', anticipo: ''
-      });
       setPorcionInput('');
       setSaborInput('');
     }
-  }, [isOpen, fechaPredefinida]);
+  }, [isOpen, fechaPredefinida, pedidoAEditar]);
 
   const addTag = (field, value, setInput) => {
     if (value.trim() !== '') {
@@ -49,13 +73,40 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData);
+    
+    let datosFinales = { ...formData };
+
+    if (porcionInput.trim() !== '') {
+      datosFinales.porciones = [...datosFinales.porciones, porcionInput.trim()];
+    }
+    
+    if (saborInput.trim() !== '') {
+      datosFinales.saborPan = [...datosFinales.saborPan, saborInput.trim()];
+    }
+
+    onSave(datosFinales);
   };
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  // 🚀 Aseguramos que los inputs separen correctamente YYYY-MM-DD y HH:mm
+  const datePart = formData.fechaEntrega ? formData.fechaEntrega.split('T')[0] : '';
+  const timePart = formData.fechaEntrega && formData.fechaEntrega.includes('T') 
+    ? formData.fechaEntrega.split('T')[1].substring(0, 5) // Agarra solo los primeros 5 caracteres (HH:mm)
+    : '';
+
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    setFormData({ ...formData, fechaEntrega: `${newDate}T${timePart || '12:00'}` });
+  };
+
+  const handleTimeChange = (e) => {
+    const newTime = e.target.value;
+    setFormData({ ...formData, fechaEntrega: `${datePart || new Date().toISOString().split('T')[0]}T${newTime}` });
+  };
+
   const costo = parseFloat(formData.costoTotal) || 0;
-  const anticipo = parseFloat(formData.anticipo) || 0;
+  const anticipo = !formData.id ? (parseFloat(formData.anticipo) || 0) : 0; 
   const deuda = Math.max(costo - anticipo, 0);
 
   const handleKeyDown = (e, field, value, setInput) => {
@@ -63,6 +114,21 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
       e.preventDefault();
       addTag(field, value, setInput);
     }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, imagenReferencia: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setFormData({ ...formData, imagenReferencia: null });
   };
 
   return (
@@ -75,7 +141,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
           >
             <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
               <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
-                <span className="bg-gradient-to-r from-emerald-500 to-teal-400 text-transparent bg-clip-text">Agendar Nuevo Pastel</span>
+                <span className="bg-gradient-to-r from-emerald-500 to-teal-400 text-transparent bg-clip-text">
+                  {pedidoAEditar ? `Editar Pedido: ${pedidoAEditar.id}` : 'Agendar Nuevo Pastel'}
+                </span>
               </h2>
               <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-gray-100 dark:bg-gray-800 rounded-full transition-colors"><X size={20} /></button>
             </div>
@@ -97,7 +165,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                       <input type="text" placeholder="Tamaño/Porciones (Ej. 20 pax... y presiona Enter)" value={porcionInput} onChange={(e) => setPorcionInput(e.target.value)} onKeyDown={(e) => handleKeyDown(e, 'porciones', porcionInput, setPorcionInput)} className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-12 py-3 text-sm text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
                       <button type="button" onClick={() => addTag('porciones', porcionInput, setPorcionInput)} className="absolute right-2 p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-800/50 transition-colors"><Plus size={16} /></button>
                     </div>
-                    {formData.porciones.length > 0 && (
+                    {formData.porciones?.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {formData.porciones.map((tag, i) => <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} key={i} className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800/50">{tag} <X size={14} className="cursor-pointer hover:text-amber-900 dark:hover:text-amber-200" onClick={() => removeTag('porciones', i)} /></motion.span>)}
                       </div>
@@ -110,7 +178,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                       <input type="text" placeholder="Sabores (Ej. Fresa... y presiona Enter)" value={saborInput} onChange={(e) => setSaborInput(e.target.value)} onKeyDown={(e) => handleKeyDown(e, 'saborPan', saborInput, setSaborInput)} className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-12 py-3 text-sm text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
                       <button type="button" onClick={() => addTag('saborPan', saborInput, setSaborInput)} className="absolute right-2 p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-800/50 transition-colors"><Plus size={16} /></button>
                     </div>
-                    {formData.saborPan.length > 0 && (
+                    {formData.saborPan?.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {formData.saborPan.map((tag, i) => <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} key={i} className="flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-800/50">{tag} <X size={14} className="cursor-pointer hover:text-purple-900 dark:hover:text-purple-200" onClick={() => removeTag('saborPan', i)} /></motion.span>)}
                       </div>
@@ -119,19 +187,50 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
 
                   <textarea name="descripcion" required rows="3" placeholder="Instrucciones especiales de decoración, dedicatoria..." value={formData.descripcion} onChange={handleChange} className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none" />
                   
-                  <button type="button" className="w-full border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl py-4 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <Camera size={24} className="mb-2" />
-                    <span className="text-sm font-medium">Añadir foto de referencia (Opcional)</span>
-                  </button>
+                  {formData.imagenReferencia ? (
+                    <div className="relative w-full h-40 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-inner group">
+                      <img src={formData.imagenReferencia} alt="Referencia" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button type="button" onClick={removeImage} className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-lg">
+                          <X size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="w-full border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl py-4 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer group">
+                      <Camera size={24} className="mb-2 group-hover:text-emerald-500 transition-colors" />
+                      <span className="text-sm font-medium group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Añadir foto de referencia (Opcional)</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
+                  )}
+
                 </div>
 
                 {/* COLUMNA 2: Logística y Pagos */}
                 <div className="space-y-5">
                   <h3 className="font-bold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-800 pb-2">2. Logística y Finanzas</h3>
                   
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-3.5 text-emerald-500" size={20} />
-                    <input type="datetime-local" name="fechaEntrega" required value={formData.fechaEntrega} onChange={handleChange} className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  <div className="flex gap-4">
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-4 top-3.5 text-emerald-500" size={20} />
+                      <input 
+                        type="date" 
+                        required 
+                        value={datePart} 
+                        onChange={handleDateChange} 
+                        className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" 
+                      />
+                    </div>
+                    <div className="relative flex-1">
+                      <Clock className="absolute left-4 top-3.5 text-emerald-500" size={20} />
+                      <input 
+                        type="time" 
+                        required 
+                        value={timePart} 
+                        onChange={handleTimeChange} 
+                        className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" 
+                      />
+                    </div>
                   </div>
 
                   <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
@@ -148,12 +247,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                         <DollarSign className="absolute left-3 top-3.5 text-emerald-600 dark:text-emerald-400" size={18} />
                         <input type="number" name="costoTotal" required min="1" placeholder="Costo Total" value={formData.costoTotal} onChange={handleChange} className="w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white font-bold outline-none focus:ring-2 focus:ring-emerald-500/50" />
                       </div>
-                      <div className="flex-1 relative">
-                        <DollarSign className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                        <input type="number" name="anticipo" placeholder="Anticipo" value={formData.anticipo} onChange={handleChange} className="w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
-                      </div>
+                      
+                      {/* Ocultamos el campo de anticipo si es una EDICIÓN (el anticipo solo se da al crear) */}
+                      {!pedidoAEditar && (
+                        <div className="flex-1 relative">
+                          <DollarSign className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                          <input type="number" name="anticipo" placeholder="Anticipo" value={formData.anticipo} onChange={handleChange} className="w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                        </div>
+                      )}
                     </div>
-                    {costo > 0 && (
+                    
+                    {(!pedidoAEditar && costo > 0) && (
                       <div className="flex justify-between items-center pt-2 px-2 border-t border-emerald-200/50 dark:border-emerald-800/50">
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Resta por Pagar:</span>
                         <span className={`text-2xl font-black ${deuda === 0 ? 'text-emerald-500' : 'text-rose-500'}`}>${deuda.toFixed(2)}</span>
@@ -167,7 +271,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-black/20 shrink-0 flex justify-end gap-4">
               <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">Cancelar</button>
               <button type="submit" form="pedidoForm" className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold px-8 py-3 rounded-xl shadow-lg shadow-emerald-500/30 hover:scale-[1.02] transition-transform active:scale-95">
-                Confirmar y Agendar
+                {pedidoAEditar ? 'Guardar Cambios' : 'Confirmar y Agendar'}
               </button>
             </div>
           </motion.div>

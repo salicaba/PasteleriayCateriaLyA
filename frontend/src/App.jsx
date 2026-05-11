@@ -293,7 +293,7 @@ function App() {
                  className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text pb-1 font-bold"
                  style={{ letterSpacing: '-0.11em', transform: 'scaleX(0.95)' }}
                >
-                 𝓛𝔂𝓪
+                 𝓛𝔂𝓐
                </span>
              </div>
 

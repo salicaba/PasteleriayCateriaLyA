@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { motion } from 'framer-motion';
-import { X, Upload, RotateCw, Package, Folder, Settings2, CheckCircle2, Star } from 'lucide-react';
+import { X, Upload, RotateCw, Package, Folder, Settings2, CheckCircle2, Star, Store } from 'lucide-react';
 import clsx from 'clsx';
 
 const createImage = (url) => new Promise((resolve, reject) => {
@@ -73,6 +73,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? '') : '',
     imageUrl: initialData?.imageUrl || initialData?.image || null,
     isActive: initialData?.isActive !== undefined ? initialData.isActive : (initialData?.disponible !== undefined ? initialData.disponible : true),
+    departamento: initialData?.departamento || 'cafeteria', // <-- NUEVO ESTADO PARA DEPARTAMENTO
     opciones: normalizeOptions(initialData?.opciones)
   });
 
@@ -199,22 +200,42 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       placeholder="Ej: Frappé de Moka"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 lya:text-lya-text/50 uppercase ml-1">Categoría</label>
-                    <div className="relative">
-                      <Folder className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
-                      <select
-                        value={formData.categoryId}
-                        onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
-                        className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none cursor-pointer transition-all font-medium"
-                      >
-                        <option value="" disabled>Selecciona una categoría...</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
+                  
+                  {/* SECCIÓN DIVIDIDA: CATEGORÍA Y DEPARTAMENTO FINANCIERO */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 lya:text-lya-text/50 uppercase ml-1">Categoría Visual</label>
+                      <div className="relative">
+                        <Folder className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
+                        <select
+                          value={formData.categoryId}
+                          onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
+                          className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none cursor-pointer transition-all font-medium"
+                        >
+                          <option value="" disabled>Selecciona una categoría...</option>
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 lya:text-lya-text/50 uppercase ml-1" title="A qué caja se irá este dinero en los reportes">Centro de Ingresos</label>
+                      <div className="relative">
+                        <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
+                        <select
+                          value={formData.departamento}
+                          onChange={(e) => setFormData({...formData, departamento: e.target.value})}
+                          className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none cursor-pointer transition-all font-medium"
+                        >
+                          <option value="cafeteria">Caja Cafetería</option>
+                          <option value="pasteleria">Caja Pastelería (Vitrina)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-gray-400 lya:text-lya-text/50 uppercase ml-1">Precio Base</label>
