@@ -1,12 +1,12 @@
+// src/modules/pasteleria/views/DetallePedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark } from 'lucide-react';
-import client from '../../../api/client'; // <-- Importamos el cliente API
+import client from '../../../api/client'; 
 
 export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
   const [transferInfo, setTransferInfo] = useState(null);
 
-  // Consultar las cuentas bancarias al abrir el modal
   useEffect(() => {
     if (isOpen) {
       client.get('/settings')
@@ -26,13 +26,14 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
       {isOpen && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
+          
+          {/* Implementación de rounded-[2rem] y shadow en lugar de pantalla completa estricta para sensación flotante, manteniendo anclaje derecho */}
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col"
+            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10"
           >
-            {/* Header */}
             <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
               <div className="flex items-center gap-4">
-                <div className="bg-emerald-500 p-2 rounded-xl text-white shadow-lg shadow-emerald-500/20">
+                <div className="bg-emerald-500 p-2 rounded-2xl text-white shadow-lg shadow-emerald-500/20">
                   <ShoppingBasket size={24} />
                 </div>
                 <div>
@@ -53,24 +54,22 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
-              {/* Imagen de Referencia */}
               <div className="space-y-3">
                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                   <Camera size={14} /> Imagen de Referencia
                 </label>
                 {pedido.imagenReferencia ? (
-                  <div className="w-full h-80 rounded-3xl overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl">
+                  <div className="w-full h-80 rounded-[2rem] overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl">
                     <img src={pedido.imagenReferencia} alt="Referencia" className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <div className="w-full h-40 rounded-3xl bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700">
+                  <div className="w-full h-40 rounded-[2rem] bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700">
                     <CameraOff size={48} className="mb-2 opacity-20" />
                     <p className="text-sm font-medium">Sin imagen de referencia</p>
                   </div>
                 )}
               </div>
 
-              {/* Información del Cliente */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase">Cliente</label>
@@ -86,8 +85,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                 </div>
               </div>
 
-              {/* Logística */}
-              <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-4 border border-gray-100 dark:border-gray-800">
+              <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-[2rem] space-y-4 border border-gray-100 dark:border-gray-800">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
                     <Calendar className="text-emerald-500" size={20} />
@@ -116,7 +114,6 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                 </div>
               </div>
 
-              {/* Especificaciones del Pastel */}
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2">
                   <Layers size={18} className="text-emerald-500" /> Especificaciones Técnicas
@@ -125,30 +122,29 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Porciones / Tamaño</p>
                     <div className="flex flex-wrap gap-2">
-                      {pedido.porciones?.map((p, i) => <span key={i} className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-xs font-bold border border-amber-200">{p}</span>)}
+                      {pedido.porciones?.map((p, i) => <span key={i} className="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl text-xs font-bold border border-amber-200">{p}</span>)}
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Sabores Elegidos</p>
                     <div className="flex flex-wrap gap-2">
-                      {pedido.saborPan?.map((s, i) => <span key={i} className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-xs font-bold border border-purple-200">{s}</span>)}
+                      {pedido.saborPan?.map((s, i) => <span key={i} className="bg-purple-100 text-purple-700 px-3 py-1 rounded-xl text-xs font-bold border border-purple-200">{s}</span>)}
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Descripción y Notas</p>
-                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm">
                       "{pedido.descripcion}"
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Resumen de Cuenta */}
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2">
                   <DollarSign size={18} className="text-emerald-500" /> Estado de Cuenta
                 </h3>
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl overflow-hidden">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-[2rem] overflow-hidden">
                   <div className="p-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700">
                     <span className="text-sm font-medium text-gray-500">Costo Total</span>
                     <span className="text-lg font-black dark:text-white">${parseFloat(pedido.costoTotal).toFixed(2)}</span>
@@ -164,7 +160,6 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                 </div>
               </div>
 
-              {/* SECCIÓN DE CUENTAS BANCARIAS DINÁMICA (Solo si hay deuda y hay cuentas registradas) */}
               {finanzas.deuda > 0 && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
                 <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
                   <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2">
@@ -173,7 +168,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   
                   <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 px-1">
                     {transferInfo.bank_accounts.map(acc => (
-                      <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0 shadow-sm">
+                      <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-3xl shrink-0 shadow-sm">
                         <div className="flex items-center gap-2 mb-3">
                           <Smartphone className="text-purple-600 dark:text-purple-400" size={18} />
                           <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>

@@ -1,14 +1,13 @@
 // src/modules/cafeteria/views/CheckoutModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CreditCard, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart } from 'lucide-react';
+import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart } from 'lucide-react';
 import client from '../../../api/client'; 
 
-// ORDEN CAMBIADO A: Efectivo, Transferencia, Tarjeta
+// SE ELIMINÓ TARJETA - Solo Efectivo y Transferencia
 const paymentMethods = [
   { id: 'efectivo', label: 'Efectivo', icon: Banknote, color: 'text-green-500' },
-  { id: 'transferencia', label: 'Transferencia', icon: Smartphone, color: 'text-purple-500' },
-  { id: 'tarjeta', label: 'Tarjeta', icon: CreditCard, color: 'text-blue-500' },
+  { id: 'transferencia', label: 'Transferencia', icon: Smartphone, color: 'text-purple-500' }
 ];
 
 const modalVariants = {
@@ -40,11 +39,11 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
         setSelectedCuenta(initialTarget.cuentaName);
       } else {
         setCobroMode('full');
-        if (cuentasResumen.length > 0) {
-           setSelectedCuenta(cuentasResumen[0].nombre);
-        }
+        if (cuentasResumen.length > 0) setSelectedCuenta(cuentasResumen[0].nombre);
       }
     }
+  // 👇 SOLUCIÓN: Solo depender de isOpen. 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   useEffect(() => {
@@ -89,7 +88,8 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
-      <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full max-w-md bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[90vh]">
+      {/* Aplicado rounded-[2rem] para consistencia estética */}
+      <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full max-w-md bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[90vh]">
         
         <div className="p-5 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border-b border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex justify-between items-center shrink-0">
           <div>
@@ -101,7 +101,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
 
         <div className="p-5 overflow-y-auto custom-scrollbar space-y-5">
           <div className="flex gap-2 p-1.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl">
-            {/* Botones de modo de cobro resumidos visualmente por espacio, mantienen su lógica */}
             <button onClick={() => setCobroMode('full')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'full' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}><LayoutList size={18}/> Toda la Mesa</button>
             <button onClick={() => setCobroMode('nominal')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'nominal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}><User size={18}/> Por Persona</button>
             <button onClick={() => setCobroMode('equal')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'equal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}><PieChart size={18}/> Dividir</button>
@@ -145,7 +144,8 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
             <div className="text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text mt-1">${amountToPay.toFixed(2)}</div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* Actualizado a grid-cols-2 */}
+          <div className="grid grid-cols-2 gap-3">
             {paymentMethods.map((pm) => (
               <button key={pm.id} onClick={() => setMethod(pm.id)}
                 className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${method === pm.id ? 'border-orange-500 bg-orange-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300 dark:hover:border-gray-600'}`}>
@@ -178,7 +178,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
               </motion.div>
             )}
 
-            {/* SECCIÓN DE TRANSFERENCIA MULTICUENTA */}
             {method === 'transferencia' && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
               <motion.div key="transferencia-panel" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-2">
                 <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 pt-1 px-1">
@@ -216,7 +215,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
           </AnimatePresence>
         </div>
 
-        {/* BOTÓN DE CONFIRMACIÓN - ESTILO ARREGLADO Y GENÉRICO */}
         <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
           <button onClick={handlePayment} disabled={amountToPay <= 0 || (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay)}
             className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/80 text-white font-bold text-lg rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  CalendarClock, Plus, Search, CheckCircle2, AlertTriangle, Wallet, CreditCard, Banknote,
-  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, ArrowRightLeft
+  CalendarClock, Plus, Search, CheckCircle2, AlertTriangle, Wallet, Banknote,
+  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
-import DetallePedidoModal from './DetallePedidoModal'; // 🚀 IMPORTANTE: Importamos el nuevo modal de detalles
+import DetallePedidoModal from './DetallePedidoModal';
+import client from '../../../api/client';
 
 export default function PasteleriaDashboard() {
   const { 
@@ -17,10 +18,20 @@ export default function PasteleriaDashboard() {
     abonoModal, setAbonoModal, abonoForm, setAbonoForm, abrirModalAbono, 
     ticketModal, abrirTicket, cerrarTicket,
     confirmModal, pedirConfirmacion, cerrarConfirmacion, ejecutarAccionConfirmada,
-    detalleModal, abrirDetalles, cerrarDetalles, // 🚀 Nuevas variables del controlador
-    pedidoAEditar, iniciarEdicion,               // 🚀 Nuevas variables del controlador
+    detalleModal, abrirDetalles, cerrarDetalles, 
+    pedidoAEditar, iniciarEdicion,               
     calcularFinanzas, guardarPedido, registrarAbono
   } = usePedidosController();
+
+  const [transferInfo, setTransferInfo] = useState(null);
+
+  useEffect(() => {
+    if (abonoModal.isOpen && abonoForm.metodo === 'transferencia') {
+      client.get('/settings')
+        .then(res => { if (res.data) setTransferInfo(res.data); })
+        .catch(err => console.error("Error al cargar datos bancarios:", err));
+    }
+  }, [abonoModal.isOpen, abonoForm.metodo]);
 
   if (loading) return null; 
 
@@ -133,7 +144,7 @@ export default function PasteleriaDashboard() {
                     initial={{ opacity: 0, scale: 0.98 }} 
                     animate={{ opacity: 1, scale: 1 }} 
                     exit={{ opacity: 0, scale: 0.95 }}
-                    onClick={() => abrirDetalles(pedido)} // 🚀 HACE QUE TODA LA TARJETA ABRA EL DETALLE
+                    onClick={() => abrirDetalles(pedido)} 
                     className={`cursor-pointer relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-all duration-300 flex flex-col justify-between h-full
                       ${isCancelado ? 'bg-gray-100 dark:bg-gray-900/50 lya:bg-lya-bg/50 border-gray-200 dark:border-gray-800 lya:border-lya-border/20 opacity-75 grayscale-[0.5]' : 'bg-white dark:bg-gray-900 lya:bg-lya-surface'}
                       ${!isCancelado && finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : ''}
@@ -262,7 +273,6 @@ export default function PasteleriaDashboard() {
         )}
       </AnimatePresence>
 
-      {/* 🚀 NUEVO: MODAL DE DETALLES */}
       <DetallePedidoModal 
         isOpen={detalleModal.isOpen} 
         onClose={cerrarDetalles} 
@@ -301,7 +311,7 @@ export default function PasteleriaDashboard() {
 
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 lya:bg-black/50 backdrop-blur-md">
-              <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl w-full max-w-lg shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col max-h-[90vh]">
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] w-full max-w-lg shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col max-h-[90vh]">
                 
                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30 lya:bg-lya-bg/50">
                   <div>
@@ -330,13 +340,39 @@ export default function PasteleriaDashboard() {
                   </div>
 
                   <form id="abonoForm" onSubmit={submitPago} className="space-y-6">
+                    
                     <div>
-                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase ml-1 mb-2 block">Método de Pago</label>
-                      <div className="flex bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 p-1 rounded-xl">
-                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'efectivo'})} className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg text-xs font-bold transition-all ${abonoForm.metodo === 'efectivo' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Banknote size={18}/> Efectivo</button>
-                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'transferencia'})} className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg text-xs font-bold transition-all ${abonoForm.metodo === 'transferencia' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-blue-600 dark:text-blue-400 lya:text-blue-500 shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><ArrowRightLeft size={18}/> Transf.</button>
-                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'tarjeta'})} className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg text-xs font-bold transition-all ${abonoForm.metodo === 'tarjeta' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-purple-600 dark:text-purple-400 lya:text-purple-500 shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><CreditCard size={18}/> Tarjeta</button>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block ml-1">Selecciona Método</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'efectivo'})}
+                          className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${abonoForm.metodo === 'efectivo' ? 'border-orange-500 bg-orange-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
+                          <Banknote size={28} className={`mb-2 ${abonoForm.metodo === 'efectivo' ? 'text-orange-500 lya:text-lya-primary' : 'text-gray-400'}`} />
+                          <span className={`text-xs font-bold ${abonoForm.metodo === 'efectivo' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Efectivo</span>
+                        </button>
+                        
+                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'transferencia'})}
+                          className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${abonoForm.metodo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
+                          <Smartphone size={28} className={`mb-2 ${abonoForm.metodo === 'transferencia' ? 'text-purple-500' : 'text-gray-400'}`} />
+                          <span className={`text-xs font-bold ${abonoForm.metodo === 'transferencia' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Transferencia</span>
+                        </button>
                       </div>
+
+                      {abonoForm.metodo === 'transferencia' && transferInfo?.bank_accounts && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 overflow-x-auto custom-scrollbar pt-4">
+                          {transferInfo.bank_accounts.map(acc => (
+                            <div key={acc.id} className="min-w-[85%] sm:min-w-[260px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-black text-[11px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
+                                <Smartphone className="text-purple-400" size={14} />
+                              </div>
+                              <div className="space-y-1">
+                                {acc.account_holder && <p className="text-[10px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
+                                {acc.account_number && <p className="text-[10px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
+                              </div>
+                            </div>
+                          ))}
+                        </motion.div>
+                      )}
                     </div>
 
                     <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl p-5 space-y-4">

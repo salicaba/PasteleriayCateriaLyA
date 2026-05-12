@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus, Clock } from 'lucide-react';
+import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus, Clock, Smartphone, Banknote } from 'lucide-react';
+import client from '../../../api/client';
 
 export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefinida, pedidoAEditar }) {
   const [formData, setFormData] = useState({
@@ -11,11 +12,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
 
   const [porcionInput, setPorcionInput] = useState('');
   const [saborInput, setSaborInput] = useState('');
+  
+  // Nuevos estados para control de pagos
+  const [metodoPagoAnticipo, setMetodoPagoAnticipo] = useState('efectivo');
+  const [transferInfo, setTransferInfo] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
       if (pedidoAEditar) {
-        // 🚀 SOLUCIÓN: Formateamos la fecha que viene de la BD para que los inputs la entiendan
         let fechaFormateada = pedidoAEditar.fechaEntrega;
         if (fechaFormateada) {
           const d = new Date(fechaFormateada);
@@ -25,7 +29,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             const day = String(d.getDate()).padStart(2, '0');
             const hours = String(d.getHours()).padStart(2, '0');
             const minutes = String(d.getMinutes()).padStart(2, '0');
-            // La dejamos exactamente como "YYYY-MM-DDTHH:mm"
             fechaFormateada = `${year}-${month}-${day}T${hours}:${minutes}`;
           }
         }
@@ -54,8 +57,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
       }
       setPorcionInput('');
       setSaborInput('');
+      setMetodoPagoAnticipo('efectivo');
     }
-  }, [isOpen, fechaPredefinida, pedidoAEditar]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pedidoAEditar]);
+
+  useEffect(() => {
+    if (isOpen && metodoPagoAnticipo === 'transferencia' && !pedidoAEditar) {
+      client.get('/settings')
+        .then(res => { if (res.data) setTransferInfo(res.data); })
+        .catch(err => console.error("Error al cargar datos bancarios:", err));
+    }
+  }, [isOpen, metodoPagoAnticipo, pedidoAEditar]);
 
   const addTag = (field, value, setInput) => {
     if (value.trim() !== '') {
@@ -76,12 +89,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     
     let datosFinales = { ...formData };
 
-    if (porcionInput.trim() !== '') {
-      datosFinales.porciones = [...datosFinales.porciones, porcionInput.trim()];
-    }
+    if (porcionInput.trim() !== '') datosFinales.porciones = [...datosFinales.porciones, porcionInput.trim()];
+    if (saborInput.trim() !== '') datosFinales.saborPan = [...datosFinales.saborPan, saborInput.trim()];
     
-    if (saborInput.trim() !== '') {
-      datosFinales.saborPan = [...datosFinales.saborPan, saborInput.trim()];
+    // Inyectar el método de pago si hay un anticipo registrado y es creación
+    if (!pedidoAEditar && parseFloat(formData.anticipo) > 0) {
+      datosFinales.metodoPagoAnticipo = metodoPagoAnticipo;
     }
 
     onSave(datosFinales);
@@ -89,10 +102,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // 🚀 Aseguramos que los inputs separen correctamente YYYY-MM-DD y HH:mm
   const datePart = formData.fechaEntrega ? formData.fechaEntrega.split('T')[0] : '';
   const timePart = formData.fechaEntrega && formData.fechaEntrega.includes('T') 
-    ? formData.fechaEntrega.split('T')[1].substring(0, 5) // Agarra solo los primeros 5 caracteres (HH:mm)
+    ? formData.fechaEntrega.split('T')[1].substring(0, 5) 
     : '';
 
   const handleDateChange = (e) => {
@@ -106,7 +118,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
   };
 
   const costo = parseFloat(formData.costoTotal) || 0;
-  const anticipo = !formData.id ? (parseFloat(formData.anticipo) || 0) : 0; 
+  const anticipo = !pedidoAEditar ? (parseFloat(formData.anticipo) || 0) : 0; 
   const deuda = Math.max(costo - anticipo, 0);
 
   const handleKeyDown = (e, field, value, setInput) => {
@@ -127,17 +139,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
   };
 
-  const removeImage = () => {
-    setFormData({ ...formData, imagenReferencia: null });
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 m-auto w-full max-w-4xl h-fit max-h-[90vh] bg-white dark:bg-gray-900 border border-white/20 dark:border-white/10 rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col"
+            className="fixed inset-0 m-auto w-full max-w-4xl h-fit max-h-[90vh] bg-white dark:bg-gray-900 border border-white/20 dark:border-white/10 rounded-[2rem] shadow-2xl z-50 overflow-hidden flex flex-col"
           >
             <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
               <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
@@ -151,7 +159,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
               <form id="pedidoForm" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
-                {/* COLUMNA 1: Datos */}
                 <div className="space-y-5">
                   <h3 className="font-bold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-800 pb-2">1. Detalles del Cliente y Diseño</h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -191,9 +198,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                     <div className="relative w-full h-40 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-inner group">
                       <img src={formData.imagenReferencia} alt="Referencia" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button type="button" onClick={removeImage} className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-lg">
-                          <X size={20} />
-                        </button>
+                        <button type="button" onClick={() => setFormData({ ...formData, imagenReferencia: null })} className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-lg"><X size={20} /></button>
                       </div>
                     </div>
                   ) : (
@@ -203,33 +208,19 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                       <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                     </label>
                   )}
-
                 </div>
 
-                {/* COLUMNA 2: Logística y Pagos */}
                 <div className="space-y-5">
                   <h3 className="font-bold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-800 pb-2">2. Logística y Finanzas</h3>
                   
                   <div className="flex gap-4">
                     <div className="relative flex-1">
                       <Calendar className="absolute left-4 top-3.5 text-emerald-500" size={20} />
-                      <input 
-                        type="date" 
-                        required 
-                        value={datePart} 
-                        onChange={handleDateChange} 
-                        className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" 
-                      />
+                      <input type="date" required value={datePart} onChange={handleDateChange} className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
                     </div>
                     <div className="relative flex-1">
                       <Clock className="absolute left-4 top-3.5 text-emerald-500" size={20} />
-                      <input 
-                        type="time" 
-                        required 
-                        value={timePart} 
-                        onChange={handleTimeChange} 
-                        className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" 
-                      />
+                      <input type="time" required value={timePart} onChange={handleTimeChange} className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
                     </div>
                   </div>
 
@@ -247,18 +238,61 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                         <DollarSign className="absolute left-3 top-3.5 text-emerald-600 dark:text-emerald-400" size={18} />
                         <input type="number" name="costoTotal" required min="1" placeholder="Costo Total" value={formData.costoTotal} onChange={handleChange} className="w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white font-bold outline-none focus:ring-2 focus:ring-emerald-500/50" />
                       </div>
-                      
-                      {/* Ocultamos el campo de anticipo si es una EDICIÓN (el anticipo solo se da al crear) */}
-                      {!pedidoAEditar && (
-                        <div className="flex-1 relative">
-                          <DollarSign className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                          <input type="number" name="anticipo" placeholder="Anticipo" value={formData.anticipo} onChange={handleChange} className="w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
-                        </div>
-                      )}
                     </div>
+
+                    {!pedidoAEditar && (
+                      <div className="flex flex-col space-y-4 pt-2">
+                        <div className="relative">
+                          <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-1">Registrar Anticipo</label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                            <input type="number" name="anticipo" placeholder="0.00" value={formData.anticipo} onChange={handleChange} className="w-full bg-white dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                          </div>
+                        </div>
+                        
+                        <AnimatePresence>
+                          {anticipo > 0 && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 overflow-hidden border-t border-emerald-200/50 dark:border-emerald-800/50 pt-4">
+                              <label className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-500 tracking-widest ml-1">Método del Anticipo</label>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <button type="button" onClick={() => setMetodoPagoAnticipo('efectivo')}
+                                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${metodoPagoAnticipo === 'efectivo' ? 'border-emerald-500 bg-emerald-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 hover:border-gray-300'}`}>
+                                  <Banknote size={24} className={`mb-1.5 ${metodoPagoAnticipo === 'efectivo' ? 'text-emerald-500' : 'text-gray-400'}`} />
+                                  <span className={`text-[11px] font-bold ${metodoPagoAnticipo === 'efectivo' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Efectivo</span>
+                                </button>
+                                
+                                <button type="button" onClick={() => setMetodoPagoAnticipo('transferencia')}
+                                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${metodoPagoAnticipo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 hover:border-gray-300'}`}>
+                                  <Smartphone size={24} className={`mb-1.5 ${metodoPagoAnticipo === 'transferencia' ? 'text-purple-500' : 'text-gray-400'}`} />
+                                  <span className={`text-[11px] font-bold ${metodoPagoAnticipo === 'transferencia' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Transferencia</span>
+                                </button>
+                              </div>
+
+                              {metodoPagoAnticipo === 'transferencia' && transferInfo?.bank_accounts && (
+                                <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                                  {transferInfo.bank_accounts.map(acc => (
+                                    <div key={acc.id} className="min-w-[85%] sm:min-w-[240px] p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-black text-[10px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
+                                        <Smartphone className="text-purple-400" size={14} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        {acc.account_holder && <p className="text-[9px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
+                                        {acc.account_number && <p className="text-[9px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </motion.div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
                     
                     {(!pedidoAEditar && costo > 0) && (
-                      <div className="flex justify-between items-center pt-2 px-2 border-t border-emerald-200/50 dark:border-emerald-800/50">
+                      <div className="flex justify-between items-center pt-3 mt-2 border-t border-emerald-200/50 dark:border-emerald-800/50">
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Resta por Pagar:</span>
                         <span className={`text-2xl font-black ${deuda === 0 ? 'text-emerald-500' : 'text-rose-500'}`}>${deuda.toFixed(2)}</span>
                       </div>
