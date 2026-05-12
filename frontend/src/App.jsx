@@ -12,7 +12,8 @@ import {
   Coffee, 
   ChevronDown,
   Calendar,
-  ShoppingBasket
+  ShoppingBasket,
+  Settings // <-- IMPORTACIÓN NUEVA: Icono de ajustes
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast'; 
@@ -27,6 +28,7 @@ import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard'
 import PasteleriaCalendar from './modules/pasteleria/views/PasteleriaCalendar';
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
+import { SettingsPage } from './modules/admin/views/SettingsPage'; // <-- IMPORTACIÓN NUEVA: La vista de ajustes
 
 // Importa aquí tu logo con la extensión correcta
 import logoLyA from './assets/logo.jpeg'; 
@@ -92,6 +94,7 @@ function App() {
       ]
     },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
+    { id: 'configuracion', label: 'Ajustes Negocio', icon: Settings }, // <-- NUEVO: Botón en el menú lateral
   ];
 
   const toggleGroup = (groupId) => {
@@ -336,6 +339,7 @@ function App() {
           {activeTab === 'pedidos' && <PasteleriaDashboard />} 
           {activeTab === 'agenda' && <PasteleriaCalendar />} 
           {activeTab === 'ajustes' && <MenuManagerPage />} 
+          {activeTab === 'configuracion' && <SettingsPage />} {/* <-- NUEVO: Renderizado de la vista de ajustes */}
           
           {activeTab === 'reportes' && (
             <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 lya:text-lya-text/50 font-medium text-center p-4">

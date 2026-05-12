@@ -1,7 +1,9 @@
 import app from './app.js';
 import sequelize from './config/database.js';
-import { setupAssociations } from './config/associations.js'; // <-- 1. Importamos la función
-import './modules/menu/GlobalOption.model.js'; // <-- Agrega esta línea
+import { setupAssociations } from './config/associations.js'; 
+import './modules/menu/GlobalOption.model.js'; 
+// 1. IMPORTAMOS EL NUEVO MODELO PARA QUE SEQUELIZE LO DETECTE Y CREE LA TABLA
+import './modules/settings/BusinessConfig.model.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -12,7 +14,7 @@ async function main() {
     console.log('✅ Conexión a MySQL establecida.');
     
     // 2. Ejecutar las relaciones ANTES de sincronizar
-    setupAssociations(); // <-- 2. Llamamos a la función aquí
+    setupAssociations(); 
     
     // 3. Sincronizar modelos
     await sequelize.sync({ alter: true });

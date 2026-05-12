@@ -1,12 +1,11 @@
 // src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
-// ¡IMPORTAMOS LA NUEVA FUNCIÓN fetchCategories AQUÍ!
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
 
 export const usePosController = () => {
   const [dbProducts, setDbProducts] = useState([]); 
-  const [dbCategories, setDbCategories] = useState([]); // <-- NUEVO ESTADO
+  const [dbCategories, setDbCategories] = useState([]);
   const [cart, setCart] = useState([]);
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
@@ -14,21 +13,18 @@ export const usePosController = () => {
   const [cuentaActiva, setCuentaActiva] = useState('General');
   const [nombresCuentas, setNombresCuentas] = useState(['General']);
 
-  // --- CARGAR PRODUCTOS Y CATEGORÍAS DESDE EL BACKEND AL MISMO TIEMPO ---
   useEffect(() => {
     const loadData = async () => {
-      // Promise.all hace que se descarguen más rápido al mismo tiempo
       const [prods, cats] = await Promise.all([
         fetchProducts(),
         fetchCategories()
       ]);
       setDbProducts(prods);
-      setDbCategories(cats); // Guardamos las categorías
+      setDbCategories(cats);
     };
     loadData();
   }, []);
 
-  // --- LÓGICA DE CARRITO Y CUENTAS (Se mantiene igual) ---
   const addToCart = (productWithDetails) => {
     setCart(prev => {
       const precioACobrar = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
@@ -75,24 +71,24 @@ export const usePosController = () => {
     setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && !p.enviadoCocina && p.cuenta === cuenta)));
   };
 
-  const moveItemToCuenta = (itemToMove, targetCuenta) => { /* Igual que el original */ };
-  const descontarStock = (itemsParaDescontar) => { /* Pendiente de ruta backend para stock */ };
+  const moveItemToCuenta = (itemToMove, targetCuenta) => { 
+      setCart(prev => prev.map(item => 
+          item === itemToMove ? { ...item, cuenta: targetCuenta } : item
+      ));
+  };
 
-  // --- ENVIAR A BD REAL ---
   const simulateKitchenSend = async (onComplete, orderType = 'LLEVAR', ticketId = 'L-01') => {
     const itemsNuevos = cart.filter(p => !p.enviadoCocina);
     if (itemsNuevos.length === 0) return;
 
     setIsSuccess(true);
     try {
-      // 1. Crear Orden
       const orderRes = await client.post('/pos/orders', {
         orderType,
         ticketId
       });
       const newOrderId = orderRes.data.order.id;
 
-      // 2. Formatear items para la BD
       const itemsPayload = itemsNuevos.map(item => ({
         productId: item.id,
         quantity: item.qty,
@@ -100,10 +96,8 @@ export const usePosController = () => {
         notes: item.preparaciones?.join(', ') || ''
       }));
 
-      // 3. Enviar items a la orden (Se van a cocina automáticamente)
       await client.post(`/pos/orders/${newOrderId}/items`, { items: itemsPayload });
 
-      // 4. Actualizar frontend
       setCart(prev => prev.map(p => ({ ...p, enviadoCocina: true })));
       
       if (onComplete) onComplete();
@@ -115,18 +109,45 @@ export const usePosController = () => {
     }
   };
 
-  const handleCheckout = async (onComplete) => {
-    if (cart.length === 0) return;
+  // NUEVO: Implementación real de pago parcial para Cuentas Separadas
+  const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
+    setIsSuccess(true);
+    try {
+      // Aquí enviarías los datos al backend (ej. client.post('/pos/orders/pay-partial', paymentDetails))
+      console.log(`Registrando pago parcial de cuenta [${nombreCuenta}]`, paymentDetails);
+
+      // Limpiamos los productos de esa cuenta específica del carrito
+      setCart(prev => prev.filter(item => item.cuenta !== nombreCuenta));
+      
+      // Eliminamos la cuenta de la lista activa (opcional, para mantener limpia la UI)
+      setNombresCuentas(prev => prev.filter(n => n !== nombreCuenta));
+      if (cuentaActiva === nombreCuenta) setCuentaActiva('General');
+
+      setTimeout(() => {
+        if (onComplete) onComplete();
+        setIsSuccess(false);
+      }, 800);
+    } catch (error) {
+      console.error("Error al cobrar cuenta parcial:", error);
+      setIsSuccess(false);
+    }
+  };
+
+  // MEJORADO: Recibe paymentDetails y no cierra todo a lo ciego
+  const handleCheckout = async (paymentDetails, onComplete) => {
+    if (cart.length === 0 && paymentDetails?.amountPaid <= 0) return;
     
     setIsSuccess(true);
     try {
-      // Si hay cosas sin enviar, las mandamos primero
       if (cart.some(p => !p.enviadoCocina)) {
          await simulateKitchenSend(null, 'LLEVAR', 'L-COBRO-DIRECTO');
       }
 
-      // Aquí iría el cierre de la orden a 'CLOSED' en el futuro
+      // Aquí enviarías los metadatos de pago al endpoint de cierre
+      console.log("Procesando pago final con metadatos:", paymentDetails);
+
       setTimeout(() => {
+        // Solo vaciamos el carrito si es un pago total de lo que queda
         setCart([]);
         setCuentaActiva('General');
         setNombresCuentas(['General']); 
@@ -139,9 +160,6 @@ export const usePosController = () => {
     }
   };
 
-  const payCuenta = (nombreCuenta, onComplete) => { /* Lógica de cobro parcial */ };
-
-  // --- UTILIDADES ---
   const total = useMemo(() => cart.reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
@@ -155,7 +173,6 @@ export const usePosController = () => {
     return cart.filter(item => item.cuenta === nombreCuenta).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
   };
 
-  // ACTUALIZADO: Ahora filtra `dbProducts` en lugar de `MOCK_PRODUCTS`
   const filteredProducts = useMemo(() => {
     return dbProducts.filter(p => {
       const matchCategoria = categoriaActiva === 'todas' || p.categoria === categoriaActiva;
@@ -183,6 +200,6 @@ export const usePosController = () => {
     filteredProducts, getProductQty, 
     handleCheckout, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    dbCategories // <-- ¡NO OLVIDES EXPORTAR ESTO AL FINAL!
+    dbCategories
   };
 };

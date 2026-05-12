@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera } from 'lucide-react';
+import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark } from 'lucide-react';
+import client from '../../../api/client'; // <-- Importamos el cliente API
 
 export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
+  const [transferInfo, setTransferInfo] = useState(null);
+
+  // Consultar las cuentas bancarias al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      client.get('/settings')
+        .then(res => { if (res.data) setTransferInfo(res.data); })
+        .catch(err => console.error("Error al cargar datos bancarios:", err));
+    }
+  }, [isOpen]);
+
   if (!pedido) return null;
 
   const finanzas = calcularFinanzas(pedido);
@@ -151,6 +163,47 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   </div>
                 </div>
               </div>
+
+              {/* SECCIÓN DE CUENTAS BANCARIAS DINÁMICA (Solo si hay deuda y hay cuentas registradas) */}
+              {finanzas.deuda > 0 && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <h3 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2">
+                    <Landmark size={18} className="text-purple-500" /> Cuentas para Transferencia
+                  </h3>
+                  
+                  <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 px-1">
+                    {transferInfo.bank_accounts.map(acc => (
+                      <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Smartphone className="text-purple-600 dark:text-purple-400" size={18} />
+                          <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {acc.account_holder && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Titular:</span>
+                              <span className="text-sm font-black text-purple-900 dark:text-white truncate" title={acc.account_holder}>{acc.account_holder}</span>
+                            </div>
+                          )}
+                          {acc.account_number && (
+                            <div className="flex justify-between items-center border-t border-purple-200/50 dark:border-purple-700/50 pt-2 mt-2">
+                              <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Cuenta/Tarjeta:</span>
+                              <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.account_number}</span>
+                            </div>
+                          )}
+                          {acc.clabe && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">CLABE:</span>
+                              <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.clabe}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           </motion.div>
         </>

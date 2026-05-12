@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState } from 'react';
 import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -68,8 +69,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     const { amountPaid, targetType, cuentaName } = paymentDetails;
     setShowCheckout(false);
 
+    // 1. Pago por cuenta nominal (Split Bill por persona)
     if (targetType === 'partial' && cuentaName) {
-       payCuenta(cuentaName, () => {
+       payCuenta(cuentaName, paymentDetails, () => {
            if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
        });
        return;
@@ -78,9 +80,25 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     const deudaTotal = (mesa.total || 0) + unsentTotal; 
     
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
-    if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
+    
+    // 2. Pago de fracción ("Dividir en partes iguales")
+    if (targetType === 'equal') {
+        if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
+        const saldoRestante = deudaTotal - amountPaid;
+        
+        // Si por casualidad con este pago parcial se liquidó la mesa
+        if (saldoRestante <= 0.01) {
+            handleCheckout(paymentDetails, () => {
+                if (onTableRelease) onTableRelease(mesa.id);
+                onClose();
+            });
+        }
+        return; // Retornamos temprano para no vaciar el carrito
+    }
 
-    handleCheckout(() => {
+    // 3. Pago Completo de la mesa
+    if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
+    handleCheckout(paymentDetails, () => {
         const saldoRestante = deudaTotal - amountPaid;
         if (saldoRestante <= 0.01) {
             if (onTableRelease) onTableRelease(mesa.id);
@@ -118,7 +136,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 text-gray-400 lya:text-lya-text/40" size={18} />
-                  {/* BÚSQUEDA RESTAURADA A ORIGINAL + LYA */}
                   <input 
                     type="text" placeholder="Buscar producto..." value={filtroTexto} onChange={(e) => setFiltroTexto(e.target.value)} 
                     className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg lya:border lya:border-lya-border/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/40 transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
@@ -130,8 +147,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 lya:bg-transparent pb-32 md:pb-4 transition-colors custom-scrollbar">
-              
-              {/* BANNER DE INFORMACIÓN RESTAURADO A AZUL + LYA TURQUESA/ROSA */}
               <div className="mb-5 bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-secondary/10 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 shadow-sm">
                 <div className="bg-blue-100 dark:bg-blue-800/50 lya:bg-lya-secondary/20 p-2.5 rounded-xl shrink-0 text-blue-600 dark:text-blue-400 lya:text-lya-secondary">
                   <Info size={20} />
