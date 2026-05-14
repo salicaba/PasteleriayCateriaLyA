@@ -286,7 +286,9 @@ export const MenuManagerPage = () => {
                   const opcionesDelTipo = globalOptions.filter(o => o.tipo === tipo);
                   return (
                     <div key={tipo}>
-                      <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 pb-2">{tipo}</h4>
+                      <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 pb-2">
+                        {tipo === 'tamanos' ? 'TAMAÑOS' : tipo}
+                      </h4>
                       {opcionesDelTipo.length === 0 ? (
                         <p className="text-sm text-gray-400 dark:text-gray-600 lya:text-lya-text/60 italic px-2 bg-white/50 dark:bg-gray-900/50 lya:bg-lya-surface p-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
                           Aún no has registrado {tipo}.

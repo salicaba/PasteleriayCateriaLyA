@@ -1,9 +1,10 @@
 import OrderItem from '../pos/OrderItem.model.js';
 import Order from '../pos/Order.model.js';
 import Product from '../menu/Product.model.js';
-import Variant from '../menu/Variant.model.js';
 
-// 1. Obtener todos los platillos pendientes o en preparación
+// ==========================================
+// 🍳 OBTENER TICKETS DE COCINA (KDS)
+// ==========================================
 export const getKitchenTickets = async (req, res) => {
   try {
     const tickets = await OrderItem.findAll({
@@ -13,15 +14,13 @@ export const getKitchenTickets = async (req, res) => {
       include: [
         {
           model: Order,
+          as: 'order', // 🔥 CRUCIAL: Debe coincidir con el alias definido en associations.js
           attributes: ['orderType', 'ticketId', 'tableId', 'createdAt'],
           where: { status: 'OPEN' } // Solo traer de órdenes que sigan abiertas
         },
         {
           model: Product,
-          attributes: ['name']
-        },
-        {
-          model: Variant,
+          as: 'product', // 🔥 CRUCIAL: Debe coincidir con el alias definido en associations.js
           attributes: ['name']
         }
       ],
@@ -30,11 +29,14 @@ export const getKitchenTickets = async (req, res) => {
 
     res.json(tickets);
   } catch (error) {
+    console.error('🔥 Error crítico al obtener tickets de cocina:', error);
     res.status(500).json({ message: 'Error al obtener tickets de cocina', error: error.message });
   }
 };
 
-// 2. Cambiar el estado de un platillo (ej: PENDING -> PREPARING -> READY)
+// ==========================================
+// 🔄 ACTUALIZAR ESTADO DEL PLATILLO
+// ==========================================
 export const updateKitchenStatus = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -55,6 +57,7 @@ export const updateKitchenStatus = async (req, res) => {
 
     res.json({ message: `Estado actualizado a ${status}`, item });
   } catch (error) {
+    console.error('🔥 Error al actualizar estado en cocina:', error);
     res.status(500).json({ message: 'Error al actualizar estado', error: error.message });
   }
 };

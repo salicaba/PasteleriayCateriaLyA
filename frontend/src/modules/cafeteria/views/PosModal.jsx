@@ -44,7 +44,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   const handleSendToKitchen = () => {
     if (!hasUnsentItems) return; 
-    simulateKitchenSend(() => {
+    simulateKitchenSend(mesa, () => {
       if (onUpdateTable && unsentTotal > 0) {
         onUpdateTable(mesa.id, unsentTotal);
       }
@@ -88,7 +88,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         
         // Si por casualidad con este pago parcial se liquidó la mesa
         if (saldoRestante <= 0.01) {
-            handleCheckout(paymentDetails, () => {
+            handleCheckout(mesa, paymentDetails, () => {
                 if (onTableRelease) onTableRelease(mesa.id);
                 onClose();
             });
@@ -98,7 +98,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
     // 3. Pago Completo de la mesa
     if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
-    handleCheckout(paymentDetails, () => {
+    handleCheckout(mesa, paymentDetails, () => {
         const saldoRestante = deudaTotal - amountPaid;
         if (saldoRestante <= 0.01) {
             if (onTableRelease) onTableRelease(mesa.id);

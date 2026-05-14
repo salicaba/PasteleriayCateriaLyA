@@ -13,6 +13,9 @@ export const usePosController = () => {
   const [cuentaActiva, setCuentaActiva] = useState('General');
   const [nombresCuentas, setNombresCuentas] = useState(['General']);
 
+  // Guardar el ID de la orden activa si la mesa ya tiene una
+  const [activeOrderId, setActiveOrderId] = useState(null);
+
   useEffect(() => {
     const loadData = async () => {
       const [prods, cats] = await Promise.all([
@@ -41,7 +44,6 @@ export const usePosController = () => {
         const newCart = [...prev];
         const itemExistente = newCart[existingItemIndex];
         
-        // Clonamos la última preparación si es que estamos agregando desde el botón + del sidebar
         const nuevaPrep = productWithDetails.detalles || 
           (itemExistente.preparaciones?.length > 0 
             ? itemExistente.preparaciones[itemExistente.preparaciones.length - 1] 
@@ -66,24 +68,21 @@ export const usePosController = () => {
     });
   };
 
-  // ¡AQUÍ ESTÁ LA CORRECCIÓN MÁGICA!
   const removeFromCart = (id, precio, enviadoCocina, cuenta) => {
     if(enviadoCocina) return; 
     setCart(prev => prev.map(p => {
       if (p.id === id && p.precio === precio && !p.enviadoCocina && p.cuenta === cuenta) {
-        // Copiamos las preparaciones actuales
         const nuevasPrep = [...(p.preparaciones || [])];
-        // Eliminamos la última preparación de la lista visual
         nuevasPrep.pop();
         
         return { 
           ...p, 
           qty: p.qty - 1, 
-          preparaciones: nuevasPrep // Asignamos la lista corregida
+          preparaciones: nuevasPrep
         };
       }
       return p;
-    }).filter(p => p.qty > 0)); // Si la cantidad llega a 0, se elimina todo el producto
+    }).filter(p => p.qty > 0));
   };
 
   const deleteLine = (id, precio, enviadoCocina, cuenta) => {
@@ -97,18 +96,28 @@ export const usePosController = () => {
       ));
   };
 
-  const simulateKitchenSend = async (onComplete, orderType = 'LLEVAR', ticketId = 'L-01') => {
+  // 🔥 FIX CRÍTICO: Lógica real para enviar a cocina y persistir la orden en DB
+  const simulateKitchenSend = async (mesaActual = null, onComplete = null) => {
     const itemsNuevos = cart.filter(p => !p.enviadoCocina);
     if (itemsNuevos.length === 0) return;
 
     setIsSuccess(true);
     try {
-      const orderRes = await client.post('/pos/orders', {
-        orderType,
-        ticketId
-      });
-      const newOrderId = orderRes.data.order.id;
+      let orderIdToUse = activeOrderId;
 
+      // 1. Si no hay una orden activa, creamos una nueva.
+      if (!orderIdToUse) {
+        const isLlevar = mesaActual?.zona === 'llevar';
+        const orderType = isLlevar ? 'LLEVAR' : 'SALON';
+        const tableId = isLlevar ? null : mesaActual?.id;
+        const ticketId = isLlevar ? `L-${mesaActual?.numero?.split('-')[0]}` : null;
+
+        const orderRes = await client.post('/pos/orders', { orderType, ticketId, tableId });
+        orderIdToUse = orderRes.data.order.id;
+        setActiveOrderId(orderIdToUse);
+      }
+
+      // 2. Preparamos los items para el backend
       const itemsPayload = itemsNuevos.map(item => ({
         productId: item.id,
         quantity: item.qty,
@@ -117,20 +126,28 @@ export const usePosController = () => {
           let nota = prep.tamano || 'Estándar';
           if (prep.leche) nota += ` - ${prep.leche}`;
           if (prep.extras && prep.extras.length > 0) nota += ` (+${prep.extras.join(', ')})`;
+          // Añadimos a qué cuenta pertenece por si lo dividen
+          nota += ` (Cuenta: ${item.cuenta})`;
           return nota;
-        }).join(', ') || ''
+        }).join(' | ') || `(Cuenta: ${item.cuenta})`
       }));
 
-      await client.post(`/pos/orders/${newOrderId}/items`, { items: itemsPayload });
+      // 3. Enviamos los items a la base de datos
+      await client.post(`/pos/orders/${orderIdToUse}/items`, { items: itemsPayload });
 
+      // 4. Actualizamos el carrito visual marcando como enviados
       setCart(prev => prev.map(p => ({ ...p, enviadoCocina: true })));
       
-      if (onComplete) onComplete();
+      // 5. Animación de 1.5s antes de cerrar
+      setTimeout(() => {
+        setIsSuccess(false);
+        if (onComplete) onComplete();
+      }, 1500);
+
     } catch (error) {
-      console.error("Error al enviar a cocina:", error);
-      alert("Hubo un error al enviar la orden al servidor.");
-    } finally {
+      console.error("🔥 Error crítico al enviar a cocina:", error);
       setIsSuccess(false);
+      alert("Hubo un error al enviar la orden a la cocina. Revisa la consola.");
     }
   };
 
@@ -145,20 +162,20 @@ export const usePosController = () => {
       setTimeout(() => {
         if (onComplete) onComplete();
         setIsSuccess(false);
-      }, 800);
+      }, 1500);
     } catch (error) {
       console.error("Error al cobrar cuenta parcial:", error);
       setIsSuccess(false);
     }
   };
 
-  const handleCheckout = async (paymentDetails, onComplete) => {
+  const handleCheckout = async (mesaActual, paymentDetails, onComplete) => {
     if (cart.length === 0 && paymentDetails?.amountPaid <= 0) return;
     
     setIsSuccess(true);
     try {
       if (cart.some(p => !p.enviadoCocina)) {
-         await simulateKitchenSend(null, 'LLEVAR', 'L-COBRO-DIRECTO');
+         await simulateKitchenSend(mesaActual, null);
       }
 
       console.log("Procesando pago final con metadatos:", paymentDetails);
@@ -167,9 +184,10 @@ export const usePosController = () => {
         setCart([]);
         setCuentaActiva('General');
         setNombresCuentas(['General']); 
+        setActiveOrderId(null); // Reseteamos la orden al cobrar
         if (onComplete) onComplete();
         setIsSuccess(false);
-      }, 1000);
+      }, 1500);
     } catch (error) {
       console.error("Error en checkout:", error);
       setIsSuccess(false);
@@ -216,6 +234,6 @@ export const usePosController = () => {
     filteredProducts, getProductQty, 
     handleCheckout, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    dbCategories
+    dbCategories 
   };
 };
