@@ -1,3 +1,4 @@
+// frontend/src/modules/cafeteria/controllers/useMesasController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchActiveOrders } from '../models/mesasModel.js';
 import client from '../../../api/client.js';
@@ -25,24 +26,34 @@ export const useMesasController = () => {
       const catalog = tablesRes.data;
       const activeOrders = orders || [];
 
-      // Cruzamos los datos: 
-      // Si la mesa del catálogo tiene una orden activa, está 'ocupada', si no, está 'libre'.
+      // Cruzamos los datos de las mesas del salón
       const mergedMesas = catalog.map(table => {
         const order = activeOrders.find(o => o.tableId === table.id);
         return {
           id: table.id,
-          numero: table.number,
+          numero: table.number, // Número de mesa (String)
           zona: table.zone,
           estado: order ? 'ocupada' : 'libre',
-          total: order ? order.total : 0,
+          total: order ? order.totalAmount : 0, // Usamos totalAmount del modelo
           orderId: order ? order.id : null,
           items: order ? order.items : [],
-          horaInicio: order ? order.horaInicio : null
+          horaInicio: order ? order.createdAt : null
         };
       });
 
-      // Añadimos también las órdenes "Para Llevar" que no están vinculadas a una mesa física
-      const paraLlevarOrders = activeOrders.filter(o => o.zona === 'llevar');
+      // CORRECCIÓN: Filtramos por orderType y construimos la estructura que pide PosModal
+      const paraLlevarOrders = activeOrders
+        .filter(o => o.orderType === 'LLEVAR')
+        .map(o => ({
+          id: o.id, 
+          numero: o.ticketId || 'Sin Nombre', // Para que split(' - ') no falle
+          zona: 'llevar',
+          estado: 'ocupada',
+          total: o.totalAmount || 0,
+          orderId: o.id,
+          items: o.items || [],
+          horaInicio: o.createdAt || null
+        }));
       
       setMesas([...mergedMesas, ...paraLlevarOrders]);
     } catch (error) {
@@ -71,7 +82,6 @@ export const useMesasController = () => {
 
   // 4. Acciones del POS
   const liberarMesa = async (id) => {
-    // Aquí llamarías a un endpoint para cerrar la orden (status = 'CLOSED')
     console.log("Cerrando cuenta y liberando mesa:", id);
     await loadMesas(); // Recargamos para ver los cambios
   };
@@ -83,8 +93,20 @@ export const useMesasController = () => {
         ticketId: nombreCliente,
         tableId: null
       });
+      
       await loadMesas();
-      return res.data.order;
+      
+      // CORRECCIÓN: Devolvemos el formato exacto de objeto para que PosModal lo lea bien inmediatamente
+      const orderDb = res.data.order;
+      return {
+        id: orderDb.id,
+        numero: orderDb.ticketId, // El identificador que acabamos de crear
+        zona: 'llevar',
+        estado: 'ocupada',
+        total: 0,
+        orderId: orderDb.id,
+        items: []
+      };
     } catch (error) {
       console.error("Error al crear pedido para llevar:", error);
       return null;

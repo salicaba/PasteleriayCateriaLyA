@@ -25,23 +25,32 @@ export const usePosController = () => {
     loadData();
   }, []);
 
-  const addToCart = (productWithDetails) => {
+  const addToCart = (productWithDetails, forceCuenta = null) => {
     setCart(prev => {
+      const targetCuenta = forceCuenta || cuentaActiva;
       const precioACobrar = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
+      
       const existingItemIndex = prev.findIndex(p => 
         p.id === productWithDetails.id && 
         (p.precioFinal || p.precioBase || p.precio) === precioACobrar &&
         !p.enviadoCocina &&
-        p.cuenta === cuentaActiva
+        p.cuenta === targetCuenta
       );
 
       if (existingItemIndex !== -1) {
         const newCart = [...prev];
         const itemExistente = newCart[existingItemIndex];
+        
+        // Clonamos la última preparación si es que estamos agregando desde el botón + del sidebar
+        const nuevaPrep = productWithDetails.detalles || 
+          (itemExistente.preparaciones?.length > 0 
+            ? itemExistente.preparaciones[itemExistente.preparaciones.length - 1] 
+            : {});
+
         newCart[existingItemIndex] = {
           ...itemExistente,
           qty: itemExistente.qty + 1,
-          preparaciones: [...(itemExistente.preparaciones || [itemExistente.detalles]), productWithDetails.detalles]
+          preparaciones: [...(itemExistente.preparaciones || []), nuevaPrep]
         };
         return newCart;
       }
@@ -50,20 +59,31 @@ export const usePosController = () => {
         ...productWithDetails, 
         precio: precioACobrar,
         qty: 1,
-        preparaciones: [productWithDetails.detalles],
+        preparaciones: [productWithDetails.detalles || {}],
         enviadoCocina: false,
-        cuenta: cuentaActiva
+        cuenta: targetCuenta
       }];
     });
   };
 
+  // ¡AQUÍ ESTÁ LA CORRECCIÓN MÁGICA!
   const removeFromCart = (id, precio, enviadoCocina, cuenta) => {
     if(enviadoCocina) return; 
-    setCart(prev => prev.map(p => 
-      (p.id === id && p.precio === precio && !p.enviadoCocina && p.cuenta === cuenta) 
-        ? { ...p, qty: p.qty - 1 } 
-        : p
-    ).filter(p => p.qty > 0));
+    setCart(prev => prev.map(p => {
+      if (p.id === id && p.precio === precio && !p.enviadoCocina && p.cuenta === cuenta) {
+        // Copiamos las preparaciones actuales
+        const nuevasPrep = [...(p.preparaciones || [])];
+        // Eliminamos la última preparación de la lista visual
+        nuevasPrep.pop();
+        
+        return { 
+          ...p, 
+          qty: p.qty - 1, 
+          preparaciones: nuevasPrep // Asignamos la lista corregida
+        };
+      }
+      return p;
+    }).filter(p => p.qty > 0)); // Si la cantidad llega a 0, se elimina todo el producto
   };
 
   const deleteLine = (id, precio, enviadoCocina, cuenta) => {
@@ -93,7 +113,12 @@ export const usePosController = () => {
         productId: item.id,
         quantity: item.qty,
         subtotal: item.precio * item.qty,
-        notes: item.preparaciones?.join(', ') || ''
+        notes: item.preparaciones?.map(prep => {
+          let nota = prep.tamano || 'Estándar';
+          if (prep.leche) nota += ` - ${prep.leche}`;
+          if (prep.extras && prep.extras.length > 0) nota += ` (+${prep.extras.join(', ')})`;
+          return nota;
+        }).join(', ') || ''
       }));
 
       await client.post(`/pos/orders/${newOrderId}/items`, { items: itemsPayload });
@@ -109,17 +134,11 @@ export const usePosController = () => {
     }
   };
 
-  // NUEVO: Implementación real de pago parcial para Cuentas Separadas
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
     setIsSuccess(true);
     try {
-      // Aquí enviarías los datos al backend (ej. client.post('/pos/orders/pay-partial', paymentDetails))
       console.log(`Registrando pago parcial de cuenta [${nombreCuenta}]`, paymentDetails);
-
-      // Limpiamos los productos de esa cuenta específica del carrito
       setCart(prev => prev.filter(item => item.cuenta !== nombreCuenta));
-      
-      // Eliminamos la cuenta de la lista activa (opcional, para mantener limpia la UI)
       setNombresCuentas(prev => prev.filter(n => n !== nombreCuenta));
       if (cuentaActiva === nombreCuenta) setCuentaActiva('General');
 
@@ -133,7 +152,6 @@ export const usePosController = () => {
     }
   };
 
-  // MEJORADO: Recibe paymentDetails y no cierra todo a lo ciego
   const handleCheckout = async (paymentDetails, onComplete) => {
     if (cart.length === 0 && paymentDetails?.amountPaid <= 0) return;
     
@@ -143,11 +161,9 @@ export const usePosController = () => {
          await simulateKitchenSend(null, 'LLEVAR', 'L-COBRO-DIRECTO');
       }
 
-      // Aquí enviarías los metadatos de pago al endpoint de cierre
       console.log("Procesando pago final con metadatos:", paymentDetails);
 
       setTimeout(() => {
-        // Solo vaciamos el carrito si es un pago total de lo que queda
         setCart([]);
         setCuentaActiva('General');
         setNombresCuentas(['General']); 

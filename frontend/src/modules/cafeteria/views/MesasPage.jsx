@@ -4,6 +4,8 @@ import { LayoutGrid, Search, X, ShoppingBag, Plus } from 'lucide-react';
 import { useMesasController } from '../controllers/useMesasController';
 import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal'; 
+// 1. Importamos el nuevo modal
+import { NuevoPedidoLlevarModal } from './NuevoPedidoLlevarModal';
 
 export const MesasPage = () => {
   const { 
@@ -13,12 +15,32 @@ export const MesasPage = () => {
   
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [busqueda, setBusqueda] = useState('');
+  
+  // 2. Estado para controlar el nuevo modal
+  const [isModalLlevarOpen, setIsModalLlevarOpen] = useState(false);
 
   const mesasVisibles = useMemo(() => {
     return mesasFiltradas.filter(mesa => 
-      mesa.numero.toString().toLowerCase().includes(busqueda.toLowerCase())
+      // Protección extra por si 'numero' llega vacío
+      (mesa?.numero || '').toString().toLowerCase().includes(busqueda.toLowerCase())
     );
   }, [mesasFiltradas, busqueda]);
+
+  // 3. Función que se ejecuta cuando el usuario confirma en el modal
+  const handleCrearPedidoLlevar = async (nombreCliente, telefono) => {
+    // Si escribieron teléfono, lo unimos al nombre. Si no, solo mandamos el nombre.
+    const identificador = telefono 
+      ? `${nombreCliente} - Cel: ${telefono}` 
+      : nombreCliente;
+
+    // AWAIT para esperar a que el backend cree la orden correctamente
+    const nuevo = await nuevoPedidoLlevar(identificador); 
+    
+    // Solo abrimos el POS si se creó correctamente
+    if (nuevo) {
+      setMesaSeleccionada(nuevo);      
+    }
+  };
 
   return (
     <motion.div 
@@ -96,13 +118,8 @@ export const MesasPage = () => {
 
         {zonaActiva === 'llevar' && (
           <button 
-            onClick={() => {
-              const nombreCliente = window.prompt("Ingresa el nombre del cliente para este pedido:");
-              if (nombreCliente !== null) {
-                 const nuevo = nuevoPedidoLlevar(nombreCliente); 
-                 setMesaSeleccionada(nuevo);       
-              }
-            }}
+            // 4. Cambiamos el onClick para que abra nuestro modal
+            onClick={() => setIsModalLlevarOpen(true)}
             className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md"
           >
             <Plus size={20} />
@@ -175,6 +192,14 @@ export const MesasPage = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* 5. NUESTRO NUEVO MODAL DE PEDIDOS PARA LLEVAR */}
+      <NuevoPedidoLlevarModal 
+        isOpen={isModalLlevarOpen} 
+        onClose={() => setIsModalLlevarOpen(false)} 
+        onSubmit={handleCrearPedidoLlevar} 
+      />
+      
     </motion.div>
   );
 };

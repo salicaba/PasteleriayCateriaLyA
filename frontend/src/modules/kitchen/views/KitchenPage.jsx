@@ -30,10 +30,10 @@ export const KitchenPage = () => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight">
-              KDS Cocina <span className="text-orange-500 lya:text-lya-primary">LyA</span>
+              KDS Cocina
             </h1>
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">
-              Pijijiapan, Chis. — Sistema Inteligente de Despacho
+              Sistema Inteligente de Despacho
             </p>
           </div>
         </div>

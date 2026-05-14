@@ -1,39 +1,40 @@
-// src/modules/pos/Order.model.js
 import { DataTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 
-const Order = sequelize.define('Order', {
+const OrderItem = sequelize.define('OrderItem', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-  orderType: {
-    type: DataTypes.ENUM('SALON', 'LLEVAR'),
-    allowNull: false,
-  },
-  ticketId: {
-    type: DataTypes.STRING, // Ej: "L-01", null si es SALON
-    allowNull: true,
-  },
-  tableId: {
-    type: DataTypes.INTEGER, // <-- ¡AQUÍ ESTÁ LA CORRECCIÓN! (Debe ser INTEGER, no UUID)
-    allowNull: true,
-  },
-  status: {
-    type: DataTypes.ENUM('OPEN', 'CLOSED', 'CANCELLED'),
-    defaultValue: 'OPEN',
-  },
-  totalAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    defaultValue: 0.00,
-  },
-  createdBy: { // Referencia al User (Employee)
+  orderId: {
     type: DataTypes.UUID,
     allowNull: false,
+  },
+  productId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  quantity: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+  },
+  subtotal: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0.00,
+  },
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true, // Aquí guardaremos las preparaciones específicas (leche deslactosada, extras, etc.)
+  },
+  kitchenStatus: {
+    type: DataTypes.ENUM('PENDING', 'PREPARING', 'READY', 'DELIVERED'),
+    defaultValue: 'PENDING',
   }
 }, {
   timestamps: true,
 });
 
-export default Order;
+export default OrderItem;

@@ -10,7 +10,8 @@ import Table from './Table.model.js';
 export const createOrder = async (req, res) => {
   try {
     const { orderType, ticketId, tableId } = req.body;
-    const employeeId = req.user.id; 
+    // CORRECCIÓN: Prevención de caída si req.user es undefined
+    const employeeId = req.user?.id || null; 
 
     const newOrder = await Order.create({
       orderType,

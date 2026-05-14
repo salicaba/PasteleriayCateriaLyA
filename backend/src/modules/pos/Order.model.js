@@ -17,7 +17,7 @@ const Order = sequelize.define('Order', {
     allowNull: true,
   },
   tableId: {
-    type: DataTypes.UUID, // null si es LLEVAR
+    type: DataTypes.INTEGER, // CORRECCIÓN: Cambiado a INTEGER para coincidir con Table.model.js
     allowNull: true,
   },
   status: {
@@ -30,7 +30,7 @@ const Order = sequelize.define('Order', {
   },
   createdBy: { // Referencia al User (Employee)
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true, // Permitimos null para pruebas y para que el sistema no explote sin sesión
   }
 }, {
   timestamps: true,

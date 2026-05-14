@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Trash2, Minus, Plus, ShoppingBag, ChefHat, 
   CreditCard, Lock, User, UserPlus, GripVertical, 
-  ArrowRightLeft, Info 
+  ArrowRightLeft, Info, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -13,8 +13,14 @@ export const TicketSidebar = ({
   cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
+  
+  // Estados para controlar el movimiento de productos
   const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverCuenta, setDragOverCuenta] = useState(null);
   const [transferModeItem, setTransferModeItem] = useState(null);
+
+  // REFERENCIA PARA EL CONTENEDOR DE SCROLL
+  const scrollContainerRef = useRef(null);
 
   const activeAcc = cuentaActiva || 'General';
   const availableAccs = cuentasDisponibles || ['General'];
@@ -30,6 +36,25 @@ export const TicketSidebar = ({
     const items = cart.filter(item => (item.cuenta || 'General') === cuentaName);
     return { cuentaName, items };
   });
+
+  // FUNCIÓN MÁGICA DE AUTO-SCROLL AL ARRASTRAR (Suavizado)
+  const handleContainerDragOver = (e) => {
+    e.preventDefault(); 
+    if (!scrollContainerRef.current || !draggedItem) return;
+
+    const container = scrollContainerRef.current;
+    const { top, bottom } = container.getBoundingClientRect();
+    const y = e.clientY;
+
+    const scrollZone = 80;
+    const scrollSpeed = 5; // AHORA ES MÁS SUAVE Y LENTO
+
+    if (y - top < scrollZone) {
+      container.scrollTop -= scrollSpeed;
+    } else if (bottom - y < scrollZone) {
+      container.scrollTop += scrollSpeed;
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors">
@@ -58,7 +83,11 @@ export const TicketSidebar = ({
       </div>
 
       {/* LISTADO DE PRODUCTOS */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+      <div 
+        ref={scrollContainerRef}
+        onDragOver={handleContainerDragOver}
+        className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar relative"
+      >
         {cart.length === 0 && availableAccs.length === 1 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-300 dark:text-gray-700 lya:text-lya-text/30 opacity-60">
             <ShoppingBag size={64} strokeWidth={1} className="mb-4" />
@@ -69,17 +98,35 @@ export const TicketSidebar = ({
           <AnimatePresence mode="popLayout"> 
             {groupedCart.map(({ cuentaName, items }) => {
               const isActive = activeAcc === cuentaName;
+              const isDragTarget = dragOverCuenta === cuentaName;
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
 
               return (
                 <motion.div 
                   key={cuentaName} layout 
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  
+                  // EVENTOS DE DROP ZONE
+                  onDragOver={(e) => { 
+                    e.preventDefault(); 
+                    if (draggedItem && draggedItem.cuentaName !== cuentaName) setDragOverCuenta(cuentaName);
+                  }}
+                  onDragLeave={() => setDragOverCuenta(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverCuenta(null);
+                    if (draggedItem && draggedItem.cuentaName !== cuentaName) {
+                      onMoveItem(draggedItem.item, cuentaName);
+                    }
+                  }}
+
                   className={clsx(
-                    "rounded-3xl transition-all duration-300 border-2",
-                    isActive 
-                      ? "border-orange-500/30 lya:border-lya-primary/40 bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-xl shadow-orange-500/5 lya:shadow-lya-primary/10" 
-                      : "border-transparent bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50"
+                    "rounded-3xl transition-all duration-300 border-2 overflow-hidden",
+                    isDragTarget 
+                      ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-inner scale-[1.02]" 
+                      : isActive 
+                        ? "border-orange-500/30 lya:border-lya-primary/40 bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-xl shadow-orange-500/5 lya:shadow-lya-primary/10" 
+                        : "border-transparent bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50"
                   )}
                 >
                   {/* CABECERA DE CUENTA */}
@@ -90,25 +137,31 @@ export const TicketSidebar = ({
                     <div className="flex items-center gap-3">
                       <div className={clsx(
                         "p-2 rounded-xl transition-colors",
-                        isActive ? "bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface" : "bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 text-gray-500 lya:text-lya-text/50"
+                        isDragTarget ? "bg-blue-500 text-white" 
+                        : isActive ? "bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface" 
+                        : "bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 text-gray-500 lya:text-lya-text/50"
                       )}>
-                        <User size={18} />
+                        <User size={18} className={isDragTarget ? "animate-bounce" : ""} />
                       </div>
                       <div>
-                        <h4 className={clsx("font-black text-sm uppercase tracking-tight", isActive ? "text-orange-500 lya:text-lya-primary" : "text-gray-600 dark:text-gray-400 lya:text-lya-text/70")}>
+                        <h4 className={clsx("font-black text-sm uppercase tracking-tight", 
+                          isDragTarget ? "text-blue-600 dark:text-blue-400" 
+                          : isActive ? "text-orange-500 lya:text-lya-primary" 
+                          : "text-gray-600 dark:text-gray-400 lya:text-lya-text/70"
+                        )}>
                           {cuentaName}
                         </h4>
                         <span className="text-[10px] font-bold text-gray-400 lya:text-lya-text/50 uppercase">{items.length} productos</span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right pointer-events-none">
                       <span className="block text-lg font-black text-gray-900 dark:text-white lya:text-lya-text">
                         ${subtotalCuenta.toFixed(2)}
                       </span>
                       {availableAccs.length > 1 && subtotalCuenta > 0 && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); onPayCuenta && onPayCuenta(cuentaName); }}
-                          className="text-[9px] font-black bg-blue-500 lya:bg-lya-secondary text-white lya:text-lya-surface px-2 py-1 rounded-lg shadow-md shadow-blue-500/20 lya:shadow-lya-secondary/20 active:scale-90 transition-transform uppercase"
+                          className="pointer-events-auto text-[9px] font-black bg-blue-500 lya:bg-lya-secondary text-white lya:text-lya-surface px-2 py-1 rounded-lg shadow-md shadow-blue-500/20 lya:shadow-lya-secondary/20 active:scale-90 transition-transform uppercase mt-1 inline-block"
                         >
                           Cobrar este
                         </button>
@@ -121,20 +174,62 @@ export const TicketSidebar = ({
                     {items.map((item, index) => (
                       <motion.div 
                         key={`${item.id}-${index}`} layout
+                        
+                        // EVENTOS DE ARRASTRE
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedItem({ item, cuentaName });
+                          e.dataTransfer.effectAllowed = 'move';
+                          setTransferModeItem(null);
+                        }}
+                        onDragEnd={() => setDraggedItem(null)}
+
                         className={clsx(
-                          "relative group flex flex-col p-3 rounded-2xl border transition-all",
+                          "relative group flex flex-col p-3 rounded-2xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden",
+                          draggedItem?.item === item ? "opacity-40 scale-95" : "opacity-100",
                           item.enviadoCocina 
                             ? "bg-gray-50 dark:bg-gray-800/40 lya:bg-lya-bg/60 border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30" 
                             : "bg-white dark:bg-gray-800 lya:bg-lya-surface border-transparent lya:border-lya-border/20 shadow-sm hover:shadow-md lya:hover:border-lya-secondary/30"
                         )}
                       >
+                        {/* OVERLAY PARA TRANSFERENCIA MÓVIL RÁPIDA */}
+                        <AnimatePresence>
+                          {transferModeItem === item && (
+                            <motion.div 
+                              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                              className="absolute inset-0 z-10 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-sm flex items-center justify-center p-2 rounded-2xl"
+                            >
+                              <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar w-full px-2">
+                                <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Mover a:</span>
+                                {availableAccs.filter(c => c !== cuentaName).map(c => (
+                                  <button 
+                                    key={c} 
+                                    onClick={() => { onMoveItem(item, c); setTransferModeItem(null); }}
+                                    className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95"
+                                  >
+                                    {c}
+                                  </button>
+                                ))}
+                                <button onClick={() => setTransferModeItem(null)} className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded-full ml-auto text-gray-500"><X size={14}/></button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
                         <div className="flex gap-3">
-                          {/* MINI IMAGEN */}
-                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg flex-shrink-0 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center relative">
+                          {/* MINI IMAGEN CON GRIP DE ARRASTRE */}
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg flex-shrink-0 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center relative group-hover:shadow-inner transition-shadow">
                             {item.imagen || item.image ? (
                               <img src={item.imagen || item.image} alt="" className="w-full h-full object-contain" />
                             ) : <span className="text-xl">🧁</span>}
-                            {item.enviadoCocina && (
+                            
+                            {availableAccs.length > 1 && (
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <GripVertical size={18} className="text-white drop-shadow-md" />
+                              </div>
+                            )}
+
+                            {item.enviadoCocina && availableAccs.length <= 1 && (
                               <div className="absolute inset-0 bg-orange-500/20 lya:bg-lya-primary/20 backdrop-blur-[1px] flex items-center justify-center">
                                 <Lock size={14} className="text-orange-600 lya:text-lya-primary" />
                               </div>
@@ -153,7 +248,7 @@ export const TicketSidebar = ({
                             </div>
 
                             {/* OPCIONES / PREPARACIONES */}
-                            <div className="space-y-1">
+                            <div className="space-y-1 pointer-events-none">
                               {item.preparaciones?.map((prep, pIdx) => {
                                 if (!prep || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
                                 return (
@@ -185,30 +280,43 @@ export const TicketSidebar = ({
                                 )}
                               </div>
                               
-                              {!item.enviadoCocina && (
-                                <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1">
+                                {availableAccs.length > 1 && (
                                   <button 
-                                    onClick={() => onRemove(item.id, item.precio, false, cuentaName)}
-                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-lg text-gray-400 lya:text-lya-text/40 hover:text-red-500 lya:hover:text-red-500 transition-colors"
+                                    onClick={() => setTransferModeItem(item)}
+                                    className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
+                                    title="Mover de cuenta"
                                   >
-                                    <Minus size={14} />
+                                    <ArrowRightLeft size={14} />
                                   </button>
-                                  <span className="text-xs font-black text-gray-600 dark:text-gray-300 lya:text-lya-text w-4 text-center">{item.qty}</span>
-                                  <button 
-                                    onClick={() => onAdd(item)}
-                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-lg text-orange-500 lya:text-lya-primary transition-colors"
-                                  >
-                                    <Plus size={14} />
-                                  </button>
-                                  <div className="w-px h-3 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/30 mx-1" />
-                                  <button 
-                                    onClick={() => onDelete(item.id, item.precio, false, cuentaName)}
-                                    className="p-1.5 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-500/10 rounded-lg text-gray-300 lya:text-lya-text/30 hover:text-red-500 lya:hover:text-red-500 transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              )}
+                                )}
+
+                                {!item.enviadoCocina && (
+                                  <>
+                                    <button 
+                                      onClick={() => onRemove(item.id, item.precio, false, cuentaName)}
+                                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-lg text-gray-400 lya:text-lya-text/40 hover:text-red-500 lya:hover:text-red-500 transition-colors"
+                                    >
+                                      <Minus size={14} />
+                                    </button>
+                                    <span className="text-xs font-black text-gray-600 dark:text-gray-300 lya:text-lya-text w-4 text-center">{item.qty}</span>
+                                    {/* MEJORA AQUÍ: Pasamos cuentaName en el onAdd para que se respete la cuenta origen */}
+                                    <button 
+                                      onClick={() => onAdd(item, cuentaName)}
+                                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-lg text-orange-500 lya:text-lya-primary transition-colors"
+                                    >
+                                      <Plus size={14} />
+                                    </button>
+                                    <div className="w-px h-3 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/30 mx-1" />
+                                    <button 
+                                      onClick={() => onDelete(item.id, item.precio, false, cuentaName)}
+                                      className="p-1.5 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-500/10 rounded-lg text-gray-300 lya:text-lya-text/30 hover:text-red-500 lya:hover:text-red-500 transition-colors"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
