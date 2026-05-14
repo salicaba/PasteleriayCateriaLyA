@@ -1,3 +1,4 @@
+// src/modules/pasteleria/views/NuevoPedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus, Clock, Smartphone, Banknote } from 'lucide-react';
@@ -92,7 +93,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     if (porcionInput.trim() !== '') datosFinales.porciones = [...datosFinales.porciones, porcionInput.trim()];
     if (saborInput.trim() !== '') datosFinales.saborPan = [...datosFinales.saborPan, saborInput.trim()];
     
-    // Inyectar el método de pago si hay un anticipo registrado y es creación
     if (!pedidoAEditar && parseFloat(formData.anticipo) > 0) {
       datosFinales.metodoPagoAnticipo = metodoPagoAnticipo;
     }
@@ -256,35 +256,47 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                               <label className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-500 tracking-widest ml-1">Método del Anticipo</label>
                               
                               <div className="grid grid-cols-2 gap-3">
-                                <button type="button" onClick={() => setMetodoPagoAnticipo('efectivo')}
-                                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${metodoPagoAnticipo === 'efectivo' ? 'border-emerald-500 bg-emerald-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 hover:border-gray-300'}`}>
+                                <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setMetodoPagoAnticipo('efectivo')}
+                                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors ${metodoPagoAnticipo === 'efectivo' ? 'border-emerald-500 bg-emerald-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 hover:border-gray-300'}`}>
                                   <Banknote size={24} className={`mb-1.5 ${metodoPagoAnticipo === 'efectivo' ? 'text-emerald-500' : 'text-gray-400'}`} />
                                   <span className={`text-[11px] font-bold ${metodoPagoAnticipo === 'efectivo' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Efectivo</span>
-                                </button>
+                                </motion.button>
                                 
-                                <button type="button" onClick={() => setMetodoPagoAnticipo('transferencia')}
-                                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${metodoPagoAnticipo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 hover:border-gray-300'}`}>
+                                <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setMetodoPagoAnticipo('transferencia')}
+                                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors ${metodoPagoAnticipo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 hover:border-gray-300'}`}>
                                   <Smartphone size={24} className={`mb-1.5 ${metodoPagoAnticipo === 'transferencia' ? 'text-purple-500' : 'text-gray-400'}`} />
                                   <span className={`text-[11px] font-bold ${metodoPagoAnticipo === 'transferencia' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Transferencia</span>
-                                </button>
+                                </motion.button>
                               </div>
 
-                              {metodoPagoAnticipo === 'transferencia' && transferInfo?.bank_accounts && (
-                                <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
-                                  {transferInfo.bank_accounts.map(acc => (
-                                    <div key={acc.id} className="min-w-[85%] sm:min-w-[240px] p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <span className="font-black text-[10px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
-                                        <Smartphone className="text-purple-400" size={14} />
-                                      </div>
-                                      <div className="space-y-1">
-                                        {acc.account_holder && <p className="text-[9px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
-                                        {acc.account_number && <p className="text-[9px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
-                                      </div>
+                              <AnimatePresence mode="wait">
+                                {metodoPagoAnticipo === 'transferencia' && transferInfo?.bank_accounts && (
+                                  <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
+                                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pt-2 pb-2">
+                                      {transferInfo.bank_accounts.map(acc => (
+                                        <div key={acc.id} className="min-w-[85%] sm:min-w-[240px] p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="font-black text-[10px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
+                                            <Smartphone className="text-purple-400" size={14} />
+                                          </div>
+                                          <div className="space-y-1">
+                                            {acc.account_holder && <p className="text-[9px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
+                                            {acc.account_number && <p className="text-[9px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
-                                </motion.div>
-                              )}
+                                  </motion.div>
+                                )}
+                                
+                                {metodoPagoAnticipo === 'efectivo' && (
+                                  <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
+                                    <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-800/50">
+                                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">El pago se ingresará a caja en mostrador.</span>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </motion.div>
                           )}
                         </AnimatePresence>

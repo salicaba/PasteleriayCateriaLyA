@@ -4,12 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart } from 'lucide-react';
 import client from '../../../api/client'; 
 
-// SE ELIMINÓ TARJETA - Solo Efectivo y Transferencia
-const paymentMethods = [
-  { id: 'efectivo', label: 'Efectivo', icon: Banknote, color: 'text-green-500' },
-  { id: 'transferencia', label: 'Transferencia', icon: Smartphone, color: 'text-purple-500' }
-];
-
 const modalVariants = {
   hidden: { scale: 0.9, opacity: 0, y: 20 },
   visible: { scale: 1, opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 25 } },
@@ -42,7 +36,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
         if (cuentasResumen.length > 0) setSelectedCuenta(cuentasResumen[0].nombre);
       }
     }
-  // 👇 SOLUCIÓN: Solo depender de isOpen. 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -88,7 +81,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
-      {/* Aplicado rounded-[2rem] para consistencia estética */}
       <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full max-w-md bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[90vh]">
         
         <div className="p-5 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border-b border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex justify-between items-center shrink-0">
@@ -144,42 +136,45 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
             <div className="text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text mt-1">${amountToPay.toFixed(2)}</div>
           </div>
 
-          {/* Actualizado a grid-cols-2 */}
           <div className="grid grid-cols-2 gap-3">
-            {paymentMethods.map((pm) => (
-              <button key={pm.id} onClick={() => setMethod(pm.id)}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${method === pm.id ? 'border-orange-500 bg-orange-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300 dark:hover:border-gray-600'}`}>
-                <pm.icon size={24} className={`mb-1.5 ${method === pm.id ? 'text-orange-500 lya:text-lya-primary' : 'text-gray-400 lya:text-lya-text/50'}`} />
-                <span className={`text-[11px] font-bold ${method === pm.id ? 'text-gray-900 dark:text-white lya:text-lya-text' : 'text-gray-400 lya:text-lya-text/50'}`}>{pm.label}</span>
-              </button>
-            ))}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setMethod('efectivo')}
+              className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors ${method === 'efectivo' ? 'border-emerald-500 bg-emerald-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300 dark:hover:border-gray-600'}`}>
+              <Banknote size={24} className={`mb-1.5 ${method === 'efectivo' ? 'text-emerald-500 lya:text-lya-primary' : 'text-gray-400 lya:text-lya-text/50'}`} />
+              <span className={`text-[11px] font-bold ${method === 'efectivo' ? 'text-gray-900 dark:text-white lya:text-lya-text' : 'text-gray-400 lya:text-lya-text/50'}`}>Efectivo</span>
+            </motion.button>
+
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setMethod('transferencia')}
+              className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors ${method === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300 dark:hover:border-gray-600'}`}>
+              <Smartphone size={24} className={`mb-1.5 ${method === 'transferencia' ? 'text-purple-500' : 'text-gray-400 lya:text-lya-text/50'}`} />
+              <span className={`text-[11px] font-bold ${method === 'transferencia' ? 'text-gray-900 dark:text-white lya:text-lya-text' : 'text-gray-400 lya:text-lya-text/50'}`}>Transferencia</span>
+            </motion.button>
           </div>
 
           <AnimatePresence mode='wait'>
             {method === 'efectivo' && (
-              <motion.div key="efectivo-panel" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-4">
-                <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 mt-2">
+              <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4 space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
                   <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Monto Recibido</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                    <input type="number" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" autoFocus className="w-full pl-8 pr-4 py-3 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:outline-none" />
+                    <input type="number" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" autoFocus className="w-full pl-8 pr-4 py-3 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary focus:outline-none" />
                   </div>
                   <div className="flex gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
-                    <button type="button" onClick={() => setAmountReceived(amountToPay.toString())} className="px-4 py-2 bg-orange-500/10 lya:bg-lya-primary/10 text-orange-500 lya:text-lya-primary border border-orange-500/20 lya:border-lya-primary/20 rounded-lg text-xs font-black whitespace-nowrap active:scale-95 transition-transform">Exacto</button>
+                    <button type="button" onClick={() => setAmountReceived(amountToPay.toString())} className="px-4 py-2 bg-emerald-500/10 lya:bg-lya-primary/10 text-emerald-600 lya:text-lya-primary border border-emerald-500/20 lya:border-lya-primary/20 rounded-lg text-xs font-black whitespace-nowrap active:scale-95 transition-transform">Exacto</button>
                     {[50, 100, 200, 500, 1000].filter(v => v > amountToPay).map(val => (
                        <button type="button" key={val} onClick={() => setAmountReceived(val.toString())} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-transform">${val}</button>
                     ))}
                   </div>
                 </div>
-                <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-900/50">
-                  <div className="flex items-center gap-2"><Calculator size={20} className="text-green-600 dark:text-green-400"/><span className="font-bold text-green-800 dark:text-green-300">Cambio a Devolver:</span></div>
-                  <span className="text-2xl font-black text-green-700 dark:text-green-400">${change >= 0 ? change.toFixed(2) : '0.00'}</span>
+                <div className="flex justify-between items-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
+                  <div className="flex items-center gap-2"><Calculator size={20} className="text-emerald-600 dark:text-emerald-400"/><span className="font-bold text-emerald-800 dark:text-emerald-300">Cambio a Devolver:</span></div>
+                  <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">${change >= 0 ? change.toFixed(2) : '0.00'}</span>
                 </div>
               </motion.div>
             )}
 
             {method === 'transferencia' && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
-              <motion.div key="transferencia-panel" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-2">
+              <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
                 <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 pt-1 px-1">
                   {transferInfo.bank_accounts.map(acc => (
                     <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0 shadow-sm">
@@ -217,7 +212,7 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
 
         <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
           <button onClick={handlePayment} disabled={amountToPay <= 0 || (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay)}
-            className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/80 text-white font-bold text-lg rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/80 text-white font-bold text-lg rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>Confirmar Cobro de ${amountToPay.toFixed(2)}</span><CheckCircle size={20} />
           </button>

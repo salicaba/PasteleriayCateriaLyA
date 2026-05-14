@@ -1,3 +1,4 @@
+// src/modules/pasteleria/views/PasteleriaDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -75,7 +76,6 @@ export default function PasteleriaDashboard() {
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
-      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-emerald-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-emerald-500/20 lya:shadow-lya-primary/20">
@@ -99,7 +99,6 @@ export default function PasteleriaDashboard() {
         </div>
       </header>
 
-      {/* TABS CON CONTADORES */}
       <div className="flex flex-wrap items-center justify-start gap-4 mb-6 shrink-0">
         <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 p-1 rounded-2xl overflow-x-auto">
           <button onClick={() => setActiveTab('activos')} className={`flex items-center px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'activos' && !searchQuery ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-emerald-500 lya:text-lya-secondary shadow-sm' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'}`} >
@@ -121,7 +120,6 @@ export default function PasteleriaDashboard() {
         </div>
       </div>
 
-      {/* GRID DE PEDIDOS */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
         {pedidosFiltrados.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50">
@@ -246,7 +244,6 @@ export default function PasteleriaDashboard() {
         )}
       </div>
 
-      {/* MODAL DE CONFIRMACIÓN */}
       <AnimatePresence>
         {confirmModal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 lya:bg-black/40 backdrop-blur-sm">
@@ -291,7 +288,6 @@ export default function PasteleriaDashboard() {
       
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
 
-      {/* MODAL DE ABONOS */}
       <AnimatePresence>
         {abonoModal.isOpen && abonoModal.pedido && (() => {
           const p = abonoModal.pedido;
@@ -341,40 +337,7 @@ export default function PasteleriaDashboard() {
 
                   <form id="abonoForm" onSubmit={submitPago} className="space-y-6">
                     
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block ml-1">Selecciona Método</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'efectivo'})}
-                          className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${abonoForm.metodo === 'efectivo' ? 'border-orange-500 bg-orange-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
-                          <Banknote size={28} className={`mb-2 ${abonoForm.metodo === 'efectivo' ? 'text-orange-500 lya:text-lya-primary' : 'text-gray-400'}`} />
-                          <span className={`text-xs font-bold ${abonoForm.metodo === 'efectivo' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Efectivo</span>
-                        </button>
-                        
-                        <button type="button" onClick={() => setAbonoForm({...abonoForm, metodo: 'transferencia'})}
-                          className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${abonoForm.metodo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
-                          <Smartphone size={28} className={`mb-2 ${abonoForm.metodo === 'transferencia' ? 'text-purple-500' : 'text-gray-400'}`} />
-                          <span className={`text-xs font-bold ${abonoForm.metodo === 'transferencia' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Transferencia</span>
-                        </button>
-                      </div>
-
-                      {abonoForm.metodo === 'transferencia' && transferInfo?.bank_accounts && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 overflow-x-auto custom-scrollbar pt-4">
-                          {transferInfo.bank_accounts.map(acc => (
-                            <div key={acc.id} className="min-w-[85%] sm:min-w-[260px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="font-black text-[11px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
-                                <Smartphone className="text-purple-400" size={14} />
-                              </div>
-                              <div className="space-y-1">
-                                {acc.account_holder && <p className="text-[10px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
-                                {acc.account_number && <p className="text-[10px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
-                              </div>
-                            </div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </div>
-
+                    {/* SECCIÓN 1: MONTO A ABONAR */}
                     <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl p-5 space-y-4">
                       <div>
                         <div className="flex justify-between items-center mb-2">
@@ -386,26 +349,81 @@ export default function PasteleriaDashboard() {
                           <input type="number" required min="1" max={fin.deuda} step="0.01" placeholder="0.00" value={abonoForm.monto} onChange={(e) => setAbonoForm({...abonoForm, monto: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all" />
                         </div>
                       </div>
-
-                      {abonoForm.metodo === 'efectivo' && (
-                        <AnimatePresence>
-                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-2">
-                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase mb-2 block">Efectivo Recibido (Para calcular cambio)</label>
-                            <div className="relative">
-                              <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                              <input type="number" min={abonoForm.monto || 0} step="0.01" placeholder="Ej: 500" value={abonoForm.recibido} onChange={(e) => setAbonoForm({...abonoForm, recibido: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-lg font-bold text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all" />
-                            </div>
-                          </motion.div>
-                        </AnimatePresence>
-                      )}
                     </div>
 
-                    {mostrarCambio && (
-                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-emerald-500 lya:bg-lya-secondary text-white lya:text-lya-surface p-4 rounded-2xl flex justify-between items-center shadow-lg shadow-emerald-500/20 lya:shadow-lya-secondary/20">
-                        <span className="font-bold uppercase text-sm">Cambio a devolver:</span>
-                        <span className="text-3xl font-black">${cambio.toFixed(2)}</span>
-                      </motion.div>
-                    )}
+                    {/* SECCIÓN 2: MÉTODO DE PAGO Y PANELES */}
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block ml-1">Selecciona Método</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setAbonoForm({...abonoForm, metodo: 'efectivo'})}
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors ${abonoForm.metodo === 'efectivo' ? 'border-emerald-500 bg-emerald-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
+                          <Banknote size={24} className={`mb-1.5 ${abonoForm.metodo === 'efectivo' ? 'text-emerald-500 lya:text-lya-primary' : 'text-gray-400'}`} />
+                          <span className={`text-[11px] font-bold ${abonoForm.metodo === 'efectivo' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Efectivo</span>
+                        </motion.button>
+                        
+                        <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setAbonoForm({...abonoForm, metodo: 'transferencia'})}
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors ${abonoForm.metodo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
+                          <Smartphone size={24} className={`mb-1.5 ${abonoForm.metodo === 'transferencia' ? 'text-purple-500' : 'text-gray-400'}`} />
+                          <span className={`text-[11px] font-bold ${abonoForm.metodo === 'transferencia' ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>Transferencia</span>
+                        </motion.button>
+                      </div>
+
+                      <AnimatePresence mode="wait">
+                        {abonoForm.metodo === 'efectivo' && (
+                          <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4 space-y-4">
+                            <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl p-4">
+                              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase mb-2 block">Efectivo Recibido (Para calcular cambio)</label>
+                              <div className="relative">
+                                <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                <input type="number" min={abonoForm.monto || 0} step="0.01" placeholder="Ej: 500" value={abonoForm.recibido} onChange={(e) => setAbonoForm({...abonoForm, recibido: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-lg font-bold text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all" />
+                              </div>
+                              
+                              <div className="flex gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
+                                <button type="button" onClick={() => setAbonoForm({...abonoForm, recibido: (parseFloat(abonoForm.monto) || 0).toString()})} className="px-4 py-2 bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 lya:text-lya-secondary border border-emerald-500/20 lya:border-lya-secondary/20 rounded-lg text-xs font-black whitespace-nowrap active:scale-95 transition-transform">
+                                  Exacto
+                                </button>
+                                {[50, 100, 200, 500, 1000].filter(v => v > (parseFloat(abonoForm.monto) || 0)).map(val => (
+                                  <button type="button" key={val} onClick={() => setAbonoForm({...abonoForm, recibido: val.toString()})} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-transform">
+                                    ${val}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {mostrarCambio && (
+                                <motion.div initial={{ opacity: 0, scale: 0.9, height: 0 }} animate={{ opacity: 1, scale: 1, height: 'auto' }} exit={{ opacity: 0, scale: 0.9, height: 0 }} className="overflow-hidden">
+                                  <div className="bg-emerald-500 lya:bg-lya-secondary text-white lya:text-lya-surface p-4 rounded-2xl flex justify-between items-center shadow-lg shadow-emerald-500/20 lya:shadow-lya-secondary/20">
+                                    <span className="font-bold uppercase text-sm">Cambio a devolver:</span>
+                                    <span className="text-3xl font-black">${cambio.toFixed(2)}</span>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+
+                        {abonoForm.metodo === 'transferencia' && transferInfo?.bank_accounts && (
+                          <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
+                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pt-2 pb-2">
+                              {transferInfo.bank_accounts.map(acc => (
+                                <div key={acc.id} className="min-w-[85%] sm:min-w-[260px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-black text-[11px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
+                                    <Smartphone className="text-purple-400" size={14} />
+                                  </div>
+                                  <div className="space-y-1">
+                                    {acc.account_holder && <p className="text-[10px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
+                                    {acc.account_number && <p className="text-[10px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
                   </form>
                 </div>
 
