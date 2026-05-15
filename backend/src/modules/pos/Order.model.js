@@ -13,24 +13,29 @@ const Order = sequelize.define('Order', {
     allowNull: false,
   },
   ticketId: {
-    type: DataTypes.STRING, // Ej: "L-01", null si es SALON
+    type: DataTypes.STRING,
     allowNull: true,
   },
   tableId: {
-    type: DataTypes.INTEGER, // CORRECCIÓN: Cambiado a INTEGER para coincidir con Table.model.js
+    type: DataTypes.INTEGER,
     allowNull: true,
   },
   status: {
-    type: DataTypes.ENUM('OPEN', 'CLOSED', 'CANCELLED'),
+    type: DataTypes.ENUM('OPEN', 'PAID', 'CLOSED', 'CANCELLED'), // Añadido PAID
     defaultValue: 'OPEN',
   },
   totalAmount: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0.00,
   },
-  createdBy: { // Referencia al User (Employee)
+  paidAccounts: {
+    type: DataTypes.JSON, // Para trackear qué cuentas individuales ya se pagaron
+    allowNull: true,
+    defaultValue: []
+  },
+  createdBy: {
     type: DataTypes.UUID,
-    allowNull: true, // Permitimos null para pruebas y para que el sistema no explote sin sesión
+    allowNull: true,
   }
 }, {
   timestamps: true,

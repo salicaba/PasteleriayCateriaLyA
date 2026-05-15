@@ -1,239 +1,171 @@
-// src/modules/cafeteria/controllers/usePosController.js
+// frontend/src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
 
-export const usePosController = () => {
+export const usePosController = (mesaActual, isOpen) => {
   const [dbProducts, setDbProducts] = useState([]); 
   const [dbCategories, setDbCategories] = useState([]);
   const [cart, setCart] = useState([]);
-  const [filtroTexto, setFiltroTexto] = useState('');
-  const [categoriaActiva, setCategoriaActiva] = useState('todas');
+  const [activeOrderId, setActiveOrderId] = useState(null);
+  const [orderStatus, setOrderStatus] = useState('OPEN');
+  const [paidAccounts, setPaidAccounts] = useState([]);
   const [isSuccess, setIsSuccess] = useState(false);
   const [cuentaActiva, setCuentaActiva] = useState('General');
   const [nombresCuentas, setNombresCuentas] = useState(['General']);
-
-  // Guardar el ID de la orden activa si la mesa ya tiene una
-  const [activeOrderId, setActiveOrderId] = useState(null);
+  const [filtroTexto, setFiltroTexto] = useState('');
+  const [categoriaActiva, setCategoriaActiva] = useState('todas');
 
   useEffect(() => {
     const loadData = async () => {
-      const [prods, cats] = await Promise.all([
-        fetchProducts(),
-        fetchCategories()
-      ]);
-      setDbProducts(prods);
-      setDbCategories(cats);
+      const [prods, cats] = await Promise.all([fetchProducts(), fetchCategories()]);
+      setDbProducts(prods); setDbCategories(cats);
     };
     loadData();
   }, []);
 
-  const addToCart = (productWithDetails, forceCuenta = null) => {
-    setCart(prev => {
-      const targetCuenta = forceCuenta || cuentaActiva;
-      const precioACobrar = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
-      
-      const existingItemIndex = prev.findIndex(p => 
-        p.id === productWithDetails.id && 
-        (p.precioFinal || p.precioBase || p.precio) === precioACobrar &&
-        !p.enviadoCocina &&
-        p.cuenta === targetCuenta
-      );
+  // 🔥 LA SOLUCIÓN DEFINITIVA A LA PERSISTENCIA
+  useEffect(() => {
+    if (!isOpen) return; // Solo reconstruir si el modal está abriéndose
 
-      if (existingItemIndex !== -1) {
-        const newCart = [...prev];
-        const itemExistente = newCart[existingItemIndex];
+    if (mesaActual && mesaActual.estado === 'ocupada') {
+        setActiveOrderId(mesaActual.orderId);
+        setOrderStatus(mesaActual.orderStatus || 'OPEN');
+        setPaidAccounts(mesaActual.paidAccounts || []);
+
+        const dbItems = mesaActual.items || [];
         
-        const nuevaPrep = productWithDetails.detalles || 
-          (itemExistente.preparaciones?.length > 0 
-            ? itemExistente.preparaciones[itemExistente.preparaciones.length - 1] 
-            : {});
+        const loadedCart = dbItems.map(item => {
+            let parsedPreps = [];
+            if (item.notes) {
+                try { parsedPreps = JSON.parse(item.notes); } catch(e) { parsedPreps = [{ detalles: item.notes }]; }
+            } else {
+                parsedPreps = [{}];
+            }
 
-        newCart[existingItemIndex] = {
-          ...itemExistente,
-          qty: itemExistente.qty + 1,
-          preparaciones: [...(itemExistente.preparaciones || []), nuevaPrep]
-        };
+            return {
+                id: item.productId,
+                nombre: item.product?.name || 'Producto',
+                imagen: item.product?.imageUrl || null,
+                precio: parseFloat(item.subtotal) / item.quantity,
+                qty: item.quantity,
+                preparaciones: parsedPreps,
+                enviadoCocina: true,
+                kitchenStatus: item.kitchenStatus,
+                cuenta: item.cuenta || 'General',
+                backendItemId: item.id
+            };
+        });
+
+        // Combinar inteligentemente sin pisar los ítems que no has enviado aún
+        setCart(prev => {
+            const unsent = prev.filter(p => !p.enviadoCocina);
+            return [...loadedCart, ...unsent];
+        });
+
+        setNombresCuentas(prev => {
+            const s = new Set(['General', ...loadedCart.map(c => c.cuenta), ...prev]);
+            if (mesaActual.paidAccounts) mesaActual.paidAccounts.forEach(pa => s.add(pa));
+            return Array.from(s);
+        });
+    } else {
+        setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
+        setNombresCuentas(['General']); setCuentaActiva('General');
+    }
+  }, [isOpen, mesaActual]); // <-- Dependencia directa a si abres el modal y la data de la mesa
+
+  const addToCart = (productWithDetails, forceCuenta = null) => {
+    if (orderStatus === 'PAID') return;
+    const targetCuenta = forceCuenta || cuentaActiva;
+    setCart(prev => {
+      const precio = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
+      const index = prev.findIndex(p => p.id === productWithDetails.id && p.precio === precio && !p.enviadoCocina && p.cuenta === targetCuenta);
+
+      if (index !== -1) {
+        const newCart = [...prev];
+        newCart[index].qty += 1;
+        newCart[index].preparaciones.push(productWithDetails.detalles || {});
         return newCart;
       }
-      
-      return [...prev, { 
-        ...productWithDetails, 
-        precio: precioACobrar,
-        qty: 1,
-        preparaciones: [productWithDetails.detalles || {}],
-        enviadoCocina: false,
-        cuenta: targetCuenta
-      }];
+      return [...prev, { ...productWithDetails, precio, qty: 1, preparaciones: [productWithDetails.detalles || {}], enviadoCocina: false, cuenta: targetCuenta }];
     });
   };
 
-  const removeFromCart = (id, precio, enviadoCocina, cuenta) => {
-    if(enviadoCocina) return; 
-    setCart(prev => prev.map(p => {
-      if (p.id === id && p.precio === precio && !p.enviadoCocina && p.cuenta === cuenta) {
-        const nuevasPrep = [...(p.preparaciones || [])];
-        nuevasPrep.pop();
-        
-        return { 
-          ...p, 
-          qty: p.qty - 1, 
-          preparaciones: nuevasPrep
-        };
-      }
-      return p;
-    }).filter(p => p.qty > 0));
-  };
-
-  const deleteLine = (id, precio, enviadoCocina, cuenta) => {
-    if(enviadoCocina) return; 
-    setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && !p.enviadoCocina && p.cuenta === cuenta)));
-  };
-
-  const moveItemToCuenta = (itemToMove, targetCuenta) => { 
-      setCart(prev => prev.map(item => 
-          item === itemToMove ? { ...item, cuenta: targetCuenta } : item
-      ));
-  };
-
-  // 🔥 FIX CRÍTICO: Lógica real para enviar a cocina y persistir la orden en DB
-  const simulateKitchenSend = async (mesaActual = null, onComplete = null) => {
+  const simulateKitchenSend = async (onComplete = null) => {
     const itemsNuevos = cart.filter(p => !p.enviadoCocina);
     if (itemsNuevos.length === 0) return;
 
     setIsSuccess(true);
     try {
-      let orderIdToUse = activeOrderId;
-
-      // 1. Si no hay una orden activa, creamos una nueva.
-      if (!orderIdToUse) {
+      let orderId = activeOrderId;
+      if (!orderId) {
         const isLlevar = mesaActual?.zona === 'llevar';
-        const orderType = isLlevar ? 'LLEVAR' : 'SALON';
-        const tableId = isLlevar ? null : mesaActual?.id;
-        const ticketId = isLlevar ? `L-${mesaActual?.numero?.split('-')[0]}` : null;
-
-        const orderRes = await client.post('/pos/orders', { orderType, ticketId, tableId });
-        orderIdToUse = orderRes.data.order.id;
-        setActiveOrderId(orderIdToUse);
+        const res = await client.post('/pos/orders', { orderType: isLlevar ? 'LLEVAR' : 'SALON', tableId: isLlevar ? null : mesaActual?.id, ticketId: isLlevar ? mesaActual?.numero : null });
+        orderId = res.data.order.id;
+        setActiveOrderId(orderId);
       }
 
-      // 2. Preparamos los items para el backend
-      const itemsPayload = itemsNuevos.map(item => ({
-        productId: item.id,
-        quantity: item.qty,
-        subtotal: item.precio * item.qty,
-        notes: item.preparaciones?.map(prep => {
-          let nota = prep.tamano || 'Estándar';
-          if (prep.leche) nota += ` - ${prep.leche}`;
-          if (prep.extras && prep.extras.length > 0) nota += ` (+${prep.extras.join(', ')})`;
-          // Añadimos a qué cuenta pertenece por si lo dividen
-          nota += ` (Cuenta: ${item.cuenta})`;
-          return nota;
-        }).join(' | ') || `(Cuenta: ${item.cuenta})`
+      const payload = itemsNuevos.map(item => ({
+        productId: item.id, quantity: item.qty, subtotal: item.precio * item.qty, cuenta: item.cuenta || 'General', notes: JSON.stringify(item.preparaciones) 
       }));
 
-      // 3. Enviamos los items a la base de datos
-      await client.post(`/pos/orders/${orderIdToUse}/items`, { items: itemsPayload });
-
-      // 4. Actualizamos el carrito visual marcando como enviados
+      await client.post(`/pos/orders/${orderId}/items`, { items: payload });
       setCart(prev => prev.map(p => ({ ...p, enviadoCocina: true })));
-      
-      // 5. Animación de 1.5s antes de cerrar
-      setTimeout(() => {
-        setIsSuccess(false);
-        if (onComplete) onComplete();
-      }, 1500);
-
-    } catch (error) {
-      console.error("🔥 Error crítico al enviar a cocina:", error);
-      setIsSuccess(false);
-      alert("Hubo un error al enviar la orden a la cocina. Revisa la consola.");
-    }
+      setTimeout(() => { setIsSuccess(false); if (onComplete) onComplete(); }, 1500);
+    } catch (error) { setIsSuccess(false); }
   };
+
+  const removeFromCart = (id, precio, env, cuenta) => { if(!env) setCart(prev => prev.map(p => p.id === id && p.precio === precio && p.cuenta === cuenta ? {...p, qty: p.qty - 1, preparaciones: p.preparaciones.slice(0, -1)} : p).filter(p => p.qty > 0)) };
+  const deleteLine = (id, precio, env, cuenta) => { if(!env) setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && p.cuenta === cuenta))) };
+  const moveItemToCuenta = (item, target) => { if(!item.enviadoCocina) setCart(prev => prev.map(i => i === item ? {...i, cuenta: target} : i)) };
+  const addNewCuenta = (n) => { if(n.trim() && !nombresCuentas.includes(n.trim())) { setNombresCuentas(prev => [...prev, n.trim()]); setCuentaActiva(n.trim()); } };
+  const toggleDeliveredStatus = (cartIndex) => { setCart(prev => { const newCart = [...prev]; newCart[cartIndex].kitchenStatus = newCart[cartIndex].kitchenStatus === 'DELIVERED' ? 'READY' : 'DELIVERED'; return newCart; }); };
+  const validateAllDelivered = (cuentaName = null) => { const itemsToCheck = cuentaName ? cart.filter(c => c.cuenta === cuentaName) : cart; return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
     setIsSuccess(true);
     try {
-      console.log(`Registrando pago parcial de cuenta [${nombreCuenta}]`, paymentDetails);
-      setCart(prev => prev.filter(item => item.cuenta !== nombreCuenta));
-      setNombresCuentas(prev => prev.filter(n => n !== nombreCuenta));
-      if (cuentaActiva === nombreCuenta) setCuentaActiva('General');
-
-      setTimeout(() => {
-        if (onComplete) onComplete();
-        setIsSuccess(false);
-      }, 1500);
-    } catch (error) {
-      console.error("Error al cobrar cuenta parcial:", error);
-      setIsSuccess(false);
-    }
+      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { cuentaName: nombreCuenta, isFullPayment: false });
+      setPaidAccounts(prev => [...prev, nombreCuenta]);
+      setTimeout(() => { if (onComplete) onComplete(); setIsSuccess(false); }, 1500);
+    } catch (error) { setIsSuccess(false); }
   };
 
-  const handleCheckout = async (mesaActual, paymentDetails, onComplete) => {
+  const handleCheckout = async (paymentDetails, onComplete) => {
     if (cart.length === 0 && paymentDetails?.amountPaid <= 0) return;
-    
     setIsSuccess(true);
     try {
-      if (cart.some(p => !p.enviadoCocina)) {
-         await simulateKitchenSend(mesaActual, null);
-      }
-
-      console.log("Procesando pago final con metadatos:", paymentDetails);
-
-      setTimeout(() => {
-        setCart([]);
-        setCuentaActiva('General');
-        setNombresCuentas(['General']); 
-        setActiveOrderId(null); // Reseteamos la orden al cobrar
-        if (onComplete) onComplete();
-        setIsSuccess(false);
-      }, 1500);
-    } catch (error) {
-      console.error("Error en checkout:", error);
-      setIsSuccess(false);
-    }
+      if (cart.some(p => !p.enviadoCocina)) await simulateKitchenSend(null);
+      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { isFullPayment: true });
+      setOrderStatus('PAID');
+      setTimeout(() => { if (onComplete) onComplete(); setIsSuccess(false); }, 1500);
+    } catch (error) { setIsSuccess(false); }
   };
+
+  const handleCloseTable = async (onComplete) => {
+      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/close`);
+      setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
+      if(onComplete) onComplete();
+  };
+
+  const handlePrintTicket = (cuentaName = null) => { alert(`🖨️ Enviando a impresora: ${cuentaName ? 'Cuenta ' + cuentaName : 'Mesa Completa'}`); };
 
   const total = useMemo(() => cart.reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
-
-  const cuentasDisponibles = useMemo(() => {
-    const cuentasEnCarrito = cart.map(item => item.cuenta || 'General');
-    return Array.from(new Set([...nombresCuentas, ...cuentasEnCarrito]));
-  }, [cart, nombresCuentas]);
-
-  const getSubtotalByCuenta = (nombreCuenta) => {
-    return cart.filter(item => item.cuenta === nombreCuenta).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
-  };
+  const cuentasDisponibles = useMemo(() => Array.from(new Set([...nombresCuentas, ...cart.map(i => i.cuenta || 'General')])), [cart, nombresCuentas]);
+  const getSubtotalByCuenta = (nombreCuenta) => cart.filter(item => item.cuenta === nombreCuenta).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
+  const getProductQty = (id) => cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva).reduce((acc, item) => acc + item.qty, 0);
 
   const filteredProducts = useMemo(() => {
-    return dbProducts.filter(p => {
-      const matchCategoria = categoriaActiva === 'todas' || p.categoria === categoriaActiva;
-      const matchTexto = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
-      return matchCategoria && matchTexto;
-    });
+    return dbProducts.filter(p => (categoriaActiva === 'todas' || p.categoria === categoriaActiva) && p.nombre.toLowerCase().includes(filtroTexto.toLowerCase()));
   }, [filtroTexto, categoriaActiva, dbProducts]);
 
-  const getProductQty = (id) => {
-    return cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva).reduce((acc, item) => acc + item.qty, 0);
-  };
-
-  const addNewCuenta = (nombre) => {
-    const nombreNormalizado = nombre.trim();
-    if (nombreNormalizado && !nombresCuentas.includes(nombreNormalizado)) {
-      setNombresCuentas(prev => [...prev, nombreNormalizado]);
-      setCuentaActiva(nombreNormalizado); 
-    }
-  };
-
   return { 
-    cart, total, unsentTotal, hasUnsentItems, 
-    addToCart, removeFromCart, deleteLine, moveItemToCuenta,
-    filtroTexto, setFiltroTexto, categoriaActiva, setCategoriaActiva,
-    filteredProducts, getProductQty, 
-    handleCheckout, simulateKitchenSend, isSuccess,
+    cart, total, unsentTotal, hasUnsentItems, addToCart, removeFromCart, deleteLine, moveItemToCuenta, toggleDeliveredStatus,
+    filtroTexto, setFiltroTexto, categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
+    handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    dbCategories 
+    dbCategories, orderStatus, paidAccounts, validateAllDelivered
   };
 };

@@ -1,26 +1,26 @@
+// src/modules/pos/pos.routes.js
 import { Router } from 'express';
 import { 
   getActiveOrders, 
   createOrder, 
   addItemsToOrder,
-  getTables,      // <-- Importamos las funciones de mesas
+  getActiveOrderByTable,
+  payOrder,
+  closeOrder,
+  getTables,
   createTable,
   deleteTable
 } from './pos.controller.js';
 
 const router = Router();
 
-// ==========================================
-// RUTAS DE ÓRDENES
-// ==========================================
 router.get('/orders/active', getActiveOrders);
+router.get('/orders/table/:tableId', getActiveOrderByTable); // NUEVO
 router.post('/orders', createOrder);
 router.post('/orders/:orderId/items', addItemsToOrder);
+router.put('/orders/:orderId/pay', payOrder); // NUEVO
+router.put('/orders/:orderId/close', closeOrder); // NUEVO
 
-// ==========================================
-// RUTAS DE MESAS (Catálogo y QR)
-// ==========================================
-// Estas son las rutas que tu frontend está intentando leer (y que daban 404)
 router.get('/tables', getTables);
 router.post('/tables', createTable);
 router.delete('/tables/:id', deleteTable);

@@ -25,9 +25,13 @@ const OrderItem = sequelize.define('OrderItem', {
     allowNull: false,
     defaultValue: 0.00,
   },
+  cuenta: { // 🔥 CRÍTICO: Nueva columna para no perder el Split Bill
+    type: DataTypes.STRING,
+    defaultValue: 'General',
+  },
   notes: {
-    type: DataTypes.TEXT,
-    allowNull: true, // Aquí guardaremos las preparaciones específicas (leche deslactosada, extras, etc.)
+    type: DataTypes.TEXT, // Aquí guardaremos un JSON stringificado con los detalles exactos
+    allowNull: true, 
   },
   kitchenStatus: {
     type: DataTypes.ENUM('PENDING', 'PREPARING', 'READY', 'DELIVERED'),

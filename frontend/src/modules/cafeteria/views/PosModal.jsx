@@ -13,11 +13,7 @@ import { CheckoutModal } from './CheckoutModal';
 import { OpcionesMesaModal } from './OpcionesMesaModal';
 
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
-const modalVariants = { 
-  hidden: { y: "100%", opacity: 0 }, 
-  visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } },
-  exit: { y: "100%", opacity: 0 } 
-};
+const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } }, exit: { y: "100%", opacity: 0 } };
 
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial }) => {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -27,95 +23,60 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
+  // 🔥 LE PASAMOS isOpen AQUÍ MISMO A usePosController
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
     categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
-    handleCheckout, isSuccess,
-    unsentTotal, hasUnsentItems, simulateKitchenSend,
+    handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
+    unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    moveItemToCuenta,
-    dbCategories 
-  } = usePosController();
+    moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered 
+  } = usePosController(mesa, isOpen); // <---- ESTE ES EL CAMBIO CLAVE
 
-  const handleConfirmOption = (productWithOptions) => {
-    addToCart(productWithOptions);
-    setSelectedProduct(null);
-  };
+  const handleConfirmOption = (productWithOptions) => { addToCart(productWithOptions); setSelectedProduct(null); };
 
   const handleSendToKitchen = () => {
     if (!hasUnsentItems) return; 
-    simulateKitchenSend(mesa, () => {
-      if (onUpdateTable && unsentTotal > 0) {
-        onUpdateTable(mesa.id, unsentTotal);
-      }
+    simulateKitchenSend(() => {
+      if (onUpdateTable && unsentTotal > 0) onUpdateTable(mesa.id, unsentTotal);
     });
   };
 
   const handleOpenCheckout = () => {
+    if (!validateAllDelivered()) { alert("Todos los productos de la mesa deben estar marcados como ENTREGADOS antes de cobrar."); return; }
     if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
-    setCheckoutTarget({ type: 'full', cuentaName: null, amount: (mesa.total || 0) + unsentTotal });
+    setCheckoutTarget({ type: 'full', cuentaName: null, amount: total });
     setShowCheckout(true); 
   };
 
   const handleOpenPayCuenta = (cuentaName) => {
+    if (!validateAllDelivered(cuentaName)) { alert(`Todos los productos de la cuenta '${cuentaName}' deben estar Entregados antes de cobrarla.`); return; }
     const subtotal = getSubtotalByCuenta(cuentaName);
-    if (subtotal > 0) {
-      setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal });
-      setShowCheckout(true);
-    }
+    if (subtotal > 0) { setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal }); setShowCheckout(true); }
   };
 
   const handleFinalizePayment = (paymentDetails) => {
     const { amountPaid, targetType, cuentaName } = paymentDetails;
     setShowCheckout(false);
 
-    // 1. Pago por cuenta nominal (Split Bill por persona)
-    if (targetType === 'partial' && cuentaName) {
-       payCuenta(cuentaName, paymentDetails, () => {
-           if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
-       });
-       return;
-    }
-
-    const deudaTotal = (mesa.total || 0) + unsentTotal; 
-    
+    if (targetType === 'partial' && cuentaName) { payCuenta(cuentaName, paymentDetails, () => { if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); }); return; }
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
-    
-    // 2. Pago de fracción ("Dividir en partes iguales")
-    if (targetType === 'equal') {
-        if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
-        const saldoRestante = deudaTotal - amountPaid;
-        
-        // Si por casualidad con este pago parcial se liquidó la mesa
-        if (saldoRestante <= 0.01) {
-            handleCheckout(mesa, paymentDetails, () => {
-                if (onTableRelease) onTableRelease(mesa.id);
-                onClose();
-            });
-        }
-        return; // Retornamos temprano para no vaciar el carrito
-    }
-
-    // 3. Pago Completo de la mesa
     if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
-    handleCheckout(mesa, paymentDetails, () => {
-        const saldoRestante = deudaTotal - amountPaid;
-        if (saldoRestante <= 0.01) {
-            if (onTableRelease) onTableRelease(mesa.id);
-            onClose();
-        } 
-    });
+    handleCheckout(paymentDetails, () => {});
   };
+
+  const finalizeTable = () => { handleCloseTable(() => { if (onTableRelease) onTableRelease(mesa.id); onClose(); }); };
 
   if (!isOpen || !mesa) return null;
 
   const sidebarProps = {
-    cart, total, hasUnsentItems, unsentTotal, mesaTotal: mesa.total || 0,
+    cart, total, hasUnsentItems, unsentTotal, mesaTotal: total,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
-    onPayCuenta: handleOpenPayCuenta,
-    onMoveItem: moveItemToCuenta
+    onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
+    orderStatus, paidAccounts, onPrintTicket: handlePrintTicket, onCloseTable: finalizeTable,
+    toggleDeliveredStatus
   };
 
   const isLlevar = mesa.zona === 'llevar';
@@ -287,7 +248,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
             <CheckoutModal 
               isOpen={showCheckout} 
               onClose={() => setShowCheckout(false)} 
-              total={(mesa.total || 0) + unsentTotal} 
+              total={total} 
               initialTarget={checkoutTarget} 
               cuentasResumen={cuentasDisponibles.map(nombre => ({
                 nombre,

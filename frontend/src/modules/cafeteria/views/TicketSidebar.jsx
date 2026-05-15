@@ -1,8 +1,9 @@
+// src/modules/cafeteria/views/TicketSidebar.jsx
 import React, { useState, useRef } from 'react';
 import { 
   Trash2, Minus, Plus, ShoppingBag, ChefHat, 
   CreditCard, Lock, User, UserPlus, GripVertical, 
-  ArrowRightLeft, Info, X
+  ArrowRightLeft, Info, X, CheckCircle, Printer, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -10,7 +11,8 @@ import clsx from 'clsx';
 export const TicketSidebar = ({ 
   cart, total, hasUnsentItems, unsentTotal, mesaTotal, 
   onAdd, onRemove, onDelete, onSendToKitchen, onCheckout,
-  cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem
+  cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem,
+  orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
   
@@ -47,7 +49,7 @@ export const TicketSidebar = ({
     const y = e.clientY;
 
     const scrollZone = 80;
-    const scrollSpeed = 5; // AHORA ES MÁS SUAVE Y LENTO
+    const scrollSpeed = 5; 
 
     if (y - top < scrollZone) {
       container.scrollTop -= scrollSpeed;
@@ -67,15 +69,16 @@ export const TicketSidebar = ({
               type="text" 
               value={newCuentaName} 
               onChange={(e) => setNewCuentaName(e.target.value)}
+              disabled={orderStatus === 'PAID'}
               placeholder="Dividir cuenta (Nombre)..."
-              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/50 transition-all border border-transparent focus:border-orange-500/20 lya:focus:border-lya-primary/30"
+              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/50 transition-all border border-transparent focus:border-orange-500/20 lya:focus:border-lya-primary/30 disabled:opacity-50"
             />
             <UserPlus size={18} className="absolute left-3 top-3.5 text-gray-400 lya:text-lya-text/40" />
           </div>
           <button 
             type="submit" 
-            disabled={!newCuentaName.trim()}
-            className="bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:bg-gray-200 dark:disabled:bg-gray-800 lya:disabled:bg-lya-border/30 text-white lya:text-lya-surface px-5 rounded-2xl font-bold text-xs transition-all active:scale-95 shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 flex items-center justify-center shrink-0"
+            disabled={!newCuentaName.trim() || orderStatus === 'PAID'}
+            className="bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:bg-gray-200 dark:disabled:bg-gray-800 lya:disabled:bg-lya-border/30 text-white lya:text-lya-surface px-5 rounded-2xl font-bold text-xs transition-all active:scale-95 shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 flex items-center justify-center shrink-0 disabled:opacity-50"
           >
             Añadir
           </button>
@@ -100,6 +103,7 @@ export const TicketSidebar = ({
               const isActive = activeAcc === cuentaName;
               const isDragTarget = dragOverCuenta === cuentaName;
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
+              const isCuentaPagada = paidAccounts?.includes(cuentaName);
 
               return (
                 <motion.div 
@@ -109,61 +113,77 @@ export const TicketSidebar = ({
                   // EVENTOS DE DROP ZONE
                   onDragOver={(e) => { 
                     e.preventDefault(); 
-                    if (draggedItem && draggedItem.cuentaName !== cuentaName) setDragOverCuenta(cuentaName);
+                    if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) setDragOverCuenta(cuentaName);
                   }}
                   onDragLeave={() => setDragOverCuenta(null)}
                   onDrop={(e) => {
                     e.preventDefault();
                     setDragOverCuenta(null);
-                    if (draggedItem && draggedItem.cuentaName !== cuentaName) {
+                    if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) {
                       onMoveItem(draggedItem.item, cuentaName);
                     }
                   }}
 
                   className={clsx(
                     "rounded-3xl transition-all duration-300 border-2 overflow-hidden",
-                    isDragTarget 
-                      ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-inner scale-[1.02]" 
-                      : isActive 
-                        ? "border-orange-500/30 lya:border-lya-primary/40 bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-xl shadow-orange-500/5 lya:shadow-lya-primary/10" 
-                        : "border-transparent bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50"
+                    isCuentaPagada 
+                      ? "border-green-500/50 bg-green-50/30 dark:bg-green-900/10 opacity-70"
+                      : isDragTarget 
+                        ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-inner scale-[1.02]" 
+                        : isActive 
+                          ? "border-orange-500/30 lya:border-lya-primary/40 bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-xl shadow-orange-500/5 lya:shadow-lya-primary/10" 
+                          : "border-transparent bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50"
                   )}
                 >
                   {/* CABECERA DE CUENTA */}
                   <div 
-                    onClick={() => setCuentaActiva && setCuentaActiva(cuentaName)}
-                    className="flex justify-between items-center p-4 cursor-pointer"
+                    onClick={() => { if(!isCuentaPagada && setCuentaActiva) setCuentaActiva(cuentaName); }}
+                    className={clsx("flex justify-between items-center p-4", !isCuentaPagada ? "cursor-pointer" : "")}
                   >
                     <div className="flex items-center gap-3">
                       <div className={clsx(
                         "p-2 rounded-xl transition-colors",
-                        isDragTarget ? "bg-blue-500 text-white" 
+                        isCuentaPagada ? "bg-green-500 text-white"
+                        : isDragTarget ? "bg-blue-500 text-white" 
                         : isActive ? "bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface" 
                         : "bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 text-gray-500 lya:text-lya-text/50"
                       )}>
-                        <User size={18} className={isDragTarget ? "animate-bounce" : ""} />
+                        {isCuentaPagada ? <CheckCircle size={18}/> : <User size={18} className={isDragTarget ? "animate-bounce" : ""} />}
                       </div>
                       <div>
                         <h4 className={clsx("font-black text-sm uppercase tracking-tight", 
-                          isDragTarget ? "text-blue-600 dark:text-blue-400" 
+                          isCuentaPagada ? "text-gray-800 dark:text-gray-200 lya:text-lya-text"
+                          : isDragTarget ? "text-blue-600 dark:text-blue-400" 
                           : isActive ? "text-orange-500 lya:text-lya-primary" 
                           : "text-gray-600 dark:text-gray-400 lya:text-lya-text/70"
                         )}>
                           {cuentaName}
                         </h4>
-                        <span className="text-[10px] font-bold text-gray-400 lya:text-lya-text/50 uppercase">{items.length} productos</span>
+                        {isCuentaPagada ? (
+                           <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider">Pagada</span>
+                        ) : (
+                           <span className="text-[10px] font-bold text-gray-400 lya:text-lya-text/50 uppercase">{items.length} productos</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right pointer-events-none">
                       <span className="block text-lg font-black text-gray-900 dark:text-white lya:text-lya-text">
                         ${subtotalCuenta.toFixed(2)}
                       </span>
-                      {availableAccs.length > 1 && subtotalCuenta > 0 && (
+                      {!isCuentaPagada && orderStatus !== 'PAID' && availableAccs.length > 1 && subtotalCuenta > 0 && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); onPayCuenta && onPayCuenta(cuentaName); }}
                           className="pointer-events-auto text-[9px] font-black bg-blue-500 lya:bg-lya-secondary text-white lya:text-lya-surface px-2 py-1 rounded-lg shadow-md shadow-blue-500/20 lya:shadow-lya-secondary/20 active:scale-90 transition-transform uppercase mt-1 inline-block"
                         >
                           Cobrar este
+                        </button>
+                      )}
+                      {isCuentaPagada && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
+                          className="pointer-events-auto text-[9px] font-black bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-lg uppercase mt-1 flex gap-1 items-center active:scale-95 transition-transform"
+                        >
+                          <Printer size={10}/> Ticket
                         </button>
                       )}
                     </div>
@@ -176,8 +196,9 @@ export const TicketSidebar = ({
                         key={`${item.id}-${index}`} layout
                         
                         // EVENTOS DE ARRASTRE
-                        draggable
+                        draggable={!isCuentaPagada && !item.enviadoCocina}
                         onDragStart={(e) => {
+                          if (isCuentaPagada || item.enviadoCocina) return;
                           setDraggedItem({ item, cuentaName });
                           e.dataTransfer.effectAllowed = 'move';
                           setTransferModeItem(null);
@@ -185,7 +206,8 @@ export const TicketSidebar = ({
                         onDragEnd={() => setDraggedItem(null)}
 
                         className={clsx(
-                          "relative group flex flex-col p-3 rounded-2xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden",
+                          "relative group flex flex-col p-3 rounded-2xl border transition-all overflow-hidden",
+                          (!isCuentaPagada && !item.enviadoCocina) ? "cursor-grab active:cursor-grabbing" : "",
                           draggedItem?.item === item ? "opacity-40 scale-95" : "opacity-100",
                           item.enviadoCocina 
                             ? "bg-gray-50 dark:bg-gray-800/40 lya:bg-lya-bg/60 border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30" 
@@ -201,7 +223,7 @@ export const TicketSidebar = ({
                             >
                               <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar w-full px-2">
                                 <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Mover a:</span>
-                                {availableAccs.filter(c => c !== cuentaName).map(c => (
+                                {availableAccs.filter(c => c !== cuentaName && !paidAccounts?.includes(c)).map(c => (
                                   <button 
                                     key={c} 
                                     onClick={() => { onMoveItem(item, c); setTransferModeItem(null); }}
@@ -223,7 +245,7 @@ export const TicketSidebar = ({
                               <img src={item.imagen || item.image} alt="" className="w-full h-full object-contain" />
                             ) : <span className="text-xl">🧁</span>}
                             
-                            {availableAccs.length > 1 && (
+                            {!isCuentaPagada && !item.enviadoCocina && availableAccs.length > 1 && (
                               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <GripVertical size={18} className="text-white drop-shadow-md" />
                               </div>
@@ -270,18 +292,27 @@ export const TicketSidebar = ({
                             <div className="mt-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 {item.enviadoCocina ? (
-                                  <span className="flex items-center gap-1 text-[9px] font-black text-orange-500 lya:text-lya-secondary bg-orange-500/10 lya:bg-lya-secondary/10 px-2 py-0.5 rounded-full border border-orange-500/10 lya:border-lya-secondary/20 uppercase">
-                                    <ChefHat size={10} /> En cocina
-                                  </span>
+                                  <button 
+                                    onClick={() => toggleDeliveredStatus(cart.findIndex(c => c === item))} 
+                                    disabled={orderStatus === 'PAID' || isCuentaPagada} 
+                                    className={clsx(
+                                      "flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border uppercase transition-colors", 
+                                      item.kitchenStatus === 'DELIVERED' 
+                                        ? "text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/20" 
+                                        : "text-orange-500 dark:text-orange-400 bg-orange-500/10 border-orange-500/20 active:scale-95"
+                                    )}
+                                  >
+                                    {item.kitchenStatus === 'DELIVERED' ? <><CheckCircle size={10} /> Entregado</> : <><ChefHat size={10} /> En cocina (Tocar)</>}
+                                  </button>
                                 ) : (
-                                  <span className="flex items-center gap-1 text-[9px] font-black text-green-500 lya:text-lya-primary bg-green-500/10 lya:bg-lya-primary/10 px-2 py-0.5 rounded-full border border-green-500/10 lya:border-lya-primary/20 uppercase tracking-tighter">
+                                  <span className="flex items-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 px-2 py-0.5 rounded-full border border-transparent uppercase tracking-tighter">
                                     Listo para enviar
                                   </span>
                                 )}
                               </div>
                               
                               <div className="flex items-center gap-1">
-                                {availableAccs.length > 1 && (
+                                {!item.enviadoCocina && availableAccs.length > 1 && (
                                   <button 
                                     onClick={() => setTransferModeItem(item)}
                                     className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
@@ -291,7 +322,7 @@ export const TicketSidebar = ({
                                   </button>
                                 )}
 
-                                {!item.enviadoCocina && (
+                                {!item.enviadoCocina && !isCuentaPagada && (
                                   <>
                                     <button 
                                       onClick={() => onRemove(item.id, item.precio, false, cuentaName)}
@@ -300,7 +331,6 @@ export const TicketSidebar = ({
                                       <Minus size={14} />
                                     </button>
                                     <span className="text-xs font-black text-gray-600 dark:text-gray-300 lya:text-lya-text w-4 text-center">{item.qty}</span>
-                                    {/* MEJORA AQUÍ: Pasamos cuentaName en el onAdd para que se respete la cuenta origen */}
                                     <button 
                                       onClick={() => onAdd(item, cuentaName)}
                                       className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-lg text-orange-500 lya:text-lya-primary transition-colors"
@@ -330,56 +360,78 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* FOOTER: TOTALES Y ACCIONES DE COBRO */}
+      {/* FOOTER: TOTALES Y ACCIONES DE COBRO/CIERRE */}
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
-        <div className="space-y-2 mb-4">
-          <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-xs font-bold uppercase tracking-wider">
-            <span>Subtotal Mesa</span>
-            <span>${mesaTotal.toFixed(2)}</span>
-          </div>
-          {hasUnsentItems && (
-            <div className="flex justify-between items-center text-orange-500 lya:text-lya-secondary text-xs font-black uppercase tracking-wider">
-              <span>Por enviar</span>
-              <span>+${unsentTotal.toFixed(2)}</span>
-            </div>
-          )}
-          <div className="flex justify-between items-end pt-2">
-            <span className="text-gray-900 dark:text-white lya:text-lya-text font-black text-sm uppercase">Total a pagar</span>
-            <span className="text-3xl font-black text-orange-600 dark:text-orange-500 lya:text-lya-primary tracking-tighter">
-              ${(mesaTotal + unsentTotal).toFixed(2)}
-            </span>
-          </div>
-        </div>
         
-        <div className="flex gap-3">
-          <button 
-            onClick={onSendToKitchen} 
-            disabled={!hasUnsentItems}
-            className={clsx(
-              "flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] transition-all active:scale-95 border-2 uppercase",
-              hasUnsentItems 
-                ? "bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 border-orange-200 dark:border-orange-500/30 lya:border-lya-secondary/30 text-orange-600 dark:text-orange-400 lya:text-lya-secondary shadow-lg shadow-orange-500/10 lya:shadow-lya-secondary/10" 
-                : "bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-transparent text-gray-400 lya:text-lya-text/40 cursor-not-allowed"
-            )}
-          >
-            <ChefHat size={18} />
-            <span>Enviar Cocina</span>
-          </button>
-          
-          <button 
-            onClick={onCheckout} 
-            disabled={cart.length === 0 && mesaTotal === 0}
-            className={clsx(
-              "flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] transition-all active:scale-95 border-2 uppercase",
-              (cart.length > 0 || mesaTotal > 0)
-                ? "bg-green-500 border-green-600 lya:bg-lya-primary lya:border-lya-primary text-white lya:text-lya-surface shadow-xl shadow-green-500/30 lya:shadow-lya-primary/30 hover:bg-green-600 lya:hover:bg-lya-primary/90"
-                : "bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 border-transparent text-gray-400 lya:text-lya-text/40 cursor-not-allowed shadow-none"
-            )}
-          >
-            <CreditCard size={18} />
-            <span>Cobrar Mesa</span>
-          </button>
-        </div>
+        {orderStatus === 'PAID' ? (
+           // ESTADO INTERMEDIO: PAGADO PERO NO CERRADO
+           <div className="flex gap-3 animate-fade-in">
+              <button 
+                onClick={() => onPrintTicket()} 
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 active:scale-95 transition-transform"
+              >
+                <Printer size={18} /><span>Imprimir Ticket</span>
+              </button>
+              <button 
+                onClick={onCloseTable} 
+                className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform"
+              >
+                <XCircle size={18} /><span>Cerrar / Liberar Mesa</span>
+              </button>
+           </div>
+        ) : (
+           // ESTADO NORMAL DE VENTA
+           <>
+             <div className="space-y-2 mb-4">
+               <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-xs font-bold uppercase tracking-wider">
+                 <span>Subtotal Mesa</span>
+                 <span>${mesaTotal.toFixed(2)}</span>
+               </div>
+               {hasUnsentItems && (
+                 <div className="flex justify-between items-center text-orange-500 lya:text-lya-secondary text-xs font-black uppercase tracking-wider">
+                   <span>Por enviar</span>
+                   <span>+${unsentTotal.toFixed(2)}</span>
+                 </div>
+               )}
+               <div className="flex justify-between items-end pt-2">
+                 <span className="text-gray-900 dark:text-white lya:text-lya-text font-black text-sm uppercase">Total a pagar</span>
+                 <span className="text-3xl font-black text-orange-600 dark:text-orange-500 lya:text-lya-primary tracking-tighter">
+                   ${(mesaTotal + unsentTotal).toFixed(2)}
+                 </span>
+               </div>
+             </div>
+             
+             <div className="flex gap-3">
+               <button 
+                 onClick={onSendToKitchen} 
+                 disabled={!hasUnsentItems}
+                 className={clsx(
+                   "flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] transition-all active:scale-95 border-2 uppercase",
+                   hasUnsentItems 
+                     ? "bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 border-orange-200 dark:border-orange-500/30 lya:border-lya-secondary/30 text-orange-600 dark:text-orange-400 lya:text-lya-secondary shadow-lg shadow-orange-500/10 lya:shadow-lya-secondary/10" 
+                     : "bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-transparent text-gray-400 lya:text-lya-text/40 cursor-not-allowed"
+                 )}
+               >
+                 <ChefHat size={18} />
+                 <span>Enviar Cocina</span>
+               </button>
+               
+               <button 
+                 onClick={onCheckout} 
+                 disabled={cart.length === 0 && mesaTotal === 0}
+                 className={clsx(
+                   "flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] transition-all active:scale-95 border-2 uppercase",
+                   (cart.length > 0 || mesaTotal > 0)
+                     ? "bg-green-500 border-green-600 lya:bg-lya-primary lya:border-lya-primary text-white lya:text-lya-surface shadow-xl shadow-green-500/30 lya:shadow-lya-primary/30 hover:bg-green-600 lya:hover:bg-lya-primary/90"
+                     : "bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 border-transparent text-gray-400 lya:text-lya-text/40 cursor-not-allowed shadow-none"
+                 )}
+               >
+                 <CreditCard size={18} />
+                 <span>Cobrar Mesa</span>
+               </button>
+             </div>
+           </>
+        )}
       </div>
     </div>
   );
