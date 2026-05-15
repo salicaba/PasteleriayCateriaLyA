@@ -23,7 +23,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
-  // 🔥 LE PASAMOS isOpen AQUÍ MISMO A usePosController
+  // 🔥 FIX: Ahora pasamos todasLasMesas para que el Hook identifique cambios globales
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
     categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
@@ -31,7 +31,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered 
-  } = usePosController(mesa, isOpen); // <---- ESTE ES EL CAMBIO CLAVE
+  } = usePosController(mesa, isOpen, todasLasMesas); 
 
   const handleConfirmOption = (productWithOptions) => { addToCart(productWithOptions); setSelectedProduct(null); };
 

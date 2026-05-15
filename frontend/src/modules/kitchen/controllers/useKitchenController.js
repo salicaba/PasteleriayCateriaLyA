@@ -1,5 +1,4 @@
-// frontend/src/modules/kitchen/controllers/useKitchenController.js
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import client from '../../../api/client.js';
 
 export const useKitchenController = () => {
@@ -8,43 +7,40 @@ export const useKitchenController = () => {
   const fetchKitchenOrders = useCallback(async () => {
     try {
       const res = await client.get('/kitchen/tickets');
-      const tickets = res.data; 
-
+      const tickets = res.data;
       const groupedOrders = {};
 
       tickets.forEach(item => {
-        // 🔥 FIX: Mapeo estricto del objeto Order (Sequelize devuelve 'order' en minúscula)
-        const order = item.order || item.Order; 
+        const order = item.order || item.Order;
         if (!order) return;
 
         if (!groupedOrders[order.id]) {
           groupedOrders[order.id] = {
             id: order.id,
             tipo: order.orderType === 'LLEVAR' ? 'llevar' : 'salon',
-            // Si es salón, debe decir "Mesa X", si no, el nombre del cliente
-            mesa: order.orderType === 'LLEVAR' ? (order.ticketId || 'Para Llevar') : `Mesa ${order.tableId || 'S/N'}`,
+            mesa: order.orderType === 'LLEVAR' 
+                  ? (order.ticketId || 'Para Llevar') 
+                  : `Mesa ${order.table?.number || order.tableId || 'S/N'}`,
             createdAt: order.createdAt,
             items: []
           };
         }
 
-        let preparaciones = [];
-        try { preparaciones = item.notes ? JSON.parse(item.notes) : []; } catch (e) { preparaciones = []; }
+        let preps = [];
+        try { preps = item.notes ? JSON.parse(item.notes) : []; } catch (e) { preps = []; }
 
         groupedOrders[order.id].items.push({
           id: item.id,
           nombre: item.product?.name || 'Producto',
           qty: item.quantity,
-          preparaciones: preparaciones.map((p, i) => ({
+          preparaciones: preps.map((p, i) => ({
             idPrep: `${item.id}-${i}`,
             tamano: p.tamano || 'Estándar',
             leche: p.leche,
             extras: p.extras || [],
-            isReady: item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED'
+            isReady: item.kitchenStatus === 'READY'
           })),
-          originalItemId: item.id, 
-          kitchenStatus: item.kitchenStatus,
-          cuenta: item.cuenta
+          kitchenStatus: item.kitchenStatus
         });
       });
 
@@ -54,19 +50,49 @@ export const useKitchenController = () => {
 
   useEffect(() => {
     fetchKitchenOrders();
-    const interval = setInterval(fetchKitchenOrders, 10000);
+    const interval = setInterval(fetchKitchenOrders, 5000);
     return () => clearInterval(interval);
   }, [fetchKitchenOrders]);
 
-  return { 
-    orders: [...orders].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), 
-    toggleItemReady: async (orderId, itemId, idPrep) => {
-        try { await client.put(`/kitchen/tickets/${itemId}/status`, { status: 'READY' }); fetchKitchenOrders(); } catch(e){}
+  return {
+    orders: [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    
+    // 🔥 LÓGICA DE TOGGLE: Permite desmarcar si hubo error
+    toggleItemReady: async (orderId, itemId) => {
+        const order = orders.find(o => o.id === orderId);
+        const item = order?.items.find(i => i.id === itemId);
+        if (!item) return;
+
+        // Si ya está READY, lo pasamos a PENDING. Si no, a READY.
+        const newStatus = item.kitchenStatus === 'READY' ? 'PENDING' : 'READY';
+        
+        try {
+            await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
+            fetchKitchenOrders();
+        } catch(e){ console.error("Error al cambiar estado"); }
     },
+
+    markAllReady: async (orderId) => {
+        const order = orders.find(o => o.id === orderId);
+        if(!order) return;
+        try {
+            const promises = order.items
+                .filter(i => i.kitchenStatus !== 'READY')
+                .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
+            await Promise.all(promises);
+            fetchKitchenOrders();
+        } catch(e){}
+    },
+
+    // 🔥 COMPLETAR: Este es el botón final que hace desaparecer la mesa (Estado DELIVERED)
     completeOrder: async (orderId) => {
         const order = orders.find(o => o.id === orderId);
         if(!order) return;
-        try { await Promise.all(order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'DELIVERED' }))); fetchKitchenOrders(); } catch(e){}
+        try {
+            const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'DELIVERED' }));
+            await Promise.all(promises);
+            fetchKitchenOrders();
+        } catch(e){}
     }
   };
 };

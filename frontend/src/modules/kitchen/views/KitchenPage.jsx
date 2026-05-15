@@ -5,7 +5,8 @@ import { KitchenOrderCard } from './KitchenOrderCard';
 import { Flame, UtensilsCrossed, ShoppingBag } from 'lucide-react';
 
 export const KitchenPage = () => {
-  const { orders, toggleItemReady, completeOrder } = useKitchenController();
+  // 🔥 CORRECCIÓN: Extraemos markAllReady del controlador
+  const { orders, toggleItemReady, completeOrder, markAllReady } = useKitchenController();
 
   // Estado para controlar qué vista se muestra en móviles
   const [vistaMovilActiva, setVistaMovilActiva] = useState('salon');
@@ -116,7 +117,8 @@ export const KitchenPage = () => {
                   <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start auto-rows-max">
                     <AnimatePresence mode="popLayout">
                       {ordersMesa.map(order => (
-                        <KitchenOrderCard key={order.id} order={order} onToggleItem={toggleItemReady} onComplete={completeOrder} />
+                        // 🔥 CORRECCIÓN: Se pasa onMarkAllReady a la tarjeta
+                        <KitchenOrderCard key={order.id} order={order} onToggleItem={toggleItemReady} onComplete={completeOrder} onMarkAllReady={markAllReady} />
                       ))}
                     </AnimatePresence>
                   </motion.div>
@@ -144,7 +146,8 @@ export const KitchenPage = () => {
                   <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start auto-rows-max">
                     <AnimatePresence mode="popLayout">
                       {ordersLlevar.map(order => (
-                        <KitchenOrderCard key={order.id} order={order} onToggleItem={toggleItemReady} onComplete={completeOrder} />
+                        // 🔥 CORRECCIÓN: Se pasa onMarkAllReady a la tarjeta
+                        <KitchenOrderCard key={order.id} order={order} onToggleItem={toggleItemReady} onComplete={completeOrder} onMarkAllReady={markAllReady} />
                       ))}
                     </AnimatePresence>
                   </motion.div>

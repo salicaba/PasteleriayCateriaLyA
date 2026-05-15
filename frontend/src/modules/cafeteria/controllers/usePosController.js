@@ -1,9 +1,8 @@
-// frontend/src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
 
-export const usePosController = (mesaActual, isOpen) => {
+export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [dbProducts, setDbProducts] = useState([]); 
   const [dbCategories, setDbCategories] = useState([]);
   const [cart, setCart] = useState([]);
@@ -16,6 +15,12 @@ export const usePosController = (mesaActual, isOpen) => {
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
 
+  // Buscamos la versión más fresca de la mesa en el pool global
+  const mesaActual = useMemo(() => {
+    if (!mesaInicial) return null;
+    return todasLasMesas.find(m => m.id === mesaInicial.id) || mesaInicial;
+  }, [mesaInicial, todasLasMesas]);
+
   useEffect(() => {
     const loadData = async () => {
       const [prods, cats] = await Promise.all([fetchProducts(), fetchCategories()]);
@@ -24,9 +29,14 @@ export const usePosController = (mesaActual, isOpen) => {
     loadData();
   }, []);
 
-  // 🔥 LA SOLUCIÓN DEFINITIVA A LA PERSISTENCIA
+  // 🔄 SINCRONIZACIÓN DE LA COMANDA AL ABRIR/ACTUALIZAR
   useEffect(() => {
-    if (!isOpen) return; // Solo reconstruir si el modal está abriéndose
+    if (!isOpen) {
+        // Limpiamos al cerrar para no cruzar datos con la siguiente mesa que abras
+        setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
+        setNombresCuentas(['General']); setCuentaActiva('General');
+        return;
+    }
 
     if (mesaActual && mesaActual.estado === 'ocupada') {
         setActiveOrderId(mesaActual.orderId);
@@ -35,13 +45,17 @@ export const usePosController = (mesaActual, isOpen) => {
 
         const dbItems = mesaActual.items || [];
         
+        // Reconstruimos el carrito con TODO lo que viene de la BD
         const loadedCart = dbItems.map(item => {
             let parsedPreps = [];
             if (item.notes) {
-                try { parsedPreps = JSON.parse(item.notes); } catch(e) { parsedPreps = [{ detalles: item.notes }]; }
-            } else {
-                parsedPreps = [{}];
+                try { 
+                    parsedPreps = JSON.parse(item.notes); 
+                } catch(e) { 
+                    parsedPreps = [{ detalles: "Personalización cargada" }]; 
+                }
             }
+            if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
 
             return {
                 id: item.productId,
@@ -50,29 +64,29 @@ export const usePosController = (mesaActual, isOpen) => {
                 precio: parseFloat(item.subtotal) / item.quantity,
                 qty: item.quantity,
                 preparaciones: parsedPreps,
-                enviadoCocina: true,
-                kitchenStatus: item.kitchenStatus,
+                enviadoCocina: true, // Indica que ya no se puede borrar, solo marcar entrega
+                kitchenStatus: item.kitchenStatus, // PENDING, READY, DELIVERED
                 cuenta: item.cuenta || 'General',
                 backendItemId: item.id
             };
         });
 
-        // Combinar inteligentemente sin pisar los ítems que no has enviado aún
         setCart(prev => {
-            const unsent = prev.filter(p => !p.enviadoCocina);
-            return [...loadedCart, ...unsent];
+            // Mantenemos lo que el usuario esté armando localmente (sin enviar)
+            const localItems = prev.filter(p => !p.enviadoCocina);
+            return [...loadedCart, ...localItems];
         });
 
-        setNombresCuentas(prev => {
-            const s = new Set(['General', ...loadedCart.map(c => c.cuenta), ...prev]);
-            if (mesaActual.paidAccounts) mesaActual.paidAccounts.forEach(pa => s.add(pa));
-            return Array.from(s);
-        });
+        // Sincronizar nombres de cuentas
+        const s = new Set(['General', ...loadedCart.map(c => c.cuenta)]);
+        if (mesaActual.paidAccounts) mesaActual.paidAccounts.forEach(pa => s.add(pa));
+        setNombresCuentas(Array.from(s));
+
     } else {
-        setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
-        setNombresCuentas(['General']); setCuentaActiva('General');
+        // Si la mesa está libre, solo dejamos lo que el usuario esté añadiendo nuevo
+        setCart(prev => prev.filter(p => !p.enviadoCocina));
     }
-  }, [isOpen, mesaActual]); // <-- Dependencia directa a si abres el modal y la data de la mesa
+  }, [isOpen, mesaActual]);
 
   const addToCart = (productWithDetails, forceCuenta = null) => {
     if (orderStatus === 'PAID') return;
@@ -100,27 +114,78 @@ export const usePosController = (mesaActual, isOpen) => {
       let orderId = activeOrderId;
       if (!orderId) {
         const isLlevar = mesaActual?.zona === 'llevar';
-        const res = await client.post('/pos/orders', { orderType: isLlevar ? 'LLEVAR' : 'SALON', tableId: isLlevar ? null : mesaActual?.id, ticketId: isLlevar ? mesaActual?.numero : null });
+        const res = await client.post('/pos/orders', { 
+            orderType: isLlevar ? 'LLEVAR' : 'SALON', 
+            tableId: isLlevar ? null : mesaActual?.id, 
+            ticketId: isLlevar ? mesaActual?.numero : null 
+        });
         orderId = res.data.order.id;
         setActiveOrderId(orderId);
       }
 
       const payload = itemsNuevos.map(item => ({
-        productId: item.id, quantity: item.qty, subtotal: item.precio * item.qty, cuenta: item.cuenta || 'General', notes: JSON.stringify(item.preparaciones) 
+        productId: item.id, 
+        quantity: item.qty, 
+        subtotal: item.precio * item.qty, 
+        cuenta: item.cuenta || 'General', 
+        notes: JSON.stringify(item.preparaciones) 
       }));
 
       await client.post(`/pos/orders/${orderId}/items`, { items: payload });
-      setCart(prev => prev.map(p => ({ ...p, enviadoCocina: true })));
-      setTimeout(() => { setIsSuccess(false); if (onComplete) onComplete(); }, 1500);
-    } catch (error) { setIsSuccess(false); }
+      
+      // Actualizamos localmente para feedback inmediato
+      setCart(prev => prev.map(p => ({ ...p, enviadoCocina: true, kitchenStatus: 'PENDING' })));
+      
+      setTimeout(() => { 
+          setIsSuccess(false); 
+          if (onComplete) onComplete(); 
+      }, 1500);
+    } catch (error) { 
+        setIsSuccess(false); 
+    }
   };
 
-  const removeFromCart = (id, precio, env, cuenta) => { if(!env) setCart(prev => prev.map(p => p.id === id && p.precio === precio && p.cuenta === cuenta ? {...p, qty: p.qty - 1, preparaciones: p.preparaciones.slice(0, -1)} : p).filter(p => p.qty > 0)) };
-  const deleteLine = (id, precio, env, cuenta) => { if(!env) setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && p.cuenta === cuenta))) };
-  const moveItemToCuenta = (item, target) => { if(!item.enviadoCocina) setCart(prev => prev.map(i => i === item ? {...i, cuenta: target} : i)) };
-  const addNewCuenta = (n) => { if(n.trim() && !nombresCuentas.includes(n.trim())) { setNombresCuentas(prev => [...prev, n.trim()]); setCuentaActiva(n.trim()); } };
-  const toggleDeliveredStatus = (cartIndex) => { setCart(prev => { const newCart = [...prev]; newCart[cartIndex].kitchenStatus = newCart[cartIndex].kitchenStatus === 'DELIVERED' ? 'READY' : 'DELIVERED'; return newCart; }); };
-  const validateAllDelivered = (cuentaName = null) => { const itemsToCheck = cuentaName ? cart.filter(c => c.cuenta === cuentaName) : cart; return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); };
+  const removeFromCart = (id, precio, env, cuenta) => { 
+    if(!env) setCart(prev => prev.map(p => p.id === id && p.precio === precio && p.cuenta === cuenta ? {...p, qty: p.qty - 1, preparaciones: p.preparaciones.slice(0, -1)} : p).filter(p => p.qty > 0));
+  };
+
+  const deleteLine = (id, precio, env, cuenta) => { 
+    if(!env) setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && p.cuenta === cuenta)));
+  };
+
+  const moveItemToCuenta = (item, target) => { 
+    if(!item.enviadoCocina) setCart(prev => prev.map(i => i === item ? {...i, cuenta: target} : i));
+  };
+
+  const addNewCuenta = (n) => { 
+    if(n.trim() && !nombresCuentas.includes(n.trim())) { 
+        setNombresCuentas(prev => [...prev, n.trim()]); 
+        setCuentaActiva(n.trim()); 
+    } 
+  };
+
+  const toggleDeliveredStatus = async (cartIndex) => {
+    const item = cart[cartIndex];
+    if (!item.backendItemId) return;
+
+    // Cambiamos entre READY y DELIVERED
+    const newStatus = item.kitchenStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
+    
+    try {
+        await client.put(`/kitchen/tickets/${item.backendItemId}/status`, { status: newStatus });
+        setCart(prev => {
+            const newCart = [...prev];
+            newCart[cartIndex].kitchenStatus = newStatus;
+            return newCart;
+        });
+    } catch (e) { console.error("Error al actualizar entrega"); }
+  };
+
+  const validateAllDelivered = (cuentaName = null) => { 
+    const itemsToCheck = cuentaName ? cart.filter(c => c.cuenta === cuentaName) : cart; 
+    if (itemsToCheck.length === 0) return false;
+    return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); 
+  };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
     setIsSuccess(true);
@@ -132,10 +197,9 @@ export const usePosController = (mesaActual, isOpen) => {
   };
 
   const handleCheckout = async (paymentDetails, onComplete) => {
-    if (cart.length === 0 && paymentDetails?.amountPaid <= 0) return;
     setIsSuccess(true);
     try {
-      if (cart.some(p => !p.enviadoCocina)) await simulateKitchenSend(null);
+      if (cart.some(p => !p.enviadoCocina)) await simulateKitchenSend();
       if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { isFullPayment: true });
       setOrderStatus('PAID');
       setTimeout(() => { if (onComplete) onComplete(); setIsSuccess(false); }, 1500);
@@ -147,8 +211,6 @@ export const usePosController = (mesaActual, isOpen) => {
       setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
       if(onComplete) onComplete();
   };
-
-  const handlePrintTicket = (cuentaName = null) => { alert(`🖨️ Enviando a impresora: ${cuentaName ? 'Cuenta ' + cuentaName : 'Mesa Completa'}`); };
 
   const total = useMemo(() => cart.reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
@@ -164,7 +226,7 @@ export const usePosController = (mesaActual, isOpen) => {
   return { 
     cart, total, unsentTotal, hasUnsentItems, addToCart, removeFromCart, deleteLine, moveItemToCuenta, toggleDeliveredStatus,
     filtroTexto, setFiltroTexto, categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
-    handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
+    handleCheckout, handleCloseTable, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     dbCategories, orderStatus, paidAccounts, validateAllDelivered
   };
