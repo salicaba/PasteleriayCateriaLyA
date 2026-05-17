@@ -54,12 +54,21 @@ export const addItemsToOrder = async (req, res) => {
       kitchenStatus: 'PENDING' 
     }));
 
-    const createdItems = await OrderItem.bulkCreate(itemsToInsert);
+    // 1. Guardamos los productos nuevos
+    await OrderItem.bulkCreate(itemsToInsert);
     
+    // 2. Actualizamos el total de la orden
     const subtotalNuevo = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
     await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
 
-    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: createdItems });
+    // 3. 🔥 FIX CRÍTICO: Recuperamos TODOS los items de la orden incluyendo el Modelo Product
+    // Esto asegura que el frontend reciba los nombres y no borre los productos visualmente.
+    const allItems = await OrderItem.findAll({
+      where: { orderId },
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+    });
+
+    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems });
   } catch (error) { 
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
   }
@@ -96,7 +105,9 @@ export const payOrder = async (req, res) => {
     const { cuentaName, isFullPayment } = req.body; 
     const order = await Order.findByPk(orderId);
     
-    let paidAccounts = order.paidAccounts || [];
+    // Clonar el arreglo es clave en Sequelize para que detecte el UPDATE en campos JSON
+    let paidAccounts = [...(order.paidAccounts || [])];
+    
     if (!isFullPayment && cuentaName && !paidAccounts.includes(cuentaName)) {
       paidAccounts.push(cuentaName);
     }
@@ -119,6 +130,7 @@ export const closeOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
     const order = await Order.findByPk(orderId);
+    if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
     
     await order.update({ status: 'CLOSED' });
     

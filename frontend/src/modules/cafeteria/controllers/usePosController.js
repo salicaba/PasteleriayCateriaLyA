@@ -15,7 +15,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
 
-  // Buscamos la versión más fresca de la mesa en el pool global
   const mesaActual = useMemo(() => {
     if (!mesaInicial) return null;
     return todasLasMesas.find(m => m.id === mesaInicial.id) || mesaInicial;
@@ -29,14 +28,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     loadData();
   }, []);
 
-  // 🔄 SINCRONIZACIÓN DE LA COMANDA AL ABRIR/ACTUALIZAR
+  // 🔄 SINCRONIZACIÓN MAESTRA DE LA COMANDA AL ABRIR/ACTUALIZAR
   useEffect(() => {
     if (!isOpen) {
-        // Limpiamos al cerrar para no cruzar datos con la siguiente mesa que abras
         setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
         setNombresCuentas(['General']); setCuentaActiva('General');
         return;
     }
+
+    let nuevasCuentas = new Set(['General']);
 
     if (mesaActual && mesaActual.estado === 'ocupada') {
         setActiveOrderId(mesaActual.orderId);
@@ -45,15 +45,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
         const dbItems = mesaActual.items || [];
         
-        // Reconstruimos el carrito con TODO lo que viene de la BD
         const loadedCart = dbItems.map(item => {
             let parsedPreps = [];
             if (item.notes) {
-                try { 
-                    parsedPreps = JSON.parse(item.notes); 
-                } catch(e) { 
-                    parsedPreps = [{ detalles: "Personalización cargada" }]; 
-                }
+                try { parsedPreps = JSON.parse(item.notes); } 
+                catch(e) { parsedPreps = [{ detalles: "Personalización cargada" }]; }
             }
             if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
 
@@ -64,28 +60,39 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 precio: parseFloat(item.subtotal) / item.quantity,
                 qty: item.quantity,
                 preparaciones: parsedPreps,
-                enviadoCocina: true, // Indica que ya no se puede borrar, solo marcar entrega
-                kitchenStatus: item.kitchenStatus, // PENDING, READY, DELIVERED
+                enviadoCocina: true,
+                kitchenStatus: item.kitchenStatus,
                 cuenta: item.cuenta || 'General',
                 backendItemId: item.id
             };
         });
 
         setCart(prev => {
-            // Mantenemos lo que el usuario esté armando localmente (sin enviar)
             const localItems = prev.filter(p => !p.enviadoCocina);
-            return [...loadedCart, ...localItems];
+            
+            // Conservamos los enviados recientemente para evitar que desaparezcan por retraso en red
+            const sentButNotLoaded = prev.filter(p => 
+                p.enviadoCocina && 
+                !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId)
+            );
+
+            const finalCart = [...loadedCart, ...sentButNotLoaded, ...localItems];
+            finalCart.forEach(c => nuevasCuentas.add(c.cuenta));
+            return finalCart;
         });
 
-        // Sincronizar nombres de cuentas
-        const s = new Set(['General', ...loadedCart.map(c => c.cuenta)]);
-        if (mesaActual.paidAccounts) mesaActual.paidAccounts.forEach(pa => s.add(pa));
-        setNombresCuentas(Array.from(s));
-
+        if (mesaActual.paidAccounts) mesaActual.paidAccounts.forEach(pa => nuevasCuentas.add(pa));
     } else {
-        // Si la mesa está libre, solo dejamos lo que el usuario esté añadiendo nuevo
-        setCart(prev => prev.filter(p => !p.enviadoCocina));
+        // 🔥 NO borramos el carrito si la mesa figura temporalmente "libre" 
+        setCart(prev => {
+            prev.forEach(c => nuevasCuentas.add(c.cuenta));
+            return prev;
+        });
     }
+
+    // Unificamos las cuentas sin duplicados
+    setNombresCuentas(prev => Array.from(new Set([...prev, ...Array.from(nuevasCuentas)])));
+
   }, [isOpen, mesaActual]);
 
   const addToCart = (productWithDetails, forceCuenta = null) => {
@@ -131,10 +138,39 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         notes: JSON.stringify(item.preparaciones) 
       }));
 
-      await client.post(`/pos/orders/${orderId}/items`, { items: payload });
+      // Enviamos a la base de datos
+      const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
       
-      // Actualizamos localmente para feedback inmediato
-      setCart(prev => prev.map(p => ({ ...p, enviadoCocina: true, kitchenStatus: 'PENDING' })));
+      // 🔥 FIX CRÍTICO: El backend ahora nos devuelve todos los items de la orden
+      const allItemsFromDB = response.data.orderItems || [];
+      
+      const updatedCart = allItemsFromDB.map(item => {
+          let parsedPreps = [];
+          if (item.notes) {
+              try { parsedPreps = JSON.parse(item.notes); } 
+              catch(e) { parsedPreps = [{ detalles: "Personalización" }]; }
+          }
+          if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+
+          return {
+              id: item.productId,
+              nombre: item.product?.name || 'Producto',
+              imagen: item.product?.imageUrl || null,
+              precio: parseFloat(item.subtotal) / item.quantity,
+              qty: item.quantity,
+              preparaciones: parsedPreps,
+              enviadoCocina: true,
+              kitchenStatus: item.kitchenStatus,
+              cuenta: item.cuenta || 'General',
+              backendItemId: item.id
+          };
+      });
+
+      // Fijamos los datos reales y mantenemos lo que aún no se envía (si el usuario sigue tocando la pantalla)
+      setCart(prev => {
+          const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
+          return [...updatedCart, ...unsentLocal];
+      });
       
       setTimeout(() => { 
           setIsSuccess(false); 
@@ -142,6 +178,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       }, 1500);
     } catch (error) { 
         setIsSuccess(false); 
+        console.error("Error al enviar a cocina:", error);
     }
   };
 
@@ -168,7 +205,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     const item = cart[cartIndex];
     if (!item.backendItemId) return;
 
-    // Cambiamos entre READY y DELIVERED
     const newStatus = item.kitchenStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
     
     try {
