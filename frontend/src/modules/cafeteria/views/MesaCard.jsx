@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
+import { UtensilsCrossed, ShoppingBag, ChefHat, Check } from 'lucide-react';
 
 export const MesaCard = ({ mesa, onClick }) => {
   const isOcupada = mesa.estado === 'ocupada';
-  const isLlevar = mesa.zona === 'llevar'; // Identificamos si es un pedido para llevar
+  const isLlevar = mesa.zona === 'llevar';
 
   // Lógica inteligente para saber cuántos productos faltan por preparar
   const { pendientes, totalItems } = useMemo(() => {
@@ -17,84 +18,128 @@ export const MesaCard = ({ mesa, onClick }) => {
     return { pendientes: pend, totalItems: mesa.items.length };
   }, [mesa.items]);
 
+  // Separamos el nombre del cliente y el teléfono para poder estructurarlos verticalmente
+  const { nombreCliente, telefonoCliente } = useMemo(() => {
+    // Convertimos a String para evitar el error "split is not a function"
+    const fuente = String(mesa.cliente || mesa.identificadorLlevar || ''); 
+    if (fuente.includes(' - Cel: ')) {
+      const [nombre, celular] = fuente.split(' - Cel: ');
+      return { nombreCliente: nombre, telefonoCliente: celular };
+    }
+    return { nombreCliente: fuente, telefonoCliente: '' };
+  }, [mesa.cliente, mesa.identificadorLlevar]);
+
+  // Limpiamos el identificador de la cabecera para que no repita el teléfono arriba
+  const cleanIdentificador = useMemo(() => {
+    if (!mesa.identificadorLlevar) return 'Pedido';
+    // Convertimos a String antes de separar
+    return String(mesa.identificadorLlevar).split(' - Cel: ')[0]; 
+  }, [mesa.identificadorLlevar]);
+
   return (
     <div 
       onClick={() => onClick(mesa)}
-      className={`relative rounded-xl p-3 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md flex flex-col justify-between min-h-[110px] ${
+      className={`group relative rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-hidden ${
         isOcupada 
-          // Tema Claro | Tema Oscuro | Tema LyA (Ocupada)
-          ? 'bg-white border-blue-300 dark:bg-gray-800 dark:border-blue-500 lya:bg-lya-surface lya:border-lya-primary' 
-          // Tema Claro | Tema Oscuro | Tema LyA (Libre)
-          : 'bg-white border-gray-200 dark:bg-gray-900 dark:border-gray-700 lya:bg-lya-surface/80 lya:border-lya-border'
+          // Tema Claro | Tema Oscuro | Tema LyA (Fondo sólido y limpio)
+          ? 'bg-white dark:bg-gray-800 border-y border-r border-gray-100 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/30' 
+          // Tema Claro | Tema Oscuro | Tema LyA (Fondo inactivo)
+          : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
       }`}
     >
-      {/* Parte Superior: Cabecera dinámica (Mesa o Llevar) y badge de estado */}
-      <div className="flex justify-between items-center mb-1">
-        <h3 className={`text-lg font-bold tracking-tight ${
-          isOcupada 
-            ? 'text-gray-900 dark:text-white lya:text-lya-text' 
-            : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/70'
-        }`}>
-          {isLlevar ? `LLEVAR ${mesa.identificadorLlevar || ''}` : `MESA ${mesa.numero}`}
-        </h3>
+      {/* Barra de Acento Lateral */}
+      <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors ${
+        isOcupada 
+          ? 'bg-blue-500 dark:bg-blue-400 lya:bg-lya-primary' 
+          : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/60'
+      }`} />
+
+      {/* Contenedor principal */}
+      <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full">
         
-        {/* Solo mostramos el badge de Ocupada/Libre si NO es para llevar */}
-        {!isLlevar && (
-          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
-            isOcupada 
-              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 lya:bg-lya-primary/20 lya:text-lya-primary' 
-              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 lya:bg-lya-bg lya:text-lya-border'
-          }`}>
-            {isOcupada ? 'Ocupada' : 'Libre'}
-          </span>
-        )}
-      </div>
-
-      {/* Centro: Precio Total bien centrado y Nombre del Cliente (si es llevar) */}
-      <div className="flex-grow flex flex-col items-center justify-center my-1">
-        {isOcupada ? (
-          <>
-            <span className="text-2xl font-bold text-gray-900 dark:text-white lya:text-lya-text">
-              ${Number(mesa.total || 0).toFixed(2)}
+        {/* Parte Superior: Título e Ícono */}
+        <div className="flex justify-between items-start">
+          <div className="z-10">
+            <span className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 block ${
+              isOcupada ? 'text-blue-500 dark:text-blue-400 lya:text-lya-primary' : 'text-gray-400 lya:text-lya-text/50'
+            }`}>
+              {isLlevar ? 'Para Llevar' : (isOcupada ? 'Mesa Ocupada' : 'Mesa Libre')}
             </span>
-            {/* Nombre del cliente si es pedido para llevar */}
-            {isLlevar && mesa.cliente && (
-              <span className="text-xs font-medium text-blue-600 dark:text-blue-400 lya:text-lya-primary mt-0.5 truncate w-full text-center italic">
-                {mesa.cliente}
-              </span>
-            )}
-          </>
-        ) : (
-          <span className="text-sm font-medium text-gray-400 dark:text-gray-600 lya:text-lya-border">
-            Disponible
-          </span>
-        )}
-      </div>
-
-      {/* Parte Inferior: Cuentas y Estado de Cocina */}
-      {isOcupada && (
-        <div className="flex justify-between items-end text-xs mt-1">
-          {/* Cuentas activas */}
-          <div className="text-gray-500 dark:text-gray-400 lya:text-lya-text/80 font-medium">
-            Cuentas: <span className="font-bold text-gray-900 dark:text-white lya:text-lya-primary">{mesa.cuentasActivas || 1}</span>
+            <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
+              isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
+            }`}>
+              {isLlevar ? cleanIdentificador : `#${mesa.numero}`}
+            </h3>
           </div>
           
-          {/* Lógica de pendientes vs Preparados */}
-          {totalItems > 0 && (
-            <div className="font-semibold tracking-tight">
-              {pendientes > 0 ? (
-                <span className="text-orange-600 bg-orange-50 border border-orange-100 dark:text-orange-400 dark:bg-orange-900/30 dark:border-orange-800/50 lya:bg-[#FDE8E8] lya:text-[#9B1C1C] lya:border-transparent px-1.5 py-0.5 rounded">
-                  {pendientes} pend.
-                </span>
-              ) : (
-                <span className="text-green-600 bg-green-50 border border-green-100 dark:text-green-400 dark:bg-green-900/30 dark:border-green-800/50 lya:bg-[#DEF7EC] lya:text-[#03543F] lya:border-transparent px-1.5 py-0.5 rounded">
-                  ¡Preparados!
-                </span>
+          <div className={`p-2 rounded-xl transition-colors ${
+            isOcupada 
+              ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
+              : 'bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-border'
+          }`}>
+            {isLlevar ? <ShoppingBag size={20} strokeWidth={2} /> : <UtensilsCrossed size={20} strokeWidth={2} />}
+          </div>
+        </div>
+
+        {/* Centro: Total y Datos del Cliente estructurados verticalmente */}
+        <div className="mt-2 mb-2 flex flex-col gap-1">
+          {isOcupada ? (
+            <>
+              <span className="text-2xl font-bold text-gray-900 dark:text-gray-100 lya:text-lya-text">
+                ${Number(mesa.total || 0).toFixed(2)}
+              </span>
+              
+              {/* Información del cliente apilada de forma bonita */}
+              {isLlevar && nombreCliente && (
+                <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate">
+                    👤 {nombreCliente}
+                  </span>
+                  {telefonoCliente && (
+                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 lya:text-lya-primary tracking-wide mt-0.5 whitespace-nowrap">
+                      📞 {telefonoCliente}
+                    </span>
+                  )}
+                </div>
               )}
-            </div>
+            </>
+          ) : (
+            <span className="text-sm font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/40">
+              Sin orden activa
+            </span>
           )}
         </div>
-      )}
+
+        {/* Parte Inferior: Cuentas y Estado de Cocina */}
+        {isOcupada && (
+          <div className="flex justify-between items-center mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
+            {/* Cuentas activas */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70">
+              <span className="w-5 h-5 rounded flex items-center justify-center font-bold text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 lya:bg-lya-primary/20 lya:text-lya-primary">
+                {mesa.cuentasActivas || 1}
+              </span>
+              <span className="font-medium">Cuentas</span>
+            </div>
+
+            {/* Cocina */}
+            {totalItems > 0 && (
+              <div className="text-[11px] font-bold">
+                {pendientes > 0 ? (
+                  <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#FDE8E8] px-2 py-0.5 rounded-md">
+                    <ChefHat size={13} className="animate-pulse" />
+                    {pendientes} cocina
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 lya:text-[#03543F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#DEF7EC] px-2 py-0.5 rounded-md">
+                    <Check size={13} strokeWidth={3} />
+                    Listos
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
