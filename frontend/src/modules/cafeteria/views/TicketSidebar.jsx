@@ -20,6 +20,10 @@ export const TicketSidebar = ({
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverCuenta, setDragOverCuenta] = useState(null);
   const [transferModeItem, setTransferModeItem] = useState(null);
+  const [transferQty, setTransferQty] = useState(1); 
+  
+  // NUEVO ESTADO PARA EL MODAL BONITO DE DRAG & DROP
+  const [dragPrompt, setDragPrompt] = useState(null);
 
   // REFERENCIA PARA EL CONTENEDOR DE SCROLL
   const scrollContainerRef = useRef(null);
@@ -39,7 +43,6 @@ export const TicketSidebar = ({
     return { cuentaName, items };
   });
 
-  // FUNCIÓN MÁGICA DE AUTO-SCROLL AL ARRASTRAR (Suavizado)
   const handleContainerDragOver = (e) => {
     e.preventDefault(); 
     if (!scrollContainerRef.current || !draggedItem) return;
@@ -120,7 +123,14 @@ export const TicketSidebar = ({
                     e.preventDefault();
                     setDragOverCuenta(null);
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) {
-                      onMoveItem(draggedItem.item, cuentaName);
+                      let qtyToMove = draggedItem.item.qty;
+                      if (qtyToMove > 1) {
+                         // EN VEZ DEL PROMPT FEO, ABRIMOS NUESTRO MODAL
+                         setTransferQty(qtyToMove); 
+                         setDragPrompt({ item: draggedItem.item, cuentaName, maxQty: qtyToMove });
+                      } else {
+                         onMoveItem(draggedItem.item, cuentaName, 1);
+                      }
                     }
                   }}
 
@@ -191,14 +201,14 @@ export const TicketSidebar = ({
 
                   {/* ITEMS DE LA CUENTA */}
                   <div className="px-3 pb-3 space-y-2">
-                    {items.map((item, index) => (
+                    {items.map((item) => (
                       <motion.div 
-                        key={`${item.id}-${index}`} layout
+                        key={item.backendItemId ? `db-${item.backendItemId}` : `local-${item.id}-${item.precio}`} layout
                         
                         // EVENTOS DE ARRASTRE
-                        draggable={!isCuentaPagada && !item.enviadoCocina}
+                        draggable={!isCuentaPagada}
                         onDragStart={(e) => {
-                          if (isCuentaPagada || item.enviadoCocina) return;
+                          if (isCuentaPagada) return;
                           setDraggedItem({ item, cuentaName });
                           e.dataTransfer.effectAllowed = 'move';
                           setTransferModeItem(null);
@@ -207,7 +217,7 @@ export const TicketSidebar = ({
 
                         className={clsx(
                           "relative group flex flex-col p-3 rounded-2xl border transition-all overflow-hidden",
-                          (!isCuentaPagada && !item.enviadoCocina) ? "cursor-grab active:cursor-grabbing" : "",
+                          (!isCuentaPagada) ? "cursor-grab active:cursor-grabbing" : "",
                           draggedItem?.item === item ? "opacity-40 scale-95" : "opacity-100",
                           item.enviadoCocina 
                             ? "bg-gray-50 dark:bg-gray-800/40 lya:bg-lya-bg/60 border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30" 
@@ -219,20 +229,30 @@ export const TicketSidebar = ({
                           {transferModeItem === item && (
                             <motion.div 
                               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                              className="absolute inset-0 z-10 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-sm flex items-center justify-center p-2 rounded-2xl"
+                              className="absolute inset-0 z-20 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-sm flex flex-col justify-center p-2 rounded-2xl"
                             >
+                              {item.qty > 1 && (
+                                <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-lg p-1 px-3 mb-2 mx-2 shadow-inner">
+                                    <span className="text-xs font-bold text-gray-500">Mover:</span>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setTransferQty(Math.max(1, transferQty - 1))} className="p-1 text-gray-500 hover:text-orange-500 lya:hover:text-lya-primary font-black active:scale-90">-</button>
+                                        <span className="font-black text-sm text-gray-800 dark:text-white lya:text-lya-text">{transferQty}</span>
+                                        <button onClick={() => setTransferQty(Math.min(item.qty, transferQty + 1))} className="p-1 text-gray-500 hover:text-orange-500 lya:hover:text-lya-primary font-black active:scale-90">+</button>
+                                    </div>
+                                </div>
+                              )}
                               <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar w-full px-2">
-                                <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Mover a:</span>
+                                <span className="text-xs font-bold text-gray-500 whitespace-nowrap">A:</span>
                                 {availableAccs.filter(c => c !== cuentaName && !paidAccounts?.includes(c)).map(c => (
                                   <button 
                                     key={c} 
-                                    onClick={() => { onMoveItem(item, c); setTransferModeItem(null); }}
-                                    className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95"
+                                    onClick={() => { onMoveItem(item, c, transferQty); setTransferModeItem(null); }}
+                                    className="bg-blue-100 dark:bg-blue-900/30 lya:bg-lya-secondary/20 text-blue-700 dark:text-blue-300 lya:text-lya-secondary px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95"
                                   >
                                     {c}
                                   </button>
                                 ))}
-                                <button onClick={() => setTransferModeItem(null)} className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded-full ml-auto text-gray-500"><X size={14}/></button>
+                                <button onClick={() => setTransferModeItem(null)} className="p-1.5 bg-gray-200 dark:bg-gray-800 rounded-full ml-auto text-gray-600"><X size={14}/></button>
                               </div>
                             </motion.div>
                           )}
@@ -245,7 +265,7 @@ export const TicketSidebar = ({
                               <img src={item.imagen || item.image} alt="" className="w-full h-full object-contain" />
                             ) : <span className="text-xl">🧁</span>}
                             
-                            {!isCuentaPagada && !item.enviadoCocina && availableAccs.length > 1 && (
+                            {!isCuentaPagada && availableAccs.length > 1 && (
                               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <GripVertical size={18} className="text-white drop-shadow-md" />
                               </div>
@@ -312,10 +332,10 @@ export const TicketSidebar = ({
                               </div>
                               
                               <div className="flex items-center gap-1">
-                                {!item.enviadoCocina && availableAccs.length > 1 && (
+                                {availableAccs.length > 1 && !isCuentaPagada && (
                                   <button 
-                                    onClick={() => setTransferModeItem(item)}
-                                    className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
+                                    onClick={() => { setTransferModeItem(item); setTransferQty(item.qty); }}
+                                    className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors z-10 relative"
                                     title="Mover de cuenta"
                                   >
                                     <ArrowRightLeft size={14} />
@@ -364,7 +384,6 @@ export const TicketSidebar = ({
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
         
         {orderStatus === 'PAID' ? (
-           // ESTADO INTERMEDIO: PAGADO PERO NO CERRADO
            <div className="flex gap-3 animate-fade-in">
               <button 
                 onClick={() => onPrintTicket()} 
@@ -380,7 +399,6 @@ export const TicketSidebar = ({
               </button>
            </div>
         ) : (
-           // ESTADO NORMAL DE VENTA
            <>
              <div className="space-y-2 mb-4">
                <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-xs font-bold uppercase tracking-wider">
@@ -433,6 +451,57 @@ export const TicketSidebar = ({
            </>
         )}
       </div>
+
+      {/* MODAL BONITO PARA DIVIDIR CANTIDADES EN DRAG & DROP */}
+      <AnimatePresence>
+        {dragPrompt && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+             <motion.div 
+               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} 
+               className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+             >
+                <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 lya:bg-lya-secondary/10 text-blue-500 lya:text-lya-secondary rounded-full flex items-center justify-center mb-4 shadow-inner">
+                   <ArrowRightLeft size={32} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2">Mover Producto</h3>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 leading-relaxed">
+                   ¿Cuántos <strong className="text-gray-800 dark:text-gray-200 lya:text-lya-text">{dragPrompt.item.nombre}</strong> deseas mover a <strong className="text-blue-600 dark:text-blue-400 lya:text-lya-secondary uppercase">{dragPrompt.cuentaName}</strong>?
+                </p>
+                
+                <div className="flex items-center gap-4 mb-6 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl p-2 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 w-full justify-center">
+                   <button 
+                     onClick={() => setTransferQty(Math.max(1, transferQty - 1))} 
+                     className="w-12 h-12 rounded-xl bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-orange-500 lya:hover:text-lya-primary font-black text-xl active:scale-95 transition-all"
+                   >-</button>
+                   <span className="text-3xl font-black w-16 text-center text-gray-900 dark:text-white lya:text-lya-text">{transferQty}</span>
+                   <button 
+                     onClick={() => setTransferQty(Math.min(dragPrompt.maxQty, transferQty + 1))} 
+                     className="w-12 h-12 rounded-xl bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-orange-500 lya:hover:text-lya-primary font-black text-xl active:scale-95 transition-all"
+                   >+</button>
+                </div>
+
+                <div className="flex gap-3 w-full">
+                   <button 
+                     onClick={() => setDragPrompt(null)} 
+                     className="flex-1 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-95"
+                   >
+                     Cancelar
+                   </button>
+                   <button 
+                     onClick={() => { onMoveItem(dragPrompt.item, dragPrompt.cuentaName, transferQty); setDragPrompt(null); }} 
+                     className="flex-1 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider text-white lya:text-lya-surface bg-blue-500 hover:bg-blue-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 transition-all active:scale-95 shadow-lg shadow-blue-500/20 lya:shadow-lya-secondary/20"
+                   >
+                     Confirmar
+                   </button>
+                </div>
+             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };

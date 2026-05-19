@@ -9,7 +9,8 @@ import {
   closeOrder,
   getTables,
   createTable,
-  deleteTable
+  deleteTable,
+  moveItemAccount
 } from './pos.controller.js';
 
 const router = Router();
@@ -24,5 +25,7 @@ router.put('/orders/:orderId/close', closeOrder); // NUEVO
 router.get('/tables', getTables);
 router.post('/tables', createTable);
 router.delete('/tables/:id', deleteTable);
+// Asegúrate de importar 'moveItemAccount' en la parte superior
+router.put('/orders/items/:itemId/move', moveItemAccount);
 
 export default router;

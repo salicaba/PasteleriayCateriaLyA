@@ -1,6 +1,6 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState } from 'react';
-import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus } from 'lucide-react';
+import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { usePosController } from '../controllers/usePosController';
@@ -20,6 +20,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
+  
+  // NUEVO ESTADO PARA LA ALERTA PERSONALIZADA
+  const [alertMessage, setAlertMessage] = useState(null);
   
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
@@ -42,14 +45,20 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   const handleOpenCheckout = () => {
-    if (!validateAllDelivered()) { alert("Todos los productos de la mesa deben estar marcados como ENTREGADOS antes de cobrar."); return; }
+    if (!validateAllDelivered()) { 
+      setAlertMessage("Todos los productos de la mesa deben estar marcados como ENTREGADOS en cocina antes de poder cobrar la cuenta completa."); 
+      return; 
+    }
     if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
     setCheckoutTarget({ type: 'full', cuentaName: null, amount: total });
     setShowCheckout(true); 
   };
 
   const handleOpenPayCuenta = (cuentaName) => {
-    if (!validateAllDelivered(cuentaName)) { alert(`Todos los productos de la cuenta '${cuentaName}' deben estar Entregados antes de cobrarla.`); return; }
+    if (!validateAllDelivered(cuentaName)) { 
+      setAlertMessage(`Todos los productos de la cuenta "${cuentaName}" deben estar ENTREGADOS antes de poder cobrarla individualmente.`); 
+      return; 
+    }
     const subtotal = getSubtotalByCuenta(cuentaName);
     if (subtotal > 0) { setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal }); setShowCheckout(true); }
   };
@@ -69,7 +78,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   if (!isOpen || !mesa) return null;
 
   const sidebarProps = {
-    cart, total, hasUnsentItems, unsentTotal, mesaTotal: total,
+    cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
@@ -78,14 +87,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     toggleDeliveredStatus
   };
 
-  // LÓGICA CORREGIDA PARA SEPARAR EL TEXTO
   const isLlevar = mesa.zona === 'llevar';
   const partesNumero = (mesa.numero || '').toString().split(' - ');
-  
-  // Si es llevar, numeroReal será "Llevar #1". Si es salón será solo "1" o "2"
   const numeroReal = partesNumero[0]; 
-  
-  // Tomamos todo lo que esté después del guión (Nombre y Teléfono) y lo volvemos a unir
   const nombreCliente = partesNumero.length > 1 ? partesNumero.slice(1).join(' - ') : 'MOSTRADOR'; 
 
   return (
@@ -179,7 +183,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
                         <button className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
                         <div>
-                          {/* CORRECCIÓN: TÍTULO MÓVIL */}
                           <span className="font-bold text-gray-700 dark:text-white lya:text-lya-text block leading-tight flex items-center gap-2">
                             <span>{isLlevar ? numeroReal : `Mesa #${numeroReal}`}</span>
                             {isLlevar && nombreCliente !== 'MOSTRADOR' && (
@@ -207,7 +210,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
               <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 lya:bg-lya-surface border-t border-gray-200 dark:border-gray-700 lya:border-lya-border/40 p-4 flex items-center justify-between gap-4 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] transition-colors">
                 <div onClick={() => setShowMobileTicket(true)} className="flex flex-col cursor-pointer">
                   <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-wider font-bold"><span>Gran Total</span><ChevronUp size={14}/></div>
-                  <span className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text transition-colors">${((mesa.total || 0) + unsentTotal).toFixed(2)}</span>
+                  <span className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text transition-colors">${total.toFixed(2)}</span>
                 </div>
                 <button onClick={() => setShowMobileTicket(true)} className="bg-gray-900 dark:bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface font-bold py-3 px-6 rounded-xl shadow-lg active:scale-95 transition-transform lya:shadow-lya-primary/30">Ver Orden</button>
               </div>
@@ -217,7 +220,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface h-full shadow-xl z-20 flex-col transition-colors">
             <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-bg border-b border-orange-500/10 dark:border-orange-500/20 lya:border-lya-border/40 flex justify-between items-center">
                <div>
-                  {/* CORRECCIÓN: TÍTULO DESKTOP */}
                   <h3 className="font-bold text-gray-900 dark:text-orange-500 lya:text-lya-text text-lg flex items-center gap-2">
                      <span>{isLlevar ? numeroReal : `Mesa #${numeroReal}`}</span>
                      {mesa.estado === 'ocupada' && (
@@ -277,6 +279,33 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                  onUnirMesas(origen, destino);
                }}
             />
+          )}
+
+          {/* MODAL BONITO DE ALERTA PARA PAGOS */}
+          {alertMessage && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} 
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+              >
+                 <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-primary/10 text-orange-500 lya:text-lya-primary rounded-full flex items-center justify-center mb-4 shadow-inner">
+                    <AlertTriangle size={32} strokeWidth={2.5} />
+                 </div>
+                 <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2">¡Atención!</h3>
+                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 leading-relaxed">
+                    {alertMessage}
+                 </p>
+                 <button 
+                   onClick={() => setAlertMessage(null)} 
+                   className="w-full bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20"
+                 >
+                    Entendido
+                 </button>
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
 

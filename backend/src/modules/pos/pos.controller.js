@@ -218,3 +218,94 @@ export const deleteTable = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar mesa', error: error.message }); 
   }
 };
+
+// ==========================================
+// 🔄 MOVER / DIVIDIR PRODUCTO ENTRE CUENTAS (CON AUTO-AGRUPACIÓN)
+// ==========================================
+export const moveItemAccount = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { targetCuenta, qtyToMove } = req.body;
+    
+    const item = await OrderItem.findByPk(itemId);
+    if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
+    
+    const unitPrice = Number(item.subtotal) / item.quantity;
+
+    // 1. Buscamos si ya existe EXACTAMENTE el mismo producto en la cuenta destino
+    const existingItems = await OrderItem.findAll({
+        where: {
+            orderId: item.orderId,
+            productId: item.productId,
+            cuenta: targetCuenta,
+            kitchenStatus: item.kitchenStatus // Que tengan el mismo estado
+        }
+    });
+
+    // Verificamos que coincida el precio unitario (para no mezclar si uno tenía descuento manual)
+    const existingItem = existingItems.find(i => (Number(i.subtotal) / i.quantity) === unitPrice);
+
+    // Parseamos las notas (preparaciones) para poder dividirlas/juntarlas correctamente
+    let moveNotes = [];
+    try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
+    if (!Array.isArray(moveNotes)) moveNotes = [moveNotes];
+    
+    const notesToMove = moveNotes.slice(0, qtyToMove);
+    const remainingNotes = moveNotes.slice(qtyToMove);
+
+    if (existingItem && existingItem.id !== item.id) {
+        // ¡EL PRODUCTO YA EXISTE! Lo fusionamos.
+        let existingNotes = [];
+        try { existingNotes = JSON.parse(existingItem.notes || '[]'); } catch(e){}
+        if (!Array.isArray(existingNotes)) existingNotes = [existingNotes];
+
+        await existingItem.update({
+            quantity: existingItem.quantity + qtyToMove,
+            subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove),
+            notes: JSON.stringify([...existingNotes, ...notesToMove]) // Juntamos las preparaciones
+        });
+
+        // Si se movió todo, borramos el original. Si no, le restamos la cantidad.
+        if (qtyToMove >= item.quantity) {
+            await item.destroy();
+        } else {
+            await item.update({
+                quantity: item.quantity - qtyToMove,
+                subtotal: unitPrice * (item.quantity - qtyToMove),
+                notes: JSON.stringify(remainingNotes)
+            });
+        }
+    } else {
+        // NO EXISTE EN LA CUENTA DESTINO. Hacemos el movimiento normal.
+        if (qtyToMove < item.quantity) {
+           await item.update({ 
+             quantity: item.quantity - qtyToMove, 
+             subtotal: unitPrice * (item.quantity - qtyToMove),
+             notes: JSON.stringify(remainingNotes)
+           });
+           
+           await OrderItem.create({
+             orderId: item.orderId,
+             productId: item.productId,
+             quantity: qtyToMove,
+             subtotal: unitPrice * qtyToMove,
+             cuenta: targetCuenta,
+             notes: JSON.stringify(notesToMove),
+             kitchenStatus: item.kitchenStatus
+           });
+        } else {
+           await item.update({ cuenta: targetCuenta });
+        }
+    }
+
+    // Devolvemos todos los items para refrescar el frontend
+    const allItems = await OrderItem.findAll({
+      where: { orderId: item.orderId },
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+    });
+    
+    res.json({ message: 'Producto movido y agrupado con éxito', orderItems: allItems });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al mover producto', error: error.message });
+  }
+};

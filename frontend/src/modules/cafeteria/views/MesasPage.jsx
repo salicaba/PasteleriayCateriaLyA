@@ -121,7 +121,7 @@ export const MesasPage = () => {
       </div>
 
       {/* CUADRÍCULA DE MESAS / PEDIDOS */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-24">
         <motion.div 
           layout 
           className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 items-start auto-rows-max"
