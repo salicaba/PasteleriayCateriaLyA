@@ -23,7 +23,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
-  // 🔥 FIX: Ahora pasamos todasLasMesas para que el Hook identifique cambios globales
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
     categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
@@ -79,10 +78,15 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     toggleDeliveredStatus
   };
 
+  // LÓGICA CORREGIDA PARA SEPARAR EL TEXTO
   const isLlevar = mesa.zona === 'llevar';
-  const partesNumero = mesa.numero.toString().split(' - ');
+  const partesNumero = (mesa.numero || '').toString().split(' - ');
+  
+  // Si es llevar, numeroReal será "Llevar #1". Si es salón será solo "1" o "2"
   const numeroReal = partesNumero[0]; 
-  const nombreCliente = partesNumero[1] || 'MOSTRADOR'; 
+  
+  // Tomamos todo lo que esté después del guión (Nombre y Teléfono) y lo volvemos a unir
+  const nombreCliente = partesNumero.length > 1 ? partesNumero.slice(1).join(' - ') : 'MOSTRADOR'; 
 
   return (
     <AnimatePresence>
@@ -132,9 +136,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       if (typeof ops === 'string') {
                         try { ops = JSON.parse(ops); } catch (e) { ops = null; }
                       }
-                      if (typeof ops === 'string') {
-                        try { ops = JSON.parse(ops); } catch (e) { ops = null; }
-                      }
 
                       let precioAdicional = 0;
                       let detalles = {};
@@ -178,9 +179,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
                         <button className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
                         <div>
+                          {/* CORRECCIÓN: TÍTULO MÓVIL */}
                           <span className="font-bold text-gray-700 dark:text-white lya:text-lya-text block leading-tight flex items-center gap-2">
-                            <span>{isLlevar ? 'Ticket' : 'Mesa'} #{numeroReal}</span>
-                            {isLlevar && (
+                            <span>{isLlevar ? numeroReal : `Mesa #${numeroReal}`}</span>
+                            {isLlevar && nombreCliente !== 'MOSTRADOR' && (
                                <span className="px-2 py-0.5 bg-orange-500 lya:bg-lya-secondary text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider">
                                   {nombreCliente}
                                </span>
@@ -215,8 +217,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface h-full shadow-xl z-20 flex-col transition-colors">
             <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-bg border-b border-orange-500/10 dark:border-orange-500/20 lya:border-lya-border/40 flex justify-between items-center">
                <div>
+                  {/* CORRECCIÓN: TÍTULO DESKTOP */}
                   <h3 className="font-bold text-gray-900 dark:text-orange-500 lya:text-lya-text text-lg flex items-center gap-2">
-                     <span>{isLlevar ? 'Ticket' : 'Mesa'} #{numeroReal}</span>
+                     <span>{isLlevar ? numeroReal : `Mesa #${numeroReal}`}</span>
                      {mesa.estado === 'ocupada' && (
                        <span className={`px-2 py-0.5 text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider ${isLlevar ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-900 dark:bg-orange-500 lya:bg-lya-primary'}`}>
                           {isLlevar ? nombreCliente : 'OCUPADA'}
@@ -224,7 +227,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                      )}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 font-medium">
-                    {isLlevar ? 'Venta de mostrador' : (mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden')}
+                    {isLlevar ? 'Venta para Llevar' : (mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden')}
                   </p>
                </div>
                {mesa.estado === 'ocupada' && !isLlevar && (

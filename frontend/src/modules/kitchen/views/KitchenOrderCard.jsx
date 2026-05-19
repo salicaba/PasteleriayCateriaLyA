@@ -1,3 +1,4 @@
+// src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, CheckCircle2, Circle, ChefHat, ShoppingBag, UtensilsCrossed, AlertTriangle } from 'lucide-react';
@@ -29,13 +30,20 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
     headerColor = 'bg-yellow-500';
   }
 
+  // Formateo dinámico del título para los pedidos "Para Llevar"
+  // Reemplaza "Ticket" o "Ticket #" por "Llevar #", manteniendo el nombre y celular intactos.
+  const displayTitle = order.tipo === 'llevar' && typeof order.mesa === 'string'
+    ? order.mesa.replace(/Ticket\s*#?/i, 'Llevar #') 
+    : order.mesa;
+
   return (
     <motion.div layout className={`flex flex-col rounded-2xl border ${statusColor} shadow-lg overflow-hidden`}>
       <div className={`p-4 flex flex-col ${headerColor} shadow-sm relative`}>
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             {order.tipo === 'llevar' ? <ShoppingBag size={20} /> : <UtensilsCrossed size={20} />}
-            <span className="font-bold text-xl">{order.mesa}</span>
+            {/* Usamos el displayTitle formateado */}
+            <span className="font-bold text-xl">{displayTitle}</span>
           </div>
           <div className="flex items-center space-x-2 bg-black/20 px-3 py-1.5 rounded-full">
             <Clock size={16} />
@@ -108,7 +116,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
           }`}
         >
           <ChefHat size={22} />
-          {/* 🔥 TEXTO CLARO: Solo se activa cuando todo está listo */}
           <span>{allItemsReady ? 'LISTO PARA ENTREGAR' : 'PREPARANDO...'}</span>
         </button>
       </div>

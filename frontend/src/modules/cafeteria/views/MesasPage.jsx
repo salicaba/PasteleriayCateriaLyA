@@ -4,7 +4,6 @@ import { LayoutGrid, Search, X, ShoppingBag, Plus } from 'lucide-react';
 import { useMesasController } from '../controllers/useMesasController';
 import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal'; 
-// 1. Importamos el nuevo modal
 import { NuevoPedidoLlevarModal } from './NuevoPedidoLlevarModal';
 
 export const MesasPage = () => {
@@ -16,7 +15,6 @@ export const MesasPage = () => {
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [busqueda, setBusqueda] = useState('');
   
-  // 2. Estado para controlar el nuevo modal
   const [isModalLlevarOpen, setIsModalLlevarOpen] = useState(false);
 
   const mesasVisibles = useMemo(() => {
@@ -26,15 +24,10 @@ export const MesasPage = () => {
     );
   }, [mesasFiltradas, busqueda]);
 
-  // 3. Función que se ejecuta cuando el usuario confirma en el modal
+  // 3. Función simplificada: Ahora el controlador se encarga de todo el formato
   const handleCrearPedidoLlevar = async (nombreCliente, telefono) => {
-    // Si escribieron teléfono, lo unimos al nombre. Si no, solo mandamos el nombre.
-    const identificador = telefono 
-      ? `${nombreCliente} - Cel: ${telefono}` 
-      : nombreCliente;
-
-    // AWAIT para esperar a que el backend cree la orden correctamente
-    const nuevo = await nuevoPedidoLlevar(identificador); 
+    // Pasamos el nombre y teléfono directamente al controlador modificado
+    const nuevo = await nuevoPedidoLlevar(nombreCliente, telefono); 
     
     // Solo abrimos el POS si se creó correctamente
     if (nuevo) {
@@ -84,7 +77,7 @@ export const MesasPage = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
           <input 
             type="text"
-            placeholder="Buscar por número..."
+            placeholder="Buscar por número o nombre..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500/20 lya:focus:ring-lya-primary/30 transition-all lya:text-lya-text lya:placeholder-lya-text/40"
@@ -118,7 +111,6 @@ export const MesasPage = () => {
 
         {zonaActiva === 'llevar' && (
           <button 
-            // 4. Cambiamos el onClick para que abra nuestro modal
             onClick={() => setIsModalLlevarOpen(true)}
             className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md"
           >
@@ -128,7 +120,7 @@ export const MesasPage = () => {
         )}
       </div>
 
-      {/* CUADRÍCULA DE MESAS */}
+      {/* CUADRÍCULA DE MESAS / PEDIDOS */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24">
         <motion.div 
           layout 
@@ -193,7 +185,6 @@ export const MesasPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 5. NUESTRO NUEVO MODAL DE PEDIDOS PARA LLEVAR */}
       <NuevoPedidoLlevarModal 
         isOpen={isModalLlevarOpen} 
         onClose={() => setIsModalLlevarOpen(false)} 

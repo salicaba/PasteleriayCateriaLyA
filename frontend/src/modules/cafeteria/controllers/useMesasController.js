@@ -1,3 +1,4 @@
+// src/modules/cafeteria/controllers/useMesasController.js
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { fetchActiveOrders } from '../models/mesasModel.js';
 import client from '../../../api/client.js';
@@ -21,7 +22,7 @@ export const useMesasController = () => {
       const orders = (activeOrders || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
       const mergedMesas = catalog.map(table => {
-        // Enlaza la orden con la mesa usando el tableId nativo de la base de datos
+        // Enlaza la orden con la mesa usando el tableId nativo
         const order = orders.find(o => o.tableId === table.id);
         
         let cuentasActivas = 0;
@@ -47,17 +48,24 @@ export const useMesasController = () => {
         };
       });
 
-      // Lógica de numeración para Para Llevar (Llevar 1, 2, 3...)
+      // 🔥 CORRECCIÓN: Garantizamos que TODOS los pedidos digan "Llevar #"
       const paraLlevarOrders = orders.filter(o => o.orderType === 'LLEVAR').map((o, index) => {
           const cuentasSet = new Set(['General']);
           if (o.items) o.items.forEach(item => cuentasSet.add(item.cuenta || 'General'));
           if (o.paidAccounts) o.paidAccounts.forEach(acc => cuentasSet.add(acc));
           
+          const rawTicketId = o.ticketId || 'Sin Nombre';
+          
+          // Red de seguridad: Si el ticket ya trae "Llevar", lo dejamos. Si no, se lo forzamos.
+          const numeroFinal = rawTicketId.toLowerCase().includes('llevar') 
+               ? rawTicketId 
+               : `Llevar #${index + 1} - ${rawTicketId}`;
+          
           return {
             id: o.id, 
-            identificadorLlevar: index + 1, // Numeración secuencial: 1, 2, 3...
-            cliente: o.ticketId || 'Sin Nombre', // El ticketId se usa como Nombre
-            numero: o.ticketId || 'Sin Nombre', // Por compatibilidad con otros componentes
+            identificadorLlevar: index + 1,
+            cliente: numeroFinal, 
+            numero: numeroFinal, 
             zona: 'llevar', 
             estado: 'ocupada', 
             total: Number(o.totalAmount) || 0,
@@ -78,10 +86,10 @@ export const useMesasController = () => {
     }
   }, []);
 
-  // 🔥 Recarga silenciosa en segundo plano (Polling)
+  // Recarga silenciosa en segundo plano (Polling)
   useEffect(() => { 
     loadMesas(); 
-    const intervalId = setInterval(loadMesas, 3000); // Mantiene el mapa fresco cada 3 segundos
+    const intervalId = setInterval(loadMesas, 3000);
     return () => clearInterval(intervalId);
   }, [loadMesas]);
 
@@ -95,10 +103,25 @@ export const useMesasController = () => {
     }; 
   }, [mesas]);
 
-  const nuevoPedidoLlevar = async (nombreCliente) => {
+  const nuevoPedidoLlevar = async (nombreCliente, telefono) => {
     try {
-      const res = await client.post('/pos/orders', { orderType: 'LLEVAR', ticketId: nombreCliente, tableId: null });
+      const currentOrders = await fetchActiveOrders();
+      const llevarOrdersCount = (currentOrders || []).filter(o => o.orderType === 'LLEVAR').length;
+      const nextNumber = llevarOrdersCount + 1;
+
+      let formattedTicketId = `Llevar #${nextNumber} - ${nombreCliente}`;
+      if (telefono && telefono.trim() !== '') {
+          formattedTicketId += ` - ${telefono}`;
+      }
+
+      const res = await client.post('/pos/orders', { 
+          orderType: 'LLEVAR', 
+          ticketId: formattedTicketId, 
+          tableId: null 
+      });
+
       await loadMesas();
+      
       return { 
         id: res.data.order.id, 
         numero: res.data.order.ticketId, 
@@ -111,7 +134,10 @@ export const useMesasController = () => {
         orderStatus: 'OPEN', 
         paidAccounts: [] 
       };
-    } catch (error) { return null; }
+    } catch (error) { 
+        console.error("Error al crear pedido para llevar", error);
+        return null; 
+    }
   };
 
   return { 
