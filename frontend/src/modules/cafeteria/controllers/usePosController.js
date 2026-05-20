@@ -28,7 +28,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     loadData();
   }, []);
 
-  // 🔄 SINCRONIZACIÓN MAESTRA DE LA COMANDA AL ABRIR/ACTUALIZAR
   useEffect(() => {
     if (!isOpen) {
         setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
@@ -69,13 +68,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
-            
-            // Conservamos los enviados recientemente para evitar que desaparezcan por retraso en red
             const sentButNotLoaded = prev.filter(p => 
                 p.enviadoCocina && 
                 !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId)
             );
-
             const finalCart = [...loadedCart, ...sentButNotLoaded, ...localItems];
             finalCart.forEach(c => nuevasCuentas.add(c.cuenta));
             return finalCart;
@@ -83,14 +79,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
         if (mesaActual.paidAccounts) mesaActual.paidAccounts.forEach(pa => nuevasCuentas.add(pa));
     } else {
-        // 🔥 NO borramos el carrito si la mesa figura temporalmente "libre" 
         setCart(prev => {
             prev.forEach(c => nuevasCuentas.add(c.cuenta));
             return prev;
         });
     }
 
-    // Unificamos las cuentas sin duplicados
     setNombresCuentas(prev => Array.from(new Set([...prev, ...Array.from(nuevasCuentas)])));
 
   }, [isOpen, mesaActual]);
@@ -104,7 +98,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
       if (index !== -1) {
           const newCart = [...prev];
-          // Creamos una copia completamente nueva del producto para no mutar el original
           newCart[index] = {
             ...newCart[index],
             qty: newCart[index].qty + 1,
@@ -142,10 +135,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         notes: JSON.stringify(item.preparaciones) 
       }));
 
-      // Enviamos a la base de datos
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
-      
-      // 🔥 FIX CRÍTICO: El backend ahora nos devuelve todos los items de la orden agrupados
       const allItemsFromDB = response.data.orderItems || [];
       
       const updatedCart = allItemsFromDB.map(item => {
@@ -170,7 +160,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           };
       });
 
-      // Fijamos los datos reales y mantenemos lo que aún no se envía
       setCart(prev => {
           const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
           return [...updatedCart, ...unsentLocal];
@@ -187,97 +176,114 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   };
 
   const removeFromCart = (id, precio, env, cuenta) => { 
-    if(!env) setCart(prev => prev.map(p => p.id === id && p.precio === precio && p.cuenta === cuenta && !p.enviadoCocina ? {...p, qty: p.qty - 1, preparaciones: p.preparaciones.slice(0, -1)} : p).filter(p => p.qty > 0));
+    if(!env) setCart(prev => {
+        const newCart = [...prev];
+        const idx = newCart.findIndex(p => p.id === id && p.precio === precio && p.cuenta === cuenta && !p.enviadoCocina);
+        if (idx !== -1) {
+            newCart[idx] = { 
+                ...newCart[idx], 
+                qty: newCart[idx].qty - 1, 
+                preparaciones: newCart[idx].preparaciones.slice(0, -1) 
+            };
+            if (newCart[idx].qty <= 0) newCart.splice(idx, 1);
+        }
+        return newCart;
+    });
   };
 
   const deleteLine = (id, precio, env, cuenta) => { 
     if(!env) setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && p.cuenta === cuenta && !p.enviadoCocina)));
   };
 
-  // 🔥 NUEVA LÓGICA: MOVER Y DIVIDIR CANTIDADES CON AUTO-AGRUPACIÓN
   const moveItemToCuenta = async (item, target, qtyToMove = item.qty) => { 
-    if (item.enviadoCocina) {
-       setIsSuccess(true); // Mostramos el loading de LyA
-       try {
-          const response = await client.put(`/pos/orders/items/${item.backendItemId}/move`, {
-              targetCuenta: target,
-              qtyToMove: qtyToMove
-          });
-          
-          // El backend nos devuelve la orden corregida y fusionada
-          const allItemsFromDB = response.data.orderItems || [];
-          const updatedCart = allItemsFromDB.map(dbItem => {
-              let parsedPreps = [];
-              if (dbItem.notes) {
-                  try { parsedPreps = JSON.parse(dbItem.notes); } 
-                  catch(e) { parsedPreps = [{ detalles: "Personalización" }]; }
-              }
-              if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+    const itemsToProcess = item._groupedItems || [item];
+    
+    setIsSuccess(true);
+    try {
+        let remainingToMove = qtyToMove;
+        let allItemsFromDB = null;
+        let dbMoveMade = false;
+        
+        for (const subItem of itemsToProcess) {
+            if (remainingToMove <= 0) break;
+            const qtyFromThis = Math.min(subItem.qty, remainingToMove);
+            
+            if (subItem.enviadoCocina) {
+                const response = await client.put(`/pos/orders/items/${subItem.backendItemId}/move`, {
+                    targetCuenta: target,
+                    qtyToMove: qtyFromThis
+                });
+                allItemsFromDB = response.data.orderItems || [];
+                dbMoveMade = true;
+            } else {
+                setCart(prev => {
+                   const newCart = [...prev];
+                   let idx = newCart.indexOf(subItem);
+                   if (idx === -1) {
+                       idx = newCart.findIndex(p => p.id === subItem.id && p.precio === subItem.precio && p.cuenta === (subItem.cuenta || 'General') && !p.enviadoCocina);
+                   }
+                   
+                   if(idx !== -1) {
+                       const existingIdx = newCart.findIndex(p => 
+                           p.id === subItem.id && p.precio === subItem.precio && p.cuenta === target && !p.enviadoCocina
+                       );
 
-              return {
-                  id: dbItem.productId,
-                  nombre: dbItem.product?.name || 'Producto',
-                  imagen: dbItem.product?.imageUrl || null,
-                  precio: parseFloat(dbItem.subtotal) / dbItem.quantity,
-                  qty: dbItem.quantity,
-                  preparaciones: parsedPreps,
-                  enviadoCocina: true,
-                  kitchenStatus: dbItem.kitchenStatus,
-                  cuenta: dbItem.cuenta || 'General',
-                  backendItemId: dbItem.id
-              };
-          });
-
-          // Juntamos lo que actualizó la BD con lo que aún no se envía
-          setCart(prev => {
-              const unsentLocal = prev.filter(p => !p.enviadoCocina);
-              return [...updatedCart, ...unsentLocal];
-          });
-          setIsSuccess(false);
-       } catch (error) {
-          setIsSuccess(false);
-          console.error("Error al mover en BD", error);
-       }
-    } else {
-       // Lógica local (si aún no se ha mandado a cocina)
-       setCart(prev => {
-           const newCart = [...prev];
-           const idx = newCart.indexOf(item);
-           if(idx === -1) return newCart;
-           
-           // Buscamos si ya hay un producto idéntico en la cuenta destino
-           const existingIdx = newCart.findIndex(p => 
-               p.id === item.id && 
-               p.precio === item.precio && 
-               p.cuenta === target && 
-               !p.enviadoCocina
-           );
-
-           if (existingIdx !== -1) {
-               // YA EXISTE: Fusionamos las cantidades y las preparaciones (extras/leches)
-               newCart[existingIdx] = {
-                   ...newCart[existingIdx],
-                   qty: newCart[existingIdx].qty + qtyToMove,
-                   preparaciones: [...newCart[existingIdx].preparaciones, ...item.preparaciones.slice(0, qtyToMove)]
-               };
-               
-               // Le restamos al original, o lo eliminamos si se movió todo
-               if (qtyToMove < item.qty) {
-                   newCart[idx] = { ...item, qty: item.qty - qtyToMove, preparaciones: item.preparaciones.slice(qtyToMove) };
-               } else {
-                   newCart.splice(idx, 1);
-               }
-           } else {
-               // NO EXISTE: Lo separamos o lo movemos como antes
-               if (qtyToMove < item.qty) {
-                   newCart[idx] = { ...item, qty: item.qty - qtyToMove, preparaciones: item.preparaciones.slice(qtyToMove) };
-                   newCart.push({ ...item, cuenta: target, qty: qtyToMove, preparaciones: item.preparaciones.slice(0, qtyToMove) });
-               } else {
-                   newCart[idx] = { ...item, cuenta: target };
-               }
-           }
-           return newCart;
-       });
+                       if (existingIdx !== -1) {
+                           newCart[existingIdx] = {
+                               ...newCart[existingIdx],
+                               qty: newCart[existingIdx].qty + qtyFromThis,
+                               preparaciones: [...newCart[existingIdx].preparaciones, ...subItem.preparaciones.slice(0, qtyFromThis)]
+                           };
+                           
+                           if (qtyFromThis < newCart[idx].qty) {
+                               newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - qtyFromThis, preparaciones: newCart[idx].preparaciones.slice(qtyFromThis) };
+                           } else {
+                               newCart.splice(idx, 1);
+                           }
+                       } else {
+                           if (qtyFromThis < newCart[idx].qty) {
+                               newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - qtyFromThis, preparaciones: newCart[idx].preparaciones.slice(qtyFromThis) };
+                               newCart.push({ ...subItem, cuenta: target, qty: qtyFromThis, preparaciones: subItem.preparaciones.slice(0, qtyFromThis) });
+                           } else {
+                               newCart[idx] = { ...newCart[idx], cuenta: target };
+                           }
+                       }
+                   }
+                   return newCart;
+                });
+            }
+            remainingToMove -= qtyFromThis;
+        }
+        
+        if (dbMoveMade && allItemsFromDB) {
+            const updatedCart = allItemsFromDB.map(dbItem => {
+                let parsedPreps = [];
+                if (dbItem.notes) {
+                    try { parsedPreps = JSON.parse(dbItem.notes); } catch(e) { parsedPreps = [{ detalles: "Personalización" }]; }
+                }
+                if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+                return {
+                    id: dbItem.productId,
+                    nombre: dbItem.product?.name || 'Producto',
+                    imagen: dbItem.product?.imageUrl || null,
+                    precio: parseFloat(dbItem.subtotal) / dbItem.quantity,
+                    qty: dbItem.quantity,
+                    preparaciones: parsedPreps,
+                    enviadoCocina: true,
+                    kitchenStatus: dbItem.kitchenStatus,
+                    cuenta: dbItem.cuenta || 'General',
+                    backendItemId: dbItem.id
+                };
+            });
+            setCart(prev => {
+                const unsentLocal = prev.filter(p => !p.enviadoCocina);
+                return [...updatedCart, ...unsentLocal];
+            });
+        }
+    } catch (error) {
+        console.error("Error al mover en BD", error);
+    } finally {
+        setIsSuccess(false);
     }
   };
 
@@ -288,20 +294,35 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     } 
   };
 
-  const toggleDeliveredStatus = async (cartIndex) => {
-    const item = cart[cartIndex];
-    if (!item.backendItemId) return;
+  // SOLUCIÓN: El botón manda ahora el grupo entero, aquí actualizamos todos los ítems que conformen el grupo visual a la vez.
+  const toggleDeliveredStatus = async (groupedItem) => {
+    if (!groupedItem) return;
+    const itemsToUpdate = groupedItem._groupedItems || [groupedItem];
+    if (itemsToUpdate.length === 0) return;
 
-    const newStatus = item.kitchenStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
+    const currentStatus = itemsToUpdate[0].kitchenStatus;
+    const newStatus = currentStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
     
     try {
-        await client.put(`/kitchen/tickets/${item.backendItemId}/status`, { status: newStatus });
+        await Promise.all(itemsToUpdate.map(async (subItem) => {
+            if (subItem.backendItemId) {
+                await client.put(`/kitchen/tickets/${subItem.backendItemId}/status`, { status: newStatus });
+            }
+        }));
+
         setCart(prev => {
             const newCart = [...prev];
-            newCart[cartIndex].kitchenStatus = newStatus;
+            itemsToUpdate.forEach(subItem => {
+                const idx = newCart.findIndex(p => p.backendItemId === subItem.backendItemId);
+                if (idx !== -1) {
+                    newCart[idx] = { ...newCart[idx], kitchenStatus: newStatus };
+                }
+            });
             return newCart;
         });
-    } catch (e) { console.error("Error al actualizar entrega"); }
+    } catch (e) { 
+        console.error("Error al actualizar entrega", e); 
+    }
   };
 
   const validateAllDelivered = (cuentaName = null) => { 

@@ -16,16 +16,13 @@ export const TicketSidebar = ({
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
   
-  // Estados para controlar el movimiento de productos
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverCuenta, setDragOverCuenta] = useState(null);
-  const [transferModeItem, setTransferModeItem] = useState(null);
+  
+  const [transferModeItemId, setTransferModeItemId] = useState(null);
   const [transferQty, setTransferQty] = useState(1); 
   
-  // NUEVO ESTADO PARA EL MODAL BONITO DE DRAG & DROP
   const [dragPrompt, setDragPrompt] = useState(null);
-
-  // REFERENCIA PARA EL CONTENEDOR DE SCROLL
   const scrollContainerRef = useRef(null);
 
   const activeAcc = cuentaActiva || 'General';
@@ -38,19 +35,45 @@ export const TicketSidebar = ({
     setNewCuentaName('');
   };
 
+  // Función ROBUSTA para extraer y comparar las características/preparaciones
+  const getPrepStr = (item) => {
+    if (!item?.preparaciones || item.preparaciones.length === 0) return "";
+    const p = item.preparaciones[0];
+    if (!p) return "";
+    return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
+  };
+
+  // Agrupar visualmente productos idénticos tomando en cuenta precios, estado y preparaciones exactas
   const groupedCart = availableAccs.map(cuentaName => {
-    const items = cart.filter(item => (item.cuenta || 'General') === cuentaName);
-    return { cuentaName, items };
+    const rawItems = cart.filter(item => (item.cuenta || 'General') === cuentaName);
+    const displayItems = [];
+    
+    rawItems.forEach(item => {
+        const existing = displayItems.find(d => 
+            d.id === item.id && 
+            Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
+            d.enviadoCocina === item.enviadoCocina &&
+            d.kitchenStatus === item.kitchenStatus &&
+            getPrepStr(d) === getPrepStr(item)
+        );
+        if (existing) {
+            existing.qty += item.qty;
+            existing.preparaciones = [...existing.preparaciones, ...(item.preparaciones || [])];
+            existing._groupedItems.push(item);
+        } else {
+            displayItems.push({ ...item, _groupedItems: [item] });
+        }
+    });
+
+    return { cuentaName, items: displayItems };
   });
 
   const handleContainerDragOver = (e) => {
     e.preventDefault(); 
     if (!scrollContainerRef.current || !draggedItem) return;
-
     const container = scrollContainerRef.current;
     const { top, bottom } = container.getBoundingClientRect();
     const y = e.clientY;
-
     const scrollZone = 80;
     const scrollSpeed = 5; 
 
@@ -64,7 +87,7 @@ export const TicketSidebar = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors">
       
-      {/* HEADER: GESTIÓN DE CUENTAS */}
+      {/* HEADER */}
       <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 p-4 shadow-sm z-20 shrink-0 sticky top-0 transition-colors">
         <form onSubmit={handleAddCuenta} className="flex gap-2">
           <div className="relative flex-1">
@@ -113,7 +136,6 @@ export const TicketSidebar = ({
                   key={cuentaName} layout 
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                   
-                  // EVENTOS DE DROP ZONE
                   onDragOver={(e) => { 
                     e.preventDefault(); 
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) setDragOverCuenta(cuentaName);
@@ -125,7 +147,6 @@ export const TicketSidebar = ({
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) {
                       let qtyToMove = draggedItem.item.qty;
                       if (qtyToMove > 1) {
-                         // EN VEZ DEL PROMPT FEO, ABRIMOS NUESTRO MODAL
                          setTransferQty(qtyToMove); 
                          setDragPrompt({ item: draggedItem.item, cuentaName, maxQty: qtyToMove });
                       } else {
@@ -201,17 +222,20 @@ export const TicketSidebar = ({
 
                   {/* ITEMS DE LA CUENTA */}
                   <div className="px-3 pb-3 space-y-2">
-                    {items.map((item) => (
+                    {items.map((item, idx) => {
+                      const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}`;
+                      const isTransferMode = transferModeItemId === currentItemKey;
+
+                      return (
                       <motion.div 
-                        key={item.backendItemId ? `db-${item.backendItemId}` : `local-${item.id}-${item.precio}`} layout
+                        key={currentItemKey} layout
                         
-                        // EVENTOS DE ARRASTRE
                         draggable={!isCuentaPagada}
                         onDragStart={(e) => {
                           if (isCuentaPagada) return;
                           setDraggedItem({ item, cuentaName });
                           e.dataTransfer.effectAllowed = 'move';
-                          setTransferModeItem(null);
+                          setTransferModeItemId(null);
                         }}
                         onDragEnd={() => setDraggedItem(null)}
 
@@ -226,7 +250,7 @@ export const TicketSidebar = ({
                       >
                         {/* OVERLAY PARA TRANSFERENCIA MÓVIL RÁPIDA */}
                         <AnimatePresence>
-                          {transferModeItem === item && (
+                          {isTransferMode && (
                             <motion.div 
                               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                               className="absolute inset-0 z-20 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-sm flex flex-col justify-center p-2 rounded-2xl"
@@ -246,20 +270,19 @@ export const TicketSidebar = ({
                                 {availableAccs.filter(c => c !== cuentaName && !paidAccounts?.includes(c)).map(c => (
                                   <button 
                                     key={c} 
-                                    onClick={() => { onMoveItem(item, c, transferQty); setTransferModeItem(null); }}
+                                    onClick={() => { onMoveItem(item, c, transferQty); setTransferModeItemId(null); }}
                                     className="bg-blue-100 dark:bg-blue-900/30 lya:bg-lya-secondary/20 text-blue-700 dark:text-blue-300 lya:text-lya-secondary px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95"
                                   >
                                     {c}
                                   </button>
                                 ))}
-                                <button onClick={() => setTransferModeItem(null)} className="p-1.5 bg-gray-200 dark:bg-gray-800 rounded-full ml-auto text-gray-600"><X size={14}/></button>
+                                <button onClick={() => setTransferModeItemId(null)} className="p-1.5 bg-gray-200 dark:bg-gray-800 rounded-full ml-auto text-gray-600"><X size={14}/></button>
                               </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
 
                         <div className="flex gap-3">
-                          {/* MINI IMAGEN CON GRIP DE ARRASTRE */}
                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg flex-shrink-0 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center relative group-hover:shadow-inner transition-shadow">
                             {item.imagen || item.image ? (
                               <img src={item.imagen || item.image} alt="" className="w-full h-full object-contain" />
@@ -289,7 +312,6 @@ export const TicketSidebar = ({
                               </span>
                             </div>
 
-                            {/* OPCIONES / PREPARACIONES */}
                             <div className="space-y-1 pointer-events-none">
                               {item.preparaciones?.map((prep, pIdx) => {
                                 if (!prep || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
@@ -308,12 +330,12 @@ export const TicketSidebar = ({
                               })}
                             </div>
 
-                            {/* ESTADO Y ACCIONES RÁPIDAS */}
                             <div className="mt-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 {item.enviadoCocina ? (
                                   <button 
-                                    onClick={() => toggleDeliveredStatus(cart.findIndex(c => c === item))} 
+                                    // SOLUCIÓN: Pasamos el 'item' completo (que tiene adentro los _groupedItems) para actualizar TODOS a la vez
+                                    onClick={() => toggleDeliveredStatus(item)} 
                                     disabled={orderStatus === 'PAID' || isCuentaPagada} 
                                     className={clsx(
                                       "flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border uppercase transition-colors", 
@@ -334,7 +356,7 @@ export const TicketSidebar = ({
                               <div className="flex items-center gap-1">
                                 {availableAccs.length > 1 && !isCuentaPagada && (
                                   <button 
-                                    onClick={() => { setTransferModeItem(item); setTransferQty(item.qty); }}
+                                    onClick={() => { setTransferModeItemId(currentItemKey); setTransferQty(item.qty); }}
                                     className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors z-10 relative"
                                     title="Mover de cuenta"
                                   >
@@ -371,7 +393,8 @@ export const TicketSidebar = ({
                           </div>
                         </div>
                       </motion.div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </motion.div>
               );
@@ -380,7 +403,7 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* FOOTER: TOTALES Y ACCIONES DE COBRO/CIERRE */}
+      {/* FOOTER */}
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
         
         {orderStatus === 'PAID' ? (
@@ -452,7 +475,6 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* MODAL BONITO PARA DIVIDIR CANTIDADES EN DRAG & DROP */}
       <AnimatePresence>
         {dragPrompt && (
           <motion.div 
