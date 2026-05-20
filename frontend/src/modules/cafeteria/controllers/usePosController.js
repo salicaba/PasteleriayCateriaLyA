@@ -294,13 +294,20 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     } 
   };
 
-  // SOLUCIÓN: El botón manda ahora el grupo entero, aquí actualizamos todos los ítems que conformen el grupo visual a la vez.
   const toggleDeliveredStatus = async (groupedItem) => {
     if (!groupedItem) return;
     const itemsToUpdate = groupedItem._groupedItems || [groupedItem];
     if (itemsToUpdate.length === 0) return;
 
     const currentStatus = itemsToUpdate[0].kitchenStatus;
+    
+    // SEGURIDAD: Prevenir que la orden pase a "Entregada" si aún no está lista o si ya lo está. 
+    // Ignorará clics accidentales si el pedido está 'PENDING' o 'IN_PREPARATION'
+    if (currentStatus !== 'READY' && currentStatus !== 'DELIVERED') {
+        console.warn("Acción denegada: No se puede cambiar la entrega de un producto que no está marcado como READY en cocina.");
+        return;
+    }
+
     const newStatus = currentStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
     
     try {

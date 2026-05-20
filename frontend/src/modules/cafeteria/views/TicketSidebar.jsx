@@ -334,17 +334,28 @@ export const TicketSidebar = ({
                               <div className="flex items-center gap-2">
                                 {item.enviadoCocina ? (
                                   <button 
-                                    // SOLUCIÓN: Pasamos el 'item' completo (que tiene adentro los _groupedItems) para actualizar TODOS a la vez
                                     onClick={() => toggleDeliveredStatus(item)} 
-                                    disabled={orderStatus === 'PAID' || isCuentaPagada} 
+                                    disabled={
+                                      orderStatus === 'PAID' || 
+                                      isCuentaPagada || 
+                                      (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')
+                                    } 
                                     className={clsx(
-                                      "flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border uppercase transition-colors", 
+                                      "flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border uppercase transition-all duration-300", 
                                       item.kitchenStatus === 'DELIVERED' 
-                                        ? "text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/20" 
-                                        : "text-orange-500 dark:text-orange-400 bg-orange-500/10 border-orange-500/20 active:scale-95"
+                                        ? "text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/20 cursor-pointer" 
+                                        : item.kitchenStatus === 'READY'
+                                        ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/40 shadow-sm shadow-blue-500/20 active:scale-95 cursor-pointer"
+                                        : "text-orange-500 dark:text-orange-400 bg-orange-500/10 border-orange-500/20 opacity-60 cursor-not-allowed"
                                     )}
                                   >
-                                    {item.kitchenStatus === 'DELIVERED' ? <><CheckCircle size={10} /> Entregado</> : <><ChefHat size={10} /> En cocina (Tocar)</>}
+                                    {item.kitchenStatus === 'DELIVERED' ? (
+                                      <><CheckCircle size={12} /> Entregado</>
+                                    ) : item.kitchenStatus === 'READY' ? (
+                                      <><CheckCircle size={12} className="animate-pulse" /> Confirmar Entrega</>
+                                    ) : (
+                                      <><ChefHat size={12} /> En Preparación</>
+                                    )}
                                   </button>
                                 ) : (
                                   <span className="flex items-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 px-2 py-0.5 rounded-full border border-transparent uppercase tracking-tighter">
