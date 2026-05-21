@@ -15,13 +15,10 @@ export const TicketSidebar = ({
   orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
-  
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverCuenta, setDragOverCuenta] = useState(null);
-  
   const [transferModeItemId, setTransferModeItemId] = useState(null);
   const [transferQty, setTransferQty] = useState(1); 
-  
   const [dragPrompt, setDragPrompt] = useState(null);
   const scrollContainerRef = useRef(null);
 
@@ -35,7 +32,6 @@ export const TicketSidebar = ({
     setNewCuentaName('');
   };
 
-  // Función ROBUSTA para extraer y comparar las características/preparaciones
   const getPrepStr = (item) => {
     if (!item?.preparaciones || item.preparaciones.length === 0) return "";
     const p = item.preparaciones[0];
@@ -43,7 +39,6 @@ export const TicketSidebar = ({
     return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
   };
 
-  // Agrupar visualmente productos idénticos tomando en cuenta precios, estado y preparaciones exactas
   const groupedCart = availableAccs.map(cuentaName => {
     const rawItems = cart.filter(item => (item.cuenta || 'General') === cuentaName);
     const displayItems = [];
@@ -135,7 +130,6 @@ export const TicketSidebar = ({
                 <motion.div 
                   key={cuentaName} layout 
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  
                   onDragOver={(e) => { 
                     e.preventDefault(); 
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) setDragOverCuenta(cuentaName);
@@ -154,7 +148,6 @@ export const TicketSidebar = ({
                       }
                     }
                   }}
-
                   className={clsx(
                     "rounded-3xl transition-all duration-300 border-2 overflow-hidden",
                     isCuentaPagada 
@@ -229,7 +222,6 @@ export const TicketSidebar = ({
                       return (
                       <motion.div 
                         key={currentItemKey} layout
-                        
                         draggable={!isCuentaPagada}
                         onDragStart={(e) => {
                           if (isCuentaPagada) return;
@@ -238,7 +230,6 @@ export const TicketSidebar = ({
                           setTransferModeItemId(null);
                         }}
                         onDragEnd={() => setDraggedItem(null)}
-
                         className={clsx(
                           "relative group flex flex-col p-3 rounded-2xl border transition-all overflow-hidden",
                           (!isCuentaPagada) ? "cursor-grab active:cursor-grabbing" : "",
@@ -248,7 +239,6 @@ export const TicketSidebar = ({
                             : "bg-white dark:bg-gray-800 lya:bg-lya-surface border-transparent lya:border-lya-border/20 shadow-sm hover:shadow-md lya:hover:border-lya-secondary/30"
                         )}
                       >
-                        {/* OVERLAY PARA TRANSFERENCIA MÓVIL RÁPIDA */}
                         <AnimatePresence>
                           {isTransferMode && (
                             <motion.div 
@@ -414,7 +404,7 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* FOOTER */}
+      {/* FOOTER - CON LOS DOS BOTONES ÚNICOS AL IMPRIMIR CUANDO ESTÁ PAID */}
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
         
         {orderStatus === 'PAID' ? (
@@ -423,7 +413,7 @@ export const TicketSidebar = ({
                 onClick={() => onPrintTicket()} 
                 className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 active:scale-95 transition-transform"
               >
-                <Printer size={18} /><span>Imprimir Ticket</span>
+                <Printer size={18} /><span>Ticket</span>
               </button>
               <button 
                 onClick={onCloseTable} 

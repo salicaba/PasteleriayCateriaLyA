@@ -1,3 +1,4 @@
+// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
@@ -111,7 +112,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const simulateKitchenSend = async (onComplete = null) => {
     const itemsNuevos = cart.filter(p => !p.enviadoCocina);
-    if (itemsNuevos.length === 0) return;
+    if (itemsNuevos.length === 0) {
+        if (onComplete) onComplete();
+        return;
+    }
 
     setIsSuccess(true);
     try {
@@ -171,6 +175,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       }, 1500);
     } catch (error) { 
         setIsSuccess(false); 
+        if (onComplete) onComplete();
         console.error("Error al enviar a cocina:", error);
     }
   };
@@ -301,12 +306,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
     const currentStatus = itemsToUpdate[0].kitchenStatus;
     
-    // SEGURIDAD: Prevenir que la orden pase a "Entregada" si aún no está lista o si ya lo está. 
-    // Ignorará clics accidentales si el pedido está 'PENDING' o 'IN_PREPARATION'
-    if (currentStatus !== 'READY' && currentStatus !== 'DELIVERED') {
-        console.warn("Acción denegada: No se puede cambiar la entrega de un producto que no está marcado como READY en cocina.");
-        return;
-    }
+    if (currentStatus !== 'READY' && currentStatus !== 'DELIVERED') return;
 
     const newStatus = currentStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
     
@@ -339,28 +339,37 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
-    setIsSuccess(true);
     try {
       if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { cuentaName: nombreCuenta, isFullPayment: false });
       setPaidAccounts(prev => [...prev, nombreCuenta]);
-      setTimeout(() => { if (onComplete) onComplete(); setIsSuccess(false); }, 1500);
-    } catch (error) { setIsSuccess(false); }
+      if (onComplete) onComplete();
+    } catch (error) { console.error("Error al pagar cuenta parcial", error); }
   };
 
   const handleCheckout = async (paymentDetails, onComplete) => {
-    setIsSuccess(true);
     try {
-      if (cart.some(p => !p.enviadoCocina)) await simulateKitchenSend();
+      if (cart.some(p => !p.enviadoCocina)) {
+         await new Promise(resolve => simulateKitchenSend(resolve));
+      }
       if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { isFullPayment: true });
       setOrderStatus('PAID');
-      setTimeout(() => { if (onComplete) onComplete(); setIsSuccess(false); }, 1500);
-    } catch (error) { setIsSuccess(false); }
+      if (onComplete) onComplete();
+    } catch (error) { console.error("Error al finalizar pago total", error); }
   };
 
   const handleCloseTable = async (onComplete) => {
       if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/close`);
       setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
       if(onComplete) onComplete();
+  };
+
+  const handlePrintTicket = async (cuentaName = null) => {
+    if (!activeOrderId) return;
+    try {
+      await client.post(`/pos/orders/${activeOrderId}/print`, { cuentaName });
+    } catch (error) {
+      console.error("Error al mandar a imprimir el ticket:", error);
+    }
   };
 
   const total = useMemo(() => cart.reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
@@ -377,7 +386,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   return { 
     cart, total, unsentTotal, hasUnsentItems, addToCart, removeFromCart, deleteLine, moveItemToCuenta, toggleDeliveredStatus,
     filtroTexto, setFiltroTexto, categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
-    handleCheckout, handleCloseTable, simulateKitchenSend, isSuccess,
+    handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     dbCategories, orderStatus, paidAccounts, validateAllDelivered
   };

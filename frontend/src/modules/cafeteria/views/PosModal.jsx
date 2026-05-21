@@ -11,6 +11,7 @@ import { SuccessScreen } from './SuccessScreen';
 import { ProductOptionsModal } from './ProductOptionsModal';
 import { CheckoutModal } from './CheckoutModal'; 
 import { OpcionesMesaModal } from './OpcionesMesaModal';
+import { TicketPreviewModal } from './TicketPreviewModal';
 
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } }, exit: { y: "100%", opacity: 0 } };
@@ -20,9 +21,11 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
-  
-  // NUEVO ESTADO PARA LA ALERTA PERSONALIZADA
   const [alertMessage, setAlertMessage] = useState(null);
+  const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+  
+  // Controla si se muestra la vista previa del ticket
+  const [previewTicketData, setPreviewTicketData] = useState(null);
   
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
@@ -67,13 +70,50 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     const { amountPaid, targetType, cuentaName } = paymentDetails;
     setShowCheckout(false);
 
-    if (targetType === 'partial' && cuentaName) { payCuenta(cuentaName, paymentDetails, () => { if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); }); return; }
+    if (targetType === 'partial' && cuentaName) { 
+      payCuenta(cuentaName, paymentDetails, () => { 
+        if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
+        setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${cuentaName}" ha sido pagada exitosamente.` });
+        setTimeout(() => setPaymentSuccessData(null), 1800);
+      }); 
+      return; 
+    }
+    
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
-    if (onPagoParcial) onPagoParcial(mesa.id, amountPaid);
-    handleCheckout(paymentDetails, () => {});
+    
+    handleCheckout(paymentDetails, () => {
+       setPaymentSuccessData({ title: '¡Mesa Cobrada!', message: `El total de la mesa ha sido pagado exitosamente.` });
+       setTimeout(() => setPaymentSuccessData(null), 1800);
+    });
   };
 
-  const finalizeTable = () => { handleCloseTable(() => { if (onTableRelease) onTableRelease(mesa.id); onClose(); }); };
+  const finalizeTable = () => { 
+    if (onPagoParcial && total > 0) onPagoParcial(mesa.id, total);
+    handleCloseTable(() => { 
+      if (onTableRelease) onTableRelease(mesa.id); 
+      onClose(); 
+    }); 
+  };
+
+  // Abre la vista previa en lugar de mandar al backend a ciegas
+  const openTicketPreview = (cuentaName = null) => {
+    setPreviewTicketData({ cuentaName });
+  };
+
+  // Se ejecuta al presionar "Imprimir" dentro de la vista previa
+  const executeRealPrint = async () => {
+    const targetCuenta = previewTicketData.cuentaName;
+    setPreviewTicketData(null); 
+    
+    setPaymentSuccessData({
+      title: '¡Imprimiendo!',
+      message: 'El ticket se ha enviado a la impresora.'
+    });
+
+    await handlePrintTicket(targetCuenta);
+
+    setTimeout(() => setPaymentSuccessData(null), 2000);
+  };
 
   if (!isOpen || !mesa) return null;
 
@@ -83,7 +123,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
-    orderStatus, paidAccounts, onPrintTicket: handlePrintTicket, onCloseTable: finalizeTable,
+    orderStatus, paidAccounts, 
+    onPrintTicket: openTicketPreview, 
+    onCloseTable: finalizeTable,
     toggleDeliveredStatus
   };
 
@@ -244,8 +286,49 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           </div>
         </motion.div>
 
+        {/* MODAL DE VISTA PREVIA DEL TICKET CON WHATSAPP INCORPORADO */}
+        <TicketPreviewModal 
+          isOpen={!!previewTicketData}
+          onClose={() => setPreviewTicketData(null)}
+          cart={cart}
+          mesa={mesa}
+          cuentaName={previewTicketData?.cuentaName}
+          onConfirmPrint={executeRealPrint}
+          onSendWhatsApp={(number, items, totalToPrint) => {
+             setPreviewTicketData(null); 
+             
+             // Generamos la URL dinámica apuntando a la ruta que acabamos de crear en el backend.
+             // NOTA IMPORTANTE: Cuando lo subas a internet, cambia "http://localhost:4000" por el dominio de tu servidor.
+             const ticketUrl = `http://localhost:4000/api/pos/orders/${mesa.orderId}/share${previewTicketData?.cuentaName ? `?cuenta=${encodeURIComponent(previewTicketData.cuentaName)}` : ''}`;
+             
+             // Armamos el texto enriquecido para WhatsApp
+             const mensajeWhatsApp = `🧁 *𝓛𝔂𝓐 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${ticketUrl}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+             
+             // Usamos la API de WhatsApp web/móvil para mandar el mensaje
+             const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${number}&text=${encodeURIComponent(mensajeWhatsApp)}`;
+             window.open(urlApiWhatsApp, '_blank');
+             
+             setPaymentSuccessData({
+                title: '¡Enlace Creado!',
+                message: 'El ticket digital ha sido preparado para WhatsApp.'
+             });
+             setTimeout(() => setPaymentSuccessData(null), 1800);
+          }}
+        />
+
+        {/* NOTIFICACIONES REUTILIZANDO EL MISMO COMPONENTE "SuccessScreen" */}
         <AnimatePresence>
-          {isSuccess && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]"><SuccessScreen /></motion.div>)}
+          {isSuccess && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]">
+              <SuccessScreen />
+            </motion.div>
+          )}
+
+          {paymentSuccessData && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[110]">
+              <SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} />
+            </motion.div>
+          )}
           
           {selectedProduct && (<ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />)}
           
@@ -281,11 +364,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
             />
           )}
 
-          {/* MODAL BONITO DE ALERTA PARA PAGOS */}
           {alertMessage && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
             >
               <motion.div 
                 initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} 

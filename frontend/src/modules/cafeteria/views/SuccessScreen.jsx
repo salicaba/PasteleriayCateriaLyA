@@ -1,45 +1,57 @@
+// src/modules/cafeteria/views/SuccessScreen.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 
-export const SuccessScreen = () => {
+export const SuccessScreen = ({ 
+  title = "¡Orden Enviada!", 
+  message = "Imprimiendo en cocina..." 
+}) => {
   return (
-    <div className="absolute inset-0 z-[60] bg-white/90 backdrop-blur-md flex flex-col items-center justify-center">
+    <div className="absolute inset-0 z-[60] bg-black/60 lya:bg-black/50 backdrop-blur-md flex flex-col items-center justify-center p-4">
       
-      {/* Círculo Animado */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 15 }}
-        className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center shadow-xl shadow-green-200 mb-6"
+      {/* Tarjetita (Card) */}
+      <motion.div 
+        initial={{ scale: 0.8, opacity: 0, y: 20 }} 
+        animate={{ scale: 1, opacity: 1, y: 0 }} 
+        exit={{ scale: 0.8, opacity: 0, y: 20 }} 
+        className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-8 w-full max-w-sm shadow-2xl flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
       >
+        {/* Círculo Animado */}
         <motion.div
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+          className="w-24 h-24 bg-green-50 dark:bg-green-500/10 lya:bg-lya-primary/10 text-green-500 rounded-full flex items-center justify-center shadow-inner mb-6"
         >
-          <Check size={48} color="white" strokeWidth={4} />
+          <motion.div
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <Check size={48} strokeWidth={3} className="text-green-500 lya:text-lya-primary" />
+          </motion.div>
         </motion.div>
-      </motion.div>
 
-      {/* Texto Animado */}
-      <motion.h2 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="text-2xl font-black text-gray-800 mb-2"
-      >
-        ¡Orden Enviada!
-      </motion.h2>
-      
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="text-gray-400 font-medium"
-      >
-        Imprimiendo en cocina...
-      </motion.p>
+        {/* Texto Animado */}
+        <motion.h2 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 uppercase tracking-tight"
+        >
+          {title}
+        </motion.h2>
+        
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70"
+        >
+          {message}
+        </motion.p>
+      </motion.div>
     </div>
   );
 };
