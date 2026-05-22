@@ -1,6 +1,5 @@
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
-import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
 // Obtener todos los pedidos
 export const getPedidos = async (req, res) => {
@@ -101,7 +100,7 @@ export const updatePedido = async (req, res) => {
 };
 
 // ==========================================
-// 🖨️ IMPRIMIR TICKET TÉRMICO (CONSOLA / MOCK)
+// 🖨️ IMPRIMIR TICKET (MOCK NATIVO EN CONSOLA)
 // ==========================================
 export const printPedidoTicket = async (req, res) => {
   try {
@@ -119,86 +118,45 @@ export const printPedidoTicket = async (req, res) => {
       weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' 
     });
 
-    let printer = new ThermalPrinter({
-      type: PrinterTypes.EPSON,      
-      characterSet: CharacterSet.PC852_LATIN2,
-      removeSpecialCharacters: false,
-      width: 42,
-    });
-
-    printer.alignCenter();
-    printer.setTextDoubleHeight();
-    printer.setTextDoubleWidth();
-    printer.println("LyA"); 
-    
-    printer.setTextNormal();
-    printer.bold(true);
-    printer.println("Pasteleria & Cafeteria");
-    printer.bold(false);
-    printer.println("Pijijiapan, Chiapas");
-    printer.drawLine();
-    
-    printer.alignCenter();
-    printer.bold(true);
-    printer.println("COMPROBANTE DE PEDIDO");
-    printer.setTextDoubleHeight();
-    printer.println(pedido.id);
-    printer.setTextNormal();
-    printer.bold(false);
-    printer.drawLine();
-
-    printer.alignLeft();
-    printer.println(`Cliente: ${pedido.cliente || 'Publico General'}`);
-    printer.println(`Telefono: ${pedido.telefono || 'N/A'}`);
-    printer.println(`Entrega: ${fecha}`);
-    
-    // Validación de seguridad para toUpperCase()
     const tipoEntregaStr = pedido.tipoEntrega || 'sucursal';
-    printer.println(`Tipo: ${tipoEntregaStr.toUpperCase()}`);
-    
-    printer.drawLine();
-    printer.bold(true);
-    printer.println("DETALLES DEL PASTEL:");
-    printer.bold(false);
-    
-    // Validaciones de seguridad por si las porciones o sabores vienen vacíos
     const porcionesSeguras = Array.isArray(pedido.porciones) ? pedido.porciones.join(' / ') : (pedido.porciones || '');
-    if (porcionesSeguras) printer.println(`Tamano: ${porcionesSeguras}`);
-    
     const saboresSeguros = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
-    if (saboresSeguros) printer.println(`Sabores: ${saboresSeguros}`);
-    
-    printer.println(`Desc: ${pedido.descripcion || 'Ninguna'}`);
-    
-    printer.drawLine();
-    printer.alignRight();
-    printer.println(`Costo Total: $${costoTotal.toFixed(2)}`);
-    printer.println(`Abonado: $${totalPagado.toFixed(2)}`);
-    
-    printer.drawLine();
-    printer.bold(true);
-    printer.setTextDoubleHeight();
-    printer.println(`RESTA: $${deuda.toFixed(2)}`);
-    printer.setTextNormal();
-    printer.bold(false);
-    
-    printer.drawLine();
-    printer.alignCenter();
+
+    // Dibujamos el ticket a mano en la consola sin usar librerías externas
+    console.log(`\n==========================================`);
+    console.log(`                   𝓛𝔂𝓐`);
+    console.log(`          Pastelería & Cafetería`);
+    console.log(`           Pijijiapan, Chiapas`);
+    console.log(`------------------------------------------`);
+    console.log(`           COMPROBANTE DE PEDIDO`);
+    console.log(`                ${pedido.id}`);
+    console.log(`------------------------------------------`);
+    console.log(`Cliente:  ${pedido.cliente || 'Público General'}`);
+    console.log(`Teléfono: ${pedido.telefono || 'N/A'}`);
+    console.log(`Entrega:  ${fecha}`);
+    console.log(`Tipo:     ${tipoEntregaStr.toUpperCase()}`);
+    console.log(`------------------------------------------`);
+    console.log(`DETALLES DEL PASTEL:`);
+    if (porcionesSeguras) console.log(`Tamaño:   ${porcionesSeguras}`);
+    if (saboresSeguros)   console.log(`Sabores:  ${saboresSeguros}`);
+    console.log(`Desc:     ${pedido.descripcion || 'Ninguna'}`);
+    console.log(`------------------------------------------`);
+    console.log(`Costo Total:  $${costoTotal.toFixed(2)}`);
+    console.log(`Abonado:      $${totalPagado.toFixed(2)}`);
+    console.log(`------------------------------------------`);
+    console.log(`RESTA:        $${deuda.toFixed(2)}`);
+    console.log(`------------------------------------------`);
     if (deuda > 0) {
-      printer.println("El pedido debe estar liquidado");
-      printer.println("al momento de su entrega.");
+      console.log(`    El pedido debe estar liquidado al`);
+      console.log(`          momento de su entrega.`);
     }
-    printer.println("*** TICKET SIMULADO ***");
-    printer.println("¡Gracias por su preferencia!");
-    printer.cut(); 
+    console.log(`          *** TICKET SIMULADO ***`);
+    console.log(`        ¡Gracias por su preferencia!`);
+    console.log(`==========================================\n`);
 
-    console.log(`\n=== TICKET PARA PEDIDO ${id} ===`);
-    console.log(printer.getText());
-    console.log(`==================================\n`);
-
-    res.json({ message: 'Ticket de pastelería enviado a impresión exitosamente' });
+    res.json({ message: 'Ticket de pastelería enviado a impresión simulada exitosamente' });
   } catch (error) {
-    console.error('❌ Error al intentar imprimir el ticket de pastelería:', error);
+    console.error('❌ Error al intentar simular la impresión del ticket:', error);
     res.status(500).json({ message: 'Error al intentar imprimir el ticket', error: error.message });
   }
 };
@@ -231,7 +189,6 @@ export const sharePedidoTicket = async (req, res) => {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    // Validaciones para el HTML web
     const porcionesHtml = Array.isArray(pedido.porciones) ? pedido.porciones.join(' / ') : (pedido.porciones || '');
     const saboresHtml = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
