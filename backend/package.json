@@ -20,6 +20,7 @@
     "firebase-admin": "^13.8.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.22.1",
+    "node-thermal-printer": "^4.6.0",
     "sequelize": "^6.37.8"
   },
   "devDependencies": {

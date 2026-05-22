@@ -24,9 +24,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [alertMessage, setAlertMessage] = useState(null);
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
   
-  // Controla si se muestra la vista previa del ticket
   const [previewTicketData, setPreviewTicketData] = useState(null);
-  
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
   const { 
@@ -95,24 +93,29 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     }); 
   };
 
-  // Abre la vista previa en lugar de mandar al backend a ciegas
   const openTicketPreview = (cuentaName = null) => {
     setPreviewTicketData({ cuentaName });
   };
 
-  // Se ejecuta al presionar "Imprimir" dentro de la vista previa
+  // =========================================================================
+  // 🔥 NUEVA LÓGICA DE IMPRESIÓN DIRECTA CON EL MENSAJE CORRECTO
+  // =========================================================================
   const executeRealPrint = async () => {
     const targetCuenta = previewTicketData.cuentaName;
     setPreviewTicketData(null); 
     
     setPaymentSuccessData({
-      title: '¡Imprimiendo!',
-      message: 'El ticket se ha enviado a la impresora.'
+      title: '¡Enviado a Impresora!',
+      message: 'El ticket se está imprimiendo.'
     });
 
-    await handlePrintTicket(targetCuenta);
+    try {
+      await handlePrintTicket(targetCuenta);
+    } catch (error) {
+      console.error("Fallo al imprimir:", error);
+    }
 
-    setTimeout(() => setPaymentSuccessData(null), 2000);
+    setTimeout(() => setPaymentSuccessData(null), 1800);
   };
 
   if (!isOpen || !mesa) return null;
@@ -132,7 +135,16 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const isLlevar = mesa.zona === 'llevar';
   const partesNumero = (mesa.numero || '').toString().split(' - ');
   const numeroReal = partesNumero[0]; 
-  const nombreCliente = partesNumero.length > 1 ? partesNumero.slice(1).join(' - ') : 'MOSTRADOR'; 
+  
+  let nombreCliente = 'MOSTRADOR';
+  if (partesNumero.length > 1) {
+    const ultimaParteDigitos = partesNumero[partesNumero.length - 1].replace(/\D/g, '');
+    if (isLlevar && partesNumero.length > 2 && ultimaParteDigitos.length >= 10) {
+      nombreCliente = partesNumero.slice(1, -1).join(' - ');
+    } else {
+      nombreCliente = partesNumero.slice(1).join(' - ');
+    }
+  }
 
   return (
     <AnimatePresence>

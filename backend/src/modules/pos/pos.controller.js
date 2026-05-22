@@ -2,6 +2,7 @@ import Order from './Order.model.js';
 import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
+import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
 // ==========================================
 // 🛒 CREAR O RECUPERAR ORDEN (Evita duplicados)
@@ -298,7 +299,7 @@ export const moveItemAccount = async (req, res) => {
 };
 
 // ==========================================
-// 🖨️ IMPRIMIR TICKET (CONSOLA BACKEND)
+// 🖨️ IMPRIMIR TICKET (CONSOLA BACKEND / MOCK)
 // ==========================================
 export const printOrderTicket = async (req, res) => {
   try {
@@ -320,9 +321,85 @@ export const printOrderTicket = async (req, res) => {
       return res.status(404).json({ message: 'Orden no encontrada para imprimir' });
     }
 
-    console.log(`[IMPRESIÓN] Ticket enviado para la orden: ${orderId} - Cuenta: ${cuentaName || 'Toda la mesa'}`);
+    // 1. CONFIGURACIÓN MODO SIMULACIÓN (SIN INTERFAZ NI DRIVER)
+    let printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,      
+      // AL NO PONER INTERFAZ, EVITAMOS QUE BUSQUE DRIVERS FÍSICOS
+      characterSet: CharacterSet.PC852_LATIN2,
+      removeSpecialCharacters: false,
+      width: 42,
+    });
+
+    // 2. CONSTRUIR EL TICKET
+    printer.alignCenter();
+    printer.setTextDoubleHeight();
+    printer.setTextDoubleWidth();
+    printer.println("LyA"); 
+    
+    printer.setTextNormal();
+    printer.bold(true);
+    printer.println("Pasteleria & Cafeteria");
+    printer.bold(false);
+    printer.println("Pijijiapan, Chiapas");
+    
+    printer.drawLine();
+    
+    // Datos de la orden
+    printer.alignLeft();
+    printer.println(`Fecha: ${new Date().toLocaleString()}`);
+    const isLlevar = order.orderType === 'LLEVAR';
+    printer.println(`Servicio: ${isLlevar ? `Llevar #${order.ticketId}` : `Mesa #${order.table?.number}`}`);
+    if(cuentaName && cuentaName !== 'General') {
+      printer.println(`Cuenta: ${cuentaName}`);
+    }
+    
+    printer.drawLine();
+
+    // Filtrar items si se pidió imprimir una cuenta específica
+    let itemsToPrint = order.items || [];
+    if (cuentaName && cuentaName !== 'General') {
+      itemsToPrint = itemsToPrint.filter(i => i.cuenta === cuentaName);
+    }
+
+    // Imprimir los productos en formato tabla
+    let total = 0;
+    printer.tableCustom([
+      { text: "Cant", align: "LEFT", width: 0.15 },
+      { text: "Desc", align: "LEFT", width: 0.55 },
+      { text: "Imp", align: "RIGHT", width: 0.30 }
+    ]);
+
+    itemsToPrint.forEach(item => {
+      const subtotal = Number(item.subtotal);
+      total += subtotal;
+      printer.tableCustom([
+        { text: item.quantity.toString(), align: "LEFT", width: 0.15 },
+        { text: item.product?.name || "Producto", align: "LEFT", width: 0.55 },
+        { text: `$${subtotal.toFixed(2)}`, align: "RIGHT", width: 0.30 }
+      ]);
+    });
+
+    printer.drawLine();
+    printer.alignRight();
+    printer.setTextDoubleHeight();
+    printer.println(`TOTAL: $${total.toFixed(2)}`);
+    printer.setTextNormal();
+    
+    printer.drawLine();
+    printer.alignCenter();
+    printer.println("*** TICKET SIMULADO ***");
+    printer.println("¡Gracias por su preferencia!");
+    printer.cut(); 
+
+    // 3. EXTRAER Y MOSTRAR EN LA TERMINAL (MOCK)
+    // Usamos getText() para obtener la representación legible del buffer térmico
+    console.log(`\n=== TICKET PARA ORDEN ${orderId} ===`);
+    console.log(printer.getText());
+    console.log(`==================================\n`);
+
     res.json({ message: 'Ticket enviado a impresión exitosamente' });
   } catch (error) {
+    console.error('❌ Error al intentar imprimir el ticket:', error);
     res.status(500).json({ message: 'Error al intentar imprimir el ticket', error: error.message });
   }
 };

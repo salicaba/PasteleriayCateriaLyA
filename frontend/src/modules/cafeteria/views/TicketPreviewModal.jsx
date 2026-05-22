@@ -1,11 +1,28 @@
 // src/modules/cafeteria/views/TicketPreviewModal.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Printer, X, MessageCircle } from 'lucide-react';
 
 export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, onConfirmPrint, onSendWhatsApp }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   
+  // Efecto para auto-completar el teléfono si viene en el string de la mesa (Para Llevar)
+  useEffect(() => {
+    if (isOpen && mesa) {
+      const partes = (mesa.numero || '').toString().split(' - ');
+      if (mesa.zona === 'llevar' && partes.length > 2) {
+        // Extraemos solo los dígitos de la última parte por seguridad
+        const posibleTelefono = partes[partes.length - 1].replace(/\D/g, '');
+        if (posibleTelefono.length >= 10) {
+          setPhoneNumber(posibleTelefono.slice(0, 10));
+          return;
+        }
+      }
+      // Reseteamos si no es una orden con teléfono
+      setPhoneNumber('');
+    }
+  }, [isOpen, mesa]);
+
   if (!isOpen) return null;
 
   // Filtrar los productos por cuenta si se seleccionó una en específico, si no, se usan todos
@@ -18,56 +35,23 @@ export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, on
   const isLlevar = mesa?.zona === 'llevar';
   const partesNumero = (mesa?.numero || '').toString().split(' - ');
   const numeroReal = partesNumero[0]; 
-  const nombreCliente = partesNumero.length > 1 ? partesNumero.slice(1).join(' - ') : 'MOSTRADOR';
+  
+  // Extraemos el nombre aislando el teléfono para no imprimirlo junto al cliente
+  let nombreCliente = 'MOSTRADOR';
+  if (partesNumero.length > 1) {
+    const ultimaParteDigitos = partesNumero[partesNumero.length - 1].replace(/\D/g, '');
+    if (isLlevar && partesNumero.length > 2 && ultimaParteDigitos.length >= 10) {
+      nombreCliente = partesNumero.slice(1, -1).join(' - ');
+    } else {
+      nombreCliente = partesNumero.slice(1).join(' - ');
+    }
+  }
 
+  // =======================================================================
+  // 🔥 IMPRESIÓN DIRECTA: Ya no abrimos la ventana del navegador.
+  // Solo avisamos al componente padre que mande la petición al Backend.
+  // =======================================================================
   const handlePhysicalPrint = () => {
-    const printContent = document.getElementById('printable-ticket-content').innerHTML;
-    const iframe = document.createElement('iframe');
-    
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const style = `
-      <style>
-        @page { margin: 0; size: 80mm auto; }
-        body { font-family: 'Courier New', Courier, monospace; padding: 10px; color: black; background: white; margin: 0; font-size: 12px; box-sizing: border-box; }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .font-bold { font-weight: bold; }
-        .font-black { font-weight: 900; }
-        .text-3xl { font-size: 30px; }
-        .border-dashed { border-top: 1px dashed black; margin: 8px 0; }
-        .flex-between { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
-        .mt-1 { margin-top: 4px; }
-        .mt-2 { margin-top: 8px; }
-        .mt-3 { margin-top: 12px; }
-        .mt-4 { margin-top: 16px; }
-        .mb-1 { margin-bottom: 4px; }
-        .mb-2 { margin-bottom: 8px; }
-        .mb-4 { margin-bottom: 16px; }
-        .uppercase { text-transform: uppercase; }
-        .h-8 { height: 32px; }
-        .account-header { font-weight: bold; text-transform: uppercase; padding: 4px 0; border-bottom: 1px dashed #ccc; margin-top: 6px; font-size: 11px; }
-      </style>
-    `;
-
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(`<html><head>${style}</head><body>${printContent}</body></html>`);
-    doc.close();
-
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
-
     onConfirmPrint();
   };
 
@@ -103,7 +87,7 @@ export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, on
           </button>
         </div>
 
-        {/* TICKET VISUAL */}
+        {/* TICKET VISUAL (Mantenemos la vista previa intacta para que la veas en pantalla) */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar bg-gray-200 dark:bg-gray-950 w-full relative block">
           <div 
             id="printable-ticket-content" 
