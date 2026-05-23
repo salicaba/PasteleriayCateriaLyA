@@ -17,41 +17,28 @@ const motivationalPhrases = [
 ];
 
 export const LoginScreen = ({ onLogin }) => {
-  // Estados de Autenticación
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotMode, setShowForgotMode] = useState(false);
-
-  // Estados de la Pantalla de Arranque (Splash Screen)
-  const [bootState, setBootState] = useState('booting'); // 'booting', 'error', 'ready'
+  const [bootState, setBootState] = useState('booting'); 
   const [phrase, setPhrase] = useState('');
 
-  // Efecto de Arranque Inicial y Chequeo de Red Real
   const runSystemCheck = async () => {
     setBootState('booting');
-    
-    // Seleccionamos una frase aleatoria
     const randomPhrase = motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
     setPhrase(randomPhrase);
 
-    // 1. Verificación local rápida de internet
     if (!navigator.onLine) {
-      setTimeout(() => setBootState('error'), 1500); // Pequeño delay por UX
+      setTimeout(() => setBootState('error'), 1500);
       return;
     }
 
     try {
-      // 2. Conexión Real al Servidor Node.js
-      // Hacemos una petición ligera para verificar que el backend responda
       await client.get('/settings');
-      
-      // Si el servidor responde muy rápido, mantenemos la pantalla de carga 1.5s 
-      // para que el usuario alcance a leer el mensaje motivador (UX)
       setTimeout(() => {
         setBootState('ready');
       }, 1500);
-
     } catch (error) {
       console.error("Fallo al conectar con el servidor backend:", error);
       setBootState('error');
@@ -71,24 +58,24 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // --- LOGIN REAL CON BASE DE DATOS ---
       const response = await client.post('/auth/login', { username, password });
       
       if (response.data && response.data.user) {
         const loggedUser = response.data.user;
         
+        // --- EXTRAEMOS SOLO EL PRIMER NOMBRE ---
+        const firstName = loggedUser.fullName ? loggedUser.fullName.split(' ')[0] : loggedUser.username;
+        
         if (loggedUser.role === 'Administrador') {
-          toast.success(`¡Bienvenido de vuelta, ${loggedUser.name}!`);
+          toast.success(`¡Bienvenido de vuelta, ${firstName}!`);
         } else {
-          toast.success(`Turno iniciado: ${loggedUser.name}`);
+          toast.success(`Turno iniciado: ${firstName}`);
         }
         
-        // Pasamos el usuario verificado a App.jsx
         onLogin(loggedUser);
       }
     } catch (error) {
       console.error("Error en inicio de sesión:", error);
-      // Mostramos el error real que envíe el backend (ej. "Contraseña incorrecta" o "Usuario inactivo")
       const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
       toast.error(errorMsg);
     } finally {
@@ -99,15 +86,11 @@ export const LoginScreen = ({ onLogin }) => {
   return (
     <div className="min-h-screen w-full bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
       
-      {/* Círculos decorativos de fondo (Estilo Apple / Modern Glassmorphism) */}
       <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-orange-500/20 lya:bg-lya-primary/20 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/20 lya:bg-lya-secondary/20 rounded-full blur-[100px] pointer-events-none" />
 
       <AnimatePresence mode="wait">
         
-        {/* =========================================
-            1. PANTALLA DE ARRANQUE / CARGA (SPLASH)
-        ========================================= */}
         {bootState === 'booting' && (
           <motion.div 
             key="splash"
@@ -142,9 +125,6 @@ export const LoginScreen = ({ onLogin }) => {
           </motion.div>
         )}
 
-        {/* =========================================
-            2. PANTALLA DE ERROR DE CONEXIÓN
-        ========================================= */}
         {bootState === 'error' && (
           <motion.div 
             key="error"
@@ -169,9 +149,6 @@ export const LoginScreen = ({ onLogin }) => {
           </motion.div>
         )}
 
-        {/* =========================================
-            3. PANTALLA DE LOGIN (LISTO)
-        ========================================= */}
         {bootState === 'ready' && (
           <motion.div 
             key="login"
@@ -181,7 +158,6 @@ export const LoginScreen = ({ onLogin }) => {
           >
             <div className="p-8 sm:p-10">
               
-              {/* LOGO Y CABECERA */}
               <div className="flex flex-col items-center mb-8">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-xl mb-6">
                   <img src={logoLyA} alt="Pastelería LyA" className="w-full h-full object-cover" />
@@ -196,7 +172,6 @@ export const LoginScreen = ({ onLogin }) => {
 
               <AnimatePresence mode="wait">
                 {!showForgotMode ? (
-                  /* --- MODO: FORMULARIO DE LOGIN --- */
                   <motion.form 
                     key="login-form"
                     initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}
@@ -239,7 +214,6 @@ export const LoginScreen = ({ onLogin }) => {
                     </button>
                   </motion.form>
                 ) : (
-                  /* --- MODO: OLVIDÉ MIS DATOS --- */
                   <motion.div 
                     key="forgot-form"
                     initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}
@@ -269,7 +243,6 @@ export const LoginScreen = ({ onLogin }) => {
         )}
       </AnimatePresence>
       
-      {/* Footer / Info del sistema */}
       <div className="absolute bottom-6 text-center w-full pointer-events-none z-0">
         <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/40 tracking-wider">
           SISTEMA POS <b>𝓛𝔂𝓐</b> • VERSIÓN 1.0.0

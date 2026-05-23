@@ -8,6 +8,10 @@ const User = sequelize.define('User', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  fullName: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   username: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -18,9 +22,9 @@ const User = sequelize.define('User', {
     allowNull: false,
   },
   role: {
-    type: DataTypes.ENUM('Owner', 'Employee'),
+    type: DataTypes.ENUM('Administrador', 'Empleado'),
     allowNull: false,
-    defaultValue: 'Employee',
+    defaultValue: 'Empleado',
   },
   isActive: {
     type: DataTypes.BOOLEAN,
@@ -28,6 +32,7 @@ const User = sequelize.define('User', {
   }
 }, {
   timestamps: true,
+  tableName: 'Users'
 });
 
 export default User;

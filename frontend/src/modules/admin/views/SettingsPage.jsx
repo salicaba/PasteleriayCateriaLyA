@@ -306,8 +306,8 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm font-bold"
                     >
-                      <option value="Empleado">Empleado (Solo Ventas y Agenda)</option>
-                      <option value="Administrador">Administrador (Acceso Total)</option>
+                      <option value="Empleado">Empleado</option>
+                      <option value="Administrador">Administrador</option>
                     </select>
                   </div>
                   <div className="pt-2 flex gap-2">

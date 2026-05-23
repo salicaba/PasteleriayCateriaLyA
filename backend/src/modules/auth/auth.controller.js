@@ -1,3 +1,4 @@
+// src/modules/auth/auth.controller.js
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../users/User.model.js';
@@ -7,36 +8,39 @@ export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    console.log(`Llegó desde React -> Usuario: "${username}" | Contraseña: "${password}"`);
+    console.log(`Intento de acceso a 𝓛𝔂𝓐 -> Usuario: "${username}"`);
 
     // 1. Buscar al usuario en la base de datos
     const user = await User.findOne({ where: { username } });
     
+    // Si no existe o está inactivo, devolvemos el mismo error genérico por seguridad
     if (!user || !user.isActive) {
-      return res.status(404).json({ message: 'Usuario no encontrado o inactivo.' });
+      return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
     }
 
     // 2. Comparar la contraseña enviada con el hash de la base de datos
     const isMatch = await bcrypt.compare(password, user.password);
     
     if (!isMatch) {
-      return res.status(401).json({ message: 'Credenciales inválidas.' });
+      return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
     }
 
-    // 3. Generar el Token (JWT) con los datos del usuario y el rol
+    // 3. Generar el Token (JWT) incluyendo el nombre completo
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
       process.env.JWT_SECRET,
-      { expiresIn: '12h' } // El token expira en 12 horas
+      { expiresIn: '12h' }
     );
 
+    // Devolvemos el fullName al frontend
     res.json({
       message: 'Login exitoso',
       token,
       user: {
         id: user.id,
         username: user.username,
-        role: user.role
+        role: user.role,
+        fullName: user.fullName
       }
     });
   } catch (error) {
@@ -44,25 +48,30 @@ export const login = async (req, res) => {
   }
 };
 
-// POST: Registro de prueba (Solo para desarrollo)
+// POST: Registro de prueba (Modificado para recibir fullName)
 export const registerTestUser = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { fullName, username, password, role } = req.body;
 
-    // Cifrar la contraseña antes de guardarla
+    if (!fullName) {
+      return res.status(400).json({ message: 'El nombre completo es requerido.' });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = await User.create({
+      fullName,
       username,
       password: hashedPassword,
-      role: role || 'Employee'
+      role: role || 'Empleado'
     });
 
     res.status(201).json({
-      message: 'Usuario de prueba creado con éxito',
+      message: 'Usuario maestro/prueba creado con éxito',
       user: {
         id: newUser.id,
+        fullName: newUser.fullName,
         username: newUser.username,
         role: newUser.role
       }
