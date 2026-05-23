@@ -1,173 +1,279 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, LogIn, Loader2, Cake, Quote, Sparkles } from 'lucide-react';
-import { useAuthController } from '../controllers/useAuthController';
-import { SplitText } from '../../../components/animations/SplitText';
+// src/modules/auth/views/LoginScreen.jsx
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import logoLyA from '../../../assets/logo.jpeg'; 
 
-const AnimatedBackground = () => {
-  const boxColors = [
-    'bg-orange-500/20 lya:bg-lya-primary/20', 
-    'bg-gray-200/20 dark:bg-gray-700/20 lya:bg-lya-border/20', 
-    'bg-orange-500/10 lya:bg-lya-primary/10', 
-    'bg-gray-900/5 dark:bg-white/5 lya:bg-lya-text/5'
-  ];
-  
-  return (
-    <div className="absolute inset-0 overflow-hidden -z-10 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-700">
-      <div className="absolute top-[-5%] left-[-5%] w-[60%] h-[60%] rounded-full bg-orange-500/15 lya:bg-lya-primary/15 blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[-5%] right-[-5%] w-[60%] h-[60%] rounded-full bg-gray-300/20 dark:bg-gray-700/20 lya:bg-lya-border/20 blur-[120px] animate-pulse" />
+// Importación de cliente habilitada para conexión real al backend
+import client from '../../../api/client'; 
 
-      {[...Array(8)].map((_, i) => (
-        <motion.div
-          key={i}
-          className={`absolute backdrop-blur-2xl border border-gray-200/30 dark:border-gray-800/30 lya:border-lya-border/30 rounded-3xl ${boxColors[i % boxColors.length]}`}
-          style={{
-            width: Math.random() * 100 + 50,
-            height: Math.random() * 100 + 50,
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-          }}
-          animate={{
-            y: [0, -40, 0],
-            rotate: [0, 180, 0],
-            scale: [1, 1.1, 1],
-            opacity: [0.2, 0.5, 0.2]
-          }}
-          transition={{
-            duration: Math.random() * 8 + 8,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-      ))}
-    </div>
-  );
-};
+const motivationalPhrases = [
+  "Preparando el aroma de un gran día...",
+  "Encendiendo los hornos de 𝓛𝔂𝓐...",
+  "La magia dulce está por comenzar...",
+  "Alistando todo para un turno excelente...",
+  "Un buen café, una sonrisa y a triunfar..."
+];
 
 export const LoginScreen = ({ onLogin }) => {
-  const {
-    email, setEmail, password, setPassword,
-    showPassword, setShowPassword, error, isLoading, handleSubmit
-  } = useAuthController(onLogin);
+  // Estados de Autenticación
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showForgotMode, setShowForgotMode] = useState(false);
 
-  const phrase1 = "La excelencia no es un acto, es un hábito.";
-  const phrase2 = "Hagamos de hoy algo delicioso.";
+  // Estados de la Pantalla de Arranque (Splash Screen)
+  const [bootState, setBootState] = useState('booting'); // 'booting', 'error', 'ready'
+  const [phrase, setPhrase] = useState('');
+
+  // Efecto de Arranque Inicial y Chequeo de Red Real
+  const runSystemCheck = async () => {
+    setBootState('booting');
+    
+    // Seleccionamos una frase aleatoria
+    const randomPhrase = motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+    setPhrase(randomPhrase);
+
+    // 1. Verificación local rápida de internet
+    if (!navigator.onLine) {
+      setTimeout(() => setBootState('error'), 1500); // Pequeño delay por UX
+      return;
+    }
+
+    try {
+      // 2. Conexión Real al Servidor Node.js
+      // Hacemos una petición ligera para verificar que el backend responda
+      await client.get('/settings');
+      
+      // Si el servidor responde muy rápido, mantenemos la pantalla de carga 1.5s 
+      // para que el usuario alcance a leer el mensaje motivador (UX)
+      setTimeout(() => {
+        setBootState('ready');
+      }, 1500);
+
+    } catch (error) {
+      console.error("Fallo al conectar con el servidor backend:", error);
+      setBootState('error');
+    }
+  };
+
+  useEffect(() => {
+    runSystemCheck();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!username || !password) {
+      return toast.error("Ingresa tus credenciales completas");
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // --- LOGIN REAL CON BASE DE DATOS ---
+      const response = await client.post('/auth/login', { username, password });
+      
+      if (response.data && response.data.user) {
+        const loggedUser = response.data.user;
+        
+        if (loggedUser.role === 'Administrador') {
+          toast.success(`¡Bienvenido de vuelta, ${loggedUser.name}!`);
+        } else {
+          toast.success(`Turno iniciado: ${loggedUser.name}`);
+        }
+        
+        // Pasamos el usuario verificado a App.jsx
+        onLogin(loggedUser);
+      }
+    } catch (error) {
+      console.error("Error en inicio de sesión:", error);
+      // Mostramos el error real que envíe el backend (ej. "Contraseña incorrecta" o "Usuario inactivo")
+      const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
+      toast.error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative overflow-y-auto md:overflow-hidden transition-colors duration-500">
+    <div className="min-h-screen w-full bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
       
-      <AnimatedBackground />
+      {/* Círculos decorativos de fondo (Estilo Apple / Modern Glassmorphism) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-orange-500/20 lya:bg-lya-primary/20 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/20 lya:bg-lya-secondary/20 rounded-full blur-[100px] pointer-events-none" />
 
-      {/* SECCIÓN DE BIENVENIDA */}
-      <div className="flex flex-col items-center justify-center p-6 md:p-12 relative flex-1 mt-8 md:mt-0">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-xl text-center space-y-6 md:space-y-8 w-full flex flex-col items-center"
-        >
-          <div className="space-y-3 md:space-y-4">
-            <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="inline-block p-3 md:p-4 bg-white/40 dark:bg-gray-900/40 lya:bg-lya-surface/40 backdrop-blur-md rounded-2xl md:rounded-3xl border border-gray-200/50 dark:border-gray-800/50 lya:border-lya-border/50 shadow-xl mb-2"
+      <AnimatePresence mode="wait">
+        
+        {/* =========================================
+            1. PANTALLA DE ARRANQUE / CARGA (SPLASH)
+        ========================================= */}
+        {bootState === 'booting' && (
+          <motion.div 
+            key="splash"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+            transition={{ duration: 0.5, ease: "easeInOut" }}
+            className="flex flex-col items-center justify-center relative z-10"
+          >
+            <motion.div 
+              animate={{ scale: [1, 1.05, 1], boxShadow: ["0px 0px 0px rgba(0,0,0,0)", "0px 20px 40px rgba(212,163,115,0.3)", "0px 0px 0px rgba(0,0,0,0)"] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-2xl mb-8"
             >
-              <Cake size={40} className="text-orange-500 lya:text-lya-primary md:w-[60px] md:h-[60px]" strokeWidth={1.5} />
+              <img src={logoLyA} alt="Pastelería LyA" className="w-full h-full object-cover" />
             </motion.div>
             
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tighter font-lya leading-tight md:leading-none">
-              Bienvenido a <br />
-              <span className="text-orange-500 lya:text-lya-primary italic">LyA POS</span>
-            </h1>
-          </div>
+            <motion.h1 
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+              className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-4"
+              style={{ letterSpacing: '-0.05em' }}
+            >
+              𝓛𝔂𝓐
+            </motion.h1>
 
-          <div className="relative p-6 md:p-10 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-2xl rounded-[2.5rem] md:rounded-[3.5rem] border border-gray-200/40 dark:border-gray-800/40 lya:border-lya-border/40 shadow-2xl w-full flex flex-col items-center">
-            <Quote size={24} className="text-orange-500 lya:text-lya-primary opacity-30 absolute -top-3 -left-3 md:-top-4 md:-left-4" />
-            
-            <div className="py-1 w-full text-center flex flex-col gap-1">
-              <SplitText 
-                text={phrase1} 
-                className="text-base md:text-xl font-bold text-gray-800/80 dark:text-gray-200/80 lya:text-lya-text/80 leading-relaxed italic"
-              />
-              <SplitText 
-                text={phrase2} 
-                className="text-lg md:text-2xl font-black text-orange-500 lya:text-lya-primary leading-relaxed"
-              />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="flex flex-col items-center gap-4">
+              <Loader2 size={28} className="text-orange-500 lya:text-lya-primary animate-spin" />
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 animate-pulse text-center max-w-[250px]">
+                {phrase}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* =========================================
+            2. PANTALLA DE ERROR DE CONEXIÓN
+        ========================================= */}
+        {bootState === 'error' && (
+          <motion.div 
+            key="error"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-sm bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 p-8 sm:p-10 text-center relative z-10"
+          >
+            <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <WifiOff size={36} strokeWidth={2.5} />
             </div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-3">Sin Conexión</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed">
+              El sistema de 𝓛𝔂𝓐 no puede comunicarse con el servidor. Revisa tu internet o asegúrate de que el equipo central esté encendido.
+            </p>
+            <button 
+              onClick={runSystemCheck}
+              className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black rounded-2xl shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={18} /> Reintentar Conexión
+            </button>
+          </motion.div>
+        )}
 
-            <div className="flex items-center justify-center gap-2 mt-4 md:mt-6 text-orange-500 lya:text-lya-primary font-bold tracking-widest text-[9px] md:text-[10px] uppercase">
-              <Sparkles size={12} />
-              <span>Equipo Elite</span>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* SECCIÓN DEL FORMULARIO */}
-      <div className="flex flex-col items-center justify-center p-4 md:p-8 z-10 flex-1 mb-8 md:mb-0">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-white/80 dark:bg-gray-900/80 lya:bg-lya-surface/80 backdrop-blur-3xl rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl border border-gray-200/30 dark:border-gray-800/30 lya:border-lya-border/30 overflow-hidden"
-        >
-          <div className="p-8 md:p-12">
-            <h2 className="text-gray-900 dark:text-white lya:text-lya-text mb-6 md:mb-8 text-center">
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Acceso Privado</span>
-            </h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white lya:text-lya-text opacity-60 ml-5">Usuario</label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 lya:text-lya-text opacity-40 group-focus-within:opacity-100 group-focus-within:text-orange-500 lya:group-focus-within:text-lya-primary transition-colors">
-                    <Mail size={18} />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-14 pr-6 py-4 md:py-5 bg-gray-100/60 dark:bg-gray-950/60 lya:bg-lya-bg/60 border border-transparent focus:bg-white dark:focus:bg-gray-900 lya:focus:bg-lya-surface rounded-2xl md:rounded-[1.8rem] focus:ring-4 focus:ring-orange-500/10 lya:focus:ring-lya-primary/10 focus:border-orange-500 lya:focus:border-lya-primary outline-none transition-all text-gray-900 dark:text-white lya:text-lya-text text-sm md:text-base placeholder-gray-400 dark:placeholder-gray-600 lya:placeholder-lya-text/30"
-                    placeholder="admin@lya.com"
-                  />
+        {/* =========================================
+            3. PANTALLA DE LOGIN (LISTO)
+        ========================================= */}
+        {bootState === 'ready' && (
+          <motion.div 
+            key="login"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10"
+          >
+            <div className="p-8 sm:p-10">
+              
+              {/* LOGO Y CABECERA */}
+              <div className="flex flex-col items-center mb-8">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-xl mb-6">
+                  <img src={logoLyA} alt="Pastelería LyA" className="w-full h-full object-cover" />
                 </div>
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2" style={{ letterSpacing: '-0.05em' }}>
+                  𝓛𝔂𝓐
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium uppercase tracking-widest">
+                  Punto de Venta
+                </p>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white lya:text-lya-text opacity-60 ml-5">Contraseña</label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-gray-500 dark:text-gray-400 lya:text-lya-text opacity-40 group-focus-within:opacity-100 group-focus-within:text-orange-500 lya:group-focus-within:text-lya-primary transition-colors">
-                    <Lock size={18} />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-14 pr-14 py-4 md:py-5 bg-gray-100/60 dark:bg-gray-950/60 lya:bg-lya-bg/60 border border-transparent focus:bg-white dark:focus:bg-gray-900 lya:focus:bg-lya-surface rounded-2xl md:rounded-[1.8rem] focus:ring-4 focus:ring-orange-500/10 lya:focus:ring-lya-primary/10 focus:border-orange-500 lya:focus:border-lya-primary outline-none transition-all text-gray-900 dark:text-white lya:text-lya-text text-sm md:text-base placeholder-gray-400 dark:placeholder-gray-600 lya:placeholder-lya-text/30"
-                    placeholder="••••••••"
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-6 text-gray-500 dark:text-gray-400 lya:text-lya-text opacity-40 hover:opacity-100 hover:text-orange-500 lya:hover:text-lya-primary transition-colors">
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-              </div>
+              <AnimatePresence mode="wait">
+                {!showForgotMode ? (
+                  /* --- MODO: FORMULARIO DE LOGIN --- */
+                  <motion.form 
+                    key="login-form"
+                    initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}
+                    onSubmit={handleSubmit} 
+                    className="space-y-5"
+                  >
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                          <User size={18} className="text-gray-400 dark:text-gray-500" />
+                        </div>
+                        <input 
+                          type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Nombre de usuario" 
+                          className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
+                        />
+                      </div>
 
-              {error && (
-                <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-xl text-red-500 text-[10px] text-center font-bold uppercase tracking-widest animate-pulse">
-                  {error}
-                </div>
-              )}
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                          <Lock size={18} className="text-gray-400 dark:text-gray-500" />
+                        </div>
+                        <input 
+                          type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" 
+                          className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
+                        />
+                      </div>
+                    </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-4 md:py-5 bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl md:rounded-[1.8rem] font-black shadow-lg shadow-orange-500/20 dark:shadow-orange-500/10 lya:shadow-lya-primary/30 flex items-center justify-center gap-3 transition-all active:scale-[0.96] mt-4 md:mt-6 tracking-widest text-[10px] md:text-xs border border-transparent"
-              >
-                {isLoading ? <Loader2 className="animate-spin" size={20} /> : <><span>ENTRAR AL SISTEMA</span><LogIn size={20} /></>}
-              </button>
-            </form>
-          </div>
-        </motion.div>
+                    <div className="flex items-center justify-end pt-1">
+                      <button type="button" onClick={() => setShowForgotMode(true)} className="text-[11px] font-bold text-gray-500 hover:text-orange-500 lya:hover:text-lya-primary transition-colors outline-none">
+                        ¿Olvidaste tus datos?
+                      </button>
+                    </div>
+
+                    <button 
+                      type="submit" disabled={isLoading}
+                      className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black rounded-2xl shadow-xl shadow-gray-900/20 dark:shadow-orange-500/20 lya:shadow-lya-primary/20 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
+                    >
+                      {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogIn size={18} /> Iniciar Turno</>}
+                    </button>
+                  </motion.form>
+                ) : (
+                  /* --- MODO: OLVIDÉ MIS DATOS --- */
+                  <motion.div 
+                    key="forgot-form"
+                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}
+                    className="flex flex-col items-center text-center space-y-6"
+                  >
+                    <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mb-2">
+                      <ShieldAlert size={32} />
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white lya:text-lya-text mb-2">Acceso Restringido</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed px-4">
+                        Por protocolos de seguridad, los empleados no pueden modificar sus credenciales de manera externa.
+                        <br /><br />
+                        Por favor, contacta al <b className="text-gray-800 dark:text-gray-200">Administrador de la sucursal</b> para que reestablezca tu contraseña desde el panel de control.
+                      </p>
+                    </div>
+
+                    <button onClick={() => setShowForgotMode(false)} className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-bg lya:hover:opacity-80 text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4">
+                      <ArrowLeft size={16} /> Volver al Inicio
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Footer / Info del sistema */}
+      <div className="absolute bottom-6 text-center w-full pointer-events-none z-0">
+        <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/40 tracking-wider">
+          SISTEMA POS <b>𝓛𝔂𝓐</b> • VERSIÓN 1.0.0
+        </p>
       </div>
     </div>
   );

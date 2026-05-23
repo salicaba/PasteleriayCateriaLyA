@@ -13,12 +13,15 @@ import {
   ChevronDown,
   Calendar,
   ShoppingBasket,
-  Settings // <-- IMPORTACIÓN NUEVA: Icono de ajustes
+  Settings,
+  Palette,
+  Landmark,
+  Printer,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Toaster } from 'react-hot-toast'; 
+import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
-import { ThemeSelector } from './components/ThemeSelector';
 
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
@@ -28,21 +31,39 @@ import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard'
 import PasteleriaCalendar from './modules/pasteleria/views/PasteleriaCalendar';
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
-import { SettingsPage } from './modules/admin/views/SettingsPage'; // <-- IMPORTACIÓN NUEVA: La vista de ajustes
+import { SettingsPage } from './modules/admin/views/SettingsPage'; 
 
-// Importa aquí tu logo con la extensión correcta
 import logoLyA from './assets/logo.jpeg'; 
 
 function App() {
-  const [user, setUser] = useState(null);
+  // 1. INICIALIZACIÓN INTELIGENTE: Lee la memoria del navegador antes de renderizar
+  const [user, setUser] = useState(() => {
+    const savedSession = localStorage.getItem('lya_pos_session');
+    if (savedSession) {
+      try {
+        const { userData, expiresAt } = JSON.parse(savedSession);
+        // Si aún no pasa la medianoche, mantiene la sesión
+        if (new Date().getTime() < expiresAt) {
+          return userData;
+        } else {
+          localStorage.removeItem('lya_pos_session');
+        }
+      } catch (e) {
+        localStorage.removeItem('lya_pos_session');
+      }
+    }
+    return null;
+  });
+
   const [activeTab, setActiveTab] = useState('mesas');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group']); 
+  const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group', 'sistema_group']); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
   const { theme } = useTheme();
 
+  // Reloj principal
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -50,12 +71,54 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Aplicar tamaño de interfaz
   useEffect(() => {
     const root = document.documentElement;
     if (uiSize === 'large') root.style.fontSize = '16px'; 
     if (uiSize === 'medium') root.style.fontSize = '14px'; 
     if (uiSize === 'small') root.style.fontSize = '12px';  
   }, [uiSize]);
+
+  // 2. EL VIGILANTE SILENCIOSO: Revisa si ya es medianoche para sacar al usuario
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      const savedSession = localStorage.getItem('lya_pos_session');
+      if (savedSession) {
+        const { expiresAt } = JSON.parse(savedSession);
+        if (new Date().getTime() >= expiresAt) {
+          handleLogout();
+          toast("El turno ha finalizado (12:00 AM). Inicia sesión para el nuevo día.", {
+            icon: '🌙',
+            duration: 6000
+          });
+        }
+      } else {
+        handleLogout(); // Por si borran la memoria manual
+      }
+    }, 10000); // Revisa cada 10 segundos discretamente
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // 3. FUNCIONES DE AUTENTICACIÓN
+  const handleLogin = (userData) => {
+    const now = new Date();
+    // Calculamos la hora exacta de la próxima medianoche (12:00 AM del día siguiente)
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+    
+    // Guardamos en el navegador con su fecha de caducidad
+    localStorage.setItem('lya_pos_session', JSON.stringify({
+      userData,
+      expiresAt: nextMidnight.getTime()
+    }));
+    
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('lya_pos_session');
+    setUser(null);
+  };
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
     hour: '2-digit', 
@@ -94,8 +157,34 @@ function App() {
       ]
     },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
-    { id: 'configuracion', label: 'Ajustes Negocio', icon: Settings }, // <-- NUEVO: Botón en el menú lateral
+    {
+      id: 'sistema_group',
+      label: 'Sistema',
+      icon: Settings,
+      isGroup: true,
+      children: [
+        { id: 'usuarios', label: 'Control de Usuarios', icon: Users },
+        { id: 'interfaz', label: 'Interfaz y Pantalla', icon: Palette },
+        { id: 'cuentas', label: 'Cuentas Bancarias', icon: Landmark },
+        { id: 'hardware', label: 'Hardware y Equipos', icon: Printer },
+      ]
+    }
   ];
+
+  // FILTRADO ESTRICTO DE ROLES
+  const visibleMenuConfig = menuConfig.filter(group => {
+    if (group.id === 'sistema_group' && user?.role === 'Empleado') {
+      return false;
+    }
+    return true;
+  });
+
+  // Forzar redirección si un empleado intenta acceder por estado residual a una pestaña restringida
+  useEffect(() => {
+    if (user?.role === 'Empleado' && ['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab)) {
+      setActiveTab('mesas');
+    }
+  }, [user, activeTab]);
 
   const toggleGroup = (groupId) => {
     setExpandedGroups(prev => 
@@ -133,7 +222,8 @@ function App() {
   };
 
   if (!user) {
-    return <LoginScreen onLogin={(userData) => setUser(userData)} />;
+    // Aquí pasamos nuestra nueva función handleLogin al componente LoginScreen
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (
@@ -167,7 +257,6 @@ function App() {
         className="h-full bg-white dark:bg-gray-800 lya:bg-lya-surface border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-xl z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
       >
         <div className="w-[240px] flex flex-col h-full">
-          {/* HEADER DEL SIDEBAR CON EL LOGO */}
           <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/20 dark:border-gray-600 lya:border-lya-primary shadow-sm bg-white flex items-center justify-center shrink-0">
               <img 
@@ -180,7 +269,7 @@ function App() {
           </div>
 
           <nav className="flex-1 py-4 flex flex-col gap-1.5 px-3 overflow-y-auto custom-scrollbar">
-            {menuConfig.map((item) => {
+            {visibleMenuConfig.map((item) => {
               if (item.isGroup) {
                 const isExpanded = expandedGroups.includes(item.id);
                 const hasActiveChild = item.children.some(child => child.id === activeTab);
@@ -232,34 +321,8 @@ function App() {
           </nav>
 
           <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
-            <div className="flex flex-col gap-2 px-1">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300 lya:text-lya-text/80">Apariencia</span>
-              <ThemeSelector />
-            </div>
-
-            <div>
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300 lya:text-lya-text/80 px-1 mb-2 block">
-                Tamaño de Pantalla
-              </span>
-              <div className="flex bg-gray-200/50 dark:bg-gray-900 lya:bg-lya-bg rounded-lg p-1">
-                {['small', 'medium', 'large'].map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setUiSize(size)}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                      uiSize === size 
-                        ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm lya:border lya:border-lya-border/30' 
-                        : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
-                    }`}
-                  >
-                    {size === 'small' ? 'Chica' : size === 'medium' ? 'Media' : 'Grande'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <button 
-              onClick={() => setUser(null)}
+              onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold"
             >
               <LogOut size={16} />
@@ -323,7 +386,7 @@ function App() {
             <div className="flex items-center gap-3 bg-white dark:bg-gray-700/50 lya:bg-lya-bg px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 shadow-sm transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 lya:hover:opacity-80">
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-none">{user?.name || 'Admin'}</p>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500 lya:text-lya-text/50">Sucursal Centro</p>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 lya:text-lya-text/50">{user?.role || 'Administrador'}</p>
               </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 bg-orange-500 lya:bg-lya-primary rounded-full overflow-hidden border-2 border-white dark:border-gray-600 lya:border-lya-surface shadow-sm shrink-0 flex items-center justify-center text-white text-xs font-bold">
                 {user?.name?.charAt(0) || 'A'}
@@ -339,7 +402,10 @@ function App() {
           {activeTab === 'pedidos' && <PasteleriaDashboard />} 
           {activeTab === 'agenda' && <PasteleriaCalendar />} 
           {activeTab === 'ajustes' && <MenuManagerPage />} 
-          {activeTab === 'configuracion' && <SettingsPage />} {/* <-- NUEVO: Renderizado de la vista de ajustes */}
+          
+          {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
+            <SettingsPage uiSize={uiSize} setUiSize={setUiSize} activeTab={activeTab} />
+          )}
           
           {activeTab === 'reportes' && (
             <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 lya:text-lya-text/50 font-medium text-center p-4">
