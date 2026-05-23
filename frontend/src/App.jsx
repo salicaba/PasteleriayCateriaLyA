@@ -155,10 +155,10 @@ function App() {
       icon: Settings,
       isGroup: true,
       children: [
-        { id: 'usuarios', label: 'Control de Usuarios', icon: Users },
-        { id: 'interfaz', label: 'Interfaz y Pantalla', icon: Palette },
         { id: 'cuentas', label: 'Cuentas Bancarias', icon: Landmark },
-        { id: 'hardware', label: 'Hardware y Equipos', icon: Printer },
+        { id: 'usuarios', label: 'Usuarios', icon: Users },
+        { id: 'interfaz', label: 'Pantalla', icon: Palette },
+        { id: 'hardware', label: 'Hardware', icon: Printer },
       ]
     }
   ];
