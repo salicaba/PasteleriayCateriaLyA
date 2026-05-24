@@ -27,7 +27,6 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
           
-          {/* Implementación de rounded-[2rem] y shadow en lugar de pantalla completa estricta para sensación flotante, manteniendo anclaje derecho */}
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10"
           >
@@ -119,16 +118,24 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   <Layers size={18} className="text-emerald-500" /> Especificaciones Técnicas
                 </h3>
                 <div className="grid grid-cols-1 gap-4">
+                  
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase">Categoría</p>
+                    <span className="inline-block bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800/50">
+                      {pedido.categoria || 'Pastel'}
+                    </span>
+                  </div>
+
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Porciones / Tamaño</p>
                     <div className="flex flex-wrap gap-2">
-                      {pedido.porciones?.map((p, i) => <span key={i} className="bg-amber-100 text-amber-700 px-3 py-1 rounded-xl text-xs font-bold border border-amber-200">{p}</span>)}
+                      {pedido.porciones?.map((p, i) => <span key={i} className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1 rounded-xl text-xs font-bold border border-amber-200 dark:border-amber-800/50">{p}</span>)}
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Sabores Elegidos</p>
                     <div className="flex flex-wrap gap-2">
-                      {pedido.saborPan?.map((s, i) => <span key={i} className="bg-purple-100 text-purple-700 px-3 py-1 rounded-xl text-xs font-bold border border-purple-200">{s}</span>)}
+                      {pedido.saborPan?.map((s, i) => <span key={i} className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-3 py-1 rounded-xl text-xs font-bold border border-purple-200 dark:border-purple-800/50">{s}</span>)}
                     </div>
                   </div>
                   <div className="space-y-2">

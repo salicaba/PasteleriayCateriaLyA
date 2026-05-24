@@ -66,13 +66,11 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
 
-    // Muestra pantalla de éxito
     setPaymentSuccessData({
       title: '¡Enlace Creado!',
       message: 'El ticket digital ha sido preparado para WhatsApp.'
     });
     
-    // Exactamente 1.8s (1800ms) igual que en Cafetería y cierra todo
     setTimeout(() => {
       setPaymentSuccessData(null);
       onClose();
@@ -83,7 +81,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   // 🖨️ LÓGICA IMPRESIÓN
   // ==========================================
   const handlePrint = async () => {
-    // Confirmación visual full screen
     setPaymentSuccessData({
       title: '¡Enviado a Impresora!',
       message: 'El ticket se está imprimiendo.'
@@ -96,7 +93,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       toast.error('Error al conectar con la impresora térmica.');
     }
 
-    // Exactamente 1.8s (1800ms) igual que en Cafetería y cierra todo
     setTimeout(() => {
       setPaymentSuccessData(null);
       onClose();
@@ -109,9 +105,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
         {isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:hidden">
             
-            {/* 🎯 EL SECRETO DE LA OPACIDAD PERFECTA: 
-                Si paymentSuccessData es verdadero, ocultamos el fondo oscuro del modal original
-                para que SOLO el fondo del SuccessScreen sea visible y no se empalmen los negros. */}
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: paymentSuccessData ? 0 : 1 }} 
@@ -120,7 +113,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
               className="absolute inset-0 bg-black/60 lya:bg-black/50 backdrop-blur-sm transition-opacity duration-300" 
             />
             
-            {/* Si se activa Success, el ticket desaparece al instante tal como pediste */}
             <AnimatePresence>
               {!paymentSuccessData && (
                 <motion.div 
@@ -152,7 +144,8 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       </div>
 
                       <div className="border-t border-b border-dashed border-gray-300 py-4 mb-4 space-y-3">
-                        <p className="font-bold text-black">Detalles del Pastel:</p>
+                        <p className="font-bold text-black">Detalles del Pedido:</p>
+                        <p className="text-xs text-gray-700"><span className="text-gray-500">Categoría:</span> <span className="font-bold">{pedido.categoria || 'Pastel'}</span></p>
                         {pedido.porciones?.length > 0 && <p className="text-xs text-gray-700"><span className="text-gray-500">Tamaño:</span> {Array.isArray(pedido.porciones) ? pedido.porciones.join(' / ') : pedido.porciones}</p>}
                         {pedido.saborPan?.length > 0 && <p className="text-xs text-gray-700"><span className="text-gray-500">Sabores:</span> {Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : pedido.saborPan}</p>}
                         <p className="text-xs mt-2 italic text-gray-600">"{pedido.descripcion || 'Sin descripción adicional'}"</p>
@@ -217,7 +210,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
         )}
       </AnimatePresence>
 
-      {/* PANTALLA DE ÉXITO FULL SCREEN (Igual a Cafetería) */}
       <AnimatePresence>
         {paymentSuccessData && (
           <motion.div 

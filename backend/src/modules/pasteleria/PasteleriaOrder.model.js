@@ -14,6 +14,10 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  categoria: { // 🚀 NUEVO CAMPO AÑADIDO
+    type: DataTypes.STRING,
+    defaultValue: 'Pastel',
+  },
   descripcion: {
     type: DataTypes.TEXT,
     allowNull: true,
@@ -50,9 +54,8 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     type: DataTypes.JSON, 
     defaultValue: [],
   },
-  // 🚀 ESTA ES LA COLUMNA QUE TE FALTABA
   imagenReferencia: {
-    type: DataTypes.TEXT('long'), // Usamos long para que quepa el código de la imagen
+    type: DataTypes.TEXT('long'),
     allowNull: true,
   }
 }, {

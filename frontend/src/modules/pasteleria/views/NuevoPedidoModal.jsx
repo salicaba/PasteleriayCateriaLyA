@@ -1,12 +1,12 @@
 // src/modules/pasteleria/views/NuevoPedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus, Clock, Smartphone, Banknote } from 'lucide-react';
+import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Users, Plus, Clock, Smartphone, Banknote, Tag } from 'lucide-react';
 import client from '../../../api/client';
 
 export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefinida, pedidoAEditar }) {
   const [formData, setFormData] = useState({
-    cliente: '', telefono: '', descripcion: '',
+    cliente: '', telefono: '', descripcion: '', categoria: 'Pastel',
     porciones: [], saborPan: [], tipoEntrega: 'sucursal', direccion: '', fechaEntrega: '', costoTotal: '', anticipo: '',
     imagenReferencia: null 
   });
@@ -17,6 +17,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
   // Nuevos estados para control de pagos
   const [metodoPagoAnticipo, setMetodoPagoAnticipo] = useState('efectivo');
   const [transferInfo, setTransferInfo] = useState(null);
+
+  const categoriasDisponibles = ['Pastel', 'Cheesecake', 'Rosca', 'Cupcakes', 'Postre', 'Otro'];
 
   useEffect(() => {
     if (isOpen) {
@@ -33,7 +35,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             fechaFormateada = `${year}-${month}-${day}T${hours}:${minutes}`;
           }
         }
-        setFormData({ ...pedidoAEditar, fechaEntrega: fechaFormateada });
+        setFormData({ ...pedidoAEditar, fechaEntrega: fechaFormateada, categoria: pedidoAEditar.categoria || 'Pastel' });
       } else {
         let defaultDate = '';
         if (fechaPredefinida) {
@@ -50,7 +52,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
         }
         
         setFormData({
-          cliente: '', telefono: '', descripcion: '',
+          cliente: '', telefono: '', descripcion: '', categoria: 'Pastel',
           porciones: [], saborPan: [], tipoEntrega: 'sucursal', 
           direccion: '', fechaEntrega: defaultDate, costoTotal: '', anticipo: '',
           imagenReferencia: null 
@@ -150,7 +152,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
               <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
                 <span className="bg-gradient-to-r from-emerald-500 to-teal-400 text-transparent bg-clip-text">
-                  {pedidoAEditar ? `Editar Pedido: ${pedidoAEditar.id}` : 'Agendar Nuevo Pastel'}
+                  {pedidoAEditar ? `Editar Pedido: ${pedidoAEditar.id}` : 'Agendar Nuevo Pedido'}
                 </span>
               </h2>
               <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-gray-100 dark:bg-gray-800 rounded-full transition-colors"><X size={20} /></button>
@@ -161,9 +163,28 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                 
                 <div className="space-y-5">
                   <h3 className="font-bold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-800 pb-2">1. Detalles del Cliente y Diseño</h3>
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <input type="text" name="cliente" required placeholder="Nombre del Cliente" value={formData.cliente} onChange={handleChange} className="col-span-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
                     <input type="tel" name="telefono" placeholder="Teléfono" value={formData.telefono} onChange={handleChange} className="col-span-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1">
+                      <Tag size={12} className="text-emerald-500" /> Categoría de Producto
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {categoriasDisponibles.map(cat => (
+                        <button 
+                          type="button" 
+                          key={cat}
+                          onClick={() => setFormData({...formData, categoria: cat})}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${formData.categoria === cat ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'}`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-2">

@@ -136,7 +136,8 @@ export const printPedidoTicket = async (req, res) => {
     console.log(`Entrega:  ${fecha}`);
     console.log(`Tipo:     ${tipoEntregaStr.toUpperCase()}`);
     console.log(`------------------------------------------`);
-    console.log(`DETALLES DEL PASTEL:`);
+    console.log(`DETALLES DEL PEDIDO:`);
+    console.log(`Categoría:${pedido.categoria || 'Pastel'}`);
     if (porcionesSeguras) console.log(`Tamaño:   ${porcionesSeguras}`);
     if (saboresSeguros)   console.log(`Sabores:  ${saboresSeguros}`);
     console.log(`Desc:     ${pedido.descripcion || 'Ninguna'}`);
@@ -245,7 +246,8 @@ export const sharePedidoTicket = async (req, res) => {
         <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
         <div class="space-y-3 mb-6">
-          <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalles del Pastel</h3>
+          <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalles del Pedido</h3>
+          <p class="text-sm"><span class="font-bold text-slate-400">Categoría:</span> <span class="font-bold text-slate-800">${pedido.categoria || 'Pastel'}</span></p>
           ${porcionesHtml ? `<p class="text-sm"><span class="font-bold text-slate-400">Tamaño:</span> <span class="font-bold text-slate-800">${porcionesHtml}</span></p>` : ''}
           ${saboresHtml ? `<p class="text-sm"><span class="font-bold text-slate-400">Sabores:</span> <span class="font-bold text-slate-800">${saboresHtml}</span></p>` : ''}
           <p class="text-sm text-slate-600 italic mt-2 bg-amber-50/50 p-3 rounded-xl border border-amber-100">"${pedido.descripcion || 'Sin detalles adicionales'}"</p>

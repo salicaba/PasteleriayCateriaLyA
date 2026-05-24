@@ -1,10 +1,11 @@
 // src/modules/pasteleria/views/PasteleriaCalendar.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, DollarSign, Plus, X, CalendarDays, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, DollarSign, Plus, X, CalendarDays, Search, Eye } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
+import DetallePedidoModal from './DetallePedidoModal';
 
 export default function PasteleriaCalendar() {
   const { 
@@ -12,14 +13,15 @@ export default function PasteleriaCalendar() {
     isModalOpen, abrirModalNuevoPedido, cerrarModalNuevoPedido, fechaPredefinida,
     abonoModal, setAbonoModal, abrirModalAbono, 
     ticketModal, abrirTicket, cerrarTicket,
-    calcularFinanzas, agregarNuevoPedido, registrarAbono 
+    detalleModal, abrirDetalles, cerrarDetalles,
+    pedidoAEditar, iniciarEdicion, calcularFinanzas, registrarAbono, guardarPedido // 🚀 AQUÍ AÑADIMOS pedidoAEditar
   } = usePedidosController();
 
   const [montoIngresado, setMontoIngresado] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   
-  // 🔥 NUEVO ESTADO: Para controlar el valor del input de búsqueda y poder limpiarlo
+  // Para controlar el valor del input de búsqueda y poder limpiarlo
   const [fechaBusqueda, setFechaBusqueda] = useState('');
 
   if (loading) return null;
@@ -35,10 +37,9 @@ export default function PasteleriaCalendar() {
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
 
-  // 🔥 ACTUALIZADA: Guardamos el valor en el estado para controlarlo
   const handleDateSearch = (e) => {
     const dateVal = e.target.value;
-    setFechaBusqueda(dateVal); // Guardamos lo que el usuario escribe
+    setFechaBusqueda(dateVal); 
     if (!dateVal) return;
     
     const [year, month, day] = dateVal.split('-');
@@ -48,12 +49,11 @@ export default function PasteleriaCalendar() {
     setSelectedDate(newDate);
   };
 
-  // 🔥 NUEVA FUNCIÓN: Regresar al día de hoy y limpiar la búsqueda
   const handleIrAHoy = () => {
     const hoy = new Date();
     setCurrentMonth(hoy);
     setSelectedDate(hoy);
-    setFechaBusqueda(''); // Limpia el input del buscador de fechas
+    setFechaBusqueda(''); 
   };
 
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -77,7 +77,7 @@ export default function PasteleriaCalendar() {
 
   const handleAbonar = (e) => {
     e.preventDefault();
-    registrarAbono(abonoModal.pedidoId, montoIngresado);
+    registrarAbono(abonoModal.pedido?.id || abonoModal.pedidoId, montoIngresado);
     setMontoIngresado('');
   };
 
@@ -109,7 +109,7 @@ export default function PasteleriaCalendar() {
              <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-wider">Ir a fecha</label>
              <input
                type="date"
-               value={fechaBusqueda} // Conectado al estado
+               value={fechaBusqueda} 
                onChange={handleDateSearch}
                className="bg-transparent border-none outline-none text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text cursor-pointer leading-none"
              />
@@ -126,7 +126,6 @@ export default function PasteleriaCalendar() {
               {meses[currentMonth.getMonth()]} <span className="text-emerald-500 lya:text-lya-primary">{currentMonth.getFullYear()}</span>
             </h2>
             <div className="flex gap-2 items-center">
-              {/* 🔥 BOTÓN HOY AÑADIDO AQUÍ */}
               <button 
                 onClick={handleIrAHoy} 
                 className="px-4 py-2 mr-1 bg-emerald-100/50 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 text-emerald-700 dark:text-emerald-400 lya:text-lya-primary rounded-xl font-bold text-sm transition-colors shadow-sm active:scale-95"
@@ -163,7 +162,7 @@ export default function PasteleriaCalendar() {
                   key={day} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setSelectedDate(dateOfThisDay)}
                   className={`relative flex flex-col items-center p-2 rounded-2xl border transition-all duration-300 min-h-[4rem]
                     ${isSelected ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30 lya:bg-lya-secondary lya:border-lya-secondary lya:shadow-lya-secondary/30' : 
-                      isToday ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 lya:bg-lya-secondary/10 lya:border-lya-secondary/30' : 
+                      isToday ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 lya:bg-lya-secondary/10 lya:border-slate-300/50' : 
                       'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 lya:bg-lya-surface lya:border-lya-border/30 lya:hover:border-lya-secondary/50'}
                   `}
                 >
@@ -207,21 +206,57 @@ export default function PasteleriaCalendar() {
                     <motion.div
                       layout initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9 }}
                       key={pedido.id}
-                      className={`p-4 rounded-2xl bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3
+                      className={`p-4 rounded-2xl bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all duration-200 hover:shadow-md
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40'}
                       `}
                     >
                       <div className="flex justify-between items-start">
-                        <div>
+                        <div className="cursor-pointer flex-1" onClick={() => abrirDetalles(pedido)}>
                           <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
-                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text">{pedido.cliente}</h4>
+                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text hover:text-emerald-500 transition-colors">{pedido.cliente}</h4>
                         </div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
                           <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {hora}
                         </div>
                       </div>
 
-                      <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 line-clamp-2">{pedido.descripcion}</p>
+                      {/* 🚀 SECCIÓN DE BADGES INTEGRADA EN EL CUERPO: Categoría + Tamaños + Sabores */}
+                      <div className="flex flex-wrap gap-1.5 my-0.5">
+                        {/* Badge de Categoría */}
+                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 shadow-sm">
+                          {pedido.categoria || 'Pastel'}
+                        </span>
+                        
+                        {/* Badges de Tamaños */}
+                        {Array.isArray(pedido.porciones) ? (
+                          pedido.porciones.map((p, i) => (
+                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40 shadow-sm">
+                              {p}
+                            </span>
+                          ))
+                        ) : pedido.porciones && (
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40 shadow-sm">
+                            {pedido.porciones}
+                          </span>
+                        )}
+
+                        {/* Badges de Sabores */}
+                        {Array.isArray(pedido.saborPan) ? (
+                          pedido.saborPan.map((s, i) => (
+                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border border-purple-100 dark:border-purple-900/40 shadow-sm">
+                              {s}
+                            </span>
+                          ))
+                        ) : pedido.saborPan && (
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border border-purple-100 dark:border-purple-900/40 shadow-sm">
+                            {pedido.saborPan}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 line-clamp-2 italic cursor-pointer" onClick={() => abrirDetalles(pedido)}>
+                        "{pedido.descripcion}"
+                      </p>
 
                       <div className="pt-3 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex justify-between items-center">
                         {finanzas.estaLiquidado ? (
@@ -233,9 +268,10 @@ export default function PasteleriaCalendar() {
                         )}
                         
                         <div className="flex gap-2">
-                          <button onClick={() => abrirTicket(pedido)} className="p-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-lg transition-colors"><FileText size={16}/></button>
+                          <button onClick={() => abrirDetalles(pedido)} className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg transition-colors" title="Ver Detalles"><Eye size={16}/></button>
+                          <button onClick={() => abrirTicket(pedido)} className="p-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-lg transition-colors" title="Ver Ticket"><FileText size={16}/></button>
                           {!finanzas.estaLiquidado && (
-                            <button onClick={() => abrirModalAbono(pedido)} className="p-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-lg transition-colors"><DollarSign size={16}/></button>
+                            <button onClick={() => abrirModalAbono(pedido)} className="p-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-lg transition-colors" title="Registrar Abono"><DollarSign size={16}/></button>
                           )}
                         </div>
                       </div>
@@ -260,8 +296,9 @@ export default function PasteleriaCalendar() {
       </div>
 
       {/* MODALES ADJUNTOS A LA PÁGINA */}
-      <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={agregarNuevoPedido} fechaPredefinida={fechaPredefinida} />
+      <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} />
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
+      <DetallePedidoModal isOpen={detalleModal.isOpen} onClose={cerrarDetalles} pedido={detalleModal.pedido} onEdit={iniciarEdicion} calcularFinanzas={calcularFinanzas} />
 
       <AnimatePresence>
         {abonoModal.isOpen && (
@@ -271,12 +308,12 @@ export default function PasteleriaCalendar() {
                 <div className="bg-emerald-500/10 lya:bg-lya-secondary/10 p-2 rounded-xl text-emerald-500 lya:text-lya-secondary">
                   <DollarSign size={24} />
                 </div>
-                <button onClick={() => setAbonoModal({ isOpen: false, pedidoId: null, cliente: '' })} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:text-lya-text/50 lya:hover:text-lya-text bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-full transition-colors">
+                <button onClick={() => setAbonoModal({ isOpen: false, pedido: null })} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:text-lya-text/50 lya:hover:text-lya-text bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
               <h3 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-1">Registrar Pago</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8">Abono para: <span className="font-bold text-emerald-500 lya:text-lya-secondary">{abonoModal.cliente}</span></p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8">Abono para: <span className="font-bold text-emerald-500 lya:text-lya-secondary">{abonoModal.pedido?.cliente}</span></p>
               <form onSubmit={handleAbonar} className="space-y-6">
                 <input type="number" required autoFocus min="1" placeholder="$ 0.00" value={montoIngresado} onChange={(e) => setMontoIngresado(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl px-4 py-4 text-3xl font-black text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-4 focus:ring-emerald-500/10 lya:focus:ring-lya-secondary/30 transition-all text-center" />
                 <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-2xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2">

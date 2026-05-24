@@ -41,25 +41,18 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   // Helper inteligente para obtener iniciales
   const getInitials = (name) => {
     if (!name) return 'US';
-    // Limpiamos los espacios accidentales al inicio y final
     const cleanName = name.trim();
-    const words = cleanName.split(/\s+/); // Separa por cualquier cantidad de espacios
-    
-    // Si tiene más de una palabra (ej. Emmanuel Salinas), toma la primera letra de cada una (ES)
-    if (words.length >= 2) {
-      return (words[0][0] + words[1][0]).toUpperCase();
-    }
-    // Si solo es una palabra (ej. Empleado), toma las primeras dos letras (EM)
+    const words = cleanName.split(/\s+/); 
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
     return cleanName.substring(0, 2).toUpperCase();
   };
 
-  // Carga asíncrona real desde la API de base de datos
   const loadInitialData = async () => {
     setFetching(true);
     try {
       const [resSettings, resUsers] = await Promise.all([
         client.get('/settings'),
-        client.get('/users') // Petición real al backend
+        client.get('/users') 
       ]);
 
       if (resSettings.data) {
@@ -92,7 +85,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(err => {
-        console.error(`Error al entrar en pantalla completa: ${err.message}`);
         toast.error("El navegador bloqueó la pantalla completa automática.");
       });
     } else {
@@ -100,36 +92,50 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     }
   };
 
-  const handleSaveToServer = async () => {
+  // Función universal para guardar en base de datos
+  const saveSettingsToDB = async (payloadToOverride) => {
     setLoading(true);
     try {
       await client.put('/settings', { 
         bank_accounts: accounts,
         printer_config: printerConfig,
-        barcode_config: barcodeConfig
+        barcode_config: barcodeConfig,
+        ...payloadToOverride // Sobrescribe con los datos más recientes antes de que React actualice el estado visual
       });
-      toast.success("¡Configuración de hardware y cuentas guardada!");
+      toast.success("¡Configuración guardada en la Base de Datos!");
     } catch (e) {
       toast.error("Error de base de datos al guardar ajustes");
     } finally { setLoading(false); }
   };
 
-  // --- MÉTODOS DE BASE DE DATOS: CUENTAS BANCARIAS ---
-  const handleAddOrUpdate = () => {
+  const handleSaveToServer = () => saveSettingsToDB({});
+
+  // --- MÉTODOS DE BASE DE DATOS: CUENTAS BANCARIAS (AUTO-GUARDADO) ---
+  const handleAddOrUpdate = async () => {
     if (!form.bank_name || !form.account_number) return toast.error("Completa los campos obligatorios");
+    
+    let newAccounts;
     if (editingId) {
-      setAccounts(accounts.map(acc => acc.id === editingId ? form : acc));
-      toast.success("Cuenta modificada en lista temporal");
+      newAccounts = accounts.map(acc => acc.id === editingId ? form : acc);
     } else {
-      setAccounts([...accounts, { ...form, id: Date.now().toString() }]);
-      toast.success("Cuenta agregada a lista temporal");
+      newAccounts = [...accounts, { ...form, id: Date.now().toString() }];
     }
-    resetForm();
+    
+    setAccounts(newAccounts); // Actualiza la UI
+    resetForm(); // Limpia los inputs
+    
+    // 🚀 ENVÍA DIRECTO A LA BASE DE DATOS
+    await saveSettingsToDB({ bank_accounts: newAccounts }); 
   };
 
   const editAccount = (acc) => { setEditingId(acc.id); setForm(acc); };
   const resetForm = () => { setEditingId(null); setForm({ id: '', bank_name: '', account_number: '', account_holder: '', clabe: '' }); };
-  const deleteAccount = (id) => { setAccounts(accounts.filter(a => a.id !== id)); toast.success("Cuenta removida"); };
+  
+  const deleteAccount = async (id) => { 
+    const newAccounts = accounts.filter(a => a.id !== id);
+    setAccounts(newAccounts); 
+    await saveSettingsToDB({ bank_accounts: newAccounts });
+  };
 
   // --- CRUD REAL CON BASE DE DATOS: CONTROL DE USUARIOS ---
   const handleUserSubmit = async () => {
@@ -139,33 +145,27 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     setLoading(true);
     try {
       if (editingUserId) {
-        // LLAMADA PUT REAL AL BACKEND: Actualización en MySQL
         await client.put(`/users/${editingUserId}`, userForm);
         toast.success("Usuario actualizado en la base de datos");
       } else {
-        // LLAMADA POST REAL AL BACKEND: Creación en MySQL
         await client.post('/users', userForm);
         toast.success("¡Nuevo personal registrado en base de datos!");
       }
       resetUserForm();
-      // Recarga limpia desde la base de datos para asegurar consistencia
       const resUsers = await client.get('/users');
       if (Array.isArray(resUsers.data)) setSystemUsers(resUsers.data);
     } catch (e) {
-      console.error(e);
       toast.error(e.response?.data?.message || "Error al procesar la transacción de usuario");
     } finally {
       setLoading(false);
     }
   };
 
-  // Soft Delete Dinámico: Cambia el booleano `isActive` de Sequelize
   const toggleUserStatus = async (id, currentStatus) => {
     try {
       const nextStatus = !currentStatus;
       await client.put(`/users/${id}`, { isActive: nextStatus });
       toast.success(nextStatus ? "Acceso al POS activado" : "Acceso revocado correctamente");
-      
       setSystemUsers(systemUsers.map(u => u.id === id ? { ...u, isActive: nextStatus } : u));
     } catch (e) {
       toast.error("No se pudo cambiar el estado de la credencial");
@@ -174,14 +174,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   const editUser = (usr) => {
     setEditingUserId(usr.id);
-    setUserForm({ 
-      id: usr.id,
-      fullName: usr.fullName,
-      username: usr.username,
-      role: usr.role,
-      isActive: usr.isActive,
-      password: '' 
-    }); 
+    setUserForm({ id: usr.id, fullName: usr.fullName, username: usr.username, role: usr.role, isActive: usr.isActive, password: '' }); 
   };
 
   const resetUserForm = () => {
@@ -353,37 +346,31 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   <p className="text-[11px] text-gray-400 italic">Administra los accesos al sistema</p>
                 </div>
                 
-                {/* TARJETAS DE USUARIOS MEJORADAS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {systemUsers.map(usr => (
                     <div key={usr.id} className={`p-5 rounded-2xl border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between hover:shadow-md ${usr.isActive ? 'border-gray-200 dark:border-gray-700' : 'border-red-200 dark:border-red-900/30 opacity-80'}`}>
                       
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3.5">
-                          {/* Avatar Circular con iniciales y color dinámico */}
                           <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
                             !usr.isActive 
-                              ? 'bg-gray-400 dark:bg-gray-600' // Gris si está suspendido
+                              ? 'bg-gray-400 dark:bg-gray-600'
                               : usr.role === 'Administrador' 
-                                ? 'bg-purple-600 dark:bg-purple-500' // Morado para administradores
-                                : 'bg-blue-600 lya:bg-lya-primary' // Azul/Lya Primary para empleados
+                                ? 'bg-purple-600 dark:bg-purple-500'
+                                : 'bg-blue-600 lya:bg-lya-primary'
                           }`}>
                             {getInitials(usr.fullName)}
                           </div>
-                          
                           <div className="flex flex-col">
-                            {/* Nombre completo destacado */}
                             <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight break-all">
                               {usr.fullName}
                             </h4>
-                            {/* Nombre de usuario limpio sin el @ */}
                             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
                               {usr.username}
                             </span>
                           </div>
                         </div>
 
-                        {/* Botones de acción mejorados */}
                         <div className="flex gap-1.5 shrink-0 ml-2">
                           <button onClick={() => editUser(usr)} className="p-2 bg-gray-50 hover:bg-blue-50 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-blue-500 transition-colors" title="Editar usuario">
                             <Edit2 size={16} />
@@ -395,12 +382,9 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                       </div>
 
                       <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between">
-                        {/* Etiqueta de Rol */}
                         <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md ${usr.role === 'Administrador' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                           {usr.role}
                         </span>
-                        
-                        {/* Estado visual de conexión */}
                         <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 px-2.5 py-1 rounded-md">
                           <div className={`w-1.5 h-1.5 rounded-full ${usr.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                           <span className={`text-[10px] font-black tracking-wide ${usr.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -431,6 +415,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Formulario de Cuentas */}
               <section className="space-y-6">
                 <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
                   <div className="flex items-center gap-3 mb-8 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
@@ -452,24 +437,25 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-1">Número de Cuenta</label>
-                        <input type="text" value={form.account_number} onChange={e => setForm({...form, account_number: e.target.value})} 
-                          className="w-full px-5 py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text" />
+                        <input type="text" value={form.account_number} onChange={e => setForm({...form, account_number: e.target.value})} placeholder="10 a 16 dígitos"
+                          className="w-full px-5 py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-mono" />
                       </div>
                       <div>
                         <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block ml-1">CLABE (18 dígitos)</label>
-                        <input type="text" value={form.clabe} onChange={e => setForm({...form, clabe: e.target.value})} 
-                          className="w-full px-5 py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text" />
+                        <input type="text" value={form.clabe} onChange={e => setForm({...form, clabe: e.target.value})} placeholder="Opcional"
+                          className="w-full px-5 py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-mono" />
                       </div>
                     </div>
 
-                    <button onClick={handleAddOrUpdate} className="w-full py-4 bg-emerald-500/10 lya:bg-lya-primary/10 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary font-bold rounded-2xl hover:bg-emerald-500 hover:text-white lya:hover:bg-lya-primary transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
-                      {editingId ? <><Check size={20}/> Actualizar Cuenta</> : <><Plus size={20}/> Añadir a la Lista</>}
+                    <button onClick={handleAddOrUpdate} disabled={loading} className="w-full py-4 bg-emerald-500 lya:bg-lya-primary text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50">
+                      {editingId ? <><Check size={20}/> Guardar Cambios</> : <><Plus size={20}/> Guardar Cuenta</>}
                     </button>
                     {editingId && <button onClick={resetForm} className="w-full text-sm text-gray-400 font-bold hover:text-red-500 transition-colors">Cancelar edición</button>}
                   </div>
                 </div>
               </section>
 
+              {/* Lista de Cuentas */}
               <section className="flex flex-col gap-6">
                 <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex-1 flex flex-col min-h-[400px]">
                   <div className="flex items-center justify-between mb-6">
@@ -487,17 +473,40 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                       ) : (
                         accounts.map(acc => (
                           <motion.div key={acc.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                            className="group relative p-5 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:border-emerald-500/30 lya:hover:border-lya-primary/30 transition-all">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight">{acc.bank_name}</p>
-                                <p className="text-xs text-gray-400 font-mono mt-1">{acc.account_number}</p>
-                                <p className="text-[10px] text-gray-400 mt-2 italic">Titular: {acc.account_holder}</p>
-                              </div>
-                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => editAccount(acc)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 hover:scale-110 transition-transform"><Edit2 size={16}/></button>
-                                <button onClick={() => deleteAccount(acc.id)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 hover:scale-110 transition-transform"><Trash2 size={16}/></button>
-                              </div>
+                            className="group relative p-5 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:border-emerald-500/30 lya:hover:border-lya-primary/30 transition-all flex justify-between items-start">
+                            
+                            {/* 🚀 DISEÑO DE TARJETA ACTUALIZADO: ALINEACIÓN PERFECTA */}
+                            <div className="flex-1 pr-4 space-y-1.5">
+                              <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight mb-3 flex items-center gap-2">
+                                <Landmark size={14} className="text-emerald-500 lya:text-lya-primary" /> {acc.bank_name}
+                              </p>
+                              
+                              {acc.account_holder && (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="text-[9px] uppercase font-bold text-gray-400 w-14 shrink-0">Titular</span>
+                                  <span className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90 font-medium truncate">{acc.account_holder}</span>
+                                </div>
+                              )}
+                              
+                              {acc.account_number && (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="text-[9px] uppercase font-bold text-gray-400 w-14 shrink-0">Cuenta</span>
+                                  <span className="font-mono font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{acc.account_number}</span>
+                                </div>
+                              )}
+
+                              {acc.clabe && (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="text-[9px] uppercase font-bold text-gray-400 w-14 shrink-0">CLABE</span>
+                                  <span className="font-mono font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{acc.clabe}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 🚀 BOTONES SIEMPRE VISIBLES */}
+                            <div className="flex gap-2 flex-col">
+                              <button onClick={() => editAccount(acc)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700"><Edit2 size={16}/></button>
+                              <button onClick={() => deleteAccount(acc.id)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700"><Trash2 size={16}/></button>
                             </div>
                           </motion.div>
                         ))
@@ -505,16 +514,11 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     </AnimatePresence>
                   </div>
 
-                  <div className="pt-6 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/20 flex flex-col sm:flex-row gap-3">
+                  <div className="pt-6 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/20">
                     <button onClick={() => accounts.length > 0 ? setShowPrintModal(true) : toast.error("No hay cuentas para imprimir")}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all active:scale-95"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all active:scale-95"
                     >
-                      <Printer size={18} /> Imprimir Tarjetas
-                    </button>
-                    <button onClick={handleSaveToServer} disabled={loading}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-xl text-sm font-black shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      <Save size={18} /> {loading ? 'Guardando...' : 'Guardar Cuentas'}
+                      <Printer size={18} /> Imprimir Tarjetas para Mesas
                     </button>
                   </div>
                 </div>

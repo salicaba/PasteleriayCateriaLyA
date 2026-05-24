@@ -100,14 +100,28 @@ export default function PasteleriaKanban({ pedidos, calcularFinanzas, abrirModal
                       </h4>
 
                       {/* Mini Tags */}
-                      <div className="flex flex-wrap gap-1 mb-3">
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {/* 🚀 NUEVO: Badge de Categoría */}
+                        <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 px-2 py-0.5 rounded shadow-sm">
+                          {pedido.categoria || 'Pastel'}
+                        </span>
+
+                        {/* Badges de Tamaño (limitado a 1 para no saturar la tarjeta pequeña) */}
                         {pedido.porciones && pedido.porciones.slice(0, 1).map((p, idx) => (
-                          <span key={idx} className="text-[9px] font-bold bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg lya:border lya:border-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text px-1.5 py-0.5 rounded">{p}</span>
+                          <span key={idx} className="text-[9px] font-bold bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg lya:border lya:border-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text px-1.5 py-0.5 rounded flex items-center">{p}</span>
                         ))}
+                        
+                        {/* Badges de Sabor (limitado a 1) */}
                         {pedido.saborPan && pedido.saborPan.slice(0, 1).map((s, idx) => (
-                          <span key={idx} className="text-[9px] font-bold bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg lya:border lya:border-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text px-1.5 py-0.5 rounded">{s}</span>
+                          <span key={idx} className="text-[9px] font-bold bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg lya:border lya:border-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text px-1.5 py-0.5 rounded flex items-center">{s}</span>
                         ))}
-                        {(pedido.porciones?.length > 1 || pedido.saborPan?.length > 1) && <span className="text-[9px] text-gray-400 lya:text-lya-text/50">+{pedido.porciones.length + pedido.saborPan.length - 2}</span>}
+                        
+                        {/* Indicador de más items */}
+                        {(pedido.porciones?.length > 1 || pedido.saborPan?.length > 1) && (
+                          <span className="text-[9px] text-gray-400 lya:text-lya-text/50 flex items-center font-bold">
+                            +{pedido.porciones.length + pedido.saborPan.length - 2}
+                          </span>
+                        )}
                       </div>
 
                       {/* Mini Finanzas */}
