@@ -35,6 +35,17 @@ import { SettingsPage } from './modules/admin/views/SettingsPage';
 
 import logoLyA from './assets/logo.jpeg'; 
 
+// Helper inteligente para obtener iniciales
+const getInitials = (name) => {
+  if (!name) return 'US';
+  const cleanName = name.trim();
+  const words = cleanName.split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return cleanName.substring(0, 2).toUpperCase();
+};
+
 function App() {
   const [user, setUser] = useState(() => {
     const savedSession = localStorage.getItem('lya_pos_session');
@@ -108,7 +119,9 @@ function App() {
   };
 
   const handleLogout = () => {
+    // 🔥 CORRECCIÓN: Ahora borramos el lya_token al salir para que no se quede guardado uno viejo
     localStorage.removeItem('lya_pos_session');
+    localStorage.removeItem('lya_token'); 
     setUser(null);
   };
 
@@ -374,7 +387,6 @@ function App() {
               <div className="flex items-center gap-2 sm:gap-4">
                 <div className="flex items-center gap-3 bg-white dark:bg-gray-700/50 lya:bg-lya-bg px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 shadow-sm transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 lya:hover:opacity-80">
                   <div className="text-right hidden sm:block">
-                    {/* --- AQUÍ TAMBIÉN MOSTRAMOS SOLO EL PRIMER NOMBRE --- */}
                     <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-none">
                       {user?.fullName ? user.fullName.split(' ')[0] : (user?.username || 'Admin')}
                     </p>
@@ -382,9 +394,15 @@ function App() {
                       {user?.role || 'Administrador'}
                     </p>
                   </div>
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-orange-500 lya:bg-lya-primary rounded-full overflow-hidden border-2 border-white dark:border-gray-600 lya:border-lya-surface shadow-sm shrink-0 flex items-center justify-center text-white text-xs font-bold uppercase">
-                    {(user?.fullName || user?.username || 'A').charAt(0)}
+                  
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border-2 border-white dark:border-gray-600 lya:border-lya-surface shadow-sm shrink-0 flex items-center justify-center text-white text-xs font-bold uppercase ${
+                    user?.role === 'Administrador' 
+                      ? 'bg-purple-600 dark:bg-purple-500' 
+                      : 'bg-blue-600 lya:bg-lya-primary'
+                  }`}>
+                    {getInitials(user?.fullName || user?.username)}
                   </div>
+
                 </div>
               </div>
             </header>

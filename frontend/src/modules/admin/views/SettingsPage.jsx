@@ -21,7 +21,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   // --- CONTROL DE USUARIOS REALES (CONECTADO A BD) ---
   const [systemUsers, setSystemUsers] = useState([]);
-  const [userForm, setUserForm] = useState({ id: '', name: '', username: '', password: '', role: 'Empleado', is_active: true });
+  const [userForm, setUserForm] = useState({ id: '', fullName: '', username: '', password: '', role: 'Empleado', isActive: true });
   const [editingUserId, setEditingUserId] = useState(null);
 
   const [isScanning, setIsScanning] = useState(false);
@@ -37,6 +37,21 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printQuantity, setPrintQuantity] = useState(2);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Helper inteligente para obtener iniciales
+  const getInitials = (name) => {
+    if (!name) return 'US';
+    // Limpiamos los espacios accidentales al inicio y final
+    const cleanName = name.trim();
+    const words = cleanName.split(/\s+/); // Separa por cualquier cantidad de espacios
+    
+    // Si tiene más de una palabra (ej. Emmanuel Salinas), toma la primera letra de cada una (ES)
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    // Si solo es una palabra (ej. Empleado), toma las primeras dos letras (EM)
+    return cleanName.substring(0, 2).toUpperCase();
+  };
 
   // Carga asíncrona real desde la API de base de datos
   const loadInitialData = async () => {
@@ -118,7 +133,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   // --- CRUD REAL CON BASE DE DATOS: CONTROL DE USUARIOS ---
   const handleUserSubmit = async () => {
-    if (!userForm.name || !userForm.username) return toast.error("Nombre y nick de usuario requeridos");
+    if (!userForm.fullName || !userForm.username) return toast.error("Nombre completo y nombre de usuario requeridos");
     if (!editingUserId && !userForm.password) return toast.error("La contraseña es requerida para nuevos usuarios");
 
     setLoading(true);
@@ -144,14 +159,14 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     }
   };
 
-  // Soft Delete Dinámico: Cambia el booleano `is_active` de Sequelize
+  // Soft Delete Dinámico: Cambia el booleano `isActive` de Sequelize
   const toggleUserStatus = async (id, currentStatus) => {
     try {
       const nextStatus = !currentStatus;
-      await client.put(`/users/${id}`, { is_active: nextStatus });
+      await client.put(`/users/${id}`, { isActive: nextStatus });
       toast.success(nextStatus ? "Acceso al POS activado" : "Acceso revocado correctamente");
       
-      setSystemUsers(systemUsers.map(u => u.id === id ? { ...u, is_active: nextStatus } : u));
+      setSystemUsers(systemUsers.map(u => u.id === id ? { ...u, isActive: nextStatus } : u));
     } catch (e) {
       toast.error("No se pudo cambiar el estado de la credencial");
     }
@@ -159,12 +174,19 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   const editUser = (usr) => {
     setEditingUserId(usr.id);
-    setUserForm({ ...usr, password: '' }); 
+    setUserForm({ 
+      id: usr.id,
+      fullName: usr.fullName,
+      username: usr.username,
+      role: usr.role,
+      isActive: usr.isActive,
+      password: '' 
+    }); 
   };
 
   const resetUserForm = () => {
     setEditingUserId(null);
-    setUserForm({ id: '', name: '', username: '', password: '', role: 'Empleado', is_active: true });
+    setUserForm({ id: '', fullName: '', username: '', password: '', role: 'Empleado', isActive: true });
   };
 
   // --- MANIPULACIÓN DEL HARDWARE ---
@@ -279,15 +301,15 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 h-fit">
+              <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 h-fit sticky top-6">
                 <h3 className="font-bold text-gray-800 dark:text-white mb-6 text-base flex items-center gap-2">
-                  <Shield size={18} className="text-blue-500" />
+                  <Shield size={18} className="text-blue-500 lya:text-lya-primary" />
                   {editingUserId ? 'Editar Credenciales' : 'Registrar Nuevo Empleado'}
                 </h3>
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Nombre Completo</label>
-                    <input type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} placeholder="Ej. Juan Pérez Maza"
+                    <input type="text" value={userForm.fullName} onChange={e => setUserForm({...userForm, fullName: e.target.value})} placeholder="Ej. Juan Pérez Maza"
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" />
                   </div>
                   <div>
@@ -319,7 +341,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     <button onClick={handleUserSubmit} disabled={loading}
                       className="flex-[2] py-3 bg-blue-600 lya:bg-lya-primary text-white font-bold rounded-xl text-xs shadow-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <Save size={14} /> {editingUserId ? 'Actualizar Cambios' : 'Registrar Empleado'}
+                      <Save size={14} /> {editingUserId ? 'Guardar Cambios' : 'Registrar Empleado'}
                     </button>
                   </div>
                 </div>
@@ -328,33 +350,65 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest">Personal Registrado ({systemUsers.length})</h4>
-                  <p className="text-[11px] text-gray-400 italic">Los empleados inactivos pierden acceso</p>
+                  <p className="text-[11px] text-gray-400 italic">Administra los accesos al sistema</p>
                 </div>
+                
+                {/* TARJETAS DE USUARIOS MEJORADAS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {systemUsers.map(usr => (
-                    <div key={usr.id} className={`p-5 rounded-3xl border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative overflow-hidden transition-all flex flex-col justify-between ${usr.is_active ? 'border-gray-100 dark:border-gray-700' : 'border-red-200/50 dark:border-red-900/30 opacity-75'}`}>
-                      <div>
-                        <div className="flex justify-between items-start">
-                          <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${usr.role === 'Administrador' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                            {usr.role}
-                          </span>
-                          <div className="flex gap-1.5">
-                            <button onClick={() => editUser(usr)} className="p-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg text-blue-500 hover:scale-105 transition-transform"><Edit2 size={14} /></button>
-                            <button onClick={() => toggleUserStatus(usr.id, usr.is_active)} className={`p-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg transition-transform hover:scale-105 ${usr.is_active ? 'text-red-500' : 'text-emerald-500'}`}>{usr.is_active ? <UserX size={14} /> : <UserCheck size={14} />}</button>
+                    <div key={usr.id} className={`p-5 rounded-2xl border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between hover:shadow-md ${usr.isActive ? 'border-gray-200 dark:border-gray-700' : 'border-red-200 dark:border-red-900/30 opacity-80'}`}>
+                      
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3.5">
+                          {/* Avatar Circular con iniciales y color dinámico */}
+                          <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
+                            !usr.isActive 
+                              ? 'bg-gray-400 dark:bg-gray-600' // Gris si está suspendido
+                              : usr.role === 'Administrador' 
+                                ? 'bg-purple-600 dark:bg-purple-500' // Morado para administradores
+                                : 'bg-blue-600 lya:bg-lya-primary' // Azul/Lya Primary para empleados
+                          }`}>
+                            {getInitials(usr.fullName)}
+                          </div>
+                          
+                          <div className="flex flex-col">
+                            {/* Nombre completo destacado */}
+                            <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight break-all">
+                              {usr.fullName}
+                            </h4>
+                            {/* Nombre de usuario limpio sin el @ */}
+                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+                              {usr.username}
+                            </span>
                           </div>
                         </div>
-                        <div className="mt-3">
-                          <p className="text-sm font-black text-gray-800 dark:text-white leading-tight">{usr.name}</p>
-                          <p className="text-xs text-gray-400 font-mono mt-0.5">@{usr.username}</p>
+
+                        {/* Botones de acción mejorados */}
+                        <div className="flex gap-1.5 shrink-0 ml-2">
+                          <button onClick={() => editUser(usr)} className="p-2 bg-gray-50 hover:bg-blue-50 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-blue-500 transition-colors" title="Editar usuario">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => toggleUserStatus(usr.id, usr.isActive)} className={`p-2 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors ${usr.isActive ? 'text-red-500 hover:bg-red-50 dark:hover:bg-gray-600' : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-gray-600'}`} title={usr.isActive ? "Desactivar Acceso" : "Activar Acceso"}>
+                            {usr.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                          </button>
                         </div>
                       </div>
-                      <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700/50 flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400 font-medium">Estado de cuenta:</span>
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${usr.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-red-400'}`} />
-                          <span className={`text-[10px] font-black ${usr.is_active ? 'text-emerald-600' : 'text-red-500'}`}>{usr.is_active ? 'ACTIVO' : 'SUSPENDIDO'}</span>
+
+                      <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between">
+                        {/* Etiqueta de Rol */}
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md ${usr.role === 'Administrador' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                          {usr.role}
+                        </span>
+                        
+                        {/* Estado visual de conexión */}
+                        <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 px-2.5 py-1 rounded-md">
+                          <div className={`w-1.5 h-1.5 rounded-full ${usr.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                          <span className={`text-[10px] font-black tracking-wide ${usr.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {usr.isActive ? 'ACTIVO' : 'SUSPENDIDO'}
+                          </span>
                         </div>
                       </div>
+                      
                     </div>
                   ))}
                 </div>

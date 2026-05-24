@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import logoLyA from '../../../assets/logo.jpeg'; 
-
-// Importación de cliente habilitada para conexión real al backend
 import client from '../../../api/client'; 
 
 const motivationalPhrases = [
@@ -61,9 +59,10 @@ export const LoginScreen = ({ onLogin }) => {
       const response = await client.post('/auth/login', { username, password });
       
       if (response.data && response.data.user) {
+        // 🔥 CORRECCIÓN AQUÍ: Guardamos el Token en el navegador para que Axios lo pueda usar
+        localStorage.setItem('lya_token', response.data.token);
+
         const loggedUser = response.data.user;
-        
-        // --- EXTRAEMOS SOLO EL PRIMER NOMBRE ---
         const firstName = loggedUser.fullName ? loggedUser.fullName.split(' ')[0] : loggedUser.username;
         
         if (loggedUser.role === 'Administrador') {
