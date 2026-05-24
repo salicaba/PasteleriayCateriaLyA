@@ -1,13 +1,13 @@
 // src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Timer, Check, ChefHat, CheckCircle, Flame } from 'lucide-react';
+import { Timer, Check, ChefHat, CheckCircle, Flame, BellRing } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllReady }) => {
   const [elapsed, setElapsed] = useState('');
   const [progress, setProgress] = useState(0);
   const [urgency, setUrgency] = useState({
-    theme: 'normal', // normal, warning, critical, ready
+    theme: 'normal',
     textGlow: 'from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 lya:from-lya-primary lya:to-lya-secondary',
     border: 'border-gray-200 dark:border-gray-800 lya:border-lya-border/40',
     shadow: 'shadow-xl shadow-gray-200/50 dark:shadow-none lya:shadow-lya-primary/5',
@@ -15,7 +15,8 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
     timeBg: 'bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-primary/10 text-blue-600 dark:text-blue-400 lya:text-lya-primary'
   });
 
-  const allReady = order.items.every(i => i.kitchenStatus === 'READY');
+  // Ahora consideramos 'allReady' cuando todos los items están en estado de 'PREPARING' (tachados en mesa de trabajo)
+  const allReady = order.items.every(i => i.kitchenStatus === 'PREPARING');
 
   // Lógica del cronómetro y la barra de progreso
   useEffect(() => {
@@ -27,7 +28,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
       const diffSecs = Math.floor((diffMs % 60000) / 1000);
       const totalSecs = Math.floor(diffMs / 1000);
       
-      // Calculamos el progreso basado en 15 minutos (900 segundos)
       const maxSecs = 15 * 60;
       const currentProgress = Math.min((totalSecs / maxSecs) * 100, 100);
       setProgress(currentProgress);
@@ -85,7 +85,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className={`relative flex flex-col rounded-[2rem] bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow}`}
     >
-      {/* BARRA DE PROGRESO DE TIEMPO (Top) */}
       <div className="absolute top-0 left-0 w-full h-1.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg">
         <div 
           className={`h-full transition-all duration-1000 ease-linear ${urgency.bar}`} 
@@ -93,7 +92,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
         />
       </div>
 
-      {/* --- ENCABEZADO "NEO" --- */}
       <div className="pt-6 pb-4 px-5 flex justify-between items-center relative z-10">
         <h3 className={`text-3xl sm:text-4xl font-black uppercase tracking-tighter bg-gradient-to-br bg-clip-text text-transparent ${urgency.textGlow}`}>
           {order.mesa}
@@ -105,10 +103,9 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
         </div>
       </div>
 
-      {/* --- LISTA DE PRODUCTOS --- */}
       <div className="flex-1 px-3 pb-3 space-y-2">
         {order.items.map(item => {
-          const isReady = item.kitchenStatus === 'READY';
+          const isReady = item.kitchenStatus === 'PREPARING';
           
           return (
             <motion.div 
@@ -121,7 +118,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
                   : 'bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 hover:shadow-md hover:border-blue-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/40'
               }`}
             >
-              {/* Círculo Checkbox Morphs */}
               <div className={`relative w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
                 isReady 
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-95' 
@@ -143,7 +139,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
                   {item.nombre}
                 </p>
                 
-                {/* Variantes en estilo "Píldoras Ghost" */}
                 {item.preparaciones && item.preparaciones.length > 0 && (
                   <div className={`mt-1 flex flex-wrap gap-1.5 transition-opacity duration-300 ${isReady ? 'opacity-40' : 'opacity-100'}`}>
                     {item.preparaciones.map((prep, idx) => (
@@ -173,21 +168,20 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
         })}
       </div>
 
-      {/* --- BOTÓN DE ACCIÓN FLOTANTE --- */}
       <div className="p-3 bg-transparent">
         {allReady ? (
           <button 
             onClick={() => onComplete(order.id)}
             className="w-full py-4 bg-gradient-to-r from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white font-black rounded-[1rem] text-sm sm:text-base uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.98]"
           >
-            <CheckCircle size={22} /> Entregar Pedido
+            <BellRing size={22} className="animate-pulse" /> Listo para Entregar
           </button>
         ) : (
           <button 
             onClick={() => onMarkAllReady(order.id)}
             className="w-full py-4 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:opacity-80 text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-[1rem] text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40"
           >
-            <ChefHat size={18} /> Marcar Todo Listo
+            <ChefHat size={18} /> Marcar Todo Preparado
           </button>
         )}
       </div>

@@ -1,6 +1,7 @@
+// src/modules/pasteleria/views/PasteleriaCalendar.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, DollarSign, Plus, X, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, DollarSign, Plus, X, CalendarDays, Search } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
@@ -17,6 +18,9 @@ export default function PasteleriaCalendar() {
   const [montoIngresado, setMontoIngresado] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  
+  // 🔥 NUEVO ESTADO: Para controlar el valor del input de búsqueda y poder limpiarlo
+  const [fechaBusqueda, setFechaBusqueda] = useState('');
 
   if (loading) return null;
 
@@ -30,6 +34,27 @@ export default function PasteleriaCalendar() {
 
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+
+  // 🔥 ACTUALIZADA: Guardamos el valor en el estado para controlarlo
+  const handleDateSearch = (e) => {
+    const dateVal = e.target.value;
+    setFechaBusqueda(dateVal); // Guardamos lo que el usuario escribe
+    if (!dateVal) return;
+    
+    const [year, month, day] = dateVal.split('-');
+    const newDate = new Date(year, month - 1, day);
+    
+    setCurrentMonth(newDate);
+    setSelectedDate(newDate);
+  };
+
+  // 🔥 NUEVA FUNCIÓN: Regresar al día de hoy y limpiar la búsqueda
+  const handleIrAHoy = () => {
+    const hoy = new Date();
+    setCurrentMonth(hoy);
+    setSelectedDate(hoy);
+    setFechaBusqueda(''); // Limpia el input del buscador de fechas
+  };
 
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -74,6 +99,22 @@ export default function PasteleriaCalendar() {
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Calendario de entregas agendadas</p>
           </div>
         </div>
+
+        {/* BUSCADOR RÁPIDO DE FECHAS */}
+        <div className="w-full md:w-auto flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-2 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-emerald-500/30 transition-all">
+          <div className="bg-white dark:bg-gray-700 lya:bg-lya-surface p-2 rounded-xl text-emerald-500 lya:text-lya-primary shadow-sm">
+             <Search size={16} />
+          </div>
+          <div className="flex flex-col pr-2 flex-1">
+             <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-wider">Ir a fecha</label>
+             <input
+               type="date"
+               value={fechaBusqueda} // Conectado al estado
+               onChange={handleDateSearch}
+               className="bg-transparent border-none outline-none text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text cursor-pointer leading-none"
+             />
+          </div>
+        </div>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
@@ -84,9 +125,16 @@ export default function PasteleriaCalendar() {
             <h2 className="text-2xl font-bold dark:text-white lya:text-lya-text capitalize">
               {meses[currentMonth.getMonth()]} <span className="text-emerald-500 lya:text-lya-primary">{currentMonth.getFullYear()}</span>
             </h2>
-            <div className="flex gap-2">
-              <button onClick={prevMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text"><ChevronLeft size={20}/></button>
-              <button onClick={nextMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text"><ChevronRight size={20}/></button>
+            <div className="flex gap-2 items-center">
+              {/* 🔥 BOTÓN HOY AÑADIDO AQUÍ */}
+              <button 
+                onClick={handleIrAHoy} 
+                className="px-4 py-2 mr-1 bg-emerald-100/50 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 text-emerald-700 dark:text-emerald-400 lya:text-lya-primary rounded-xl font-bold text-sm transition-colors shadow-sm active:scale-95"
+              >
+                Hoy
+              </button>
+              <button onClick={prevMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text active:scale-95"><ChevronLeft size={20}/></button>
+              <button onClick={nextMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text active:scale-95"><ChevronRight size={20}/></button>
             </div>
           </div>
 

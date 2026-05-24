@@ -10,8 +10,9 @@ export const getKitchenTickets = async (req, res) => {
   try {
     const tickets = await OrderItem.findAll({
       where: {
-        // 🔥 FIX: Ahora incluimos 'READY' para que no desaparezcan al marcarlos
-        kitchenStatus: ['PENDING', 'PREPARING', 'READY']
+        // 🔥 REFACTOR FASE 1 y 2: Solo traemos los que están pendientes o en preparación. 
+        // Cuando pasen a 'READY' (Listo para Entregar), desaparecerán mágicamente de aquí.
+        kitchenStatus: ['PENDING', 'PREPARING']
       },
       include: [
         {

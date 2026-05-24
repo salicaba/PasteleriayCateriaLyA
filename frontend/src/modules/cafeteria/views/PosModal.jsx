@@ -120,6 +120,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   if (!isOpen || !mesa) return null;
 
+  // 🔥 MOVEMOS isLlevar ARRIBA para poder usarlo en sidebarProps
+  const isLlevar = mesa.zona === 'llevar';
+
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -129,10 +132,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     orderStatus, paidAccounts, 
     onPrintTicket: openTicketPreview, 
     onCloseTable: finalizeTable,
-    toggleDeliveredStatus
+    toggleDeliveredStatus,
+    isLlevar // <-- AÑADIDO AQUÍ
   };
 
-  const isLlevar = mesa.zona === 'llevar';
   const partesNumero = (mesa.numero || '').toString().split(' - ');
   const numeroReal = partesNumero[0]; 
   

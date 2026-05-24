@@ -38,7 +38,8 @@ export const useKitchenController = () => {
             tamano: p.tamano || 'Estándar',
             leche: p.leche,
             extras: p.extras || [],
-            isReady: item.kitchenStatus === 'READY'
+            // En KDS, "isReady" visualmente es cuando ya se preparó (PREPARING)
+            isReady: item.kitchenStatus === 'PREPARING'
           })),
           kitchenStatus: item.kitchenStatus
         });
@@ -57,19 +58,18 @@ export const useKitchenController = () => {
   return {
     orders: [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
     
-    // 🔥 LÓGICA DE TOGGLE: Permite desmarcar si hubo error
+    // 🔥 FASE 1: Tachado individual (Cambia a PREPARING en BD)
     toggleItemReady: async (orderId, itemId) => {
         const order = orders.find(o => o.id === orderId);
         const item = order?.items.find(i => i.id === itemId);
         if (!item) return;
 
-        // Si ya está READY, lo pasamos a PENDING. Si no, a READY.
-        const newStatus = item.kitchenStatus === 'READY' ? 'PENDING' : 'READY';
+        const newStatus = item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING';
         
         try {
             await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
             fetchKitchenOrders();
-        } catch(e){ console.error("Error al cambiar estado"); }
+        } catch(e){ console.error("Error al cambiar estado individual"); }
     },
 
     markAllReady: async (orderId) => {
@@ -77,22 +77,23 @@ export const useKitchenController = () => {
         if(!order) return;
         try {
             const promises = order.items
-                .filter(i => i.kitchenStatus !== 'READY')
-                .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
+                .filter(i => i.kitchenStatus !== 'PREPARING')
+                .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'PREPARING' }));
             await Promise.all(promises);
             fetchKitchenOrders();
-        } catch(e){}
+        } catch(e){ console.error("Error al marcar todo preparado"); }
     },
 
-    // 🔥 COMPLETAR: Este es el botón final que hace desaparecer la mesa (Estado DELIVERED)
+    // 🔥 FASE 2: LISTO PARA ENTREGAR
+    // Pasa los productos a READY, haciéndolos desaparecer del KDS y aparecer al mesero.
     completeOrder: async (orderId) => {
         const order = orders.find(o => o.id === orderId);
         if(!order) return;
         try {
-            const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'DELIVERED' }));
+            const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
             await Promise.all(promises);
             fetchKitchenOrders();
-        } catch(e){}
+        } catch(e){ console.error("Error al enviar pedido a meseros"); }
     }
   };
 };

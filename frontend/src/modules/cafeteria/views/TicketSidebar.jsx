@@ -12,7 +12,8 @@ export const TicketSidebar = ({
   cart, total, hasUnsentItems, unsentTotal, mesaTotal, 
   onAdd, onRemove, onDelete, onSendToKitchen, onCheckout,
   cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem,
-  orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus
+  orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus,
+  isLlevar // 🔥 AÑADIDO: Prop para saber si es pedido para llevar
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
   const [draggedItem, setDraggedItem] = useState(null);
@@ -342,7 +343,7 @@ export const TicketSidebar = ({
                                     {item.kitchenStatus === 'DELIVERED' ? (
                                       <><CheckCircle size={12} /> Entregado</>
                                     ) : item.kitchenStatus === 'READY' ? (
-                                      <><CheckCircle size={12} className="animate-pulse" /> Confirmar Entrega</>
+                                      <><CheckCircle size={12} className="animate-pulse" /> Listo para Entregar</>
                                     ) : (
                                       <><ChefHat size={12} /> En Preparación</>
                                     )}
@@ -419,14 +420,17 @@ export const TicketSidebar = ({
                 onClick={onCloseTable} 
                 className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform"
               >
-                <XCircle size={18} /><span>Cerrar / Liberar Mesa</span>
+                <XCircle size={18} />
+                {/* 🔥 TEXTO DINÁMICO AQUÍ */}
+                <span>{isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa'}</span>
               </button>
            </div>
         ) : (
            <>
              <div className="space-y-2 mb-4">
                <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-xs font-bold uppercase tracking-wider">
-                 <span>Subtotal Mesa</span>
+                 {/* 🔥 TEXTO DINÁMICO AQUÍ */}
+                 <span>{isLlevar ? 'Subtotal Pedido' : 'Subtotal Mesa'}</span>
                  <span>${mesaTotal.toFixed(2)}</span>
                </div>
                {hasUnsentItems && (
@@ -469,7 +473,8 @@ export const TicketSidebar = ({
                  )}
                >
                  <CreditCard size={18} />
-                 <span>Cobrar Mesa</span>
+                 {/* 🔥 TEXTO DINÁMICO AQUÍ */}
+                 <span>{isLlevar ? 'Cobrar Pedido' : 'Cobrar Mesa'}</span>
                </button>
              </div>
            </>
