@@ -5,7 +5,7 @@ import { KitchenOrderCard } from './KitchenOrderCard';
 import { Flame, UtensilsCrossed, ShoppingBag } from 'lucide-react';
 
 export const KitchenPage = () => {
-  // 🔥 CORRECCIÓN: Extraemos markAllReady del controlador
+  // 🔥 Extraemos markAllReady del controlador
   const { orders, toggleItemReady, completeOrder, markAllReady } = useKitchenController();
 
   // Estado para controlar qué vista se muestra en móviles
@@ -77,10 +77,11 @@ export const KitchenPage = () => {
       {/* ÁREA DE CONTENIDO */}
       <div className="flex-1 overflow-hidden">
         {orders.length === 0 ? (
-          // ESTADO VACÍO
+          // ESTADO VACÍO (ANIMADO)
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
             className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 lya:text-lya-text/50 space-y-5"
           >
             <div className="p-8 rounded-full bg-gray-100 dark:bg-gray-900 lya:bg-lya-surface lya:border lya:border-lya-border/30">
@@ -103,13 +104,12 @@ export const KitchenPage = () => {
                   <UtensilsCrossed size={20} className="text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary" />
                   <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-300 lya:text-lya-secondary">Mesas (Local)</h2>
                 </div>
-                {/* LA PRIORIDAD AHORA ESTÁ AQUÍ */}
                 <span className="bg-emerald-500 lya:bg-lya-secondary text-white lya:text-lya-surface text-[10px] uppercase px-2.5 py-1 rounded-full font-black tracking-wider animate-pulse">
                   Prioridad
                 </span>
               </div>
               
-              {/* Lista Scrollable de Salón */}
+              {/* Lista Scrollable de Salón con Animaciones Consistentes */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-gray-50/50 dark:bg-transparent lya:bg-lya-bg/30">
                 {ordersMesa.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-400 lya:text-lya-text/50 text-sm font-medium">Sin comandas de salón</div>
@@ -117,8 +117,21 @@ export const KitchenPage = () => {
                   <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start auto-rows-max">
                     <AnimatePresence mode="popLayout">
                       {ordersMesa.map(order => (
-                        // 🔥 CORRECCIÓN: Se pasa onMarkAllReady a la tarjeta
-                        <KitchenOrderCard key={order.id} order={order} onToggleItem={toggleItemReady} onComplete={completeOrder} onMarkAllReady={markAllReady} />
+                        <motion.div
+                          key={order.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        >
+                          <KitchenOrderCard 
+                            order={order} 
+                            onToggleItem={toggleItemReady} 
+                            onComplete={completeOrder} 
+                            onMarkAllReady={markAllReady} 
+                          />
+                        </motion.div>
                       ))}
                     </AnimatePresence>
                   </motion.div>
@@ -138,7 +151,7 @@ export const KitchenPage = () => {
                 </div>
               </div>
               
-              {/* Lista Scrollable Para Llevar */}
+              {/* Lista Scrollable Para Llevar con Animaciones Consistentes */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-gray-50/50 dark:bg-transparent lya:bg-lya-bg/30">
                 {ordersLlevar.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-400 lya:text-lya-text/50 text-sm font-medium">Sin pedidos para llevar</div>
@@ -146,8 +159,21 @@ export const KitchenPage = () => {
                   <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start auto-rows-max">
                     <AnimatePresence mode="popLayout">
                       {ordersLlevar.map(order => (
-                        // 🔥 CORRECCIÓN: Se pasa onMarkAllReady a la tarjeta
-                        <KitchenOrderCard key={order.id} order={order} onToggleItem={toggleItemReady} onComplete={completeOrder} onMarkAllReady={markAllReady} />
+                        <motion.div
+                          key={order.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        >
+                          <KitchenOrderCard 
+                            order={order} 
+                            onToggleItem={toggleItemReady} 
+                            onComplete={completeOrder} 
+                            onMarkAllReady={markAllReady} 
+                          />
+                        </motion.div>
                       ))}
                     </AnimatePresence>
                   </motion.div>

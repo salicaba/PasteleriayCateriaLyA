@@ -24,7 +24,12 @@ export const QrControlPage = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white"
+    >
       
       {/* MAGIA CSS PARA IMPRESIÓN REFORZADA CON LÍNEA DE RECORTE */}
       <style dangerouslySetInnerHTML={{ __html: `
@@ -50,7 +55,7 @@ export const QrControlPage = () => {
       `}} />
 
       {/* HEADER EN PANTALLA */}
-      <header className="no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10">
+      <header className="no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
             <QrCode size={28} />
@@ -64,38 +69,40 @@ export const QrControlPage = () => {
             </p>
           </div>
         </div>
+      </header>
+
+      {/* TABS EN PANTALLA Y CONTROLES */}
+      <div className="no-print flex flex-wrap items-center justify-between gap-4 mb-6 shrink-0 z-10">
+        <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 p-1 rounded-2xl overflow-x-auto">
+          {zonas.map(zona => (
+            <button
+              key={zona.id}
+              onClick={() => setZonaActiva(zona.id)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+                zonaActiva === zona.id 
+                  ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-orange-500 lya:text-lya-primary shadow-sm' 
+                  : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'
+              }`}
+            >
+              {zona.id === 'salon' ? <LayoutGrid size={18} /> : <ShoppingBag size={18} />}
+              {zona.label}
+            </button>
+          ))}
+        </div>
 
         {zonaActiva === 'salon' && (
           <button 
             onClick={addMesa}
-            className="flex items-center gap-2 bg-gray-900 dark:bg-orange-600 hover:bg-gray-800 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3 rounded-2xl font-bold transition-all shadow-lg active:scale-95"
+            className="flex items-center gap-2 bg-gray-900 dark:bg-orange-600 hover:bg-gray-800 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md"
           >
             <Plus size={20} />
             <span>Agregar Mesa</span>
           </button>
         )}
-      </header>
-
-      {/* TABS EN PANTALLA */}
-      <div className="no-print flex gap-2 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 p-1 rounded-2xl overflow-x-auto w-fit mb-6 shrink-0 z-10">
-        {zonas.map(zona => (
-          <button
-            key={zona.id}
-            onClick={() => setZonaActiva(zona.id)}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${
-              zonaActiva === zona.id 
-                ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-orange-500 lya:text-lya-primary shadow-sm' 
-                : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'
-            }`}
-          >
-            {zona.id === 'salon' ? <LayoutGrid size={18} /> : <ShoppingBag size={18} />}
-            {zona.label}
-          </button>
-        ))}
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pb-24 relative">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-24 relative">
         <AnimatePresence mode='wait'>
           
           {zonaActiva === 'salon' ? (
@@ -163,10 +170,14 @@ export const QrControlPage = () => {
               </AnimatePresence>
 
               {mesas.length === 0 && (
-                <div className="col-span-full py-20 flex flex-col items-center text-gray-400 lya:text-lya-text/50">
+                <motion.div 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="col-span-full py-20 flex flex-col items-center text-gray-400 lya:text-lya-text/50"
+                >
                   <LayoutGrid size={48} className="mb-4 opacity-20" />
-                  <p className="font-medium">No hay mesas en el sistema. Haz clic en "Agregar Mesa".</p>
-                </div>
+                  <p className="font-medium text-lg">No hay mesas en el sistema.</p>
+                  <button onClick={addMesa} className="mt-2 text-orange-500 lya:text-lya-primary font-bold hover:underline">Agregar Mesa</button>
+                </motion.div>
               )}
             </motion.div>
           ) : (
@@ -203,7 +214,6 @@ export const QrControlPage = () => {
                   </span>
                 </div>
 
-                {/* AQUÍ CAMBIAMOS EL BOTÓN DE "IMPRIMIR" A "MOSTRAR QR" COMO QUERÍAS */}
                 <button 
                   onClick={() => setPreviewMesa({ isLlevar: true })}
                   className="w-full mt-auto py-2.5 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 no-print"
@@ -284,6 +294,6 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
       
-    </div>
+    </motion.div>
   );
 };

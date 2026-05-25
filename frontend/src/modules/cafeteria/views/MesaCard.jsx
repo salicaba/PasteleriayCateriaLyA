@@ -80,14 +80,6 @@ export const MesaCard = ({ mesa, onClick }) => {
           }`}>
             {isLlevar ? <ShoppingBag size={20} strokeWidth={2} /> : <UtensilsCrossed size={20} strokeWidth={2} />}
           </div>
-          
-          <div className={`p-2 rounded-xl transition-colors ${
-            isOcupada 
-              ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
-              : 'bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-border'
-          }`}>
-            {isLlevar ? <ShoppingBag size={20} strokeWidth={2} /> : <UtensilsCrossed size={20} strokeWidth={2} />}
-          </div>
         </div>
 
         {/* Centro: Total y Datos del Cliente estructurados verticalmente */}

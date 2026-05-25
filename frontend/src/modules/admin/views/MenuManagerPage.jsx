@@ -53,7 +53,9 @@ export const MenuManagerPage = () => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+      initial={{ opacity: 0, y: 10 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
@@ -94,10 +96,18 @@ export const MenuManagerPage = () => {
                 </h2>
 
                 {categoryProducts.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <AnimatePresence>
+                  <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <AnimatePresence mode="popLayout">
                       {categoryProducts.map((product) => (
-                        <motion.div key={product.id} layout initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-5 shadow-sm border ${product.disponible || product.isActive ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30' : 'border-red-200 dark:border-red-900/50 opacity-75'}`}>
+                        <motion.div 
+                          key={product.id} 
+                          layout 
+                          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-5 shadow-sm border ${product.disponible || product.isActive ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30' : 'border-red-200 dark:border-red-900/50 opacity-75'}`}
+                        >
                           <div className="flex items-center space-x-4 mb-4">
                             <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner flex items-center justify-center">
                               {product.image || product.imageUrl ? (
@@ -125,7 +135,7 @@ export const MenuManagerPage = () => {
                         </motion.div>
                       ))}
                     </AnimatePresence>
-                  </div>
+                  </motion.div>
                 ) : (
                   <div className="p-6 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
                     <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium">Categoría vacía. Añade un producto aquí.</p>
@@ -146,7 +156,13 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {isCategoryManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 lya:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]"
+            >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">Administrar Categorías</h3>
                 <button onClick={() => { setIsCategoryManagerOpen(false); setCategoryToEdit(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 lya:text-lya-text/50 lya:hover:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/40 p-2 rounded-full transition-colors">
@@ -185,7 +201,13 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {categoryToDelete && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
+            >
               <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
                 <AlertTriangle size={36} />
               </div>
@@ -210,7 +232,13 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {productToDelete && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
+            >
               <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
                 <AlertTriangle size={36} />
               </div>
@@ -235,7 +263,13 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {isOptionsManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
                 <div>
                   <h3 className="text-xl font-black dark:text-gray-100 lya:text-lya-text flex items-center gap-2">
