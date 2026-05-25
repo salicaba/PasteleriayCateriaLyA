@@ -4,7 +4,7 @@ import {
   Save, Landmark, Plus, Trash2, Edit2, Check, Printer, 
   Settings, Sliders, Info, Palette, Monitor, 
   Maximize, Minimize, Layout, Wifi, Usb, 
-  RefreshCw, AlertCircle, Barcode, Keyboard, Users, Shield, UserX, UserCheck
+  RefreshCw, AlertCircle, Barcode, Keyboard, Users, Shield, UserX, UserCheck, MessageCircle
 } from 'lucide-react';
 import client from '../../../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,7 @@ import { ThemeSelector } from '../../../components/ThemeSelector';
 
 export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const [accounts, setAccounts] = useState([]);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   
   // Estados de Configuración de Hardware
   const [printerConfig, setPrinterConfig] = useState({ type: 'usb', interface: '' });
@@ -59,6 +60,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
         if (Array.isArray(resSettings.data.bank_accounts)) setAccounts(resSettings.data.bank_accounts);
         if (resSettings.data.printer_config) setPrinterConfig(resSettings.data.printer_config);
         if (resSettings.data.barcode_config) setBarcodeConfig(resSettings.data.barcode_config);
+        if (resSettings.data.whatsapp_number) setWhatsappNumber(resSettings.data.whatsapp_number);
       }
 
       if (Array.isArray(resUsers.data)) {
@@ -100,6 +102,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
         bank_accounts: accounts,
         printer_config: printerConfig,
         barcode_config: barcodeConfig,
+        whatsapp_number: whatsappNumber,
         ...payloadToOverride // Sobrescribe con los datos más recientes antes de que React actualice el estado visual
       });
       toast.success("¡Configuración guardada en la Base de Datos!");
@@ -225,6 +228,10 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     iframe.style.position = 'absolute'; iframe.style.width = '0px'; iframe.style.height = '0px'; iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
+    const footerText = whatsappNumber 
+      ? `<b>Importante:</b> En el concepto escribe tu número de mesa o folio (si es para llevar, tu nombre).<br>Envía tu comprobante al WhatsApp <b>${whatsappNumber}</b> o muéstraselo a tu mesero. ¡Gracias!`
+      : `<b>Importante:</b> En el concepto escribe tu número de mesa o folio (si es para llevar, tu nombre).<br>Muestra tu comprobante al mesero. ¡Gracias!`;
+
     const htmlContent = `
       <html>
         <head>
@@ -239,7 +246,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             .info-group { margin-bottom: 8px; text-align: left; background: #f9f9f9; padding: 8px; border-radius: 8px; }
             .label { font-size: 9px; font-weight: bold; color: #999; text-transform: uppercase; display: block; }
             .val { font-size: 13px; font-weight: bold; color: #333; word-break: break-all; }
-            .footer { font-size: 9px; margin-top: 15px; font-style: italic; color: #666; line-height: 1.2; }
+            .footer { font-size: 9px; margin-top: 15px; font-style: italic; color: #666; line-height: 1.3; background: #fff5eb; padding: 10px; border-radius: 8px; border: 1px solid #ffe8cc; }
             @media print { body { padding: 0; } }
           </style>
         </head>
@@ -255,7 +262,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   <div class="info-group"><span class="label">Cuenta/Tarjeta</span><span class="val">${acc.account_number}</span></div>
                   ${acc.clabe ? `<div class="info-group"><span class="label">CLABE</span><span class="val">${acc.clabe}</span></div>` : ''}
                 `).join('<hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">')}
-                <div class="footer"><b>Importante:</b> Escribe tu número de mesa o folio en el concepto.<br>Envía tu comprobante por WhatsApp. ¡Gracias!</div>
+                <div class="footer">${footerText}</div>
               </div>
             `).join('')}
           </div>
@@ -414,6 +421,33 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
               </div>
             </div>
 
+            {/* Tarjeta Neo-Bento para WhatsApp */}
+            <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/10 lya:bg-lya-primary/10 flex items-center justify-center shrink-0">
+                 <MessageCircle size={28} className="text-emerald-500 lya:text-lya-primary" />
+              </div>
+              <div className="flex-1 w-full text-center sm:text-left">
+                <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">WhatsApp para Comprobantes</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Este número se imprimirá en las tarjetas de pago y se mostrará al personal para verificar transferencias.</p>
+              </div>
+              <div className="w-full sm:w-80 flex items-center gap-2">
+                <input 
+                  type="text" 
+                  value={whatsappNumber} 
+                  onChange={e => setWhatsappNumber(e.target.value)} 
+                  placeholder="Ej. 961 123 4567" 
+                  className="w-full px-5 py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-bold" 
+                />
+                <button 
+                  onClick={() => saveSettingsToDB({ whatsapp_number: whatsappNumber })} 
+                  className="h-[52px] px-5 bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center" 
+                  title="Guardar Número"
+                >
+                  <Save size={20}/>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Formulario de Cuentas */}
               <section className="space-y-6">
@@ -475,7 +509,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                           <motion.div key={acc.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                             className="group relative p-5 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:border-emerald-500/30 lya:hover:border-lya-primary/30 transition-all flex justify-between items-start">
                             
-                            {/* 🚀 DISEÑO DE TARJETA ACTUALIZADO: ALINEACIÓN PERFECTA */}
                             <div className="flex-1 pr-4 space-y-1.5">
                               <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight mb-3 flex items-center gap-2">
                                 <Landmark size={14} className="text-emerald-500 lya:text-lya-primary" /> {acc.bank_name}
@@ -503,7 +536,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                               )}
                             </div>
 
-                            {/* 🚀 BOTONES SIEMPRE VISIBLES */}
                             <div className="flex gap-2 flex-col">
                               <button onClick={() => editAccount(acc)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700"><Edit2 size={16}/></button>
                               <button onClick={() => deleteAccount(acc.id)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700"><Trash2 size={16}/></button>

@@ -3,17 +3,30 @@ import BusinessConfig from './BusinessConfig.model.js';
 
 export const getConfig = async (req, res) => {
   try {
-    // Buscamos la configuración bajo la clave única 'bank_accounts'
-    const config = await BusinessConfig.findByPk('bank_accounts');
+    const configs = await BusinessConfig.findAll();
     
-    if (!config) {
-      // Si no existe, devolvemos un arreglo vacío
-      return res.json({ bank_accounts: [] });
-    }
-
-    // Intentamos parsear el valor que es un String JSON en la BD
-    const accounts = config.value ? JSON.parse(config.value) : [];
-    res.json({ bank_accounts: accounts });
+    // Objeto con valores predeterminados seguros
+    const result = { 
+      bank_accounts: [], 
+      whatsapp_number: '', 
+      printer_config: null, 
+      barcode_config: null 
+    };
+    
+    configs.forEach(config => {
+      if (config.key === 'bank_accounts' || config.key === 'printer_config' || config.key === 'barcode_config') {
+        try {
+          result[config.key] = JSON.parse(config.value);
+        } catch(e) {
+          result[config.key] = config.key === 'bank_accounts' ? [] : {};
+        }
+      } else {
+        // Configuraciones de texto plano, como whatsapp_number
+        result[config.key] = config.value;
+      }
+    });
+    
+    res.json(result);
   } catch (error) {
     console.error("Error al obtener ajustes:", error);
     res.status(500).json({ message: "Error al obtener configuración" });
@@ -22,19 +35,21 @@ export const getConfig = async (req, res) => {
 
 export const updateConfig = async (req, res) => {
   try {
-    const { bank_accounts } = req.body;
+    const updates = req.body;
     
-    // Validamos que venga un arreglo
-    if (!Array.isArray(bank_accounts)) {
-      return res.status(400).json({ message: "Formato de cuentas inválido" });
+    for (const [key, value] of Object.entries(updates)) {
+      let valueToSave = value;
+      
+      // Aseguramos que objetos y arreglos se guarden como string JSON
+      if (key === 'bank_accounts' || key === 'printer_config' || key === 'barcode_config' || typeof value === 'object') {
+        valueToSave = JSON.stringify(value);
+      }
+      
+      await BusinessConfig.upsert({ 
+        key, 
+        value: String(valueToSave) 
+      });
     }
-
-    // Guardamos toda la lista como un solo String JSON bajo la clave 'bank_accounts'
-    // El método upsert crea el registro si no existe o lo actualiza si ya existe
-    await BusinessConfig.upsert({ 
-      key: 'bank_accounts', 
-      value: JSON.stringify(bank_accounts) 
-    });
 
     res.json({ message: "Configuración guardada exitosamente" });
   } catch (error) {

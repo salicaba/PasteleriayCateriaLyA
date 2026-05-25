@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, AlertTriangle, Wallet, Banknote,
-  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone
+  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
@@ -163,7 +163,6 @@ export default function PasteleriaDashboard() {
                         </div>
                       </div>
 
-                      {/* 🚀 AQUÍ SE AÑADIÓ LA CATEGORÍA AL LADO DEL TAMAÑO Y SABOR */}
                       <div className="flex flex-wrap gap-2 mb-4">
                         <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 lya:border-indigo-800/50 px-2 py-1 rounded-md shadow-sm">
                           {pedido.categoria || 'Pastel'}
@@ -297,6 +296,8 @@ export default function PasteleriaDashboard() {
         {abonoModal.isOpen && abonoModal.pedido && (() => {
           const p = abonoModal.pedido;
           const fin = calcularFinanzas(p);
+          
+          // AQUÍ ESTÁ LA VARIABLE CORREGIDA: costoFormat
           const costoFormat = parseFloat(p.costoTotal).toFixed(2);
           
           const montoIngresadoNum = parseFloat(abonoForm.monto) || 0;
@@ -328,6 +329,7 @@ export default function PasteleriaDashboard() {
                   <div className="grid grid-cols-3 gap-3 mb-6">
                     <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg p-3 rounded-2xl text-center border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
                       <span className="block text-[10px] uppercase font-bold text-gray-400 lya:text-lya-text/50 mb-1">Total</span>
+                      {/* LLAMADO CORREGIDO: costoFormat */}
                       <span className="font-bold text-gray-800 dark:text-white lya:text-lya-text">${costoFormat}</span>
                     </div>
                     <div className="bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-primary/10 p-3 rounded-2xl text-center border border-emerald-100 dark:border-emerald-500/20 lya:border-lya-primary/20">
@@ -410,16 +412,48 @@ export default function PasteleriaDashboard() {
 
                         {abonoForm.metodo === 'transferencia' && transferInfo?.bank_accounts && (
                           <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
-                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pt-2 pb-2">
+                            
+                            {/* 🚀 BANNER NEO-BENTO PARA RECORDATORIO DE WHATSAPP 🚀 */}
+                            {transferInfo?.whatsapp_number && (
+                              <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
+                                <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">
+                                  <MessageCircle size={24} className="text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <div>
+                                  <h4 className="text-[11px] font-black text-purple-800 dark:text-purple-300 uppercase tracking-widest mb-1">Aviso para el Staff</h4>
+                                  <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed">Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 🚀 CARDS DE BANCO ACTUALIZADAS Y HOMOLOGADAS CON MÓDULO DE CAFETERÍA 🚀 */}
+                            <div className="flex gap-3 overflow-x-auto custom-scrollbar pt-2 pb-2 px-1">
                               {transferInfo.bank_accounts.map(acc => (
-                                <div key={acc.id} className="min-w-[85%] sm:min-w-[260px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="font-black text-[11px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
-                                    <Smartphone className="text-purple-400" size={14} />
+                                <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-3xl shrink-0 shadow-sm flex flex-col justify-between">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Smartphone className="text-purple-600 dark:text-purple-400" size={18} />
+                                    <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
                                   </div>
-                                  <div className="space-y-1">
-                                    {acc.account_holder && <p className="text-[10px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
-                                    {acc.account_number && <p className="text-[10px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
+                                  
+                                  <div className="space-y-2">
+                                    {acc.account_holder && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Titular:</span>
+                                        <span className="text-sm font-black text-purple-900 dark:text-white truncate" title={acc.account_holder}>{acc.account_holder}</span>
+                                      </div>
+                                    )}
+                                    {acc.account_number && (
+                                      <div className="flex justify-between items-center border-t border-purple-200/50 dark:border-purple-700/50 pt-2 mt-2">
+                                        <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Cuenta/Tarjeta:</span>
+                                        <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.account_number}</span>
+                                      </div>
+                                    )}
+                                    {acc.clabe && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">CLABE:</span>
+                                        <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.clabe}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}

@@ -1,7 +1,7 @@
 // src/modules/pasteleria/views/DetallePedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark } from 'lucide-react';
+import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark, MessageCircle } from 'lucide-react';
 import client from '../../../api/client'; 
 
 export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
@@ -173,6 +173,19 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                     <Landmark size={18} className="text-purple-500" /> Cuentas para Transferencia
                   </h3>
                   
+                  {/* 🚀 BANNER NEO-BENTO PARA RECORDATORIO DE WHATSAPP 🚀 */}
+                  {transferInfo?.whatsapp_number && (
+                    <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
+                      <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">
+                        <MessageCircle size={24} className="text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-[11px] font-black text-purple-800 dark:text-purple-300 uppercase tracking-widest mb-1">Aviso para el Staff</h4>
+                        <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed">Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 px-1">
                     {transferInfo.bank_accounts.map(acc => (
                       <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-3xl shrink-0 shadow-sm">
