@@ -17,7 +17,8 @@ import {
   Palette,
   Landmark,
   Printer,
-  Users
+  Users,
+  Tags // <-- AQUI IMPORTAMOS EL NUEVO ICONO DEL CATALOGO
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
@@ -29,6 +30,7 @@ import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
 import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard';
 import PasteleriaCalendar from './modules/pasteleria/views/PasteleriaCalendar';
+import PasteleriaConfigPage from './modules/pasteleria/views/PasteleriaConfigPage'; // <-- AQUI ESTÁ LA NUEVA VISTA
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 import { SettingsPage } from './modules/admin/views/SettingsPage'; 
@@ -64,13 +66,21 @@ function App() {
     return null;
   });
 
-  const [activeTab, setActiveTab] = useState('mesas');
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('lya_active_tab');
+    return savedTab || 'mesas';
+  });
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group', 'sistema_group']); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
   const { theme } = useTheme();
+
+  useEffect(() => {
+    localStorage.setItem('lya_active_tab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -119,10 +129,11 @@ function App() {
   };
 
   const handleLogout = () => {
-    // 🔥 CORRECCIÓN: Ahora borramos el lya_token al salir para que no se quede guardado uno viejo
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
+    localStorage.removeItem('lya_active_tab'); 
     setUser(null);
+    setActiveTab('mesas');
   };
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
@@ -159,6 +170,7 @@ function App() {
       children: [
         { id: 'pedidos', label: 'Pedidos', icon: ShoppingBasket },
         { id: 'agenda', label: 'Agenda', icon: Calendar },
+        { id: 'catalogo', label: 'Catálogo', icon: Tags }, // <--- AQUI ESTA EL NUEVO BOTON
       ]
     },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
@@ -413,6 +425,7 @@ function App() {
               {activeTab === 'cocina' && <KitchenPage />}
               {activeTab === 'pedidos' && <PasteleriaDashboard />} 
               {activeTab === 'agenda' && <PasteleriaCalendar />} 
+              {activeTab === 'catalogo' && <PasteleriaConfigPage />} {/* <-- AQUI RENDERIZAMOS LA NUEVA PANTALLA */}
               {activeTab === 'ajustes' && <MenuManagerPage />} 
               
               {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (

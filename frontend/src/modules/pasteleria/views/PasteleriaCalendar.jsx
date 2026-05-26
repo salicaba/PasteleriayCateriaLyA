@@ -1,4 +1,3 @@
-// src/modules/pasteleria/views/PasteleriaCalendar.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, Plus, CalendarDays, Search, Eye } from 'lucide-react';
@@ -201,7 +200,8 @@ export default function PasteleriaCalendar() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4 mb-4">
+          {/* 🔥 MODIFICACIÓN AQUI: Ocultamos la barra visualmente pero mantenemos el overflow */}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <AnimatePresence mode="popLayout">
               {pedidosSeleccionados.length === 0 ? (
                 <motion.div 
