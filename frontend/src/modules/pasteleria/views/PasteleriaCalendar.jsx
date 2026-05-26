@@ -19,10 +19,7 @@ export default function PasteleriaCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   
-  // 🚀 NUEVO: Estado para controlar qué vista se muestra en móviles
   const [showMobileList, setShowMobileList] = useState(false);
-
-  // Para controlar el valor del input de búsqueda y poder limpiarlo
   const [fechaBusqueda, setFechaBusqueda] = useState('');
 
   if (loading) return null;
@@ -48,7 +45,7 @@ export default function PasteleriaCalendar() {
     
     setCurrentMonth(newDate);
     setSelectedDate(newDate);
-    setShowMobileList(true); // Si busca una fecha, abrimos la vista de la lista en móviles
+    setShowMobileList(true); 
   };
 
   const handleIrAHoy = () => {
@@ -56,7 +53,7 @@ export default function PasteleriaCalendar() {
     setCurrentMonth(hoy);
     setSelectedDate(hoy);
     setFechaBusqueda(''); 
-    setShowMobileList(true); // Al ir a "Hoy", mostramos la agenda del día
+    setShowMobileList(true); 
   };
 
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -82,7 +79,7 @@ export default function PasteleriaCalendar() {
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
       {/* HEADER FIJO */}
@@ -116,7 +113,7 @@ export default function PasteleriaCalendar() {
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
         
-        {/* LADO IZQUIERDO: Calendario (Se oculta en móvil si la lista está activa) */}
+        {/* LADO IZQUIERDO: Calendario */}
         <div className={`w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 shadow-xl overflow-y-auto custom-scrollbar 
           ${showMobileList ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
           <div className="flex justify-between items-center mb-6">
@@ -160,11 +157,12 @@ export default function PasteleriaCalendar() {
                   key={day} 
                   whileHover={{ scale: 1.05 }} 
                   whileTap={{ scale: 0.95 }} 
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   onClick={() => {
                     setSelectedDate(dateOfThisDay);
-                    setShowMobileList(true); // 🚀 Al hacer clic, abrimos la lista en móviles
+                    setShowMobileList(true); 
                   }}
-                  className={`relative flex flex-col items-center p-2 rounded-2xl border transition-all duration-300 min-h-[4rem]
+                  className={`relative flex flex-col items-center p-2 rounded-2xl border transition-colors duration-300 min-h-[4rem]
                     ${isSelected ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30 lya:bg-lya-secondary lya:border-lya-secondary lya:shadow-lya-secondary/30' : 
                       isToday ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 lya:bg-lya-secondary/10 lya:border-slate-300/50' : 
                       'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 lya:bg-lya-surface lya:border-lya-border/30 lya:hover:border-lya-secondary/50'}
@@ -184,12 +182,11 @@ export default function PasteleriaCalendar() {
           </div>
         </div>
 
-        {/* LADO DERECHO: Lista de Entregas del Día (Se muestra como principal en móvil si está activa) */}
+        {/* LADO DERECHO: Lista de Entregas del Día */}
         <div className={`w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 shadow-xl overflow-hidden h-full
           ${showMobileList ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'}`}>
           
           <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 shrink-0 flex items-start gap-3">
-            {/* 🚀 BOTÓN DE VOLVER (Solo visible en móviles) */}
             <button 
               onClick={() => setShowMobileList(false)} 
               className="lg:hidden mt-0.5 p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30"
@@ -207,7 +204,13 @@ export default function PasteleriaCalendar() {
           <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4 mb-4">
             <AnimatePresence mode="popLayout">
               {pedidosSeleccionados.length === 0 ? (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }} 
+                  animate={{ opacity: 1, scale: 1 }} 
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  className="h-full flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40"
+                >
                   <Cake size={48} className="mb-3 opacity-20" />
                   <p className="mb-4 text-center">No hay entregas agendadas<br/>para este día.</p>
                 </motion.div>
@@ -218,9 +221,13 @@ export default function PasteleriaCalendar() {
 
                   return (
                     <motion.div
-                      layout initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+                      layout 
+                      initial={{ opacity: 0, scale: 0.9, x: 20 }} 
+                      animate={{ opacity: 1, scale: 1, x: 0 }} 
+                      exit={{ opacity: 0, scale: 0.8, x: -20 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
                       key={pedido.id}
-                      className={`p-4 rounded-2xl bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all duration-200 hover:shadow-md
+                      className={`p-4 rounded-2xl bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-colors hover:shadow-md
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40'}
                       `}
                     >
@@ -302,7 +309,6 @@ export default function PasteleriaCalendar() {
         </div>
       </div>
 
-      {/* MODALES ADJUNTOS A LA PÁGINA */}
       <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} />
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
       <DetallePedidoModal isOpen={detalleModal.isOpen} onClose={cerrarDetalles} pedido={detalleModal.pedido} onEdit={iniciarEdicion} calcularFinanzas={calcularFinanzas} />

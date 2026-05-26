@@ -276,7 +276,10 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }}
+      initial={{ opacity: 0, y: 15 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 overflow-y-auto custom-scrollbar p-4 md:p-6"
     >
       <div className="max-w-7xl mx-auto w-full space-y-6 pb-20">
@@ -285,7 +288,13 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             VISTA INDEPENDIENTE: CONTROL DE USUARIOS
         ========================================================== */}
         {activeTab === 'usuarios' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }} 
+            className="space-y-6"
+          >
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex items-center gap-4">
               <div className="bg-blue-600 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0">
                 <Users size={28} />
@@ -354,54 +363,64 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {systemUsers.map(usr => (
-                    <div key={usr.id} className={`p-5 rounded-2xl border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between hover:shadow-md ${usr.isActive ? 'border-gray-200 dark:border-gray-700' : 'border-red-200 dark:border-red-900/30 opacity-80'}`}>
-                      
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3.5">
-                          <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
-                            !usr.isActive 
-                              ? 'bg-gray-400 dark:bg-gray-600'
-                              : usr.role === 'Administrador' 
-                                ? 'bg-purple-600 dark:bg-purple-500'
-                                : 'bg-blue-600 lya:bg-lya-primary'
-                          }`}>
-                            {getInitials(usr.fullName)}
+                  <AnimatePresence mode="popLayout">
+                    {systemUsers.map(usr => (
+                      <motion.div 
+                        key={usr.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        className={`p-5 rounded-2xl border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-colors flex flex-col justify-between hover:shadow-md ${usr.isActive ? 'border-gray-200 dark:border-gray-700' : 'border-red-200 dark:border-red-900/30 opacity-80'}`}
+                      >
+                        
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3.5">
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
+                              !usr.isActive 
+                                ? 'bg-gray-400 dark:bg-gray-600'
+                                : usr.role === 'Administrador' 
+                                  ? 'bg-purple-600 dark:bg-purple-500'
+                                  : 'bg-blue-600 lya:bg-lya-primary'
+                            }`}>
+                              {getInitials(usr.fullName)}
+                            </div>
+                            <div className="flex flex-col">
+                              <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight break-all">
+                                {usr.fullName}
+                              </h4>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+                                {usr.username}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight break-all">
-                              {usr.fullName}
-                            </h4>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
-                              {usr.username}
+
+                          <div className="flex gap-1.5 shrink-0 ml-2">
+                            <button onClick={() => editUser(usr)} className="p-2 bg-gray-50 hover:bg-blue-50 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-blue-500 transition-colors" title="Editar usuario">
+                              <Edit2 size={16} />
+                            </button>
+                            <button onClick={() => toggleUserStatus(usr.id, usr.isActive)} className={`p-2 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors ${usr.isActive ? 'text-red-500 hover:bg-red-50 dark:hover:bg-gray-600' : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-gray-600'}`} title={usr.isActive ? "Desactivar Acceso" : "Activar Acceso"}>
+                              {usr.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between">
+                          <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md ${usr.role === 'Administrador' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                            {usr.role}
+                          </span>
+                          <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 px-2.5 py-1 rounded-md">
+                            <div className={`w-1.5 h-1.5 rounded-full ${usr.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                            <span className={`text-[10px] font-black tracking-wide ${usr.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {usr.isActive ? 'ACTIVO' : 'SUSPENDIDO'}
                             </span>
                           </div>
                         </div>
-
-                        <div className="flex gap-1.5 shrink-0 ml-2">
-                          <button onClick={() => editUser(usr)} className="p-2 bg-gray-50 hover:bg-blue-50 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-blue-500 transition-colors" title="Editar usuario">
-                            <Edit2 size={16} />
-                          </button>
-                          <button onClick={() => toggleUserStatus(usr.id, usr.isActive)} className={`p-2 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors ${usr.isActive ? 'text-red-500 hover:bg-red-50 dark:hover:bg-gray-600' : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-gray-600'}`} title={usr.isActive ? "Desactivar Acceso" : "Activar Acceso"}>
-                            {usr.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between">
-                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md ${usr.role === 'Administrador' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                          {usr.role}
-                        </span>
-                        <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 px-2.5 py-1 rounded-md">
-                          <div className={`w-1.5 h-1.5 rounded-full ${usr.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                          <span className={`text-[10px] font-black tracking-wide ${usr.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {usr.isActive ? 'ACTIVO' : 'SUSPENDIDO'}
-                          </span>
-                        </div>
-                      </div>
-                      
-                    </div>
-                  ))}
+                        
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>
@@ -412,7 +431,13 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             VISTA INDEPENDIENTE: CUENTAS BANCARIAS
         ========================================================== */}
         {activeTab === 'cuentas' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }} 
+            className="space-y-6"
+          >
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex items-center gap-4">
               <div className="bg-emerald-500 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0"><Landmark size={28} /></div>
               <div>
@@ -500,14 +525,27 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 mb-6">
                     <AnimatePresence mode="popLayout">
                       {accounts.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-400 italic py-20">
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9 }} 
+                          animate={{ opacity: 1, scale: 1 }} 
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                          className="h-full flex flex-col items-center justify-center text-gray-400 italic py-20"
+                        >
                           <Sliders size={48} className="opacity-10 mb-4" />
                           <p className="text-sm">Aún no has agregado cuentas bancarias.</p>
-                        </div>
+                        </motion.div>
                       ) : (
                         accounts.map(acc => (
-                          <motion.div key={acc.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                            className="group relative p-5 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:border-emerald-500/30 lya:hover:border-lya-primary/30 transition-all flex justify-between items-start">
+                          <motion.div 
+                            key={acc.id} 
+                            layout 
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+                            animate={{ opacity: 1, scale: 1, y: 0 }} 
+                            exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                            className="group relative p-5 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:border-emerald-500/30 lya:hover:border-lya-primary/30 transition-colors flex justify-between items-start"
+                          >
                             
                             <div className="flex-1 pr-4 space-y-1.5">
                               <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight mb-3 flex items-center gap-2">
@@ -563,7 +601,13 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             VISTA INDEPENDIENTE: INTERFAZ Y PANTALLA
         ========================================================== */}
         {activeTab === 'interfaz' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }} 
+            className="space-y-6"
+          >
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex items-center gap-4">
               <div className="bg-purple-500 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0"><Palette size={28} /></div>
               <div>
@@ -625,7 +669,13 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             VISTA INDEPENDIENTE: HARDWARE Y EQUIPOS
         ========================================================== */}
         {activeTab === 'hardware' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }} 
+            className="space-y-6"
+          >
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex items-center gap-4">
               <div className="bg-gray-900 dark:bg-gray-700 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0"><Printer size={28} /></div>
               <div>
@@ -725,7 +775,13 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
         {showPrintModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPrintModal(false)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.8, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+            >
               <div className="mx-auto bg-emerald-500/10 lya:bg-lya-primary/10 w-20 h-20 rounded-full flex items-center justify-center mb-6"><Printer size={36} className="text-emerald-500 lya:text-lya-primary" /></div>
               <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">Imprimir Tarjetas</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8">¿Cuántas tarjetas de datos bancarios deseas imprimir para tus mesas?</p>

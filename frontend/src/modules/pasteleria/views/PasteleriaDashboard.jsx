@@ -73,7 +73,9 @@ export default function PasteleriaDashboard() {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }}
+      initial={{ opacity: 0, y: 10 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
@@ -122,13 +124,18 @@ export default function PasteleriaDashboard() {
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
         {pedidosFiltrados.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }} 
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50"
+          >
             <ShoppingBasket size={64} className="mb-4 opacity-20" />
             <p className="text-xl font-bold">{searchQuery ? `No se encontró el pedido "${searchQuery}"` : 'No hay pedidos en esta sección'}</p>
           </motion.div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
-            <AnimatePresence>
+            <AnimatePresence mode="popLayout">
               {pedidosFiltrados.map((pedido) => {
                 const finanzas = calcularFinanzas(pedido);
                 const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
@@ -139,11 +146,12 @@ export default function PasteleriaDashboard() {
                   <motion.div
                     key={pedido.id} 
                     layout 
-                    initial={{ opacity: 0, scale: 0.98 }} 
-                    animate={{ opacity: 1, scale: 1 }} 
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+                    animate={{ opacity: 1, scale: 1, y: 0 }} 
+                    exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
                     onClick={() => abrirDetalles(pedido)} 
-                    className={`cursor-pointer relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-all duration-300 flex flex-col justify-between h-full
+                    className={`cursor-pointer relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full
                       ${isCancelado ? 'bg-gray-100 dark:bg-gray-900/50 lya:bg-lya-bg/50 border-gray-200 dark:border-gray-800 lya:border-lya-border/20 opacity-75 grayscale-[0.5]' : 'bg-white dark:bg-gray-900 lya:bg-lya-surface'}
                       ${!isCancelado && finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : ''}
                       ${!isCancelado && !finanzas.requiereLiquidacionUrgente ? 'border-gray-100 dark:border-gray-800 hover:border-emerald-400/50 lya:border-lya-border/30 lya:hover:border-lya-secondary/50' : ''}
@@ -297,7 +305,6 @@ export default function PasteleriaDashboard() {
           const p = abonoModal.pedido;
           const fin = calcularFinanzas(p);
           
-          // AQUÍ ESTÁ LA VARIABLE CORREGIDA: costoFormat
           const costoFormat = parseFloat(p.costoTotal).toFixed(2);
           
           const montoIngresadoNum = parseFloat(abonoForm.monto) || 0;
@@ -329,7 +336,6 @@ export default function PasteleriaDashboard() {
                   <div className="grid grid-cols-3 gap-3 mb-6">
                     <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg p-3 rounded-2xl text-center border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
                       <span className="block text-[10px] uppercase font-bold text-gray-400 lya:text-lya-text/50 mb-1">Total</span>
-                      {/* LLAMADO CORREGIDO: costoFormat */}
                       <span className="font-bold text-gray-800 dark:text-white lya:text-lya-text">${costoFormat}</span>
                     </div>
                     <div className="bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-primary/10 p-3 rounded-2xl text-center border border-emerald-100 dark:border-emerald-500/20 lya:border-lya-primary/20">
@@ -344,7 +350,6 @@ export default function PasteleriaDashboard() {
 
                   <form id="abonoForm" onSubmit={submitPago} className="space-y-6">
                     
-                    {/* SECCIÓN 1: MONTO A ABONAR */}
                     <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl p-5 space-y-4">
                       <div>
                         <div className="flex justify-between items-center mb-2">
@@ -358,7 +363,6 @@ export default function PasteleriaDashboard() {
                       </div>
                     </div>
 
-                    {/* SECCIÓN 2: MÉTODO DE PAGO Y PANELES */}
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block ml-1">Selecciona Método</label>
                       <div className="grid grid-cols-2 gap-3">
@@ -413,7 +417,6 @@ export default function PasteleriaDashboard() {
                         {abonoForm.metodo === 'transferencia' && transferInfo?.bank_accounts && (
                           <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
                             
-                            {/* 🚀 BANNER NEO-BENTO PARA RECORDATORIO DE WHATSAPP 🚀 */}
                             {transferInfo?.whatsapp_number && (
                               <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
                                 <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">
@@ -426,7 +429,6 @@ export default function PasteleriaDashboard() {
                               </div>
                             )}
 
-                            {/* 🚀 CARDS DE BANCO ACTUALIZADAS Y HOMOLOGADAS CON MÓDULO DE CAFETERÍA 🚀 */}
                             <div className="flex gap-3 overflow-x-auto custom-scrollbar pt-2 pb-2 px-1">
                               {transferInfo.bank_accounts.map(acc => (
                                 <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-3xl shrink-0 shadow-sm flex flex-col justify-between">
