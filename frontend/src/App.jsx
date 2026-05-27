@@ -1,25 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutGrid, 
-  ChefHat, 
-  Cake, 
-  Menu, 
-  PieChart, 
-  BookOpenCheck, 
-  Clock, 
-  LogOut, 
-  QrCode, 
-  Coffee, 
-  ChevronDown,
-  Calendar,
-  ShoppingBasket,
-  Settings,
-  Palette,
-  Landmark,
-  Printer,
-  Users,
-  Tags // <-- AQUI IMPORTAMOS EL NUEVO ICONO DEL CATALOGO
-} from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -30,10 +10,11 @@ import { KitchenPage } from './modules/kitchen/views/KitchenPage';
 import { LoginScreen } from './modules/auth/views/LoginScreen';
 import PasteleriaDashboard from './modules/pasteleria/views/PasteleriaDashboard';
 import PasteleriaCalendar from './modules/pasteleria/views/PasteleriaCalendar';
-import PasteleriaConfigPage from './modules/pasteleria/views/PasteleriaConfigPage'; // <-- AQUI ESTÁ LA NUEVA VISTA
+import PasteleriaConfigPage from './modules/pasteleria/views/PasteleriaConfigPage'; 
 import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 import { SettingsPage } from './modules/admin/views/SettingsPage'; 
+import { CashRegisterPage } from './modules/cash/views/CashRegisterPage';
 
 import logoLyA from './assets/logo.jpeg'; 
 
@@ -170,9 +151,11 @@ function App() {
       children: [
         { id: 'pedidos', label: 'Pedidos', icon: ShoppingBasket },
         { id: 'agenda', label: 'Agenda', icon: Calendar },
-        { id: 'catalogo', label: 'Catálogo', icon: Tags }, // <--- AQUI ESTA EL NUEVO BOTON
+        { id: 'catalogo', label: 'Catálogo', icon: Tags },
       ]
     },
+    // <-- AQUÍ ESTÁ EL BOTÓN DE CAJA PRINCIPAL -->
+    { id: 'caja', label: 'Caja', icon: Wallet }, 
     { id: 'reportes', label: 'Reportes', icon: PieChart },
     {
       id: 'sistema_group',
@@ -425,8 +408,9 @@ function App() {
               {activeTab === 'cocina' && <KitchenPage />}
               {activeTab === 'pedidos' && <PasteleriaDashboard />} 
               {activeTab === 'agenda' && <PasteleriaCalendar />} 
-              {activeTab === 'catalogo' && <PasteleriaConfigPage />} {/* <-- AQUI RENDERIZAMOS LA NUEVA PANTALLA */}
+              {activeTab === 'catalogo' && <PasteleriaConfigPage />}
               {activeTab === 'ajustes' && <MenuManagerPage />} 
+              {activeTab === 'caja' && <CashRegisterPage user={user} />}
               
               {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
                 <SettingsPage uiSize={uiSize} setUiSize={setUiSize} activeTab={activeTab} />

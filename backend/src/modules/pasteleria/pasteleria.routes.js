@@ -5,20 +5,35 @@ import {
   addAbono, 
   updateEstado, 
   updatePedido,
-  printPedidoTicket,   // <-- NUEVO
-  sharePedidoTicket    // <-- NUEVO
+  printPedidoTicket,   
+  sharePedidoTicket    
 } from './pasteleria.controller.js';
+import { verifyToken } from '../../middlewares/auth.middleware.js'; // <-- Importamos tu candado
 
 const router = Router();
 
+// ==========================================
+// 🌍 RUTAS PÚBLICAS (No requieren sesión)
+// ==========================================
+// La ponemos ANTES del verifyToken para que cualquier cliente en WhatsApp pueda ver su ticket
+router.get('/pedidos/:id/share', sharePedidoTicket);
+
+
+// ==========================================
+// 🛡️ BARRERA DE SEGURIDAD 
+// ==========================================
+// Todo lo que esté debajo de esta línea exigirá estar logueado en el sistema
+router.use(verifyToken);
+
+
+// ==========================================
+// 🔒 RUTAS PRIVADAS (Solo Empleados / Admins)
+// ==========================================
 router.get('/pedidos', getPedidos);
 router.post('/pedidos', createPedido);
 router.post('/pedidos/:id/abonos', addAbono);
 router.put('/pedidos/:id/estado', updateEstado);
 router.put('/pedidos/:id', updatePedido); 
-
-// Rutas para Impresión Térmica y Ticket Digital (Compartir)
 router.post('/pedidos/:id/print', printPedidoTicket);
-router.get('/pedidos/:id/share', sharePedidoTicket);
 
 export default router;

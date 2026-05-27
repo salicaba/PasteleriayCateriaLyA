@@ -4,8 +4,10 @@ import OrderItem from '../modules/pos/OrderItem.model.js';
 import Product from '../modules/menu/Product.model.js';
 import Table from '../modules/pos/Table.model.js';
 import Category from '../modules/menu/Category.model.js';
-import Variant from '../modules/menu/Variant.model.js'; // <-- 1. Importamos Variant
+import Variant from '../modules/menu/Variant.model.js'; 
 import PasteleriaOrder from '../modules/pasteleria/PasteleriaOrder.model.js';
+import Transaction from '../modules/cash/Transaction.model.js'; // <-- NUEVO
+import User from '../modules/users/User.model.js'; // <-- NUEVO
 
 export const setupAssociations = () => {
   // Relación Orden -> Items
@@ -24,9 +26,12 @@ export const setupAssociations = () => {
   Product.hasMany(OrderItem, { foreignKey: 'productId', as: 'orderItems' });
   OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
-  // 🔥 NUEVA: Relación Producto -> Variante (1 a Muchos)
   Product.hasMany(Variant, { foreignKey: 'productId', as: 'variants' });
   Variant.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+
+  // 🔥 NUEVA: Relaciones de Caja
+  Transaction.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
+  Transaction.belongsTo(User, { foreignKey: 'cancelledBy', as: 'canceller' });
 
   console.log('🔗 Asociaciones de Sequelize configuradas correctamente.');
 };

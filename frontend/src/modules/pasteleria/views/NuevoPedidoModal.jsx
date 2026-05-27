@@ -1,7 +1,7 @@
 // src/modules/pasteleria/views/NuevoPedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Hash, Plus, Clock, Smartphone, Banknote, Tag } from 'lucide-react';
+import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Hash, Clock, Smartphone, Banknote, Tag } from 'lucide-react';
 import client from '../../../api/client';
 import { usePasteleriaConfig } from '../controllers/usePasteleriaConfig';
 
@@ -14,7 +14,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     imagenReferencia: null 
   });
 
-  // Arreglos de objetos { nombre: "Chocolate", cant: 2 }
+  // Arreglos simples de strings: ['Vainilla', 'Chocolate']
   const [porcionesTags, setPorcionesTags] = useState([]);
   const [saboresTags, setSaboresTags] = useState([]);
   
@@ -23,18 +23,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
 
   const [metodoPagoAnticipo, setMetodoPagoAnticipo] = useState('efectivo');
   const [transferInfo, setTransferInfo] = useState(null);
-
-  // Funciones Mágicas para leer "2x Vainilla" de la BD o convertirlos
-  const parseTags = (arr) => {
-    if (!arr) return [];
-    return arr.map(str => {
-      const match = str.match(/^(\d+)x\s+(.+)$/i);
-      if (match) return { nombre: match[2], cant: parseInt(match[1]) };
-      return { nombre: str, cant: 1 };
-    });
-  };
-
-  const stringifyTags = (arr) => arr.map(t => t.cant > 1 ? `${t.cant}x ${t.nombre}` : t.nombre);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,8 +40,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
           }
         }
         setFormData({ ...pedidoAEditar, fechaEntrega: fechaFormateada });
-        setPorcionesTags(parseTags(pedidoAEditar.porciones));
-        setSaboresTags(parseTags(pedidoAEditar.saborPan));
+        // Usamos los arreglos directamente
+        setPorcionesTags(Array.isArray(pedidoAEditar.porciones) ? pedidoAEditar.porciones : []);
+        setSaboresTags(Array.isArray(pedidoAEditar.saborPan) ? pedidoAEditar.saborPan : []);
       } else {
         let defaultDate = '';
         if (fechaPredefinida) {
@@ -90,31 +79,22 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
   }, [isOpen, metodoPagoAnticipo, pedidoAEditar]);
 
+  // Función mágica simplificada: Agrega o quita el tag de la lista
   const toggleTag = (stateArray, setState, nombre, isAddOnly = false) => {
-    const exists = stateArray.find(t => t.nombre === nombre);
-    if (exists) {
-      if (!isAddOnly) setState(stateArray.filter(t => t.nombre !== nombre));
+    if (stateArray.includes(nombre)) {
+      if (!isAddOnly) setState(stateArray.filter(t => t !== nombre)); // Desmarcar
     } else {
-      setState([...stateArray, { nombre, cant: 1 }]);
+      setState([...stateArray, nombre]); // Marcar
     }
-  };
-
-  const changeCant = (stateArray, setState, nombre, delta) => {
-    setState(stateArray.map(t => {
-      if (t.nombre === nombre) {
-         const newCant = Math.max(1, t.cant + delta);
-         return { ...t, cant: newCant };
-      }
-      return t;
-    }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     let datosFinales = { ...formData };
     
-    datosFinales.porciones = stringifyTags(porcionesTags);
-    datosFinales.saborPan = stringifyTags(saboresTags);
+    // Guardamos los arreglos de tags directamente
+    datosFinales.porciones = porcionesTags;
+    datosFinales.saborPan = saboresTags;
     
     if (!pedidoAEditar && parseFloat(formData.anticipo) > 0) {
       datosFinales.metodoPagoAnticipo = metodoPagoAnticipo;
@@ -143,41 +123,39 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
   };
 
-  // Componente Reutilizable para los Selectores con Contador
+  // Componente Reutilizable: Botones simples de selección
   const renderSelectorInteractivos = (opcionesBase, seleccionados, setSeleccionados, customInput, setCustomInput, Icono, placeholder) => (
     <div className="space-y-3 p-3 bg-white dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-2xl">
       <div className="flex flex-wrap gap-2">
          {opcionesBase.map(opcion => {
-            const isSelected = seleccionados.find(s => s.nombre === opcion);
+            const isSelected = seleccionados.includes(opcion);
             return (
-              <div key={opcion} className={`flex items-center gap-1 border rounded-xl pl-3 pr-1 py-1.5 transition-all shadow-sm ${isSelected ? 'bg-emerald-50 border-emerald-500 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-300 lya:bg-lya-primary/10 lya:border-lya-primary lya:text-lya-primary' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 hover:border-emerald-300 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text cursor-pointer hover:shadow-md'}`}
-                   onClick={() => !isSelected && toggleTag(seleccionados, setSeleccionados, opcion)}>
-                 <span className={`text-sm font-bold ${!isSelected && 'pr-2'}`}>{opcion}</span>
-                 {isSelected && (
-                   <div className="flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-bg rounded-lg border border-emerald-200 dark:border-emerald-800 lya:border-lya-primary/30 ml-2 px-1 shadow-inner">
-                      <button type="button" onClick={(e)=>{ e.stopPropagation(); changeCant(seleccionados, setSeleccionados, opcion, -1); }} className="px-1.5 text-gray-400 hover:text-red-500 font-bold active:scale-95">-</button>
-                      <span className="text-xs font-black w-3 text-center">{isSelected.cant}</span>
-                      <button type="button" onClick={(e)=>{ e.stopPropagation(); changeCant(seleccionados, setSeleccionados, opcion, 1); }} className="px-1.5 text-gray-400 hover:text-emerald-500 font-bold active:scale-95">+</button>
-                      <div className="w-px h-3 bg-gray-200 dark:bg-gray-700 mx-1"></div>
-                      <button type="button" onClick={(e)=>{ e.stopPropagation(); toggleTag(seleccionados, setSeleccionados, opcion); }} className="p-1 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"><X size={12}/></button>
-                   </div>
-                 )}
-              </div>
+              <button
+                key={opcion}
+                type="button"
+                onClick={() => toggleTag(seleccionados, setSeleccionados, opcion)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border outline-none active:scale-95 ${
+                  isSelected 
+                    ? 'bg-emerald-50 border-emerald-500 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-300 lya:bg-lya-primary/10 lya:border-lya-primary lya:text-lya-primary shadow-sm' 
+                    : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 hover:border-emerald-300 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text hover:shadow-md'
+                }`}
+              >
+                {opcion}
+              </button>
             )
          })}
          
          {/* Render de tags personalizados que agregaste a mano */}
-         {seleccionados.filter(s => !opcionesBase.includes(s.nombre)).map(custom => (
-             <div key={custom.nombre} className="flex items-center gap-1 border rounded-xl pl-3 pr-1 py-1.5 bg-purple-50 border-purple-500 text-purple-800 dark:bg-purple-900/30 dark:border-purple-500 dark:text-purple-300 lya:bg-lya-secondary/10 lya:border-lya-secondary lya:text-lya-secondary shadow-sm">
-                 <span className="text-sm font-bold">{custom.nombre}</span>
-                 <div className="flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-bg rounded-lg border border-purple-200 dark:border-purple-800 lya:border-lya-secondary/30 ml-2 px-1 shadow-inner">
-                    <button type="button" onClick={(e)=>{ e.stopPropagation(); changeCant(seleccionados, setSeleccionados, custom.nombre, -1); }} className="px-1.5 text-gray-400 hover:text-red-500 font-bold">-</button>
-                    <span className="text-xs font-black w-3 text-center">{custom.cant}</span>
-                    <button type="button" onClick={(e)=>{ e.stopPropagation(); changeCant(seleccionados, setSeleccionados, custom.nombre, 1); }} className="px-1.5 text-gray-400 hover:text-purple-500 font-bold">+</button>
-                    <div className="w-px h-3 bg-gray-200 dark:bg-gray-700 mx-1"></div>
-                    <button type="button" onClick={(e)=>{ e.stopPropagation(); toggleTag(seleccionados, setSeleccionados, custom.nombre); }} className="p-1 text-red-400 hover:bg-red-50 rounded-md transition-colors"><X size={12}/></button>
-                 </div>
-              </div>
+         {seleccionados.filter(s => !opcionesBase.includes(s)).map(custom => (
+            <button
+              key={custom}
+              type="button"
+              onClick={() => toggleTag(seleccionados, setSeleccionados, custom)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all border outline-none active:scale-95 bg-purple-50 border-purple-500 text-purple-800 dark:bg-purple-900/30 dark:border-purple-500 dark:text-purple-300 lya:bg-lya-secondary/10 lya:border-lya-secondary lya:text-lya-secondary shadow-sm"
+              title="Haz clic para eliminar"
+            >
+              {custom} <X size={14} className="opacity-70 hover:opacity-100 transition-opacity"/>
+            </button>
          ))}
       </div>
 
@@ -234,14 +212,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1">
-                      <Hash size={12} className="text-emerald-500 lya:text-lya-primary" /> Tamaños / Porciones (Selecciona y ajusta cantidad)
+                      <Hash size={12} className="text-emerald-500 lya:text-lya-primary" /> Tamaños / Porciones (Selecciona varios)
                     </label>
                     {renderSelectorInteractivos(config.tamanos, porcionesTags, setPorcionesTags, customPorcion, setCustomPorcion, Hash, "+ Otro tamaño y presiona Enter")}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1">
-                      <Layers size={12} className="text-emerald-500 lya:text-lya-primary" /> Sabores (Selecciona y ajusta cantidad)
+                      <Layers size={12} className="text-emerald-500 lya:text-lya-primary" /> Sabores (Selecciona varios)
                     </label>
                     {renderSelectorInteractivos(config.sabores, saboresTags, setSaboresTags, customSabor, setCustomSabor, Layers, "+ Otro sabor y presiona Enter")}
                   </div>

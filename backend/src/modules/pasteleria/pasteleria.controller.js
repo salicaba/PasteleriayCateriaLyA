@@ -1,5 +1,6 @@
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
+import Transaction from '../cash/Transaction.model.js'; // <-- IMPORTAMOS EL MODELO DE CAJA
 
 // Obtener todos los pedidos
 export const getPedidos = async (req, res) => {
@@ -14,15 +15,48 @@ export const getPedidos = async (req, res) => {
   }
 };
 
-// Crear un nuevo pedido
+// Crear un nuevo pedido (¡AHORA INTERCEPTA ANTICIPOS PARA LA CAJA!)
 export const createPedido = async (req, res) => {
   try {
+    // Detectamos quién está creando el pedido
+    const userId = req.user?.id || req.userId || req.usuario?.id || null;
+    
+    // Extraemos los abonos (anticipos) del resto de los datos
+    const { abonos, ...pedidoData } = req.body;
+
     const count = await PasteleriaOrder.count();
     const newId = `PED-${String(count + 1).padStart(3, '0')}`;
 
+    let abonosParaGuardar = [];
+
+    // Si el formulario envió un anticipo inicial
+    if (abonos && Array.isArray(abonos) && abonos.length > 0) {
+      for (const abono of abonos) {
+        const montoAbono = parseFloat(abono.monto);
+        if (montoAbono > 0) {
+          // 1. Registramos el anticipo en la CAJA
+          const tx = await Transaction.create({
+            source: 'PASTELERIA',
+            amount: montoAbono,
+            description: `Anticipo Pedido ${newId}`,
+            referenceId: newId,
+            createdBy: userId
+          });
+          
+          // 2. Lo guardamos en la tarjeta del pedido usando el ID exacto de la caja (para poder anularlo después)
+          abonosParaGuardar.push({
+            id: tx.id,
+            fecha: abono.fecha || new Date().toISOString(),
+            monto: montoAbono
+          });
+        }
+      }
+    }
+
     const nuevoPedido = await PasteleriaOrder.create({
       id: newId,
-      ...req.body
+      ...pedidoData,
+      abonos: abonosParaGuardar // Guardamos el pedido ya enlazado con la caja
     });
 
     res.status(201).json({ data: nuevoPedido });
@@ -37,15 +71,28 @@ export const addAbono = async (req, res) => {
   try {
     const { id } = req.params;
     const { monto } = req.body;
+    
+    // Detectamos quién está cobrando
+    const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
     const pedido = await PasteleriaOrder.findByPk(id);
     if (!pedido) {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
+    // 1. Registramos el movimiento en caja
+    const tx = await Transaction.create({
+      source: 'PASTELERIA',
+      amount: parseFloat(monto),
+      description: `Abono/Liquidación Pedido ${pedido.id}`,
+      referenceId: pedido.id,
+      createdBy: userId
+    });
+
     const abonosActuales = pedido.abonos || [];
+    // 2. Vinculamos el abono al ticket de la caja
     const nuevoAbono = {
-      id: Date.now().toString(),
+      id: tx.id, 
       fecha: new Date().toISOString(),
       monto: parseFloat(monto)
     };

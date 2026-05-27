@@ -2,6 +2,7 @@ import Order from './Order.model.js';
 import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
+import Transaction from '../cash/Transaction.model.js';
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
 // ==========================================
@@ -100,12 +101,22 @@ export const payOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { cuentaName, isFullPayment } = req.body; 
-    const order = await Order.findByPk(orderId);
+    
+    const order = await Order.findByPk(orderId, { include: ['items'] });
+    if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
     
     let paidAccounts = [...(order.paidAccounts || [])];
-    
-    if (!isFullPayment && cuentaName && !paidAccounts.includes(cuentaName)) {
-      paidAccounts.push(cuentaName);
+    let amountToRegister = 0;
+    let desc = '';
+
+    if (isFullPayment) {
+      const unpaidItems = order.items.filter(i => !paidAccounts.includes(i.cuenta));
+      amountToRegister = unpaidItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
+      desc = `Pago total orden ${order.ticketId || order.tableId || orderId.substring(0,5)}`;
+    } else if (cuentaName) {
+      amountToRegister = order.items.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+      desc = `Pago cuenta ${cuentaName}`;
+      if (!paidAccounts.includes(cuentaName)) paidAccounts.push(cuentaName);
     }
 
     await order.update({ 
@@ -113,7 +124,21 @@ export const payOrder = async (req, res) => {
       paidAccounts: paidAccounts 
     });
 
-    res.json({ message: 'Pago registrado con éxito', order });
+    // Registramos en la caja si hubo dinero entrante
+    if (amountToRegister > 0) {
+      // 🕵️‍♂️ AQUÍ ESTÁ EL TRUCO: Buscamos tu ID en todas las variables posibles de Express
+      const userId = req.user?.id || req.userId || req.usuario?.id || null;
+
+      await Transaction.create({
+        source: 'CAFETERIA',
+        amount: amountToRegister,
+        description: desc,
+        referenceId: order.id,
+        createdBy: userId // <-- Mandamos el ID atrapado
+      });
+    }
+
+    res.json({ message: 'Pago registrado con éxito en Caja', order });
   } catch (error) { 
     res.status(500).json({ message: 'Error al procesar pago', error: error.message }); 
   }
