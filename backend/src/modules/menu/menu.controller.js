@@ -197,7 +197,9 @@ export const deleteProduct = async (req, res) => {
 // ==========================================
 export const getGlobalOptions = async (req, res) => {
   try {
-    const options = await GlobalOption.findAll();
+    const options = await GlobalOption.findAll({
+      order: [['order', 'ASC']] // 🔥 Ahora siempre devolverá ordenado
+    });
     res.json(options);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener opciones', error: error.message });
@@ -206,10 +208,41 @@ export const getGlobalOptions = async (req, res) => {
 
 export const createGlobalOption = async (req, res) => {
   try {
-    const newOption = await GlobalOption.create(req.body);
+    const { tipo } = req.body;
+    // Obtener el order más alto actual para ese tipo específico
+    const maxOrder = await GlobalOption.max('order', { where: { tipo } }) || 0;
+    
+    const newOption = await GlobalOption.create({
+      ...req.body,
+      order: maxOrder + 1 // Ponerlo al final
+    });
     res.status(201).json(newOption);
   } catch (error) {
     res.status(500).json({ message: 'Error al crear opción', error: error.message });
+  }
+};
+
+// 🔥 NUEVO: Función para reordenar las opciones globales
+export const reorderGlobalOptions = async (req, res) => {
+  const { items } = req.body;
+  const transaction = await sequelize.transaction();
+
+  try {
+    const updatePromises = items.map(item => 
+      GlobalOption.update(
+        { order: item.order },
+        { where: { id: item.id }, transaction }
+      )
+    );
+
+    await Promise.all(updatePromises);
+    await transaction.commit();
+
+    res.json({ message: 'Orden de opciones actualizado correctamente' });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error en el reordenamiento de opciones:', error);
+    res.status(500).json({ message: 'Error al guardar el nuevo orden', error: error.message });
   }
 };
 

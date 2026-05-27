@@ -1,5 +1,19 @@
 import { Router } from 'express';
-import { getCategories, createCategory, updateCategory, reorderCategories, deleteCategory, getProducts, createProduct, updateProduct, deleteProduct, getGlobalOptions, createGlobalOption, deleteGlobalOption } from './menu.controller.js';
+import { 
+  getCategories, 
+  createCategory, 
+  updateCategory, 
+  reorderCategories, 
+  deleteCategory, 
+  getProducts, 
+  createProduct, 
+  updateProduct, 
+  deleteProduct, 
+  getGlobalOptions, 
+  createGlobalOption, 
+  deleteGlobalOption,
+  reorderGlobalOptions // 🔥 NUEVO: Importamos la función para reordenar las opciones
+} from './menu.controller.js';
 
 const router = Router();
 
@@ -22,6 +36,10 @@ router.delete('/products/:id', deleteProduct);
 // Rutas de Opciones Globales
 router.get('/options', getGlobalOptions);
 router.post('/options', createGlobalOption);
+
+// 👇 NUEVO FIX: Igual que en categorías, la ruta /reorder va antes de cualquier ruta con /:id
+router.put('/options/reorder', reorderGlobalOptions); 
+
 router.delete('/options/:id', deleteGlobalOption);
 
 export default router;

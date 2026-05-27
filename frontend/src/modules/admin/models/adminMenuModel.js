@@ -54,5 +54,11 @@ export const adminMenuModel = {
   deleteGlobalOption: async (id) => {
     const response = await client.delete(`/menu/options/${id}`);
     return response.data;
+  },
+  
+  // 🔥 NUEVO: Función para reordenar las opciones globales mediante Drag & Drop
+  reorderGlobalOptions: async (items) => {
+    const response = await client.put('/menu/options/reorder', { items });
+    return response.data;
   }
 };

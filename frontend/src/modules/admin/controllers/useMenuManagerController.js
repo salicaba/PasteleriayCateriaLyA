@@ -189,6 +189,17 @@ export const useMenuManagerController = () => {
     }
   };
 
+  // 🔥 NUEVO: Función para guardar el reordenamiento de opciones en la base de datos
+  const handleDragEndOptionsAPI = async (newList) => {
+    try {
+      const payload = newList.map((opt, index) => ({ id: opt.id, order: index }));
+      await adminMenuModel.reorderGlobalOptions(payload);
+    } catch (error) {
+      toast.error('Error al guardar orden de opciones');
+      loadData(); // Si falla, recargamos para restaurar el orden original
+    }
+  };
+
   return {
     products, categories, setCategories,
     isModalOpen, isCategoryManagerOpen, setIsCategoryManagerOpen,
@@ -197,11 +208,16 @@ export const useMenuManagerController = () => {
     editingProduct, openModal, closeModal: () => setIsModalOpen(false),
     saveProduct, saveCategory, handleDragEndAPI,
     
-    // 🔥 Exportamos las nuevas funciones arregladas
+    // Funciones de productos
     productToDelete, requestRemoveProduct, confirmRemoveProduct, cancelRemoveProduct,
-    deleteProduct: requestRemoveProduct, // Enlazamos el botón del basurero aquí
+    deleteProduct: requestRemoveProduct,
     toggleAvailability,
     
-    globalOptions, saveGlobalOption, removeGlobalOption
+    // 🔥 Nuevos exports para las opciones globales
+    globalOptions, 
+    setGlobalOptions, 
+    saveGlobalOption, 
+    removeGlobalOption,
+    handleDragEndOptionsAPI
   };
 };

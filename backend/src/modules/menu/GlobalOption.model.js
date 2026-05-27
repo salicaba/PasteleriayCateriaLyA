@@ -8,15 +8,19 @@ const GlobalOption = sequelize.define('GlobalOption', {
     primaryKey: true,
   },
   tipo: {
-    type: DataTypes.STRING, // Aquí guardaremos si es 'tamanos', 'leches' o 'extras'
+    type: DataTypes.STRING,
     allowNull: false,
   },
   nombre: {
-    type: DataTypes.STRING, // Ej: "Leche de Almendra"
+    type: DataTypes.STRING, 
     allowNull: false,
   },
   precioAdicional: {
-    type: DataTypes.DECIMAL(10, 2), // Ej: 15.00
+    type: DataTypes.DECIMAL(10, 2), 
+    defaultValue: 0,
+  },
+  order: { // 🔥 NUEVO: Campo para guardar el orden
+    type: DataTypes.INTEGER,
     defaultValue: 0,
   }
 }, {
