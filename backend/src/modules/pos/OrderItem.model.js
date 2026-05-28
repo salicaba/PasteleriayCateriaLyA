@@ -25,12 +25,16 @@ const OrderItem = sequelize.define('OrderItem', {
     allowNull: false,
     defaultValue: 0.00,
   },
-  cuenta: { // 🔥 CRÍTICO: Nueva columna para no perder el Split Bill
+  cuenta: { 
     type: DataTypes.STRING,
     defaultValue: 'General',
   },
+  isTakeaway: { // 🔥 NUEVO: Bandera para saber si se empaqueta
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   notes: {
-    type: DataTypes.TEXT, // Aquí guardaremos un JSON stringificado con los detalles exactos
+    type: DataTypes.TEXT, 
     allowNull: true, 
   },
   kitchenStatus: {

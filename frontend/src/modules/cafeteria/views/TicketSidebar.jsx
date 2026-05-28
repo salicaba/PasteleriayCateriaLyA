@@ -13,7 +13,7 @@ export const TicketSidebar = ({
   onAdd, onRemove, onDelete, onSendToKitchen, onCheckout,
   cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem,
   orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus,
-  isLlevar // 🔥 AÑADIDO: Prop para saber si es pedido para llevar
+  isLlevar, toggleItemTakeaway // 🔥 NUEVO: Prop para alternar
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
   const [draggedItem, setDraggedItem] = useState(null);
@@ -24,7 +24,7 @@ export const TicketSidebar = ({
   const scrollContainerRef = useRef(null);
 
   const activeAcc = cuentaActiva || 'General';
-  const availableAccs = cuentasDisponibles || ['General'];
+  const availableAccs = isLlevar ? ['General'] : (cuentasDisponibles || ['General']);
 
   const handleAddCuenta = (e) => {
     e.preventDefault();
@@ -50,6 +50,7 @@ export const TicketSidebar = ({
             Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
             d.enviadoCocina === item.enviadoCocina &&
             d.kitchenStatus === item.kitchenStatus &&
+            !!d.isTakeaway === !!item.isTakeaway && 
             getPrepStr(d) === getPrepStr(item)
         );
         if (existing) {
@@ -83,31 +84,31 @@ export const TicketSidebar = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors">
       
-      {/* HEADER */}
-      <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 p-4 shadow-sm z-20 shrink-0 sticky top-0 transition-colors">
-        <form onSubmit={handleAddCuenta} className="flex gap-2">
-          <div className="relative flex-1">
-            <input 
-              type="text" 
-              value={newCuentaName} 
-              onChange={(e) => setNewCuentaName(e.target.value)}
-              disabled={orderStatus === 'PAID'}
-              placeholder="Dividir cuenta (Nombre)..."
-              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/50 transition-all border border-transparent focus:border-orange-500/20 lya:focus:border-lya-primary/30 disabled:opacity-50"
-            />
-            <UserPlus size={18} className="absolute left-3 top-3.5 text-gray-400 lya:text-lya-text/40" />
-          </div>
-          <button 
-            type="submit" 
-            disabled={!newCuentaName.trim() || orderStatus === 'PAID'}
-            className="bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:bg-gray-200 dark:disabled:bg-gray-800 lya:disabled:bg-lya-border/30 text-white lya:text-lya-surface px-5 rounded-2xl font-bold text-xs transition-all active:scale-95 shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 flex items-center justify-center shrink-0 disabled:opacity-50"
-          >
-            Añadir
-          </button>
-        </form>
-      </div>
+      {!isLlevar && (
+        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 p-4 shadow-sm z-20 shrink-0 sticky top-0 transition-colors">
+          <form onSubmit={handleAddCuenta} className="flex gap-2">
+            <div className="relative flex-1">
+              <input 
+                type="text" 
+                value={newCuentaName} 
+                onChange={(e) => setNewCuentaName(e.target.value)}
+                disabled={orderStatus === 'PAID'}
+                placeholder="Dividir cuenta (Nombre)..."
+                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/50 transition-all border border-transparent focus:border-orange-500/20 lya:focus:border-lya-primary/30 disabled:opacity-50"
+              />
+              <UserPlus size={18} className="absolute left-3 top-3.5 text-gray-400 lya:text-lya-text/40" />
+            </div>
+            <button 
+              type="submit" 
+              disabled={!newCuentaName.trim() || orderStatus === 'PAID'}
+              className="bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:bg-gray-200 dark:disabled:bg-gray-800 lya:disabled:bg-lya-border/30 text-white lya:text-lya-surface px-5 rounded-2xl font-bold text-xs transition-all active:scale-95 shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 flex items-center justify-center shrink-0 disabled:opacity-50"
+            >
+              Añadir
+            </button>
+          </form>
+        </div>
+      )}
 
-      {/* LISTADO DE PRODUCTOS */}
       <div 
         ref={scrollContainerRef}
         onDragOver={handleContainerDragOver}
@@ -133,13 +134,13 @@ export const TicketSidebar = ({
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                   onDragOver={(e) => { 
                     e.preventDefault(); 
-                    if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) setDragOverCuenta(cuentaName);
+                    if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar) setDragOverCuenta(cuentaName);
                   }}
                   onDragLeave={() => setDragOverCuenta(null)}
                   onDrop={(e) => {
                     e.preventDefault();
                     setDragOverCuenta(null);
-                    if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada) {
+                    if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar) {
                       let qtyToMove = draggedItem.item.qty;
                       if (qtyToMove > 1) {
                          setTransferQty(qtyToMove); 
@@ -160,10 +161,9 @@ export const TicketSidebar = ({
                           : "border-transparent bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50"
                   )}
                 >
-                  {/* CABECERA DE CUENTA */}
                   <div 
-                    onClick={() => { if(!isCuentaPagada && setCuentaActiva) setCuentaActiva(cuentaName); }}
-                    className={clsx("flex justify-between items-center p-4", !isCuentaPagada ? "cursor-pointer" : "")}
+                    onClick={() => { if(!isCuentaPagada && !isLlevar && setCuentaActiva) setCuentaActiva(cuentaName); }}
+                    className={clsx("flex justify-between items-center p-4", (!isCuentaPagada && !isLlevar) ? "cursor-pointer" : "")}
                   >
                     <div className="flex items-center gap-3">
                       <div className={clsx(
@@ -214,7 +214,6 @@ export const TicketSidebar = ({
                     </div>
                   </div>
 
-                  {/* ITEMS DE LA CUENTA */}
                   <div className="px-3 pb-3 space-y-2">
                     {items.map((item, idx) => {
                       const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}`;
@@ -223,9 +222,9 @@ export const TicketSidebar = ({
                       return (
                       <motion.div 
                         key={currentItemKey} layout
-                        draggable={!isCuentaPagada}
+                        draggable={!isCuentaPagada && !isLlevar}
                         onDragStart={(e) => {
-                          if (isCuentaPagada) return;
+                          if (isCuentaPagada || isLlevar) return;
                           setDraggedItem({ item, cuentaName });
                           e.dataTransfer.effectAllowed = 'move';
                           setTransferModeItemId(null);
@@ -233,7 +232,7 @@ export const TicketSidebar = ({
                         onDragEnd={() => setDraggedItem(null)}
                         className={clsx(
                           "relative group flex flex-col p-3 rounded-2xl border transition-all overflow-hidden",
-                          (!isCuentaPagada) ? "cursor-grab active:cursor-grabbing" : "",
+                          (!isCuentaPagada && !isLlevar) ? "cursor-grab active:cursor-grabbing" : "",
                           draggedItem?.item === item ? "opacity-40 scale-95" : "opacity-100",
                           item.enviadoCocina 
                             ? "bg-gray-50 dark:bg-gray-800/40 lya:bg-lya-bg/60 border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30" 
@@ -303,6 +302,15 @@ export const TicketSidebar = ({
                               </span>
                             </div>
 
+                            {/* 🔥 ETIQUETA VISUAL SOLO CUANDO YA ESTÁ EN COCINA */}
+                            {item.isTakeaway && item.enviadoCocina && (
+                              <div className="mb-1">
+                                <span className="text-[10px] font-black bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-md uppercase border border-orange-500/20 inline-flex items-center gap-1">
+                                  <ShoppingBag size={10} /> Empacar Llevar
+                                </span>
+                              </div>
+                            )}
+
                             <div className="space-y-1 pointer-events-none">
                               {item.preparaciones?.map((prep, pIdx) => {
                                 if (!prep || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
@@ -322,7 +330,7 @@ export const TicketSidebar = ({
                             </div>
 
                             <div className="mt-2 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
                                 {item.enviadoCocina ? (
                                   <button 
                                     onClick={() => toggleDeliveredStatus(item)} 
@@ -343,15 +351,33 @@ export const TicketSidebar = ({
                                     {item.kitchenStatus === 'DELIVERED' ? (
                                       <><CheckCircle size={12} /> Entregado</>
                                     ) : item.kitchenStatus === 'READY' ? (
-                                      <><CheckCircle size={12} className="animate-pulse" /> Listo para Entregar</>
+                                      <><CheckCircle size={12} className="animate-pulse" /> Listo Entregar</>
                                     ) : (
                                       <><ChefHat size={12} /> En Preparación</>
                                     )}
                                   </button>
                                 ) : (
-                                  <span className="flex items-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 px-2 py-0.5 rounded-full border border-transparent uppercase tracking-tighter">
-                                    Listo para enviar
-                                  </span>
+                                  <>
+                                    <span className="flex items-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 px-2 py-0.5 rounded-full border border-transparent uppercase tracking-tighter">
+                                      Listo
+                                    </span>
+                                    {/* 🔥 BOTÓN INTERACTIVO PARA EMPACAR */}
+                                    {!isLlevar && toggleItemTakeaway && (
+                                      <button
+                                        onClick={() => toggleItemTakeaway(item)}
+                                        className={clsx(
+                                          "flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter transition-all active:scale-95 cursor-pointer",
+                                          item.isTakeaway
+                                            ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-500/20 dark:border-orange-500/50 shadow-sm"
+                                            : "text-gray-400 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 hover:text-orange-500 hover:border-orange-300"
+                                        )}
+                                        title={item.isTakeaway ? "Quitar empaque" : "Empacar para llevar"}
+                                      >
+                                        <ShoppingBag size={10} className={item.isTakeaway ? "text-orange-600" : "text-gray-400"} />
+                                        {item.isTakeaway ? 'Empacar' : 'Mesa'}
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                               
@@ -369,7 +395,7 @@ export const TicketSidebar = ({
                                 {!item.enviadoCocina && !isCuentaPagada && (
                                   <>
                                     <button 
-                                      onClick={() => onRemove(item.id, item.precio, false, cuentaName)}
+                                      onClick={() => onRemove(item)}
                                       className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-lg text-gray-400 lya:text-lya-text/40 hover:text-red-500 lya:hover:text-red-500 transition-colors"
                                     >
                                       <Minus size={14} />
@@ -383,7 +409,7 @@ export const TicketSidebar = ({
                                     </button>
                                     <div className="w-px h-3 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/30 mx-1" />
                                     <button 
-                                      onClick={() => onDelete(item.id, item.precio, false, cuentaName)}
+                                      onClick={() => onDelete(item)}
                                       className="p-1.5 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-500/10 rounded-lg text-gray-300 lya:text-lya-text/30 hover:text-red-500 lya:hover:text-red-500 transition-colors"
                                     >
                                       <Trash2 size={14} />
@@ -405,7 +431,6 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* FOOTER - CON LOS DOS BOTONES ÚNICOS AL IMPRIMIR CUANDO ESTÁ PAID */}
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
         
         {orderStatus === 'PAID' ? (
@@ -421,7 +446,6 @@ export const TicketSidebar = ({
                 className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform"
               >
                 <XCircle size={18} />
-                {/* 🔥 TEXTO DINÁMICO AQUÍ */}
                 <span>{isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa'}</span>
               </button>
            </div>
@@ -429,7 +453,6 @@ export const TicketSidebar = ({
            <>
              <div className="space-y-2 mb-4">
                <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-xs font-bold uppercase tracking-wider">
-                 {/* 🔥 TEXTO DINÁMICO AQUÍ */}
                  <span>{isLlevar ? 'Subtotal Pedido' : 'Subtotal Mesa'}</span>
                  <span>${mesaTotal.toFixed(2)}</span>
                </div>
@@ -473,7 +496,6 @@ export const TicketSidebar = ({
                  )}
                >
                  <CreditCard size={18} />
-                 {/* 🔥 TEXTO DINÁMICO AQUÍ */}
                  <span>{isLlevar ? 'Cobrar Pedido' : 'Cobrar Mesa'}</span>
                </button>
              </div>

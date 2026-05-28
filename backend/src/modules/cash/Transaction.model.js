@@ -8,6 +8,11 @@ const Transaction = sequelize.define('Transaction', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  folio: { // 🔥 NUEVO: Identificador de pago único
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
   type: {
     type: DataTypes.ENUM('INCOME', 'EXPENSE'),
     defaultValue: 'INCOME',

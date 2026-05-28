@@ -53,7 +53,8 @@ export const addItemsToOrder = async (req, res) => {
       ...item, 
       orderId, 
       cuenta: item.cuenta || 'General', 
-      kitchenStatus: 'PENDING' 
+      kitchenStatus: 'PENDING',
+      isTakeaway: item.isTakeaway || false // 🔥 NUEVO: Guardamos si el producto es para llevar
     }));
 
     await OrderItem.bulkCreate(itemsToInsert);
@@ -107,15 +108,19 @@ export const payOrder = async (req, res) => {
     
     let paidAccounts = [...(order.paidAccounts || [])];
     let amountToRegister = 0;
+    
+    // 🔥 NUEVO: GENERADOR DE FOLIOS ÚNICOS (Ej. CAF-1738493129-482)
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const folioUnico = `CAF-${Date.now().toString().slice(-6)}${randomNum}`;
     let desc = '';
 
     if (isFullPayment) {
       const unpaidItems = order.items.filter(i => !paidAccounts.includes(i.cuenta));
       amountToRegister = unpaidItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
-      desc = `Pago total orden ${order.ticketId || order.tableId || orderId.substring(0,5)}`;
+      desc = `[Folio: ${folioUnico}] Pago total orden ${order.ticketId || order.tableId || orderId.substring(0,5)}`;
     } else if (cuentaName) {
       amountToRegister = order.items.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
-      desc = `Pago cuenta ${cuentaName}`;
+      desc = `[Folio: ${folioUnico}] Pago cuenta individual: ${cuentaName}`;
       if (!paidAccounts.includes(cuentaName)) paidAccounts.push(cuentaName);
     }
 
@@ -126,15 +131,15 @@ export const payOrder = async (req, res) => {
 
     // Registramos en la caja si hubo dinero entrante
     if (amountToRegister > 0) {
-      // 🕵️‍♂️ AQUÍ ESTÁ EL TRUCO: Buscamos tu ID en todas las variables posibles de Express
       const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
       await Transaction.create({
+        folio: folioUnico, // 🔥 NUEVO: Guardamos el folio oficial en la caja
         source: 'CAFETERIA',
         amount: amountToRegister,
         description: desc,
         referenceId: order.id,
-        createdBy: userId // <-- Mandamos el ID atrapado
+        createdBy: userId 
       });
     }
 
@@ -252,12 +257,14 @@ export const moveItemAccount = async (req, res) => {
     
     const unitPrice = Number(item.subtotal) / item.quantity;
 
+    // 🔥 NUEVO: Respetamos el flag isTakeaway al agrupar cuentas
     const existingItems = await OrderItem.findAll({
         where: {
             orderId: item.orderId,
             productId: item.productId,
             cuenta: targetCuenta,
-            kitchenStatus: item.kitchenStatus
+            kitchenStatus: item.kitchenStatus,
+            isTakeaway: item.isTakeaway 
         }
     });
 
@@ -305,7 +312,8 @@ export const moveItemAccount = async (req, res) => {
              subtotal: unitPrice * qtyToMove,
              cuenta: targetCuenta,
              notes: JSON.stringify(notesToMove),
-             kitchenStatus: item.kitchenStatus
+             kitchenStatus: item.kitchenStatus,
+             isTakeaway: item.isTakeaway // 🔥 NUEVO: Mantenemos la propiedad al dividir
            });
         } else {
            await item.update({ cuenta: targetCuenta });
@@ -346,10 +354,9 @@ export const printOrderTicket = async (req, res) => {
       return res.status(404).json({ message: 'Orden no encontrada para imprimir' });
     }
 
-    // 1. CONFIGURACIÓN MODO SIMULACIÓN (SIN INTERFAZ NI DRIVER)
+    // 1. CONFIGURACIÓN MODO SIMULACIÓN
     let printer = new ThermalPrinter({
       type: PrinterTypes.EPSON,      
-      // AL NO PONER INTERFAZ, EVITAMOS QUE BUSQUE DRIVERS FÍSICOS
       characterSet: CharacterSet.PC852_LATIN2,
       removeSpecialCharacters: false,
       width: 42,
@@ -397,9 +404,13 @@ export const printOrderTicket = async (req, res) => {
     itemsToPrint.forEach(item => {
       const subtotal = Number(item.subtotal);
       total += subtotal;
+      
+      // 🔥 NUEVO: Agregamos el indicativo "(Llevar)" físico en el ticket
+      const nombreLlevar = item.isTakeaway ? `(Llevar) ${item.product?.name || "Prod"}` : (item.product?.name || "Prod");
+      
       printer.tableCustom([
         { text: item.quantity.toString(), align: "LEFT", width: 0.15 },
-        { text: item.product?.name || "Producto", align: "LEFT", width: 0.55 },
+        { text: nombreLlevar, align: "LEFT", width: 0.55 },
         { text: `$${subtotal.toFixed(2)}`, align: "RIGHT", width: 0.30 }
       ]);
     });
@@ -416,8 +427,7 @@ export const printOrderTicket = async (req, res) => {
     printer.println("¡Gracias por su preferencia!");
     printer.cut(); 
 
-    // 3. EXTRAER Y MOSTRAR EN LA TERMINAL (MOCK)
-    // Usamos getText() para obtener la representación legible del buffer térmico
+    // 3. EXTRAER Y MOSTRAR EN LA TERMINAL
     console.log(`\n=== TICKET PARA ORDEN ${orderId} ===`);
     console.log(printer.getText());
     console.log(`==================================\n`);
@@ -468,7 +478,7 @@ export const shareOrderTicket = async (req, res) => {
     const isLlevar = order.orderType === 'LLEVAR';
     const identificadorMesa = isLlevar ? `Pedido #${order.ticketId || 'Llevar'}` : `Mesa #${order.table?.number || 'Salón'}`;
 
-    // Construcción del HTML dinámico responsivo móvil agrupando por cuentas activas
+    // Construcción del HTML dinámico responsivo móvil
     const htmlResponse = `
     <!DOCTYPE html>
     <html lang="es">
@@ -541,7 +551,10 @@ export const shareOrderTicket = async (req, res) => {
                   <div class="flex items-start gap-3 text-sm px-1">
                     <span class="font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-lg text-xs mt-0.5">${item.quantity}x</span>
                     <div class="flex-1 min-w-0">
-                      <p class="font-bold text-slate-900 break-words">${item.product?.name || 'Producto'}</p>
+                      <p class="font-bold text-slate-900 break-words">
+                        ${item.isTakeaway ? '<span class="text-orange-500 mr-1 text-[11px] uppercase tracking-tighter bg-orange-50 px-1 rounded">🛍️ Llevar</span>' : ''}
+                        ${item.product?.name || 'Producto'}
+                      </p>
                       ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-400 font-medium font-italic">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
                     </div>
                     <span class="font-bold text-slate-900 shrink-0">$${Number(item.subtotal).toFixed(2)}</span>

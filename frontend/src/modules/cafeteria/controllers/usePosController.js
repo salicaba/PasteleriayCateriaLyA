@@ -63,6 +63,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 enviadoCocina: true,
                 kitchenStatus: item.kitchenStatus,
                 cuenta: item.cuenta || 'General',
+                isTakeaway: item.isTakeaway || false,
                 backendItemId: item.id
             };
         });
@@ -95,7 +96,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     const targetCuenta = forceCuenta || cuentaActiva;
     setCart(prev => {
       const precio = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
-      const index = prev.findIndex(p => p.id === productWithDetails.id && p.precio === precio && !p.enviadoCocina && p.cuenta === targetCuenta);
+      
+      const index = prev.findIndex(p => 
+        p.id === productWithDetails.id && 
+        p.precio === precio && 
+        !p.enviadoCocina && 
+        p.cuenta === targetCuenta && 
+        !!p.isTakeaway === !!productWithDetails.isTakeaway
+      );
 
       if (index !== -1) {
           const newCart = [...prev];
@@ -106,7 +114,16 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           };
           return newCart;
         }
-      return [...prev, { ...productWithDetails, precio, qty: 1, preparaciones: [productWithDetails.detalles || {}], enviadoCocina: false, cuenta: targetCuenta }];
+        
+      return [...prev, { 
+        ...productWithDetails, 
+        precio, 
+        qty: 1, 
+        preparaciones: [productWithDetails.detalles || {}], 
+        enviadoCocina: false, 
+        cuenta: targetCuenta, 
+        isTakeaway: productWithDetails.isTakeaway || false
+      }];
     });
   };
 
@@ -136,7 +153,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         quantity: item.qty, 
         subtotal: item.precio * item.qty, 
         cuenta: item.cuenta || 'General', 
-        notes: JSON.stringify(item.preparaciones) 
+        notes: JSON.stringify(item.preparaciones),
+        isTakeaway: item.isTakeaway || false
       }));
 
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
@@ -160,6 +178,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
               enviadoCocina: true,
               kitchenStatus: item.kitchenStatus,
               cuenta: item.cuenta || 'General',
+              isTakeaway: item.isTakeaway || false,
               backendItemId: item.id
           };
       });
@@ -180,10 +199,17 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  const removeFromCart = (id, precio, env, cuenta) => { 
-    if(!env) setCart(prev => {
+  const removeFromCart = (itemToRemove) => { 
+    if(!itemToRemove.enviadoCocina) setCart(prev => {
         const newCart = [...prev];
-        const idx = newCart.findIndex(p => p.id === id && p.precio === precio && p.cuenta === cuenta && !p.enviadoCocina);
+        const idx = newCart.findIndex(p => 
+          p.id === itemToRemove.id && 
+          p.precio === itemToRemove.precio && 
+          p.cuenta === itemToRemove.cuenta && 
+          !!p.isTakeaway === !!itemToRemove.isTakeaway &&
+          !p.enviadoCocina
+        );
+        
         if (idx !== -1) {
             newCart[idx] = { 
                 ...newCart[idx], 
@@ -196,8 +222,80 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     });
   };
 
-  const deleteLine = (id, precio, env, cuenta) => { 
-    if(!env) setCart(prev => prev.filter(p => !(p.id === id && p.precio === precio && p.cuenta === cuenta && !p.enviadoCocina)));
+  const deleteLine = (itemToRemove) => { 
+    if(!itemToRemove.enviadoCocina) setCart(prev => prev.filter(p => !(
+      p.id === itemToRemove.id && 
+      p.precio === itemToRemove.precio && 
+      p.cuenta === itemToRemove.cuenta && 
+      !!p.isTakeaway === !!itemToRemove.isTakeaway && 
+      !p.enviadoCocina
+    )));
+  };
+
+  // ==========================================
+  // 🔥 LÓGICA MEJORADA DE SEPARACIÓN "PARA LLEVAR"
+  // ==========================================
+  const toggleItemTakeaway = (itemToToggle) => {
+    if (itemToToggle.enviadoCocina) return;
+    
+    setCart(prev => {
+      const newCart = [...prev];
+      // Buscamos el grupo actual que queremos modificar
+      const idx = newCart.findIndex(p => 
+        p.id === itemToToggle.id && 
+        p.precio === itemToToggle.precio && 
+        p.cuenta === itemToToggle.cuenta && 
+        !!p.isTakeaway === !!itemToToggle.isTakeaway && 
+        !p.enviadoCocina
+      );
+
+      if (idx !== -1) {
+        const currentItem = newCart[idx];
+        const targetTakeawayState = !currentItem.isTakeaway;
+
+        if (currentItem.qty === 1) {
+          // Si solo hay 1, cambiamos su estado y listo
+          newCart[idx] = { ...currentItem, isTakeaway: targetTakeawayState };
+        } else {
+          // Si hay varios (ej: 4 Frappés), separamos 1 unidad
+          
+          // 1. Extraemos la última preparación y reducimos la cantidad original
+          const prepToMove = currentItem.preparaciones[currentItem.preparaciones.length - 1];
+          newCart[idx] = { 
+            ...currentItem, 
+            qty: currentItem.qty - 1,
+            preparaciones: currentItem.preparaciones.slice(0, -1)
+          };
+
+          // 2. Buscamos si YA EXISTE un grupo con el estado destino (ej: ya hay frappés "Empacados")
+          const existingTargetIdx = newCart.findIndex(p => 
+            p.id === currentItem.id && 
+            p.precio === currentItem.precio && 
+            p.cuenta === currentItem.cuenta && 
+            !!p.isTakeaway === targetTakeawayState && 
+            !p.enviadoCocina
+          );
+
+          if (existingTargetIdx !== -1) {
+            // Si ya existe, le sumamos 1
+            newCart[existingTargetIdx] = {
+              ...newCart[existingTargetIdx],
+              qty: newCart[existingTargetIdx].qty + 1,
+              preparaciones: [...newCart[existingTargetIdx].preparaciones, prepToMove]
+            };
+          } else {
+            // Si no existe, creamos un nuevo renglón separado con qty 1
+            newCart.push({
+              ...currentItem,
+              qty: 1,
+              preparaciones: [prepToMove],
+              isTakeaway: targetTakeawayState
+            });
+          }
+        }
+      }
+      return newCart;
+    });
   };
 
   const moveItemToCuenta = async (item, target, qtyToMove = item.qty) => { 
@@ -224,13 +322,24 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 setCart(prev => {
                    const newCart = [...prev];
                    let idx = newCart.indexOf(subItem);
+                   
                    if (idx === -1) {
-                       idx = newCart.findIndex(p => p.id === subItem.id && p.precio === subItem.precio && p.cuenta === (subItem.cuenta || 'General') && !p.enviadoCocina);
+                       idx = newCart.findIndex(p => 
+                         p.id === subItem.id && 
+                         p.precio === subItem.precio && 
+                         p.cuenta === (subItem.cuenta || 'General') && 
+                         !!p.isTakeaway === !!subItem.isTakeaway && 
+                         !p.enviadoCocina
+                       );
                    }
                    
                    if(idx !== -1) {
                        const existingIdx = newCart.findIndex(p => 
-                           p.id === subItem.id && p.precio === subItem.precio && p.cuenta === target && !p.enviadoCocina
+                           p.id === subItem.id && 
+                           p.precio === subItem.precio && 
+                           p.cuenta === target && 
+                           !!p.isTakeaway === !!subItem.isTakeaway && 
+                           !p.enviadoCocina
                        );
 
                        if (existingIdx !== -1) {
@@ -277,6 +386,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                     enviadoCocina: true,
                     kitchenStatus: dbItem.kitchenStatus,
                     cuenta: dbItem.cuenta || 'General',
+                    isTakeaway: dbItem.isTakeaway || false,
                     backendItemId: dbItem.id
                 };
             });
@@ -305,7 +415,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     if (itemsToUpdate.length === 0) return;
 
     const currentStatus = itemsToUpdate[0].kitchenStatus;
-    
     if (currentStatus !== 'READY' && currentStatus !== 'DELIVERED') return;
 
     const newStatus = currentStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
@@ -388,6 +497,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     filtroTexto, setFiltroTexto, categoriaActiva, setCategoriaActiva, filteredProducts, getProductQty, 
     handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    dbCategories, orderStatus, paidAccounts, validateAllDelivered
+    dbCategories, orderStatus, paidAccounts, validateAllDelivered,
+    toggleItemTakeaway
   };
 };

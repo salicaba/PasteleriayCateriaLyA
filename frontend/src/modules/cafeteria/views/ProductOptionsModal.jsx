@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, Check, AlertCircle } from 'lucide-react';
+import { X, Check, AlertCircle, ShoppingBag } from 'lucide-react'; // 🔥 NUEVO: Importamos ShoppingBag
 import clsx from 'clsx';
 
 export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
+  const [isTakeaway, setIsTakeaway] = useState(false); // 🔥 NUEVO: Estado local para el switch "Para Llevar"
 
   if (!product) return null;
 
@@ -124,6 +125,7 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
          ...(lecheStr && { leche: lecheStr }),
          ...(extrasArr.length > 0 && { extras: extrasArr })
       },
+      isTakeaway, // 🔥 NUEVO: Pasamos el flag al carrito
       uniqueId: Date.now()
     });
   };
@@ -203,6 +205,27 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
               </div>
             ))
           )}
+
+          {/* 🔥 NUEVO: SECCIÓN Opción "Para Llevar" a Nivel de Producto */}
+          <div className="mt-8 mb-2">
+            <label className="flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-500/30 bg-orange-50/50 dark:bg-orange-500/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform">
+              <input 
+                type="checkbox" 
+                checked={isTakeaway}
+                onChange={(e) => setIsTakeaway(e.target.checked)}
+                className="w-6 h-6 text-orange-500 bg-white border-orange-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+              />
+              <div className="flex flex-col">
+                <span className="font-black text-orange-900 dark:text-orange-300 text-sm flex items-center gap-2">
+                  <ShoppingBag size={16} /> Empaquetar para Llevar
+                </span>
+                <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 mt-0.5">
+                  Se enviará a cocina con indicación de empaque desechable.
+                </span>
+              </div>
+            </label>
+          </div>
+
         </div>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 lya:border-lya-border/30 bg-white dark:bg-gray-800 lya:bg-lya-surface shrink-0 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] transition-colors">

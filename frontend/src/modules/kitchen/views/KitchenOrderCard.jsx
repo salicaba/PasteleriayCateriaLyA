@@ -1,6 +1,6 @@
 // src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Timer, Check, ChefHat, CheckCircle, Flame, BellRing } from 'lucide-react';
+import { Timer, Check, ChefHat, CheckCircle, Flame, BellRing, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllReady }) => {
@@ -152,7 +152,7 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
               </div>
               
               <div className="flex-1 min-w-0">
-                {/* NOMBRE DEL ITEM SIN TRUNCAR (Baja de línea si es largo) */}
+                {/* NOMBRE DEL ITEM SIN TRUNCAR */}
                 <p className={`text-sm sm:text-[15px] font-bold uppercase leading-snug break-words transition-all duration-300 ${
                   isReady 
                     ? 'line-through text-gray-400 dark:text-gray-500 decoration-2 decoration-gray-400/50' 
@@ -160,11 +160,25 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
                 }`}>
                   {item.nombre}
                 </p>
+
+                {/* 🔥 NUEVO: ETIQUETA VISUAL PARA COCINA SI ES PARA LLEVAR */}
+                {item.isTakeaway && (
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
+                       isReady 
+                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
+                        : 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400'
+                    }`}>
+                      <ShoppingBag size={10} /> Empacar Llevar
+                    </span>
+                  </div>
+                )}
                 
                 {item.preparaciones && item.preparaciones.length > 0 && (
                   <div className={`mt-1 flex flex-wrap gap-1 transition-opacity duration-300 ${isReady ? 'opacity-40' : 'opacity-100'}`}>
-                    {item.preparaciones.map((prep, idx) => (
-                      <React.Fragment key={prep.idPrep}>
+                    {/* 🔥 CORRECCIÓN: .slice(0,1) para no repetir configuraciones visualmente en cocina */}
+                    {item.preparaciones.slice(0, 1).map((prep, idx) => (
+                      <React.Fragment key={idx}>
                         {prep.tamano && prep.tamano !== 'Estándar' && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
                             {prep.tamano}

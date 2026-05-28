@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/MesaCard.jsx
 import React, { useMemo } from 'react';
 import { UtensilsCrossed, ShoppingBag, ChefHat, Check } from 'lucide-react';
 
@@ -11,39 +12,54 @@ export const MesaCard = ({ mesa, onClick }) => {
     
     let pend = 0;
     mesa.items.forEach(item => {
-      // Contamos como pendientes los que están en PENDING
       if (item.kitchenStatus === 'PENDING') pend++;
     });
     
     return { pendientes: pend, totalItems: mesa.items.length };
   }, [mesa.items]);
 
-  // Separamos el nombre del cliente y el teléfono para poder estructurarlos verticalmente
-  const { nombreCliente, telefonoCliente } = useMemo(() => {
-    // Convertimos a String para evitar el error "split is not a function"
-    const fuente = String(mesa.cliente || mesa.identificadorLlevar || ''); 
-    if (fuente.includes(' - Cel: ')) {
-      const [nombre, celular] = fuente.split(' - Cel: ');
-      return { nombreCliente: nombre, telefonoCliente: celular };
-    }
-    return { nombreCliente: fuente, telefonoCliente: '' };
-  }, [mesa.cliente, mesa.identificadorLlevar]);
+  // 🔥 CORRECCIÓN: Separamos el nombre y teléfono basado en la nueva estructura de `mesa.numero`
+  const { idPrincipal, nombreCliente, telefonoCliente } = useMemo(() => {
+    const rawNumero = String(mesa.numero || '');
+    
+    // Si no es un pedido para llevar, devolvemos el número tal cual
+    if (!isLlevar) return { idPrincipal: rawNumero, nombreCliente: '', telefonoCliente: '' };
 
-  // Limpiamos el identificador de la cabecera para que no repita el teléfono arriba
-  const cleanIdentificador = useMemo(() => {
-    if (!mesa.identificadorLlevar) return 'Pedido';
-    // Convertimos a String antes de separar
-    return String(mesa.identificadorLlevar).split(' - Cel: ')[0]; 
-  }, [mesa.identificadorLlevar]);
+    // Estructura esperada de backend: "L-XX - Nombre - Teléfono"
+    const partes = rawNumero.split(' - ');
+    
+    // El ID siempre es la primera parte (Ej: "L-01")
+    const id = partes[0] || 'Pedido';
+    
+    // Si solo hay 1 o 2 partes, no hay teléfono
+    if (partes.length < 3) {
+       return { idPrincipal: id, nombreCliente: partes[1] || 'Mostrador', telefonoCliente: '' };
+    }
+
+    // Si tiene las 3 partes (ID, Nombre, Teléfono), extraemos el teléfono limpio
+    // El teléfono siempre va a ser la última parte de la cadena, limpia de espacios y caracteres no numéricos
+    const rawTel = partes[partes.length - 1];
+    const telLimpio = rawTel.replace(/\D/g, ''); 
+    
+    // Si la última parte parece un teléfono válido (ej: al menos 10 dígitos)
+    if (telLimpio.length >= 10) {
+      // Todo lo que esté en medio es el nombre
+      const nombre = partes.slice(1, -1).join(' - ');
+      return { idPrincipal: id, nombreCliente: nombre, telefonoCliente: rawTel };
+    }
+
+    // Si la última parte no parece teléfono, asumimos que es parte del nombre
+    return { idPrincipal: id, nombreCliente: partes.slice(1).join(' - '), telefonoCliente: '' };
+
+  }, [mesa.numero, isLlevar]);
+
 
   return (
     <div 
       onClick={() => onClick(mesa)}
       className={`group relative rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-hidden ${
         isOcupada 
-          // Tema Claro | Tema Oscuro | Tema LyA (Fondo sólido y limpio)
           ? 'bg-white dark:bg-gray-800 border-y border-r border-gray-100 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/30' 
-          // Tema Claro | Tema Oscuro | Tema LyA (Fondo inactivo)
           : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
       }`}
     >
@@ -54,7 +70,6 @@ export const MesaCard = ({ mesa, onClick }) => {
           : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/60'
       }`} />
 
-      {/* Contenedor principal */}
       <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full">
         
         {/* Parte Superior: Título e Ícono */}
@@ -68,8 +83,7 @@ export const MesaCard = ({ mesa, onClick }) => {
             <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
               isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
             }`}>
-              {/* Aquí agregamos el # para Para Llevar también */}
-              {isLlevar ? `#${cleanIdentificador}` : `#${mesa.numero}`}
+              #{idPrincipal}
             </h3>
           </div>
           
@@ -90,14 +104,14 @@ export const MesaCard = ({ mesa, onClick }) => {
                 ${Number(mesa.total || 0).toFixed(2)}
               </span>
               
-              {/* Información del cliente apilada de forma bonita */}
-              {isLlevar && nombreCliente && (
+              {/* 🔥 CORRECCIÓN: Renderizado dinámico de Nombre y Teléfono en tarjetas "Para Llevar" */}
+              {isLlevar && nombreCliente && nombreCliente !== 'Mostrador' && (
                 <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
-                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1">
                     👤 {nombreCliente}
                   </span>
                   {telefonoCliente && (
-                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 lya:text-lya-primary tracking-wide mt-0.5 whitespace-nowrap">
+                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 lya:text-lya-primary tracking-wide mt-0.5 whitespace-nowrap flex items-center gap-1">
                       📞 {telefonoCliente}
                     </span>
                   )}

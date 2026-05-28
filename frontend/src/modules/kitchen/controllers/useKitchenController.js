@@ -33,6 +33,7 @@ export const useKitchenController = () => {
           id: item.id,
           nombre: item.product?.name || 'Producto',
           qty: item.quantity,
+          isTakeaway: item.isTakeaway, // 🔥 AQUÍ ABRIMOS LA TUBERÍA: Pasamos la variable a la vista
           preparaciones: preps.map((p, i) => ({
             idPrep: `${item.id}-${i}`,
             tamano: p.tamano || 'Estándar',

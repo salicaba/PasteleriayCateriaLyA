@@ -33,7 +33,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered 
+    moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered,
+    toggleItemTakeaway 
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
   const handleConfirmOption = (productWithOptions) => { addToCart(productWithOptions); setSelectedProduct(null); };
@@ -97,9 +98,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     setPreviewTicketData({ cuentaName });
   };
 
-  // =========================================================================
-  // 🔥 NUEVA LÓGICA DE IMPRESIÓN DIRECTA CON EL MENSAJE CORRECTO
-  // =========================================================================
   const executeRealPrint = async () => {
     const targetCuenta = previewTicketData.cuentaName;
     setPreviewTicketData(null); 
@@ -120,7 +118,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   if (!isOpen || !mesa) return null;
 
-  // 🔥 MOVEMOS isLlevar ARRIBA para poder usarlo en sidebarProps
   const isLlevar = mesa.zona === 'llevar';
 
   const sidebarProps = {
@@ -133,21 +130,30 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onPrintTicket: openTicketPreview, 
     onCloseTable: finalizeTable,
     toggleDeliveredStatus,
-    isLlevar // <-- AÑADIDO AQUÍ
+    isLlevar,
+    toggleItemTakeaway
   };
 
+  // 🔥 NUEVA LÓGICA DE EXTRACCIÓN (Igual a la de MesaCard)
   const partesNumero = (mesa.numero || '').toString().split(' - ');
-  const numeroReal = partesNumero[0]; 
+  const numeroReal = partesNumero[0] || 'Pedido'; 
   
   let nombreCliente = 'MOSTRADOR';
-  if (partesNumero.length > 1) {
-    const ultimaParteDigitos = partesNumero[partesNumero.length - 1].replace(/\D/g, '');
-    if (isLlevar && partesNumero.length > 2 && ultimaParteDigitos.length >= 10) {
-      nombreCliente = partesNumero.slice(1, -1).join(' - ');
+  let telefonoCliente = '';
+
+  if (isLlevar && partesNumero.length >= 2) {
+    const rawTel = partesNumero[partesNumero.length - 1];
+    const telLimpio = rawTel.replace(/\D/g, '');
+
+    if (partesNumero.length >= 3 && telLimpio.length >= 10) {
+       nombreCliente = partesNumero.slice(1, -1).join(' - ');
+       telefonoCliente = rawTel;
     } else {
-      nombreCliente = partesNumero.slice(1).join(' - ');
+       nombreCliente = partesNumero.slice(1).join(' - ');
     }
   }
+
+  const tableTitle = isLlevar ? `Llevar #${numeroReal}` : `Mesa ${numeroReal}`;
 
   return (
     <AnimatePresence>
@@ -240,11 +246,17 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
                         <button className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
                         <div>
-                          <span className="font-bold text-gray-700 dark:text-white lya:text-lya-text block leading-tight flex items-center gap-2">
-                            <span>{isLlevar ? numeroReal : `Mesa #${numeroReal}`}</span>
+                          {/* 🔥 VISTA MÓVIL: Agregado Nombre y Teléfono en píldoras */}
+                          <span className="font-bold text-gray-700 dark:text-white lya:text-lya-text block leading-tight flex items-center gap-2 flex-wrap">
+                            <span>{tableTitle}</span>
                             {isLlevar && nombreCliente !== 'MOSTRADOR' && (
-                               <span className="px-2 py-0.5 bg-orange-500 lya:bg-lya-secondary text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider">
-                                  {nombreCliente}
+                               <span className="px-2 py-0.5 bg-orange-500 lya:bg-lya-secondary text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider flex items-center gap-1">
+                                  👤 {nombreCliente}
+                               </span>
+                            )}
+                            {isLlevar && telefonoCliente && (
+                               <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-black rounded-full uppercase tracking-wider flex items-center gap-1">
+                                  📞 {telefonoCliente}
                                </span>
                             )}
                           </span>
@@ -275,20 +287,36 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           </div>
 
           <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface h-full shadow-xl z-20 flex-col transition-colors">
-            <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-bg border-b border-orange-500/10 dark:border-orange-500/20 lya:border-lya-border/40 flex justify-between items-center">
+            <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-bg border-b border-orange-500/10 dark:border-orange-500/20 lya:border-lya-border/40 flex justify-between items-start">
                <div>
                   <h3 className="font-bold text-gray-900 dark:text-orange-500 lya:text-lya-text text-lg flex items-center gap-2">
-                     <span>{isLlevar ? numeroReal : `Mesa #${numeroReal}`}</span>
-                     {mesa.estado === 'ocupada' && (
-                       <span className={`px-2 py-0.5 text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider ${isLlevar ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-900 dark:bg-orange-500 lya:bg-lya-primary'}`}>
-                          {isLlevar ? nombreCliente : 'OCUPADA'}
+                     <span>{tableTitle}</span>
+                     {mesa.estado === 'ocupada' && !isLlevar && (
+                       <span className="px-2 py-0.5 text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider bg-gray-900 dark:bg-orange-500 lya:bg-lya-primary">
+                          OCUPADA
                        </span>
                      )}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 font-medium">
+                  
+                  {/* 🔥 VISTA DESKTOP: Agregado Nombre y Teléfono en píldoras */}
+                  {isLlevar && nombreCliente !== 'MOSTRADOR' && (
+                     <div className="flex gap-2 mt-1.5 flex-wrap">
+                       <span className="px-2 py-0.5 bg-orange-500 lya:bg-lya-secondary text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider flex items-center gap-1">
+                          👤 {nombreCliente}
+                       </span>
+                       {telefonoCliente && (
+                          <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-black rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                             📞 {telefonoCliente}
+                          </span>
+                       )}
+                     </div>
+                  )}
+                  
+                  <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 font-medium">
                     {isLlevar ? 'Venta para Llevar' : (mesa.estado === 'ocupada' ? 'Cuenta abierta' : 'Nueva orden')}
                   </p>
                </div>
+               
                {mesa.estado === 'ocupada' && !isLlevar && (
                   <button onClick={() => setShowOpcionesMesa(true)} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-orange-500 dark:hover:text-orange-500 lya:hover:text-lya-primary transition-colors active:scale-95" title="Opciones Avanzadas">
                      <MoreVertical size={20} />
@@ -301,7 +329,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           </div>
         </motion.div>
 
-        {/* MODAL DE VISTA PREVIA DEL TICKET CON WHATSAPP INCORPORADO */}
         <TicketPreviewModal 
           isOpen={!!previewTicketData}
           onClose={() => setPreviewTicketData(null)}
@@ -311,18 +338,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           onConfirmPrint={executeRealPrint}
           onSendWhatsApp={(number, items, totalToPrint) => {
              setPreviewTicketData(null); 
-             
-             // Generamos la URL dinámica apuntando a la ruta que acabamos de crear en el backend.
-             // NOTA IMPORTANTE: Cuando lo subas a internet, cambia "http://localhost:4000" por el dominio de tu servidor.
              const ticketUrl = `http://localhost:4000/api/pos/orders/${mesa.orderId}/share${previewTicketData?.cuentaName ? `?cuenta=${encodeURIComponent(previewTicketData.cuentaName)}` : ''}`;
-             
-             // Armamos el texto enriquecido para WhatsApp
              const mensajeWhatsApp = `🧁 *𝓛𝔂𝓐 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${ticketUrl}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
-             
-             // Usamos la API de WhatsApp web/móvil para mandar el mensaje
              const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${number}&text=${encodeURIComponent(mensajeWhatsApp)}`;
              window.open(urlApiWhatsApp, '_blank');
-             
              setPaymentSuccessData({
                 title: '¡Enlace Creado!',
                 message: 'El ticket digital ha sido preparado para WhatsApp.'
@@ -331,7 +350,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           }}
         />
 
-        {/* NOTIFICACIONES REUTILIZANDO EL MISMO COMPONENTE "SuccessScreen" */}
         <AnimatePresence>
           {isSuccess && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100]">
