@@ -7,7 +7,20 @@ export const useCashController = (user) => {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    // Forzamos a que agarre tu fecha local (Ej: YYYY-MM-DD)
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+
+  // --- NUEVO ESTADO PARA CONTROLAR EL MODAL ELEGANTE ---
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    actionType: null, // Puede ser 'CANCEL' o 'RESTORE'
+    transactionId: null,
+    title: '',
+    message: ''
   });
 
   const fetchTransactions = async (date) => {
@@ -26,38 +39,59 @@ export const useCashController = (user) => {
     fetchTransactions(selectedDate);
   }, [selectedDate]);
 
-  const handleCancelTransaction = async (id) => {
+  // --- PREPARAMOS LA ANULACIÓN (Abre el modal) ---
+  const requestCancelTransaction = (id) => {
     if (user?.role !== 'Administrador') {
       toast.error('Acceso denegado: Solo el Administrador puede anular.');
       return;
     }
-    
-    if(!window.confirm("¿Estás completamente seguro de anular este ingreso? Se descontará de la caja y revertirá el estatus en el sistema original.")) return;
-
-    try {
-      await api.post(`/cash/${id}/cancel`);
-      toast.success('Movimiento anulado exitosamente');
-      fetchTransactions(selectedDate);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al anular transacción');
-    }
+    setConfirmModal({
+      isOpen: true,
+      actionType: 'CANCEL',
+      transactionId: id,
+      title: 'Anular Ingreso',
+      message: '¿Estás completamente seguro de anular este ingreso? Se descontará de la caja y revertirá el estatus en el sistema original.'
+    });
   };
 
-  // --- NUEVA FUNCIÓN: RESTAURAR ---
-  const handleRestoreTransaction = async (id) => {
+  // --- PREPARAMOS LA RESTAURACIÓN (Abre el modal) ---
+  const requestRestoreTransaction = (id) => {
     if (user?.role !== 'Administrador') {
       toast.error('Acceso denegado: Solo el Administrador puede restaurar.');
       return;
     }
-    
-    if(!window.confirm("¿Restaurar este ingreso? El dinero volverá a sumarse a la caja y se marcará como pagado nuevamente.")) return;
+    setConfirmModal({
+      isOpen: true,
+      actionType: 'RESTORE',
+      transactionId: id,
+      title: 'Restaurar Ingreso',
+      message: '¿Restaurar este ingreso? El dinero volverá a sumarse a la caja y se marcará como pagado nuevamente.'
+    });
+  };
+
+  // --- CERRAR EL MODAL SIN HACER NADA ---
+  const closeConfirmModal = () => {
+    setConfirmModal({ isOpen: false, actionType: null, transactionId: null, title: '', message: '' });
+  };
+
+  // --- EJECUTAR LA ACCIÓN UNA VEZ QUE EL CLIENTE DICE "SÍ" EN EL MODAL ---
+  const executeConfirmAction = async () => {
+    const { actionType, transactionId } = confirmModal;
+    if (!transactionId) return;
+
+    closeConfirmModal(); // Escondemos el modal de inmediato para dar sensación de rapidez
 
     try {
-      await api.post(`/cash/${id}/restore`);
-      toast.success('Movimiento restaurado exitosamente');
+      if (actionType === 'CANCEL') {
+        await api.post(`/cash/${transactionId}/cancel`);
+        toast.success('Movimiento anulado exitosamente');
+      } else if (actionType === 'RESTORE') {
+        await api.post(`/cash/${transactionId}/restore`);
+        toast.success('Movimiento restaurado exitosamente');
+      }
       fetchTransactions(selectedDate);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al restaurar transacción');
+      toast.error(error.response?.data?.message || `Error al ${actionType === 'CANCEL' ? 'anular' : 'restaurar'} transacción`);
     }
   };
 
@@ -79,7 +113,11 @@ export const useCashController = (user) => {
     selectedDate,
     setSelectedDate,
     resumen,
-    handleCancelTransaction,
-    handleRestoreTransaction // <-- Exportamos la nueva función
+    handleCancelTransaction: requestCancelTransaction, // Ahora estas mandan a abrir el modal
+    handleRestoreTransaction: requestRestoreTransaction, 
+    // Exportamos los controles del nuevo modal hacia la vista:
+    confirmModal,
+    closeConfirmModal,
+    executeConfirmAction
   };
 };

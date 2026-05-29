@@ -24,7 +24,7 @@ export const MesasPage = () => {
     );
   }, [mesasFiltradas, busqueda]);
 
-  // 3. Función simplificada: Ahora el controlador se encarga de todo el formato
+  // Función simplificada: Ahora el controlador se encarga de todo el formato
   const handleCrearPedidoLlevar = async (nombreCliente, telefono) => {
     // Pasamos el nombre y teléfono directamente al controlador modificado
     const nuevo = await nuevoPedidoLlevar(nombreCliente, telefono); 
@@ -179,7 +179,7 @@ export const MesasPage = () => {
             }}
             onPagoParcial={(id, monto) => {
               pagoParcialMesa(id, monto);
-              setMesaSeleccionada(null); 
+              // 🔥 CORRECCIÓN: Eliminamos la línea que forzaba a cerrar el modal aquí
             }}
           />
         )}

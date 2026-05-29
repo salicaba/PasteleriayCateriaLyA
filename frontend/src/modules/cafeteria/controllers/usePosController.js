@@ -1,7 +1,7 @@
-// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
+import toast from 'react-hot-toast'; // 🔥 NUEVO: Importamos los mensajes emergentes
 
 export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [dbProducts, setDbProducts] = useState([]); 
@@ -232,15 +232,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     )));
   };
 
-  // ==========================================
-  // 🔥 LÓGICA MEJORADA DE SEPARACIÓN "PARA LLEVAR"
-  // ==========================================
   const toggleItemTakeaway = (itemToToggle) => {
     if (itemToToggle.enviadoCocina) return;
     
     setCart(prev => {
       const newCart = [...prev];
-      // Buscamos el grupo actual que queremos modificar
       const idx = newCart.findIndex(p => 
         p.id === itemToToggle.id && 
         p.precio === itemToToggle.precio && 
@@ -254,12 +250,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         const targetTakeawayState = !currentItem.isTakeaway;
 
         if (currentItem.qty === 1) {
-          // Si solo hay 1, cambiamos su estado y listo
           newCart[idx] = { ...currentItem, isTakeaway: targetTakeawayState };
         } else {
-          // Si hay varios (ej: 4 Frappés), separamos 1 unidad
-          
-          // 1. Extraemos la última preparación y reducimos la cantidad original
           const prepToMove = currentItem.preparaciones[currentItem.preparaciones.length - 1];
           newCart[idx] = { 
             ...currentItem, 
@@ -267,7 +259,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             preparaciones: currentItem.preparaciones.slice(0, -1)
           };
 
-          // 2. Buscamos si YA EXISTE un grupo con el estado destino (ej: ya hay frappés "Empacados")
           const existingTargetIdx = newCart.findIndex(p => 
             p.id === currentItem.id && 
             p.precio === currentItem.precio && 
@@ -277,14 +268,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           );
 
           if (existingTargetIdx !== -1) {
-            // Si ya existe, le sumamos 1
             newCart[existingTargetIdx] = {
               ...newCart[existingTargetIdx],
               qty: newCart[existingTargetIdx].qty + 1,
               preparaciones: [...newCart[existingTargetIdx].preparaciones, prepToMove]
             };
           } else {
-            // Si no existe, creamos un nuevo renglón separado con qty 1
             newCart.push({
               ...currentItem,
               qty: 1,
@@ -447,14 +436,20 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); 
   };
 
+  // 🔥 NUEVO: Ahora manda el toast.success
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
     try {
       if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { cuentaName: nombreCuenta, isFullPayment: false });
       setPaidAccounts(prev => [...prev, nombreCuenta]);
+      toast.success(`Cuenta "${nombreCuenta}" pagada correctamente.`);
       if (onComplete) onComplete();
-    } catch (error) { console.error("Error al pagar cuenta parcial", error); }
+    } catch (error) { 
+      console.error("Error al pagar cuenta parcial", error);
+      toast.error("Hubo un error al procesar el pago.");
+    }
   };
 
+  // 🔥 NUEVO: Ahora manda el toast.success
   const handleCheckout = async (paymentDetails, onComplete) => {
     try {
       if (cart.some(p => !p.enviadoCocina)) {
@@ -462,8 +457,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       }
       if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { isFullPayment: true });
       setOrderStatus('PAID');
+      toast.success('Mesa cobrada en su totalidad.');
       if (onComplete) onComplete();
-    } catch (error) { console.error("Error al finalizar pago total", error); }
+    } catch (error) { 
+      console.error("Error al finalizar pago total", error);
+      toast.error("Hubo un error al cobrar la mesa.");
+    }
   };
 
   const handleCloseTable = async (onComplete) => {
@@ -481,7 +480,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  const total = useMemo(() => cart.reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
+  // 🔥 NUEVO: Esta lógica ahora EXCLUYE las cuentas que ya están en "paidAccounts"
+  const total = useMemo(() => {
+    return cart
+      .filter(item => !paidAccounts.includes(item.cuenta || 'General'))
+      .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
+  }, [cart, paidAccounts]);
+
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
   const cuentasDisponibles = useMemo(() => Array.from(new Set([...nombresCuentas, ...cart.map(i => i.cuenta || 'General')])), [cart, nombresCuentas]);

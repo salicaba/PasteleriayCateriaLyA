@@ -3,6 +3,7 @@ import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
+import User from '../users/User.model.js'; 
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
 // ==========================================
@@ -54,7 +55,7 @@ export const addItemsToOrder = async (req, res) => {
       orderId, 
       cuenta: item.cuenta || 'General', 
       kitchenStatus: 'PENDING',
-      isTakeaway: item.isTakeaway || false // 🔥 NUEVO: Guardamos si el producto es para llevar
+      isTakeaway: item.isTakeaway || false 
     }));
 
     await OrderItem.bulkCreate(itemsToInsert);
@@ -103,24 +104,38 @@ export const payOrder = async (req, res) => {
     const { orderId } = req.params;
     const { cuentaName, isFullPayment } = req.body; 
     
-    const order = await Order.findByPk(orderId, { include: ['items'] });
+    const order = await Order.findByPk(orderId, { 
+      include: ['items', { model: Table, as: 'table' }] 
+    });
+    
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
     
     let paidAccounts = [...(order.paidAccounts || [])];
     let amountToRegister = 0;
     
-    // 🔥 NUEVO: GENERADOR DE FOLIOS ÚNICOS (Ej. CAF-1738493129-482)
     const randomNum = Math.floor(100 + Math.random() * 900);
     const folioUnico = `CAF-${Date.now().toString().slice(-6)}${randomNum}`;
     let desc = '';
 
+    let identificador = '';
+    if (order.orderType === 'LLEVAR') {
+      const rawId = String(order.ticketId || '');
+      const partes = rawId.split(' - ');
+      let idLimpio = partes[0] || 'Pedido';
+      idLimpio = idLimpio.replace(/Llevar\s*#?/i, '').trim();
+      identificador = `Para Llevar #${idLimpio}`;
+    } else {
+      const numMesa = order.table ? order.table.number : (order.tableId || '?');
+      identificador = `Mesa #${numMesa}`;
+    }
+
     if (isFullPayment) {
       const unpaidItems = order.items.filter(i => !paidAccounts.includes(i.cuenta));
       amountToRegister = unpaidItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
-      desc = `[Folio: ${folioUnico}] Pago total orden ${order.ticketId || order.tableId || orderId.substring(0,5)}`;
+      desc = `Pago de consumo (${identificador}) ${folioUnico}`;
     } else if (cuentaName) {
       amountToRegister = order.items.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
-      desc = `[Folio: ${folioUnico}] Pago cuenta individual: ${cuentaName}`;
+      desc = `Pago de consumo (${identificador}) [Cuenta: ${cuentaName}] ${folioUnico}`;
       if (!paidAccounts.includes(cuentaName)) paidAccounts.push(cuentaName);
     }
 
@@ -129,12 +144,10 @@ export const payOrder = async (req, res) => {
       paidAccounts: paidAccounts 
     });
 
-    // Registramos en la caja si hubo dinero entrante
     if (amountToRegister > 0) {
       const userId = req.user?.id || req.userId || req.usuario?.id || null;
-
       await Transaction.create({
-        folio: folioUnico, // 🔥 NUEVO: Guardamos el folio oficial en la caja
+        folio: folioUnico, 
         source: 'CAFETERIA',
         amount: amountToRegister,
         description: desc,
@@ -257,7 +270,6 @@ export const moveItemAccount = async (req, res) => {
     
     const unitPrice = Number(item.subtotal) / item.quantity;
 
-    // 🔥 NUEVO: Respetamos el flag isTakeaway al agrupar cuentas
     const existingItems = await OrderItem.findAll({
         where: {
             orderId: item.orderId,
@@ -313,7 +325,7 @@ export const moveItemAccount = async (req, res) => {
              cuenta: targetCuenta,
              notes: JSON.stringify(notesToMove),
              kitchenStatus: item.kitchenStatus,
-             isTakeaway: item.isTakeaway // 🔥 NUEVO: Mantenemos la propiedad al dividir
+             isTakeaway: item.isTakeaway
            });
         } else {
            await item.update({ cuenta: targetCuenta });
@@ -332,7 +344,7 @@ export const moveItemAccount = async (req, res) => {
 };
 
 // ==========================================
-// 🖨️ IMPRIMIR TICKET (CONSOLA BACKEND / MOCK)
+// 🖨️ IMPRIMIR TICKET (CONSOLA BACKEND / FÍSICO)
 // ==========================================
 export const printOrderTicket = async (req, res) => {
   try {
@@ -354,7 +366,16 @@ export const printOrderTicket = async (req, res) => {
       return res.status(404).json({ message: 'Orden no encontrada para imprimir' });
     }
 
-    // 1. CONFIGURACIÓN MODO SIMULACIÓN
+    let cashierName = 'Sistema';
+    try {
+      const tx = await Transaction.findOne({ where: { referenceId: order.id, source: 'CAFETERIA' }, order: [['createdAt', 'DESC']] });
+      const userIdToLook = (tx && tx.createdBy) ? tx.createdBy : order.createdBy;
+      if (userIdToLook) {
+        const userObj = await User.findByPk(userIdToLook);
+        if (userObj) cashierName = userObj.fullName?.split(' ')[0] || userObj.username;
+      }
+    } catch(e){}
+
     let printer = new ThermalPrinter({
       type: PrinterTypes.EPSON,      
       characterSet: CharacterSet.PC852_LATIN2,
@@ -362,7 +383,7 @@ export const printOrderTicket = async (req, res) => {
       width: 42,
     });
 
-    // 2. CONSTRUIR EL TICKET
+    // --- ENCABEZADO ESTILO DIGITAL ---
     printer.alignCenter();
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
@@ -376,61 +397,147 @@ export const printOrderTicket = async (req, res) => {
     
     printer.drawLine();
     
-    // Datos de la orden
     printer.alignLeft();
-    printer.println(`Fecha: ${new Date().toLocaleString()}`);
-    const isLlevar = order.orderType === 'LLEVAR';
-    printer.println(`Servicio: ${isLlevar ? `Llevar #${order.ticketId}` : `Mesa #${order.table?.number}`}`);
-    if(cuentaName && cuentaName !== 'General') {
-      printer.println(`Cuenta: ${cuentaName}`);
+    printer.println(`Fecha de emision: ${new Date().toLocaleString()}`);
+    printer.println(`Atendido por:     ${cashierName}`);
+    
+    let isLlevar = order.orderType === 'LLEVAR';
+    let rawId = String(order.ticketId || '');
+    let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
+    let identificadorMesa = isLlevar ? `Pedido #${idLimpio || 'Llevar'}` : `Mesa #${order.table?.number || 'Salon'}`;
+    
+    printer.println(`Servicio:         ${identificadorMesa}`);
+    if (cuentaName && cuentaName !== 'General') {
+      printer.println(`Cuenta de:        ${cuentaName}`);
     }
     
     printer.drawLine();
 
-    // Filtrar items si se pidió imprimir una cuenta específica
-    let itemsToPrint = order.items || [];
+    // --- SECCIÓN DETALLE DE CONSUMO ---
+    printer.alignCenter();
+    printer.bold(true);
+    printer.println("DETALLE DE CONSUMO");
+    printer.bold(false);
+    printer.alignLeft();
+
+    let itemsFiltrados = order.items || [];
     if (cuentaName && cuentaName !== 'General') {
-      itemsToPrint = itemsToPrint.filter(i => i.cuenta === cuentaName);
+      itemsFiltrados = itemsFiltrados.filter(i => i.cuenta === cuentaName);
     }
 
-    // Imprimir los productos en formato tabla
-    let total = 0;
-    printer.tableCustom([
-      { text: "Cant", align: "LEFT", width: 0.15 },
-      { text: "Desc", align: "LEFT", width: 0.55 },
-      { text: "Imp", align: "RIGHT", width: 0.30 }
-    ]);
+    const cuentasUnicas = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
+    let grandTotal = 0;
 
-    itemsToPrint.forEach(item => {
-      const subtotal = Number(item.subtotal);
-      total += subtotal;
-      
-      // 🔥 NUEVO: Agregamos el indicativo "(Llevar)" físico en el ticket
-      const nombreLlevar = item.isTakeaway ? `(Llevar) ${item.product?.name || "Prod"}` : (item.product?.name || "Prod");
-      
+    cuentasUnicas.forEach(accName => {
+      const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
+      if (accountItemsRaw.length === 0) return;
+
+      // Si hay varias cuentas y estamos imprimiendo el ticket general, ponemos el subtítulo de la cuenta
+      if (cuentasUnicas.length > 1 && (!cuentaName || cuentaName === 'General')) {
+        printer.println("");
+        printer.println(`>> CUENTA: ${accName.toUpperCase()}`);
+        printer.println("------------------------------------------");
+      }
+
+      const groupedAccountItems = [];
+      accountItemsRaw.forEach(item => {
+        let notes = '[]';
+        try { 
+          const parsed = JSON.parse(item.notes || '[]');
+          notes = JSON.stringify(Array.isArray(parsed) ? parsed : [parsed]);
+        } catch(e){}
+        
+        const key = `${item.productId}-${item.isTakeaway}-${notes}`;
+        const existing = groupedAccountItems.find(g => g.key === key);
+        
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.subtotal += Number(item.subtotal);
+        } else {
+          groupedAccountItems.push({
+            key,
+            product: item.product,
+            quantity: item.quantity,
+            subtotal: Number(item.subtotal),
+            unitPrice: Number(item.subtotal) / item.quantity,
+            isTakeaway: item.isTakeaway,
+            notes: notes
+          });
+        }
+      });
+
       printer.tableCustom([
-        { text: item.quantity.toString(), align: "LEFT", width: 0.15 },
-        { text: nombreLlevar, align: "LEFT", width: 0.55 },
-        { text: `$${subtotal.toFixed(2)}`, align: "RIGHT", width: 0.30 }
+        { text: "Cant", align: "LEFT", width: 0.15 },
+        { text: "Desc", align: "LEFT", width: 0.55 },
+        { text: "Imp", align: "RIGHT", width: 0.30 }
       ]);
+
+      groupedAccountItems.forEach(item => {
+        const subtotal = item.subtotal;
+        grandTotal += subtotal;
+        const nombreLlevar = item.isTakeaway ? `(Llevar) ${item.product?.name || "Prod"}` : (item.product?.name || "Prod");
+        
+        printer.tableCustom([
+          { text: `${item.quantity}x`, align: "LEFT", width: 0.15 },
+          { text: nombreLlevar, align: "LEFT", width: 0.55 },
+          { text: `$${subtotal.toFixed(2)}`, align: "RIGHT", width: 0.30 }
+        ]);
+
+        if (item.quantity > 1) {
+          printer.println(`  Unitario: $${item.unitPrice.toFixed(2)}`);
+        }
+
+        let preps = [];
+        try { preps = JSON.parse(item.notes); } catch(e){}
+        preps.forEach(p => {
+          if (p.tamano) {
+            let extra = `- ${p.tamano}`;
+            if (p.leche) extra += ` * ${p.leche}`;
+            printer.println(`  ${extra}`);
+          }
+        });
+      });
     });
 
     printer.drawLine();
+
+    // --- SECCIÓN RESUMEN POR CUENTAS (Si aplica) ---
+    if (cuentasUnicas.length > 1 && (!cuentaName || cuentaName === 'General')) {
+      printer.alignCenter();
+      printer.bold(true);
+      printer.println("RESUMEN POR CUENTAS");
+      printer.bold(false);
+      printer.alignLeft();
+      
+      cuentasUnicas.forEach(accName => {
+        const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+        printer.tableCustom([
+          { text: accName.toUpperCase(), align: "LEFT", width: 0.60 },
+          { text: `$${subTotalAcc.toFixed(2)}`, align: "RIGHT", width: 0.40 }
+        ]);
+      });
+      printer.drawLine();
+    }
+
+    // --- TOTAL FINAL ---
     printer.alignRight();
     printer.setTextDoubleHeight();
-    printer.println(`TOTAL: $${total.toFixed(2)}`);
+    printer.println(`TOTAL CONSUMIDO: $${grandTotal.toFixed(2)}`);
     printer.setTextNormal();
     
     printer.drawLine();
     printer.alignCenter();
-    printer.println("*** TICKET SIMULADO ***");
-    printer.println("¡Gracias por su preferencia!");
+    printer.bold(true);
+    printer.println("!Muchas gracias por tu preferencia!");
+    printer.bold(false);
+    printer.println("Este documento es un comprobante");
+    printer.println("de caja impreso.");
     printer.cut(); 
 
-    // 3. EXTRAER Y MOSTRAR EN LA TERMINAL
-    console.log(`\n=== TICKET PARA ORDEN ${orderId} ===`);
+    // Mostrar en consola simulada
+    console.log(`\n=== TICKET FÍSICO PARA ORDEN ${orderId} ===`);
     console.log(printer.getText());
-    console.log(`==================================\n`);
+    console.log(`==========================================\n`);
 
     res.json({ message: 'Ticket enviado a impresión exitosamente' });
   } catch (error) {
@@ -462,6 +569,16 @@ export const shareOrderTicket = async (req, res) => {
       return res.status(404).send('<h1>Ticket no encontrado o expirado</h1>');
     }
 
+    let cashierName = 'Sistema';
+    try {
+      const tx = await Transaction.findOne({ where: { referenceId: order.id, source: 'CAFETERIA' }, order: [['createdAt', 'DESC']] });
+      const userIdToLook = (tx && tx.createdBy) ? tx.createdBy : order.createdBy;
+      if (userIdToLook) {
+        const userObj = await User.findByPk(userIdToLook);
+        if (userObj) cashierName = userObj.fullName?.split(' ')[0] || userObj.username;
+      }
+    } catch(e) {}
+
     let itemsFiltrados = order.items || [];
     if (cuenta && cuenta !== 'General') {
       itemsFiltrados = itemsFiltrados.filter(i => i.cuenta === cuenta);
@@ -472,13 +589,13 @@ export const shareOrderTicket = async (req, res) => {
       year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    // Obtener las cuentas únicas presentes en este ticket
     const cuentasUnicas = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
-    const isLlevar = order.orderType === 'LLEVAR';
-    const identificadorMesa = isLlevar ? `Pedido #${order.ticketId || 'Llevar'}` : `Mesa #${order.table?.number || 'Salón'}`;
+    let isLlevar = order.orderType === 'LLEVAR';
+    let rawId = String(order.ticketId || '');
+    let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
+    let identificadorMesa = isLlevar ? `Pedido #${idLimpio || 'Llevar'}` : `Mesa #${order.table?.number || 'Salón'}`;
 
-    // Construcción del HTML dinámico responsivo móvil
     const htmlResponse = `
     <!DOCTYPE html>
     <html lang="es">
@@ -510,16 +627,20 @@ export const shareOrderTicket = async (req, res) => {
         <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
         <div class="space-y-2 text-sm font-medium text-slate-600 mb-6">
-          <div class="flex justify-between">
+          <div class="flex justify-between items-center">
             <span>Fecha de emisión:</span>
             <span class="text-slate-900 font-bold">${dateStr}</span>
           </div>
-          <div class="flex justify-between">
+          <div class="flex justify-between items-center">
+            <span>Atendido por:</span>
+            <span class="text-slate-900 font-bold capitalize">${cashierName}</span>
+          </div>
+          <div class="flex justify-between items-center">
             <span>Servicio:</span>
             <span class="text-slate-900 font-black uppercase tracking-wide">${identificadorMesa}</span>
           </div>
           ${cuenta ? `
-          <div class="flex justify-between">
+          <div class="flex justify-between items-center">
             <span>Cuenta de:</span>
             <span class="text-amber-600 font-black uppercase">${cuenta}</span>
           </div>` : ''}
@@ -531,8 +652,35 @@ export const shareOrderTicket = async (req, res) => {
           <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalle de consumo</h3>
           
           ${cuentasUnicas.map(accName => {
-            const accountItems = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
-            if (accountItems.length === 0) return '';
+            const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
+            if (accountItemsRaw.length === 0) return '';
+
+            const groupedAccountItems = [];
+            accountItemsRaw.forEach(item => {
+              let notes = '[]';
+              try { 
+                const parsed = JSON.parse(item.notes || '[]');
+                notes = JSON.stringify(Array.isArray(parsed) ? parsed : [parsed]);
+              } catch(e){}
+              
+              const key = `${item.productId}-${item.isTakeaway}-${notes}`;
+              const existing = groupedAccountItems.find(g => g.key === key);
+              
+              if (existing) {
+                existing.quantity += item.quantity;
+                existing.subtotal += Number(item.subtotal);
+              } else {
+                groupedAccountItems.push({
+                  key,
+                  product: item.product,
+                  quantity: item.quantity,
+                  subtotal: Number(item.subtotal),
+                  unitPrice: Number(item.subtotal) / item.quantity,
+                  isTakeaway: item.isTakeaway,
+                  notes: notes
+                });
+              }
+            });
 
             return `
               <div class="space-y-3">
@@ -542,10 +690,9 @@ export const shareOrderTicket = async (req, res) => {
                   </div>
                 ` : ''}
                 
-                ${accountItems.map(item => {
+                ${groupedAccountItems.map(item => {
                   let preps = [];
-                  try { preps = JSON.parse(item.notes || '[]'); } catch(e){}
-                  if(!Array.isArray(preps)) preps = [preps];
+                  try { preps = JSON.parse(item.notes); } catch(e){}
 
                   return `
                   <div class="flex items-start gap-3 text-sm px-1">
@@ -555,6 +702,7 @@ export const shareOrderTicket = async (req, res) => {
                         ${item.isTakeaway ? '<span class="text-orange-500 mr-1 text-[11px] uppercase tracking-tighter bg-orange-50 px-1 rounded">🛍️ Llevar</span>' : ''}
                         ${item.product?.name || 'Producto'}
                       </p>
+                      ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-0.5 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
                       ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-400 font-medium font-italic">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
                     </div>
                     <span class="font-bold text-slate-900 shrink-0">$${Number(item.subtotal).toFixed(2)}</span>

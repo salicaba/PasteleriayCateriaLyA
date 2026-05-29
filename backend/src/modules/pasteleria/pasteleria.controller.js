@@ -24,8 +24,9 @@ export const createPedido = async (req, res) => {
     // Extraemos los abonos (anticipos) del resto de los datos
     const { abonos, ...pedidoData } = req.body;
 
-    const count = await PasteleriaOrder.count();
-    const newId = `PED-${String(count + 1).padStart(3, '0')}`;
+    // 🔥 CORRECCIÓN: Generador de folio único idéntico al de Cafetería (Ej. PED-839210452)
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const newId = `PED-${Date.now().toString().slice(-6)}${randomNum}`;
 
     let abonosParaGuardar = [];
 

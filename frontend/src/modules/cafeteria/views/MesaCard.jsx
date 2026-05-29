@@ -28,8 +28,10 @@ export const MesaCard = ({ mesa, onClick }) => {
     // Estructura esperada de backend: "L-XX - Nombre - Teléfono"
     const partes = rawNumero.split(' - ');
     
-    // El ID siempre es la primera parte (Ej: "L-01")
-    const id = partes[0] || 'Pedido';
+    // El ID siempre es la primera parte. 
+    // 🔥 CORRECCIÓN: Limpiamos la palabra "Llevar" y cualquier "#" extra que venga de la base de datos para que quede solo el número
+    let id = partes[0] || 'Pedido';
+    id = id.replace(/Llevar\s*#?/i, '').trim(); 
     
     // Si solo hay 1 o 2 partes, no hay teléfono
     if (partes.length < 3) {
@@ -104,7 +106,7 @@ export const MesaCard = ({ mesa, onClick }) => {
                 ${Number(mesa.total || 0).toFixed(2)}
               </span>
               
-              {/* 🔥 CORRECCIÓN: Renderizado dinámico de Nombre y Teléfono en tarjetas "Para Llevar" */}
+              {/* Renderizado dinámico de Nombre y Teléfono en tarjetas "Para Llevar" */}
               {isLlevar && nombreCliente && nombreCliente !== 'Mostrador' && (
                 <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1">

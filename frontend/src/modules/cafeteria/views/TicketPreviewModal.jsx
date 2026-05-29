@@ -4,7 +4,16 @@ import { motion } from 'framer-motion';
 import { Printer, X, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, onConfirmPrint, onSendWhatsApp }) => {
+export const TicketPreviewModal = ({ 
+  isOpen, 
+  onClose, 
+  cart, 
+  mesa, 
+  cuentaName, 
+  onConfirmPrint, 
+  onSendWhatsApp,
+  userName = 'Cajero en turno' // 🔥 NUEVO: Recibe el nombre del usuario, por defecto "Cajero en turno"
+}) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   
   // Efecto para auto-completar el teléfono si viene en el string de la mesa (Para Llevar)
@@ -32,7 +41,10 @@ export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, on
 
   const isLlevar = mesa?.zona === 'llevar';
   const partesNumero = (mesa?.numero || '').toString().split(' - ');
-  const numeroReal = partesNumero[0]; 
+  
+  // 🔥 CORRECCIÓN: Limpiamos la palabra "Llevar" para que quede solo el número
+  let numeroReal = partesNumero[0] || 'Pedido';
+  numeroReal = numeroReal.replace(/Llevar\s*#?/i, '').trim(); 
   
   let nombreCliente = 'MOSTRADOR';
   if (partesNumero.length > 1) {
@@ -98,18 +110,34 @@ export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, on
             </div>
 
             {/* Info de Mesa y Cliente */}
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between"><span className="text-gray-500">{isLlevar ? 'TICKET:' : 'MESA:'}</span> <span className="font-bold text-right text-black">{isLlevar ? numeroReal : `#${numeroReal}`}</span></div>
+            <div className="space-y-2 mb-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Atendido por:</span> 
+                <span className="font-bold text-right text-black capitalize">{userName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">{isLlevar ? 'Servicio:' : 'Servicio:'}</span> 
+                <span className="font-bold text-right text-black uppercase">{isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`}</span>
+              </div>
               {isLlevar && nombreCliente !== 'MOSTRADOR' && (
-                <div className="flex justify-between"><span className="text-gray-500">Cliente:</span> <span className="font-bold text-right text-black uppercase">{nombreCliente}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cliente:</span> 
+                  <span className="font-bold text-right text-black uppercase">{nombreCliente}</span>
+                </div>
               )}
               {cuentaName && cuentaName !== 'General' && (
-                <div className="flex justify-between"><span className="text-gray-500">Cuenta:</span> <span className="font-bold text-right text-black uppercase">{cuentaName}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cuenta:</span> 
+                  <span className="font-bold text-right text-black uppercase">{cuentaName}</span>
+                </div>
               )}
             </div>
 
             {/* Tabla de Productos */}
             <div className="border-t border-b border-dashed border-gray-300 py-4 mb-4">
+              <div className="text-center mb-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Detalle de consumo</p>
+              </div>
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="text-gray-400 text-[11px] uppercase tracking-wider border-b border-dashed border-gray-200">
@@ -125,21 +153,44 @@ export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, on
                     const accountItems = itemsToPrint.filter(item => (item.cuenta || 'General') === accName);
                     if (accountItems.length === 0) return null;
 
+                    // 🔥 LÓGICA DE AGRUPACIÓN (Suma cantidades de productos idénticos)
+                    const groupedItems = [];
+                    accountItems.forEach(item => {
+                      const prepString = JSON.stringify(item.preparaciones || []);
+                      const key = `${item.id || item.nombre}-${!!item.isTakeaway}-${prepString}`;
+                      
+                      const existing = groupedItems.find(g => g.key === key);
+                      if (existing) {
+                        existing.qty += item.qty;
+                      } else {
+                        groupedItems.push({ ...item, key, qty: item.qty });
+                      }
+                    });
+
                     return (
                       <React.Fragment key={accName}>
                         {cuentasActivas.length > 1 && !cuentaName && (
                           <tr>
-                            <td colSpan="3" className="text-[10px] font-bold text-gray-500 uppercase pt-2 pb-1">
+                            <td colSpan="3" className="text-[10px] font-bold text-gray-500 uppercase pt-2 pb-1 bg-gray-50 px-2 rounded">
                               ● Cuenta: {accName}
                             </td>
                           </tr>
                         )}
 
-                        {accountItems.map((item, idx) => (
+                        {groupedItems.map((item, idx) => (
                           <React.Fragment key={`${accName}-${idx}`}>
                             <tr>
-                              <td className="font-bold align-top pt-2 text-black">{item.qty}</td>
-                              <td className="align-top pt-2 pr-1 break-words leading-tight">{item.nombre}</td>
+                              <td className="font-bold align-top pt-2 text-black">{item.qty}x</td>
+                              <td className="align-top pt-2 pr-1 break-words leading-tight">
+                                {item.isTakeaway && <span className="text-orange-500 mr-1 text-[10px] uppercase tracking-tighter">🛍️ Llevar</span>}
+                                {item.nombre}
+                                {/* 🔥 Muestra el precio unitario si hay más de 1 artículo igual */}
+                                {item.qty > 1 && (
+                                  <div className="text-[10px] font-bold text-gray-500 mt-0.5">
+                                    Unitario: ${Number(item.precio).toFixed(2)}
+                                  </div>
+                                )}
+                              </td>
                               <td className="align-top pt-2 text-right font-medium text-black">${(item.precio * item.qty).toFixed(2)}</td>
                             </tr>
                             {item.preparaciones?.map((prep, pIdx) => {
@@ -183,14 +234,14 @@ export const TicketPreviewModal = ({ isOpen, onClose, cart, mesa, cuentaName, on
 
             {/* Gran Total */}
             <div className="flex justify-between text-base mt-2 pt-2 border-t border-gray-300">
-              <span className="font-bold">TOTAL:</span>
+              <span className="font-bold">TOTAL CONSUMIDO:</span>
               <span className="font-black text-black text-lg">${totalToPrint.toFixed(2)}</span>
             </div>
 
             {/* Footer */}
             <div className="text-center mt-6 text-xs text-gray-500 font-bold">
-              <p>¡Gracias por su preferencia!</p>
-              <p className="mt-1 text-sm text-black">Vuelva pronto</p>
+              <p>¡Muchas gracias por tu preferencia!</p>
+              <p className="mt-1 text-[10px] font-normal text-gray-400">Este documento es una previsualización de caja.</p>
             </div>
           </div>
         </div>

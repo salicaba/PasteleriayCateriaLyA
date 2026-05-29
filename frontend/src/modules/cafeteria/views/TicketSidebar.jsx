@@ -13,7 +13,7 @@ export const TicketSidebar = ({
   onAdd, onRemove, onDelete, onSendToKitchen, onCheckout,
   cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem,
   orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus,
-  isLlevar, toggleItemTakeaway // 🔥 NUEVO: Prop para alternar
+  isLlevar, toggleItemTakeaway 
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
   const [draggedItem, setDraggedItem] = useState(null);
@@ -23,8 +23,14 @@ export const TicketSidebar = ({
   const [dragPrompt, setDragPrompt] = useState(null);
   const scrollContainerRef = useRef(null);
 
+  // 🔥 NUEVO: Estado para ocultar de la vista las cuentas que ya pagaron y se fueron
+  const [cuentasOcultas, setCuentasOcultas] = useState([]);
+
   const activeAcc = cuentaActiva || 'General';
   const availableAccs = isLlevar ? ['General'] : (cuentasDisponibles || ['General']);
+
+  const allItemsPaid = cart.length > 0 && cart.every(item => item.enviadoCocina && paidAccounts?.includes(item.cuenta || 'General'));
+  const isCompletamentePagada = orderStatus === 'PAID' || allItemsPaid;
 
   const handleAddCuenta = (e) => {
     e.preventDefault();
@@ -92,7 +98,7 @@ export const TicketSidebar = ({
                 type="text" 
                 value={newCuentaName} 
                 onChange={(e) => setNewCuentaName(e.target.value)}
-                disabled={orderStatus === 'PAID'}
+                disabled={isCompletamentePagada}
                 placeholder="Dividir cuenta (Nombre)..."
                 className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/50 transition-all border border-transparent focus:border-orange-500/20 lya:focus:border-lya-primary/30 disabled:opacity-50"
               />
@@ -100,7 +106,7 @@ export const TicketSidebar = ({
             </div>
             <button 
               type="submit" 
-              disabled={!newCuentaName.trim() || orderStatus === 'PAID'}
+              disabled={!newCuentaName.trim() || isCompletamentePagada}
               className="bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:bg-gray-200 dark:disabled:bg-gray-800 lya:disabled:bg-lya-border/30 text-white lya:text-lya-surface px-5 rounded-2xl font-bold text-xs transition-all active:scale-95 shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 flex items-center justify-center shrink-0 disabled:opacity-50"
             >
               Añadir
@@ -122,7 +128,8 @@ export const TicketSidebar = ({
           </div>
         ) : (
           <AnimatePresence mode="popLayout"> 
-            {groupedCart.map(({ cuentaName, items }) => {
+            {/* 🔥 CORRECCIÓN: Filtramos las cuentas para no mostrar las que el usuario decidió ocultar/liberar */}
+            {groupedCart.filter(g => !cuentasOcultas.includes(g.cuentaName)).map(({ cuentaName, items }) => {
               const isActive = activeAcc === cuentaName;
               const isDragTarget = dragOverCuenta === cuentaName;
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
@@ -131,7 +138,7 @@ export const TicketSidebar = ({
               return (
                 <motion.div 
                   key={cuentaName} layout 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, height: 0, marginBottom: 0 }}
                   onDragOver={(e) => { 
                     e.preventDefault(); 
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar) setDragOverCuenta(cuentaName);
@@ -195,7 +202,7 @@ export const TicketSidebar = ({
                       <span className="block text-lg font-black text-gray-900 dark:text-white lya:text-lya-text">
                         ${subtotalCuenta.toFixed(2)}
                       </span>
-                      {!isCuentaPagada && orderStatus !== 'PAID' && availableAccs.length > 1 && subtotalCuenta > 0 && (
+                      {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && subtotalCuenta > 0 && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); onPayCuenta && onPayCuenta(cuentaName); }}
                           className="pointer-events-auto text-[9px] font-black bg-blue-500 lya:bg-lya-secondary text-white lya:text-lya-surface px-2 py-1 rounded-lg shadow-md shadow-blue-500/20 lya:shadow-lya-secondary/20 active:scale-90 transition-transform uppercase mt-1 inline-block"
@@ -203,13 +210,23 @@ export const TicketSidebar = ({
                           Cobrar este
                         </button>
                       )}
+                      {/* 🔥 NUEVO: Botones de Ticket y Liberar para la "colada" pagada */}
                       {isCuentaPagada && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
-                          className="pointer-events-auto text-[9px] font-black bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-lg uppercase mt-1 flex gap-1 items-center active:scale-95 transition-transform"
-                        >
-                          <Printer size={10}/> Ticket
-                        </button>
+                        <div className="flex justify-end gap-1 mt-1">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
+                            className="pointer-events-auto text-[9px] font-black bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-lg uppercase flex gap-1 items-center active:scale-95 transition-transform"
+                          >
+                            <Printer size={10}/> Ticket
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
+                            className="pointer-events-auto text-[9px] font-black bg-red-50 dark:bg-red-500/10 lya:bg-lya-secondary/10 text-red-600 dark:text-red-400 lya:text-lya-secondary border border-red-200 dark:border-red-500/20 lya:border-lya-secondary/30 px-2 py-1 rounded-lg uppercase flex gap-1 items-center active:scale-95 transition-transform hover:bg-red-100 dark:hover:bg-red-500/20"
+                            title="Quitar cuenta de la mesa"
+                          >
+                            <XCircle size={10}/> Liberar
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -302,7 +319,6 @@ export const TicketSidebar = ({
                               </span>
                             </div>
 
-                            {/* 🔥 ETIQUETA VISUAL SOLO CUANDO YA ESTÁ EN COCINA */}
                             {item.isTakeaway && item.enviadoCocina && (
                               <div className="mb-1">
                                 <span className="text-[10px] font-black bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-md uppercase border border-orange-500/20 inline-flex items-center gap-1">
@@ -335,7 +351,7 @@ export const TicketSidebar = ({
                                   <button 
                                     onClick={() => toggleDeliveredStatus(item)} 
                                     disabled={
-                                      orderStatus === 'PAID' || 
+                                      isCompletamentePagada || 
                                       isCuentaPagada || 
                                       (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')
                                     } 
@@ -361,7 +377,6 @@ export const TicketSidebar = ({
                                     <span className="flex items-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 px-2 py-0.5 rounded-full border border-transparent uppercase tracking-tighter">
                                       Listo
                                     </span>
-                                    {/* 🔥 BOTÓN INTERACTIVO PARA EMPACAR */}
                                     {!isLlevar && toggleItemTakeaway && (
                                       <button
                                         onClick={() => toggleItemTakeaway(item)}
@@ -433,7 +448,7 @@ export const TicketSidebar = ({
 
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
         
-        {orderStatus === 'PAID' ? (
+        {isCompletamentePagada ? (
            <div className="flex gap-3 animate-fade-in">
               <button 
                 onClick={() => onPrintTicket()} 
