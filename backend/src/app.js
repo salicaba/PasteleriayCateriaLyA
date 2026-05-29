@@ -8,7 +8,8 @@ import posRoutes from './modules/pos/pos.routes.js';
 import kitchenRoutes from './modules/kitchen/kitchen.routes.js';
 import pasteleriaRoutes from './modules/pasteleria/pasteleria.routes.js'; 
 import settingsRoutes from './modules/settings/settings.routes.js';
-import cashRoutes from './modules/cash/cash.routes.js'; // <-- NUEVO
+import cashRoutes from './modules/cash/cash.routes.js';
+import inventoryRoutes from './modules/inventory/inventory.routes.js'; // <-- NUEVO INVENTARIO
 
 const app = express();
 
@@ -24,7 +25,8 @@ app.use('/api/pos', posRoutes);
 app.use('/api/kitchen', kitchenRoutes);
 app.use('/api/pasteleria', pasteleriaRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/cash', cashRoutes); // <-- NUEVO
+app.use('/api/cash', cashRoutes);
+app.use('/api/inventory', inventoryRoutes); // <-- NUEVA RUTA DE INVENTARIO
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓐 operando correctamente' });

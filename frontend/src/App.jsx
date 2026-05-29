@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -15,6 +15,7 @@ import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 import { SettingsPage } from './modules/admin/views/SettingsPage'; 
 import { CashRegisterPage } from './modules/cash/views/CashRegisterPage';
+import InventoryPage from './modules/inventory/views/InventoryPage'; // <-- NUEVO INVENTARIO
 
 import logoLyA from './assets/logo.jpeg'; 
 
@@ -155,7 +156,8 @@ function App() {
       ]
     },
     // <-- AQUÍ ESTÁ EL BOTÓN DE CAJA PRINCIPAL -->
-    { id: 'caja', label: 'Caja', icon: Wallet }, 
+    { id: 'caja', label: 'Caja', icon: Wallet },
+    { id: 'inventario', label: 'Inventario', icon: Package }, // <-- NUEVO BOTÓN DE INVENTARIO
     { id: 'reportes', label: 'Reportes', icon: PieChart },
     {
       id: 'sistema_group',
@@ -411,6 +413,8 @@ function App() {
               {activeTab === 'catalogo' && <PasteleriaConfigPage />}
               {activeTab === 'ajustes' && <MenuManagerPage />} 
               {activeTab === 'caja' && <CashRegisterPage user={user} />}
+              
+              {activeTab === 'inventario' && <InventoryPage />} {/* <-- AQUÍ SE RENDERIZA EL INVENTARIO */}
               
               {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
                 <SettingsPage uiSize={uiSize} setUiSize={setUiSize} activeTab={activeTab} />
