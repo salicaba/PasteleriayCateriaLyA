@@ -8,7 +8,7 @@ const Transaction = sequelize.define('Transaction', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-  folio: { // 🔥 NUEVO: Identificador de pago único
+  folio: { 
     type: DataTypes.STRING,
     allowNull: true,
     unique: true
@@ -21,6 +21,12 @@ const Transaction = sequelize.define('Transaction', {
     type: DataTypes.ENUM('CAFETERIA', 'PASTELERIA', 'MANUAL'),
     allowNull: false,
   },
+  expenseCategory: { // 🔥 NUEVO: Categoría de Egresos (OPEX)
+    type: DataTypes.ENUM('NONE', 'PAYROLL', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'MARKETING', 'OTHER'),
+    defaultValue: 'NONE',
+    allowNull: false,
+    comment: 'NONE (para ingresos). PAYROLL (Sueldos), UTILITIES (Servicios), MAINTENANCE (Mantenimiento), SUPPLIES (Limpieza/Insumos no contables), MARKETING, OTHER.'
+  },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -31,7 +37,7 @@ const Transaction = sequelize.define('Transaction', {
   },
   referenceId: {
     type: DataTypes.STRING,
-    allowNull: true, // ID de la Orden o del Pedido de Pastelería
+    allowNull: true, 
   },
   status: {
     type: DataTypes.ENUM('ACTIVE', 'CANCELLED'),

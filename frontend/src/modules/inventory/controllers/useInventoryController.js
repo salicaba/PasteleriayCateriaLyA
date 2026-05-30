@@ -102,6 +102,62 @@ export const useInventoryController = () => {
     }
   };
 
+  // 6. PROCESAR ARQUEO (Corregido y con Token blindado)
+  const processReconciliation = async (itemsCounted, notes = '') => {
+    try {
+      setIsLoading(true); 
+      
+      const sessionStr = localStorage.getItem('lya_pos_session');
+      let token = localStorage.getItem('lya_token'); 
+      let userId = null;
+      
+      if (sessionStr) {
+        const sessionData = JSON.parse(sessionStr);
+        userId = sessionData.userData?.id;
+        
+        // 🔥 Salvavidas: Si por alguna razón el token no está en 'lya_token', 
+        // lo buscamos directamente dentro de los datos de sesión del usuario.
+        if (!token && sessionData.userData?.token) {
+          token = sessionData.userData.token;
+        }
+      }
+
+      // Si después de buscar, el token sigue sin existir, detenemos todo para evitar el error 403
+      if (!token) {
+        throw new Error('Token de seguridad ausente. Por favor, cierra sesión y vuelve a iniciarla.');
+      }
+
+      const response = await fetch(`${API_URL}/inventory/reconciliation`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({
+          items: itemsCounted,
+          notes,
+          userId
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al procesar el arqueo');
+      }
+      
+      const data = await response.json();
+      await fetchInventory(); 
+      return data;
+
+    } catch (err) {
+      console.error('Error procesando arqueo:', err);
+      setError(err.message);
+      throw err; // El frontend lo captura y lo muestra en consola
+    } finally {
+      setIsLoading(false); 
+    }
+  };
+
   return { 
     inventory, 
     isLoading, 
@@ -110,6 +166,7 @@ export const useInventoryController = () => {
     createItem,
     getItemHistory,
     registerTransaction,
-    deleteItem 
+    deleteItem,
+    processReconciliation 
   };
 };

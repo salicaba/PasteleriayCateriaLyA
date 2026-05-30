@@ -1,0 +1,86 @@
+// frontend/src/modules/finance/controllers/useFinanceController.js
+import { useState, useCallback } from 'react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+
+export const useFinanceController = () => {
+  const [expenses, setExpenses] = useState([]);
+  const [summary, setSummary] = useState(null); // 🔥 Nuevo estado para el Dashboard
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false); // 🔥 Nuevo loading
+
+  const fetchExpenses = useCallback(async (dateString) => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('lya_token');
+      const response = await fetch(`${API_URL}/cash?date=${dateString}&type=EXPENSE`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar gastos');
+      const data = await response.json();
+      setExpenses(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const registerExpense = async (expenseData) => {
+    try {
+      const token = localStorage.getItem('lya_token');
+      const response = await fetch(`${API_URL}/cash/manual`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(expenseData)
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // 🔥 NUEVA FUNCIÓN: Obtener Resumen Financiero
+  const fetchFinancialSummary = useCallback(async (startDate, endDate) => {
+    setIsSummaryLoading(true);
+    try {
+      const token = localStorage.getItem('lya_token');
+      let url = `${API_URL}/cash/summary`;
+      
+      // Si mandamos fechas, las agregamos a la URL
+      if (startDate && endDate) {
+        url += `?startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Error al cargar el resumen financiero');
+      const data = await response.json();
+      setSummary(data.metrics);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  }, []);
+
+  return { 
+    expenses, 
+    summary, 
+    isLoading, 
+    isSummaryLoading, 
+    fetchExpenses, 
+    registerExpense,
+    fetchFinancialSummary 
+  };
+};

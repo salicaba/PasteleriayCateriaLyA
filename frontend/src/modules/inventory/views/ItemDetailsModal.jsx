@@ -1,7 +1,7 @@
 // src/modules/inventory/views/ItemDetailsModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, History, ArrowDownToLine, Trash2, AlertTriangle, ArrowRightLeft, MessageSquare, ChevronDown } from 'lucide-react';
+import { X, History, ArrowDownToLine, Trash2, AlertTriangle, ArrowRightLeft, MessageSquare, ChevronDown, PackageMinus, PackagePlus } from 'lucide-react';
 
 export default function ItemDetailsModal({ item, isOpen, onClose, controller }) {
   const [activeTab, setActiveTab] = useState('history'); 
@@ -82,7 +82,7 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
   return (
     <AnimatePresence>
       <motion.div
-        key="detalles-modal" // <--- AÑADE ESTO
+        key="detalles-modal" 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -176,9 +176,29 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
                           const hasDetails = tx.notes || tx.reference;
                           const isExpanded = expandedTx === tx.id;
 
+                          // 🔥 Lógica de Colores y Signos
+                          const isOutflow = ['OUT', 'WASTE', 'CONSUMPTION'].includes(tx.type);
+                          const sign = isOutflow ? '-' : '+';
+                          const colorClass = isOutflow 
+                            ? 'text-red-600 dark:text-red-400 lya:text-red-500' 
+                            : 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-500';
+
+                          // Configuración visual por tipo de transacción
+                          const getTypeConfig = (type) => {
+                            switch(type) {
+                              case 'IN': return { label: 'COMPRA', icon: <ArrowDownToLine size={12}/> };
+                              case 'WASTE': return { label: 'MERMA', icon: <Trash2 size={12}/> };
+                              case 'CONSUMPTION': return { label: 'CONSUMO', icon: <PackageMinus size={12}/> };
+                              case 'ADJUSTMENT': return { label: 'AJUSTE', icon: <PackagePlus size={12}/> };
+                              case 'OUT': return { label: 'SALIDA', icon: <ArrowRightLeft size={12}/> };
+                              default: return { label: type, icon: <ArrowRightLeft size={12}/> };
+                            }
+                          };
+                          
+                          const typeConfig = getTypeConfig(tx.type);
+
                           return (
                             <React.Fragment key={tx.id}>
-                              {/* 1. La fila principal sigue igual */}
                               <tr 
                                 onClick={() => hasDetails && setExpandedTx(isExpanded ? null : tx.id)}
                                 className={`transition-colors ${hasDetails ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/20 lya:hover:bg-lya-bg/20' : ''}`}
@@ -188,22 +208,26 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
                                     <MessageSquare size={16} className={`inline transition-transform ${isExpanded ? 'text-orange-500 lya:text-lya-primary' : ''}`} />
                                   )}
                                 </td>
-                                <td className="p-3.5 text-xs font-medium opacity-80">{new Date(tx.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                                <td className="p-3.5">
-                                  {tx.type === 'IN' ? (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1"><ArrowDownToLine size={12}/> COMPRA</span>
-                                  ) : (
-                                    <span className="text-red-600 dark:text-red-400 font-bold text-xs flex items-center gap-1"><Trash2 size={12}/> MERMA</span>
-                                  )}
+                                <td className="p-3.5 text-xs font-medium opacity-80">
+                                  {new Date(tx.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </td>
-                                <td className="p-3.5 text-right font-mono font-bold">{Number(tx.quantity).toFixed(2)}</td>
-                                <td className="p-3.5 text-right font-black text-gray-900 dark:text-white lya:text-lya-text flex items-center justify-end gap-2">
-                                  ${Number(tx.totalCost).toFixed(2)}
+                                
+                                <td className="p-3.5">
+                                  <span className={`${colorClass} font-bold text-xs flex items-center gap-1`}>
+                                    {typeConfig.icon} {typeConfig.label}
+                                  </span>
+                                </td>
+                                
+                                <td className={`p-3.5 text-right font-mono font-bold ${colorClass}`}>
+                                  {sign}{Number(tx.quantity).toFixed(2)}
+                                </td>
+                                
+                                <td className={`p-3.5 text-right font-black flex items-center justify-end gap-2 ${colorClass}`}>
+                                  {sign}${Number(tx.totalCost).toFixed(2)}
                                   {hasDetails && <ChevronDown size={14} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />}
                                 </td>
                               </tr>
                               
-                              {/* 2. LA MAGIA CORREGIDA: AnimatePresence va DENTRO del <td> */}
                               {hasDetails && (
                                 <tr key={`expand-${tx.id}`}>
                                   <td colSpan="5" className="p-0 border-none">
@@ -215,7 +239,7 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
                                           exit={{ height: 0, opacity: 0 }}
                                           className="overflow-hidden bg-gray-50/50 dark:bg-gray-950/30"
                                         >
-                                          <div className="m-3 p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl shadow-sm border-l-4 border-orange-500 lya:border-lya-primary text-sm space-y-1">
+                                          <div className={`m-3 p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl shadow-sm border-l-4 text-sm space-y-1 ${isOutflow ? 'border-red-500' : 'border-emerald-500'}`}>
                                             {tx.reference && <div><span className="font-bold opacity-70">Referencia:</span> {tx.reference}</div>}
                                             {tx.notes && <div><span className="font-bold opacity-70">Nota / Justificación:</span> {tx.notes}</div>}
                                           </div>

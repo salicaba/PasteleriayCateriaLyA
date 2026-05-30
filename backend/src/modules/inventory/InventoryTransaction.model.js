@@ -8,9 +8,10 @@ const InventoryTransaction = sequelize.define('InventoryTransaction', {
     autoIncrement: true,
   },
   type: {
-    type: DataTypes.ENUM('IN', 'OUT', 'WASTE', 'ADJUSTMENT'),
+    // 🔥 Añadimos CONSUMPTION para registrar lo consumido tras un arqueo
+    type: DataTypes.ENUM('IN', 'OUT', 'WASTE', 'ADJUSTMENT', 'CONSUMPTION'),
     allowNull: false,
-    comment: 'IN (Compra), OUT (Venta/Uso), WASTE (Merma), ADJUSTMENT (Ajuste de inventario)',
+    comment: 'IN (Compra), OUT (Salida), WASTE (Merma), ADJUSTMENT (Ajuste manual), CONSUMPTION (Consumo por Arqueo)',
   },
   quantity: {
     type: DataTypes.DECIMAL(10, 3),
@@ -30,7 +31,7 @@ const InventoryTransaction = sequelize.define('InventoryTransaction', {
   reference: {
     type: DataTypes.STRING,
     allowNull: true,
-    comment: 'Ej: ID del Ticket POS, Número de Factura del Proveedor, etc.',
+    comment: 'Ej: ID del Arqueo, Número de Factura del Proveedor, etc.',
   },
   notes: {
     type: DataTypes.TEXT,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -15,7 +15,10 @@ import { MenuManagerPage } from './modules/admin/views/MenuManagerPage';
 import { QrControlPage } from './modules/cafeteria/views/QrControlPage';
 import { SettingsPage } from './modules/admin/views/SettingsPage'; 
 import { CashRegisterPage } from './modules/cash/views/CashRegisterPage';
-import InventoryPage from './modules/inventory/views/InventoryPage'; // <-- NUEVO INVENTARIO
+import InventoryPage from './modules/inventory/views/InventoryPage'; 
+import { InventoryReconciliationPage } from './modules/inventory/views/InventoryReconciliationPage'; 
+import { ExpensesPage } from './modules/finance/views/ExpensesPage'; 
+import { NetProfitDashboard } from './modules/finance/views/NetProfitDashboard'; // <-- NUEVO DASHBOARD
 
 import logoLyA from './assets/logo.jpeg'; 
 
@@ -54,7 +57,7 @@ function App() {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group', 'sistema_group']); 
+  const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group', 'sistema_group', 'inventario_group', 'finanzas_group']); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
@@ -155,9 +158,31 @@ function App() {
         { id: 'catalogo', label: 'Catálogo', icon: Tags },
       ]
     },
-    // <-- AQUÍ ESTÁ EL BOTÓN DE CAJA PRINCIPAL -->
     { id: 'caja', label: 'Caja', icon: Wallet },
-    { id: 'inventario', label: 'Inventario', icon: Package }, // <-- NUEVO BOTÓN DE INVENTARIO
+    
+    {
+      id: 'inventario_group',
+      label: 'Inventario',
+      icon: Package,
+      isGroup: true,
+      children: [
+        { id: 'inventario', label: 'Catálogo Kardex', icon: Package },
+        { id: 'arqueo', label: 'Arqueos', icon: ClipboardCheck },
+      ]
+    },
+
+    // 🔥 GRUPO DE FINANZAS COMPLETO
+    {
+      id: 'finanzas_group',
+      label: 'Finanzas',
+      icon: PieChart, 
+      isGroup: true,
+      children: [
+        { id: 'egresos', label: 'Gastos Operativos', icon: Briefcase },
+        { id: 'dashboard', label: 'Ganancias Netas', icon: Landmark }, // 🔥 AÑADIDO
+      ]
+    },
+
     { id: 'reportes', label: 'Reportes', icon: PieChart },
     {
       id: 'sistema_group',
@@ -414,7 +439,12 @@ function App() {
               {activeTab === 'ajustes' && <MenuManagerPage />} 
               {activeTab === 'caja' && <CashRegisterPage user={user} />}
               
-              {activeTab === 'inventario' && <InventoryPage />} {/* <-- AQUÍ SE RENDERIZA EL INVENTARIO */}
+              {activeTab === 'inventario' && <InventoryPage />}
+              {activeTab === 'arqueo' && <InventoryReconciliationPage />}
+              
+              {/* 🔥 RENDERIZADO DEL GRUPO DE FINANZAS */}
+              {activeTab === 'egresos' && <ExpensesPage />}
+              {activeTab === 'dashboard' && <NetProfitDashboard />} 
               
               {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
                 <SettingsPage uiSize={uiSize} setUiSize={setUiSize} activeTab={activeTab} />
