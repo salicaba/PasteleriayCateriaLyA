@@ -15,7 +15,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "axios": "^1.15.0",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^4.4.0",
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.1",
     "lucide-react": "^0.574.0",
@@ -24,6 +24,7 @@
     "react-easy-crop": "^5.5.7",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.13.0",
+    "recharts": "^3.8.1",
     "tailwind-merge": "^3.4.1"
   },
   "devDependencies": {

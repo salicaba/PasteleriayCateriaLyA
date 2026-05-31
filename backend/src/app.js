@@ -10,6 +10,7 @@ import pasteleriaRoutes from './modules/pasteleria/pasteleria.routes.js';
 import settingsRoutes from './modules/settings/settings.routes.js';
 import cashRoutes from './modules/cash/cash.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js'; // <-- NUEVO INVENTARIO
+import reportsRoutes from './modules/reports/reports.routes.js'; // <-- AÑADIR
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use('/api/pasteleria', pasteleriaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/cash', cashRoutes);
 app.use('/api/inventory', inventoryRoutes); // <-- NUEVA RUTA DE INVENTARIO
+app.use('/api/reports', reportsRoutes); // <-- AÑADIR
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓐 operando correctamente' });

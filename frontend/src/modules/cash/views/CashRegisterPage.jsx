@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
-import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, RefreshCw, UserCheck, RotateCcw, Filter, AlertTriangle } from 'lucide-react';
+import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, RefreshCw, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const CashRegisterPage = ({ user }) => {
@@ -25,12 +25,41 @@ export const CashRegisterPage = ({ user }) => {
     return tx.source === filterSource;
   });
 
+  // Interceptor Inteligente para detectar el Método de Pago
+  const getPaymentInfo = (tx) => {
+    const method = tx.paymentMethod || 
+      (tx.description?.toLowerCase().includes('tarjeta') ? 'Tarjeta' :
+       tx.description?.toLowerCase().includes('transferencia') ? 'Transferencia' : 'Efectivo');
+
+    if (method === 'Tarjeta') {
+      return { label: 'Tarjeta', icon: CreditCard, color: 'text-purple-600 dark:text-purple-400 lya:text-purple-700', bg: 'bg-purple-100 dark:bg-purple-500/20 lya:bg-purple-100' };
+    }
+    if (method === 'Transferencia') {
+      return { label: 'Transferencia', icon: Landmark, color: 'text-blue-600 dark:text-blue-400 lya:text-blue-700', bg: 'bg-blue-100 dark:bg-blue-500/20 lya:bg-blue-100' };
+    }
+    return { label: 'Efectivo', icon: Banknote, color: 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-700', bg: 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-emerald-100' };
+  };
+
+  // Cálculo en tiempo real para separar el Efectivo físico del dinero en Banco
+  const activeTransactions = transactions.filter(tx => tx.status === 'ACTIVE');
+  const paymentStats = useMemo(() => {
+    return activeTransactions.reduce((acc, tx) => {
+      const amount = parseFloat(tx.amount) || 0;
+      const info = getPaymentInfo(tx);
+      
+      if (info.label === 'Efectivo') acc.efectivo += amount;
+      else acc.digital += amount;
+      
+      return acc;
+    }, { efectivo: 0, digital: 0 });
+  }, [activeTransactions]);
+
   // --- VARIANTES DE ANIMACIÓN HOMOLOGADAS ---
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
+      transition: { staggerChildren: 0.05 }
     }
   };
 
@@ -47,7 +76,7 @@ export const CashRegisterPage = ({ user }) => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
       
-      {/* Encabezado y Fecha Premium (Estilo Inventario) */}
+      {/* Encabezado y Fecha Premium */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
@@ -73,38 +102,51 @@ export const CashRegisterPage = ({ user }) => {
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
+              style={{ colorScheme: 'dark' }}
               className="bg-transparent border-none text-gray-700 dark:text-white lya:text-lya-text font-bold outline-none cursor-pointer w-full"
             />
           </div>
         </div>
       </header>
 
-      {/* Tarjetas de Resumen Animadas (Con Hover) */}
+      {/* Tarjetas de Resumen Animadas (Expandido a 6 columnas para incluir Banco y Efectivo) */}
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+        className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6"
       >
-        <motion.div variants={cardVariants} className="bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F] text-white rounded-3xl p-6 shadow-lg shadow-emerald-500/20 relative overflow-hidden transform transition-all hover:-translate-y-1 hover:shadow-xl">
-          <p className="text-emerald-100 text-xs font-black uppercase tracking-wider mb-1">Ingreso Total</p>
-          <h2 className="text-4xl font-black">${resumen.total.toFixed(2)}</h2>
-          <Calculator className="absolute -right-4 -bottom-4 opacity-20 w-24 h-24" />
+        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-gray-900 dark:bg-gray-800 lya:bg-[#03543F] text-white rounded-3xl p-5 shadow-lg relative overflow-hidden transform transition-all hover:-translate-y-1">
+          <p className="text-gray-400 lya:text-emerald-100 text-[10px] font-black uppercase tracking-wider mb-1">Total del Día</p>
+          <h2 className="text-3xl font-black">${resumen.total.toFixed(2)}</h2>
+          <Calculator className="absolute -right-4 -bottom-4 opacity-10 w-20 h-20" />
+        </motion.div>
+
+        {/* Efectivo (Físico) */}
+        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-3xl p-5 shadow-sm lya:bg-emerald-500/5 lya:border-emerald-500/20 transform transition-all hover:-translate-y-1">
+          <div className="flex items-center gap-2 text-emerald-600 lya:text-emerald-500 mb-1"><Banknote size={16}/> <span className="text-[10px] font-black uppercase tracking-wider">Efectivo en Cajón</span></div>
+          <h2 className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 lya:text-emerald-600">${paymentStats.efectivo.toFixed(2)}</h2>
+        </motion.div>
+
+        {/* Transferencia / Tarjeta (Digital) */}
+        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-3xl p-5 shadow-sm lya:bg-blue-500/5 lya:border-blue-500/20 transform transition-all hover:-translate-y-1">
+          <div className="flex items-center gap-2 text-blue-600 lya:text-blue-500 mb-1"><Landmark size={16}/> <span className="text-[10px] font-black uppercase tracking-wider">Banco / Digital</span></div>
+          <h2 className="text-2xl font-extrabold text-blue-700 dark:text-blue-400 lya:text-blue-600">${paymentStats.digital.toFixed(2)}</h2>
         </motion.div>
         
-        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center gap-2 text-gray-400 lya:text-lya-text/50 mb-1"><Coffee size={16}/> <span className="text-xs font-black uppercase tracking-wider">Cafetería</span></div>
-          <h2 className="text-2xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">${resumen.cafeteria.toFixed(2)}</h2>
+        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all hover:-translate-y-1">
+          <div className="flex items-center gap-2 text-gray-400 lya:text-lya-text/50 mb-1"><Coffee size={14}/> <span className="text-[10px] font-black uppercase tracking-wider">Cafetería</span></div>
+          <h2 className="text-xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">${resumen.cafeteria.toFixed(2)}</h2>
         </motion.div>
 
-        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center gap-2 text-gray-400 lya:text-lya-text/50 mb-1"><Cake size={16}/> <span className="text-xs font-black uppercase tracking-wider">Pastelería</span></div>
-          <h2 className="text-2xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">${resumen.pasteleria.toFixed(2)}</h2>
+        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all hover:-translate-y-1">
+          <div className="flex items-center gap-2 text-gray-400 lya:text-lya-text/50 mb-1"><Cake size={14}/> <span className="text-[10px] font-black uppercase tracking-wider">Pastelería</span></div>
+          <h2 className="text-xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">${resumen.pasteleria.toFixed(2)}</h2>
         </motion.div>
 
-        <motion.div variants={cardVariants} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-3xl p-6 shadow-sm lya:bg-red-500/5 lya:border-red-500/20 transform transition-all hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center gap-2 text-red-500 lya:text-red-500 mb-1"><XCircle size={16}/> <span className="text-xs font-black uppercase tracking-wider">Total Anulado</span></div>
-          <h2 className="text-2xl font-extrabold text-red-600 dark:text-red-400 lya:text-red-500">${resumen.anulados.toFixed(2)}</h2>
+        <motion.div variants={cardVariants} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-3xl p-5 shadow-sm lya:bg-red-500/5 lya:border-red-500/20 transform transition-all hover:-translate-y-1">
+          <div className="flex items-center gap-2 text-red-500 lya:text-red-500 mb-1"><XCircle size={14}/> <span className="text-[10px] font-black uppercase tracking-wider">Anulado</span></div>
+          <h2 className="text-xl font-extrabold text-red-600 dark:text-red-400 lya:text-red-500">${resumen.anulados.toFixed(2)}</h2>
         </motion.div>
       </motion.div>
 
@@ -136,7 +178,7 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* Tabla de Movimientos (PopLayout y Spring) */}
+      {/* Tabla de Movimientos */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4">
         <AnimatePresence>
           {loading && (
@@ -155,7 +197,7 @@ export const CashRegisterPage = ({ user }) => {
               <tr>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Hora</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Origen</th>
-                <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Descripción</th>
+                <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Descripción / Pago</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-right lya:text-lya-text/50">Monto</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-center lya:text-lya-text/50">Estado</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-center lya:text-lya-text/50">Acciones</th>
@@ -177,6 +219,8 @@ export const CashRegisterPage = ({ user }) => {
                   const creatorName = tx.creator 
                     ? (tx.creator.fullName?.split(' ')[0] || tx.creator.username) 
                     : 'Sistema';
+                  
+                  const payInfo = getPaymentInfo(tx);
 
                   return (
                     <motion.tr 
@@ -199,9 +243,17 @@ export const CashRegisterPage = ({ user }) => {
                       </td>
                       <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">
                         <p className={isCancelled ? 'line-through opacity-50' : ''}>{tx.description}</p>
-                        <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
-                          <UserCheck size={12} /> Por: {creatorName}
-                        </p>
+                        <div className={`text-[11px] font-semibold mt-1.5 flex flex-wrap items-center gap-2 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
+                          <span className="flex items-center gap-1"><UserCheck size={12} /> Por: {creatorName}</span>
+                          {!isCancelled && (
+                            <>
+                              <span className="text-gray-300 dark:text-gray-700 lya:text-lya-border">•</span>
+                              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest ${payInfo.bg} ${payInfo.color}`}>
+                                <payInfo.icon size={10} /> {payInfo.label}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text">
                         <span className={isCancelled ? 'line-through opacity-50' : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'}>

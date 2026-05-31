@@ -5,11 +5,12 @@ import { useFinanceController } from '../controllers/useFinanceController';
 import { Zap, Wrench, Package, Briefcase, Megaphone, HelpCircle, Plus, Calendar, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// 🔥 CORRECCIÓN: Sincronizado exactamente con Reportes (Artículos de Limpieza)
 const CATEGORIES = [
-  { id: 'UTILITIES', label: 'Servicios (Luz, Agua)', icon: Zap, color: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 lya:bg-yellow-500/10' },
   { id: 'PAYROLL', label: 'Nómina / Sueldos', icon: Briefcase, color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10 lya:bg-blue-500/10' },
+  { id: 'UTILITIES', label: 'Servicios (Luz, Agua, Gas)', icon: Zap, color: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 lya:bg-yellow-500/10' },
   { id: 'MAINTENANCE', label: 'Mantenimiento', icon: Wrench, color: 'text-orange-500 bg-orange-50 dark:bg-orange-500/10 lya:bg-orange-500/10' },
-  { id: 'SUPPLIES', label: 'Limpieza e Insumos', icon: Package, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 lya:bg-emerald-500/10' },
+  { id: 'SUPPLIES', label: 'Artículos de Limpieza', icon: Package, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 lya:bg-emerald-500/10' },
   { id: 'MARKETING', label: 'Publicidad', icon: Megaphone, color: 'text-purple-500 bg-purple-50 dark:bg-purple-500/10 lya:bg-purple-500/10' },
   { id: 'OTHER', label: 'Otros Gastos', icon: HelpCircle, color: 'text-gray-500 bg-gray-50 dark:bg-gray-500/10 lya:bg-gray-500/10' },
 ];
@@ -25,7 +26,7 @@ export const ExpensesPage = () => {
   
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('UTILITIES');
+  const [category, setCategory] = useState('PAYROLL'); // Por defecto seleccionado
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {

@@ -19,6 +19,7 @@ import InventoryPage from './modules/inventory/views/InventoryPage';
 import { InventoryReconciliationPage } from './modules/inventory/views/InventoryReconciliationPage'; 
 import { ExpensesPage } from './modules/finance/views/ExpensesPage'; 
 import { NetProfitDashboard } from './modules/finance/views/NetProfitDashboard'; 
+import ReportsPage from './modules/reports/views/ReportsPage';
 
 import logoLyA from './assets/logo.jpeg'; 
 
@@ -481,14 +482,7 @@ function App() {
                 <SettingsPage uiSize={uiSize} setUiSize={setUiSize} activeTab={activeTab} />
               )}
               
-              {activeTab === 'reportes' && (
-                <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 lya:text-lya-text/50 font-medium text-center p-4">
-                  <div className="flex flex-col items-center space-y-4">
-                    <PieChart size={48} className="opacity-50" />
-                    <p>Módulo de Reportes en construcción...</p>
-                  </div>
-                </div>
-              )}
+              {activeTab === 'reportes' && <ReportsPage />}
             </main>
           </div>
         </div>
