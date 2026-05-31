@@ -1,6 +1,5 @@
 import InventoryItem from './InventoryItem.model.js';
 import InventoryTransaction from './InventoryTransaction.model.js';
-// 🔥 NUEVOS MODELOS PARA EL ARQUEO
 import InventoryReconciliation from './InventoryReconciliation.model.js';
 import InventoryReconciliationDetail from './InventoryReconciliationDetail.model.js';
 import sequelize from '../../config/database.js';
@@ -149,30 +148,27 @@ export const deleteItem = async (req, res) => {
 };
 
 // =========================================================================
-// 🔥 NUEVO: MOTOR DE ARQUEO / CONCILIACIÓN DE INVENTARIO (INVENTARIO PERIÓDICO)
+// MOTOR DE ARQUEO / CONCILIACIÓN DE INVENTARIO
 // =========================================================================
 export const processReconciliation = async (req, res) => {
   const t = await sequelize.transaction();
   
   try {
-    // items será un arreglo: [{ inventoryItemId: 1, physicalStock: 10.5 }, ...]
     const { items, notes, userId } = req.body;
 
     if (!items || !items.length) {
       throw new Error('No se enviaron insumos para el arqueo.');
     }
 
-    // 1. Crear la cabecera del Arqueo
     const reconciliation = await InventoryReconciliation.create({
       userId: userId || null,
       status: 'COMPLETED',
-      totalConsumptionValue: 0, // Se actualizará al final
+      totalConsumptionValue: 0, 
       notes: notes || 'Arqueo periódico',
     }, { transaction: t });
 
-    let totalCOGS = 0; // Costo de Ventas (Cost of Goods Sold)
+    let totalCOGS = 0;
 
-    // 2. Iterar sobre lo que el usuario contó físicamente
     for (const count of items) {
       const { inventoryItemId, physicalStock } = count;
       const parsedPhysical = parseFloat(physicalStock);
@@ -185,7 +181,6 @@ export const processReconciliation = async (req, res) => {
       const averageCost = parseFloat(item.averageCost);
       const differenceCost = difference * averageCost;
 
-      // 2.1 Guardar el detalle de la conciliación
       await InventoryReconciliationDetail.create({
         reconciliationId: reconciliation.id,
         inventoryItemId: item.id,
@@ -196,13 +191,12 @@ export const processReconciliation = async (req, res) => {
         totalDifferenceCost: differenceCost 
       }, { transaction: t });
 
-      // 2.2 Evaluar si hubo consumo o sobrante para afectar el Kardex
+      // 🔥 CORRECCIÓN: Ahora adjuntamos la nota del usuario si existe
       if (difference < 0) {
-        // FALTAN INSUMOS = SE CONSUMIERON EN VENTAS O PRODUCCIÓN
         const consumedQuantity = Math.abs(difference);
         const consumedCost = consumedQuantity * averageCost;
         
-        totalCOGS += consumedCost; // Acumulamos el valor para las métricas financieras
+        totalCOGS += consumedCost; 
 
         await InventoryTransaction.create({
           inventoryItemId: item.id,
@@ -212,11 +206,11 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: consumedCost,
           reference: `Arqueo #${reconciliation.id}`,
-          notes: 'Consumo determinado por arqueo'
+          // Si el usuario escribió una nota, la mostramos. Si no, texto por defecto.
+          notes: notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'
         }, { transaction: t });
 
       } else if (difference > 0) {
-        // SOBRAN INSUMOS = SE ENCONTRÓ MERCANCÍA (Ajuste positivo)
         await InventoryTransaction.create({
           inventoryItemId: item.id,
           userId: userId || null,
@@ -225,18 +219,16 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: Math.abs(differenceCost),
           reference: `Arqueo #${reconciliation.id}`,
-          notes: 'Ajuste positivo por arqueo'
+          // Si el usuario escribió una nota, la mostramos. Si no, texto por defecto.
+          notes: notes ? `Ajuste positivo: ${notes}` : 'Ajuste positivo por arqueo'
         }, { transaction: t });
       }
 
-      // 2.3 Ajustar el stock maestro al conteo físico real
       await item.update({ currentStock: parsedPhysical }, { transaction: t });
     }
 
-    // 3. Guardar el Costo de Ventas total en la cabecera
     await reconciliation.update({ totalConsumptionValue: totalCOGS }, { transaction: t });
 
-    // 4. Todo salió perfecto, confirmamos a la base de datos
     await t.commit();
 
     res.status(201).json({ 
@@ -246,7 +238,7 @@ export const processReconciliation = async (req, res) => {
     });
 
   } catch (error) {
-    await t.rollback(); // Deshacemos todo si hay un error
+    await t.rollback(); 
     console.error('Error procesando arqueo:', error);
     res.status(400).json({ message: error.message || 'Error al procesar el arqueo.' });
   }

@@ -26,7 +26,8 @@ export const useCashController = (user) => {
   const fetchTransactions = async (date) => {
     setLoading(true);
     try {
-      const response = await api.get(`/cash?date=${date}`);
+      // 🔥 CORRECCIÓN: Agregamos &type=INCOME para que ignore los Gastos Operativos (EXPENSE)
+      const response = await api.get(`/cash?date=${date}&type=INCOME`);
       setTransactions(response.data);
     } catch (error) {
       toast.error('Error al cargar los movimientos de caja');
@@ -100,9 +101,12 @@ export const useCashController = (user) => {
     if (tx.status === 'CANCELLED') {
       acc.anulados += val;
     } else {
-      acc.total += val;
-      if (tx.source === 'CAFETERIA') acc.cafeteria += val;
-      if (tx.source === 'PASTELERIA') acc.pasteleria += val;
+      // 🔥 DOBLE SEGURIDAD: Solo suma si de verdad el movimiento es un INGRESO
+      if (tx.type === 'INCOME') {
+        acc.total += val;
+        if (tx.source === 'CAFETERIA') acc.cafeteria += val;
+        if (tx.source === 'PASTELERIA') acc.pasteleria += val;
+      }
     }
     return acc;
   }, { total: 0, cafeteria: 0, pasteleria: 0, anulados: 0 });
@@ -113,9 +117,8 @@ export const useCashController = (user) => {
     selectedDate,
     setSelectedDate,
     resumen,
-    handleCancelTransaction: requestCancelTransaction, // Ahora estas mandan a abrir el modal
+    handleCancelTransaction: requestCancelTransaction, 
     handleRestoreTransaction: requestRestoreTransaction, 
-    // Exportamos los controles del nuevo modal hacia la vista:
     confirmModal,
     closeConfirmModal,
     executeConfirmAction

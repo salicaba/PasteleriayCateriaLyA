@@ -55,7 +55,7 @@ export const CashRegisterPage = ({ user }) => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">Caja</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Control de ingresos y anulaciones del negocio</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Control de ingresos y anulaciones de Cafetería y Pastelería</p>
           </div>
         </div>
         
@@ -87,7 +87,7 @@ export const CashRegisterPage = ({ user }) => {
         className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
       >
         <motion.div variants={cardVariants} className="bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F] text-white rounded-3xl p-6 shadow-lg shadow-emerald-500/20 relative overflow-hidden transform transition-all hover:-translate-y-1 hover:shadow-xl">
-          <p className="text-emerald-100 text-xs font-black uppercase tracking-wider mb-1">Ingreso Neto Total</p>
+          <p className="text-emerald-100 text-xs font-black uppercase tracking-wider mb-1">Ingreso Total</p>
           <h2 className="text-4xl font-black">${resumen.total.toFixed(2)}</h2>
           <Calculator className="absolute -right-4 -bottom-4 opacity-20 w-24 h-24" />
         </motion.div>

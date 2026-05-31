@@ -18,11 +18,10 @@ import { CashRegisterPage } from './modules/cash/views/CashRegisterPage';
 import InventoryPage from './modules/inventory/views/InventoryPage'; 
 import { InventoryReconciliationPage } from './modules/inventory/views/InventoryReconciliationPage'; 
 import { ExpensesPage } from './modules/finance/views/ExpensesPage'; 
-import { NetProfitDashboard } from './modules/finance/views/NetProfitDashboard'; // <-- NUEVO DASHBOARD
+import { NetProfitDashboard } from './modules/finance/views/NetProfitDashboard'; 
 
 import logoLyA from './assets/logo.jpeg'; 
 
-// Helper inteligente para obtener iniciales
 const getInitials = (name) => {
   if (!name) return 'US';
   const cleanName = name.trim();
@@ -51,13 +50,28 @@ function App() {
     return null;
   });
 
+  // 🔥 NUEVO: El estado inicial de la pestaña es dinámico dependiendo del rol
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('lya_active_tab');
-    return savedTab || 'mesas';
+    if (savedTab) return savedTab;
+    
+    // Si no hay pestaña guardada, revisamos la sesión actual para decidir el Inicio
+    const savedSession = localStorage.getItem('lya_pos_session');
+    if (savedSession) {
+      try {
+        const { userData } = JSON.parse(savedSession);
+        return userData?.role === 'Empleado' ? 'mesas' : 'caja';
+      } catch (e) {}
+    }
+    return 'caja'; // Por defecto (Administrador o nuevo)
   });
 
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const savedGroups = localStorage.getItem('lya_expanded_groups');
+    return savedGroups ? JSON.parse(savedGroups) : []; 
+  }); 
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [expandedGroups, setExpandedGroups] = useState(['cafeteria_group', 'pasteleria_group', 'sistema_group', 'inventario_group', 'finanzas_group']); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
@@ -66,6 +80,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('lya_active_tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('lya_expanded_groups', JSON.stringify(expandedGroups));
+  }, [expandedGroups]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -111,14 +129,21 @@ function App() {
     }));
     
     setUser(userData);
+    
+    // 🔥 NUEVO: En el login, redirigimos inmediatamente a la pantalla principal según su rol
+    const initialTab = userData.role === 'Empleado' ? 'mesas' : 'caja';
+    setActiveTab(initialTab);
+    localStorage.setItem('lya_active_tab', initialTab);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
     localStorage.removeItem('lya_active_tab'); 
+    localStorage.removeItem('lya_expanded_groups'); 
     setUser(null);
-    setActiveTab('mesas');
+    setActiveTab('caja'); 
+    setExpandedGroups([]); 
   };
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
@@ -135,6 +160,8 @@ function App() {
   });
 
   const menuConfig = [
+    { id: 'caja', label: 'Caja', icon: Wallet },
+    
     {
       id: 'cafeteria_group',
       label: 'Cafetería',
@@ -158,7 +185,6 @@ function App() {
         { id: 'catalogo', label: 'Catálogo', icon: Tags },
       ]
     },
-    { id: 'caja', label: 'Caja', icon: Wallet },
     
     {
       id: 'inventario_group',
@@ -171,7 +197,6 @@ function App() {
       ]
     },
 
-    // 🔥 GRUPO DE FINANZAS COMPLETO
     {
       id: 'finanzas_group',
       label: 'Finanzas',
@@ -179,7 +204,7 @@ function App() {
       isGroup: true,
       children: [
         { id: 'egresos', label: 'Gastos Operativos', icon: Briefcase },
-        { id: 'dashboard', label: 'Ganancias Netas', icon: Landmark }, // 🔥 AÑADIDO
+        { id: 'dashboard', label: 'Ganancias Netas', icon: Landmark },
       ]
     },
 
@@ -207,7 +232,7 @@ function App() {
 
   useEffect(() => {
     if (user?.role === 'Empleado' && ['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab)) {
-      setActiveTab('mesas');
+      setActiveTab('mesas'); // Si un empleado intenta acceder a sistema por glitch, lo regresamos a mesas
     }
   }, [user, activeTab]);
 
@@ -253,19 +278,26 @@ function App() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: theme === 'dark' ? '#1f2937' : theme === 'lya' ? '#FFFFFF' : '#ffffff',
+            background: theme === 'dark' ? '#1f2937' : theme === 'lya' ? '#FDF8F5' : '#ffffff',
             color: theme === 'dark' ? '#f3f4f6' : theme === 'lya' ? '#4A2B29' : '#1f2937',
             borderRadius: '1rem',
-            border: theme === 'lya' ? '1px solid #D4A373' : 'none',
+            border: theme === 'dark' ? '1px solid #374151' : theme === 'lya' ? '1px solid #E6CCB2' : '1px solid #f3f4f6',
             fontWeight: 'bold',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            padding: '14px 20px',
           },
           success: {
             iconTheme: { 
-              primary: theme === 'lya' ? '#F49AC2' : '#f97316', 
+              primary: theme === 'lya' ? '#10b981' : '#10b981', 
               secondary: theme === 'dark' ? '#1f2937' : '#ffffff' 
             },
           },
+          error: {
+            iconTheme: { 
+              primary: '#ef4444', 
+              secondary: theme === 'dark' ? '#1f2937' : '#ffffff' 
+            },
+          }
         }}
       />
 
@@ -442,7 +474,6 @@ function App() {
               {activeTab === 'inventario' && <InventoryPage />}
               {activeTab === 'arqueo' && <InventoryReconciliationPage />}
               
-              {/* 🔥 RENDERIZADO DEL GRUPO DE FINANZAS */}
               {activeTab === 'egresos' && <ExpensesPage />}
               {activeTab === 'dashboard' && <NetProfitDashboard />} 
               
