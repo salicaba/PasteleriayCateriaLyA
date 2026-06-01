@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon, Filter } from 'lucide-react';
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon, Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useReportsController } from '../controllers/useReportsController';
 import { useTheme } from '../../../hooks/useTheme';
 
-// Paleta de colores adaptativa
 const COLORS = {
   primary: ['#f97316', '#fb923c', '#fdba74'], 
   lya: ['#4A2B29', '#E6CCB2', '#DDB892'], 
@@ -25,9 +24,13 @@ const OPEX_TRANSLATIONS = {
   'NONE': 'Sin Categoría'
 };
 
-const KPICard = ({ title, amount, icon: Icon, type, delay }) => {
+const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
   const isPositive = type === 'income' || (type === 'profit' && amount >= 0);
   const isNegative = type === 'expense' || (type === 'profit' && amount < 0);
+  
+  // Lógica de tendencias: Si suben ingresos/utilidad es bueno (+). Si suben gastos/mermas es malo (-)
+  const isTrendGood = (type === 'income' || type === 'profit') ? trend >= 0 : trend <= 0;
+  const TrendIcon = trend >= 0 ? TrendingUp : TrendingDown;
   
   return (
     <motion.div 
@@ -45,6 +48,14 @@ const KPICard = ({ title, amount, icon: Icon, type, delay }) => {
         }`}>
           ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
         </h3>
+        
+        {/* Renderizado condicional de Tendencias */}
+        {trend !== undefined && !isNaN(trend) && (
+          <div className={`mt-2 flex items-center text-xs font-black ${isTrendGood ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+            <TrendIcon size={14} className="mr-1" strokeWidth={3} />
+            <span>{Math.abs(trend).toFixed(1)}% <span className="text-gray-400 dark:text-gray-500 font-bold ml-1">vs anterior</span></span>
+          </div>
+        )}
       </div>
       <div className={`p-4 rounded-2xl transition-colors ${
         isPositive ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 lya:bg-green-100 lya:text-green-700' : 
@@ -59,9 +70,8 @@ const KPICard = ({ title, amount, icon: Icon, type, delay }) => {
 
 export const ReportsPage = () => {
   const { theme } = useTheme();
-  const { loading, dateRange, setDateRange, chartData } = useReportsController();
+  const { loading, dateRange, setDateRange, chartData, exportToExcel, exportToPDF } = useReportsController();
   
-  // 🔥 Por defecto ahora es Top 5 para una vista más rápida y limpia
   const [productFilter, setProductFilter] = useState('5');
 
   const gridColor = theme === 'dark' ? '#374151' : theme === 'lya' ? '#E6CCB2' : '#e5e7eb';
@@ -80,7 +90,6 @@ export const ReportsPage = () => {
     if (!chartData.productSales) return [];
     
     let list = [...chartData.productSales];
-    
     list.sort((a, b) => b.cantidad - a.cantidad);
 
     if (productFilter === 'SOLD') {
@@ -97,7 +106,6 @@ export const ReportsPage = () => {
   }, [processedProducts]);
 
   const dynamicChartHeight = Math.max(300, chartDisplayedProducts.length * 35);
-
 
   if (loading || !chartData.kpis) {
     return (
@@ -124,7 +132,7 @@ export const ReportsPage = () => {
     >
       
       {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors duration-300">
+      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors duration-300">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 dark:shadow-orange-900/30 lya:shadow-lya-primary/20">
             <PieChartIcon size={28} />
@@ -139,15 +147,33 @@ export const ReportsPage = () => {
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+          
+          {/* Botones de Exportación */}
+          <div className="flex gap-2 w-full sm:w-auto">
+             <button 
+                onClick={exportToPDF}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/40 px-4 py-2.5 rounded-xl transition-colors text-sm font-bold shadow-sm"
+             >
+                <FileText size={18} /> <span className="hidden sm:inline">Exportar PDF</span>
+             </button>
+             <button 
+                onClick={exportToExcel}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800/40 px-4 py-2.5 rounded-xl transition-colors text-sm font-bold shadow-sm"
+             >
+                <FileSpreadsheet size={18} /> <span className="hidden sm:inline">Exportar Excel</span>
+             </button>
+          </div>
+
+          {/* Date Picker */}
           <div className="flex items-center gap-3 w-full sm:w-auto bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2.5 shadow-inner transition-colors">
-            <CalendarIcon size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40" />
+            <CalendarIcon size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 shrink-0" />
             <input 
               type="date" 
               value={dateRange.start.toISOString().split('T')[0]} 
               onChange={(e) => handleDateChange(e, 'start')}
               style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-              className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer"
+              className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full"
             />
             <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border font-bold">-</span>
             <input 
@@ -155,7 +181,7 @@ export const ReportsPage = () => {
               value={dateRange.end.toISOString().split('T')[0]} 
               onChange={(e) => handleDateChange(e, 'end')}
               style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-              className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer"
+              className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full"
             />
           </div>
         </div>
@@ -166,10 +192,10 @@ export const ReportsPage = () => {
         
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <KPICard title="Ingresos Totales" amount={chartData.kpis.totalIncome} icon={DollarSign} type="income" delay={0.05} />
-          <KPICard title="Utilidad Neta (Aprox)" amount={chartData.kpis.netProfit} icon={chartData.kpis.netProfit >= 0 ? TrendingUp : TrendingDown} type="profit" delay={0.1} />
-          <KPICard title="Gastos (OPEX)" amount={chartData.kpis.totalOpex} icon={Wallet} type="expense" delay={0.15} />
-          <KPICard title="Mermas (Kardex)" amount={chartData.kpis.totalMermas} icon={PackageMinus} type="expense" delay={0.2} />
+          <KPICard title="Ingresos Totales" amount={chartData.kpis.totalIncome} trend={chartData.trends?.income} icon={DollarSign} type="income" delay={0.05} />
+          <KPICard title="Utilidad Neta (Aprox)" amount={chartData.kpis.netProfit} trend={chartData.trends?.profit} icon={chartData.kpis.netProfit >= 0 ? TrendingUp : TrendingDown} type="profit" delay={0.1} />
+          <KPICard title="Gastos (OPEX)" amount={chartData.kpis.totalOpex} trend={chartData.trends?.opex} icon={Wallet} type="expense" delay={0.15} />
+          <KPICard title="Mermas (Kardex)" amount={chartData.kpis.totalMermas} trend={chartData.trends?.mermas} icon={PackageMinus} type="expense" delay={0.2} />
         </div>
 
         {/* INGRESOS DIARIOS */}
@@ -257,21 +283,19 @@ export const ReportsPage = () => {
           </motion.div>
         </div>
 
-        {/* 🔥 SECCIÓN DE PRODUCTOS (GRÁFICA Y TABLA CONTROLADAS POR EL FILTRO) */}
+        {/* SECCIÓN DE PRODUCTOS */}
         <motion.div 
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }} 
           transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.45 }}
           className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden transition-colors duration-300"
         >
-          {/* Cabecera compartida con Filtro */}
           <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
              <div>
                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text transition-colors">Rendimiento y Desglose del Menú</h3>
                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Análisis visual y financiero de los productos vendidos.</p>
              </div>
 
-             {/* 🔥 Menú desplegable para filtrar la cantidad con la opción Top 5 */}
              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 shadow-inner w-full md:w-auto">
                <Filter size={16} className="text-gray-400" />
                <span className="text-xs font-bold text-gray-500 mr-1">Mostrar:</span>
@@ -290,10 +314,8 @@ export const ReportsPage = () => {
              </div>
           </div>
           
-          {/* Contenedor Flex para la Gráfica y la Tabla */}
           <div className="p-6 flex flex-col gap-6">
             
-            {/* GRÁFICA */}
             <div className="w-full border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl overflow-y-auto hide-scrollbar max-h-[400px]">
               {chartDisplayedProducts.length > 0 ? (
                 <div style={{ height: dynamicChartHeight, width: '100%' }}>
@@ -332,7 +354,6 @@ export const ReportsPage = () => {
               )}
             </div>
 
-            {/* TABLA DE RENDIMIENTO */}
             <div className="overflow-x-auto hide-scrollbar border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl max-h-[400px]">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 sticky top-0 z-10">

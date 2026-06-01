@@ -10,16 +10,20 @@ export const getDashboardData = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    // Configurar rango de fechas (Por defecto: mes actual)
+    // Configurar rango de fechas actual
     const start = startDate ? new Date(startDate) : new Date(new Date().setDate(1));
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    const dateFilter = {
-      createdAt: { [Op.between]: [start, end] }
-    };
+    // --- CÁLCULO DE PERIODO ANTERIOR (TENDENCIAS) ---
+    const duration = end.getTime() - start.getTime();
+    const prevStart = new Date(start.getTime() - duration - 1); 
+    const prevEnd = new Date(start.getTime() - 1);
 
-    // 1. Tendencia de Ventas Diarias e Ingresos por Origen (Cafetería vs Pastelería)
+    const dateFilter = { createdAt: { [Op.between]: [start, end] } };
+    const prevDateFilter = { createdAt: { [Op.between]: [prevStart, prevEnd] } };
+
+    // 1. Tendencia de Ventas Diarias e Ingresos por Origen (Actual)
     const incomeTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [
@@ -31,7 +35,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 2. Gastos Operativos (OPEX)
+    // 2. Gastos Operativos (OPEX) (Actual)
     const opexTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'EXPENSE', status: 'ACTIVE' },
       attributes: [
@@ -42,7 +46,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 3. Ventas de TODOS los productos (incluyendo 0 ventas)
+    // 3. Ventas de TODOS los productos
     const allProducts = await Product.findAll({
       attributes: ['id', 'name', 'departamento'],
       raw: true
@@ -52,9 +56,9 @@ export const getDashboardData = async (req, res) => {
       where: { createdAt: { [Op.between]: [start, end] } },
       include: [{
         model: Order,
-        as: 'order', // <-- ALIAS AGREGADO
+        as: 'order',
         attributes: [],
-        where: { status: { [Op.in]: ['PAID', 'CLOSED'] } } // Solo órdenes pagadas
+        where: { status: { [Op.in]: ['PAID', 'CLOSED'] } }
       }],
       attributes: [
         'productId',
@@ -73,25 +77,25 @@ export const getDashboardData = async (req, res) => {
         cantidad: saleData ? parseInt(saleData.totalQuantity) : 0,
         ingreso: saleData ? parseFloat(saleData.totalRevenue) : 0
       };
-    }).sort((a, b) => b.cantidad - a.cantidad); // Ordenar de mayor a menor
+    }).sort((a, b) => b.cantidad - a.cantidad);
 
-    // 4. Mermas y Ajustes de Inventario (Arqueos)
+    // 4. Mermas y Ajustes de Inventario (Actual)
     const inventoryStats = await InventoryReconciliationDetail.findAll({
       where: { createdAt: { [Op.between]: [start, end] } },
       include: [{ 
         model: InventoryReconciliation, 
-        as: 'reconciliation', // <-- ALIAS AGREGADO
+        as: 'reconciliation',
         attributes: [], 
         where: { status: 'COMPLETED' } 
       }],
       attributes: [
-        [fn('SUM', literal('CASE WHEN difference < 0 THEN totalDifferenceCost ELSE 0 END')), 'totalMermas'], // Consumos/Pérdidas
-        [fn('SUM', literal('CASE WHEN difference > 0 THEN totalDifferenceCost ELSE 0 END')), 'totalSobrantes'] // Ajustes positivos a favor
+        [fn('SUM', literal('CASE WHEN difference < 0 THEN totalDifferenceCost ELSE 0 END')), 'totalMermas'],
+        [fn('SUM', literal('CASE WHEN difference > 0 THEN totalDifferenceCost ELSE 0 END')), 'totalSobrantes']
       ],
       raw: true
     });
 
-    // 5. Métodos de Pago (Simulación basada en descripción si no existe la columna en Transaction)
+    // 5. Métodos de Pago
     const paymentMethods = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [
@@ -108,6 +112,32 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
+    // --- CONSULTAS DEL PERIODO ANTERIOR ---
+    const prevIncomeTransactions = await Transaction.findAll({
+      where: { ...prevDateFilter, type: 'INCOME', status: 'ACTIVE' },
+      attributes: [[fn('SUM', col('amount')), 'total']],
+      raw: true
+    });
+    const prevTotalIncome = parseFloat(prevIncomeTransactions[0]?.total || 0);
+
+    const prevOpexTransactions = await Transaction.findAll({
+      where: { ...prevDateFilter, type: 'EXPENSE', status: 'ACTIVE' },
+      attributes: [[fn('SUM', col('amount')), 'total']],
+      raw: true
+    });
+    const prevTotalOpex = parseFloat(prevOpexTransactions[0]?.total || 0);
+
+    const prevInventoryStats = await InventoryReconciliationDetail.findAll({
+      where: { createdAt: { [Op.between]: [prevStart, prevEnd] } },
+      include: [{ 
+        model: InventoryReconciliation, as: 'reconciliation', attributes: [], 
+        where: { status: 'COMPLETED' } 
+      }],
+      attributes: [[fn('SUM', literal('CASE WHEN difference < 0 THEN totalDifferenceCost ELSE 0 END')), 'totalMermas']],
+      raw: true
+    });
+    const prevTotalMermas = Math.abs(parseFloat(prevInventoryStats[0]?.totalMermas || 0));
+
     res.json({
       success: true,
       data: {
@@ -115,7 +145,12 @@ export const getDashboardData = async (req, res) => {
         opexTransactions,
         productSales,
         inventoryStats: inventoryStats[0] || { totalMermas: 0, totalSobrantes: 0 },
-        paymentMethods
+        paymentMethods,
+        previousKpis: {
+          totalIncome: prevTotalIncome,
+          totalOpex: prevTotalOpex,
+          totalMermas: prevTotalMermas
+        }
       }
     });
 
