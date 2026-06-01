@@ -102,7 +102,7 @@ export const getActiveOrderByTable = async (req, res) => {
 export const payOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cuentaName, isFullPayment } = req.body; 
+    const { cuentaName, isFullPayment, paymentMethod } = req.body;
     
     const order = await Order.findByPk(orderId, { 
       include: ['items', { model: Table, as: 'table' }] 
@@ -129,13 +129,23 @@ export const payOrder = async (req, res) => {
       identificador = `Mesa #${numMesa}`;
     }
 
+    // Detectar el método de pago
+    let dbMethod = 'CASH';
+    if (paymentMethod === 'transferencia' || paymentMethod === 'TRANSFER') dbMethod = 'TRANSFER';
+    else if (paymentMethod === 'tarjeta' || paymentMethod === 'CARD') dbMethod = 'CARD';
+
+    // Construcción de la descripción (completamente limpia del método de pago)
     if (isFullPayment) {
       const unpaidItems = order.items.filter(i => !paidAccounts.includes(i.cuenta));
       amountToRegister = unpaidItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
-      desc = `Pago de consumo (${identificador}) ${folioUnico}`;
+      
+      desc = `Pago de Consumo (${identificador})  ${folioUnico}`; 
+      
     } else if (cuentaName) {
       amountToRegister = order.items.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
-      desc = `Pago de consumo (${identificador}) [Cuenta: ${cuentaName}] ${folioUnico}`;
+      
+      desc = `Pago de Consumo (${identificador}) Cuenta: ${cuentaName}  ${folioUnico}`;
+      
       if (!paidAccounts.includes(cuentaName)) paidAccounts.push(cuentaName);
     }
 
@@ -151,6 +161,7 @@ export const payOrder = async (req, res) => {
         source: 'CAFETERIA',
         amount: amountToRegister,
         description: desc,
+        paymentMethod: dbMethod, 
         referenceId: order.id,
         createdBy: userId 
       });
@@ -383,7 +394,6 @@ export const printOrderTicket = async (req, res) => {
       width: 42,
     });
 
-    // --- ENCABEZADO ESTILO DIGITAL ---
     printer.alignCenter();
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
@@ -413,7 +423,6 @@ export const printOrderTicket = async (req, res) => {
     
     printer.drawLine();
 
-    // --- SECCIÓN DETALLE DE CONSUMO ---
     printer.alignCenter();
     printer.bold(true);
     printer.println("DETALLE DE CONSUMO");
@@ -432,7 +441,6 @@ export const printOrderTicket = async (req, res) => {
       const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
       if (accountItemsRaw.length === 0) return;
 
-      // Si hay varias cuentas y estamos imprimiendo el ticket general, ponemos el subtítulo de la cuenta
       if (cuentasUnicas.length > 1 && (!cuentaName || cuentaName === 'General')) {
         printer.println("");
         printer.println(`>> CUENTA: ${accName.toUpperCase()}`);
@@ -501,7 +509,6 @@ export const printOrderTicket = async (req, res) => {
 
     printer.drawLine();
 
-    // --- SECCIÓN RESUMEN POR CUENTAS (Si aplica) ---
     if (cuentasUnicas.length > 1 && (!cuentaName || cuentaName === 'General')) {
       printer.alignCenter();
       printer.bold(true);
@@ -519,7 +526,6 @@ export const printOrderTicket = async (req, res) => {
       printer.drawLine();
     }
 
-    // --- TOTAL FINAL ---
     printer.alignRight();
     printer.setTextDoubleHeight();
     printer.println(`TOTAL CONSUMIDO: $${grandTotal.toFixed(2)}`);
@@ -534,7 +540,6 @@ export const printOrderTicket = async (req, res) => {
     printer.println("de caja impreso.");
     printer.cut(); 
 
-    // Mostrar en consola simulada
     console.log(`\n=== TICKET FÍSICO PARA ORDEN ${orderId} ===`);
     console.log(printer.getText());
     console.log(`==========================================\n`);

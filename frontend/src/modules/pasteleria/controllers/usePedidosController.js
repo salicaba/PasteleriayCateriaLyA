@@ -5,7 +5,7 @@ import {
   actualizarEstadoPedidoReal,
   crearPedidoReal,
   registrarAbonoReal,
-  editarPedidoReal // 🚀 Asegúrate de tener esta función en tu modelo
+  editarPedidoReal 
 } from '../models/pedidosModel';
 
 export const usePedidosController = () => {
@@ -19,16 +19,16 @@ export const usePedidosController = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fechaPredefinida, setFechaPredefinida] = useState(null);
   
-  // ESTADO PROFESIONAL PARA EL MODAL DE ABONOS
   const [abonoModal, setAbonoModal] = useState({ isOpen: false, pedido: null });
   const [abonoForm, setAbonoForm] = useState({ monto: '', metodo: 'efectivo', recibido: '' });
 
   const [ticketModal, setTicketModal] = useState({ isOpen: false, pedido: null });
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, tipo: '', pedido: null });
 
-  // 🚀 ESTADOS PARA EL NUEVO FLUJO DE DETALLE Y EDICIÓN
   const [detalleModal, setDetalleModal] = useState({ isOpen: false, pedido: null });
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
+
+  const [isSuccessScreenOpen, setIsSuccessScreenOpen] = useState(false);
 
   useEffect(() => {
     loadPedidos();
@@ -144,7 +144,6 @@ export const usePedidosController = () => {
     }
   };
 
-  // 🚀 LÓGICA DE DETALLE Y EDICIÓN
   const abrirDetalles = (pedido) => setDetalleModal({ isOpen: true, pedido });
   const cerrarDetalles = () => setDetalleModal({ isOpen: false, pedido: null });
 
@@ -154,7 +153,7 @@ export const usePedidosController = () => {
   };
 
   const abrirModalNuevoPedido = (fecha = null) => {
-    setPedidoAEditar(null); // Asegurarnos de que no haya pedido en edición
+    setPedidoAEditar(null); 
     setFechaPredefinida(fecha);
     setIsModalOpen(true);
   };
@@ -165,13 +164,11 @@ export const usePedidosController = () => {
     setPedidoAEditar(null);
   };
 
-  // 🚀 FUNCIÓN UNIFICADA PARA GUARDAR (CREAR O EDITAR)
   const guardarPedido = async (datosPedido) => {
     try {
       const toastId = toast.loading(pedidoAEditar ? 'Actualizando pedido...' : 'Guardando pedido...');
       const anticipoNum = parseFloat(datosPedido.anticipo) || 0;
       
-      // Si es un pedido nuevo, preparamos el formato de abonos inicial y el estado
       let pedidoAEnviar = { ...datosPedido };
       pedidoAEnviar.costoTotal = parseFloat(datosPedido.costoTotal);
       
@@ -183,21 +180,36 @@ export const usePedidosController = () => {
       let pedidoResult;
       
       if (pedidoAEditar) {
-        // Llamar a la API para EDITAR
         pedidoResult = await editarPedidoReal(pedidoAEditar.id, pedidoAEnviar);
         const dataActualizada = pedidoResult.data || pedidoResult;
         setPedidos(pedidos.map(p => p.id === pedidoAEditar.id ? dataActualizada : p));
-        toast.success('Pedido actualizado correctamente', { id: toastId });
+        
+        const finanzasEditado = calcularFinanzas(dataActualizada);
+        if (finanzasEditado.estaLiquidado) {
+          toast.dismiss(toastId);
+          setIsSuccessScreenOpen(true);
+          setTimeout(() => setIsSuccessScreenOpen(false), 2500);
+        } else {
+          toast.success('Pedido actualizado correctamente', { id: toastId });
+        }
+
       } else {
-        // Llamar a la API para CREAR
         pedidoResult = await crearPedidoReal(pedidoAEnviar);
         const dataGuardada = pedidoResult.data || pedidoResult;
         setPedidos([dataGuardada, ...pedidos]);
-        toast.success('Pedido creado correctamente', { id: toastId });
+        
+        // 🔥 Controlamos la notificación al crear
+        const finanzasCreado = calcularFinanzas(dataGuardada);
+        if (finanzasCreado.estaLiquidado) {
+           toast.dismiss(toastId); // Quitamos la notificación si liquidó todo en el anticipo
+           setIsSuccessScreenOpen(true);
+           setTimeout(() => setIsSuccessScreenOpen(false), 2500);
+        } else {
+           toast.success('Pedido creado correctamente', { id: toastId });
+        }
       }
 
       cerrarModalNuevoPedido();
-      // Si el modal de detalle estaba abierto, lo actualizamos con la nueva info o lo cerramos
       if (detalleModal.isOpen) {
          cerrarDetalles();
       }
@@ -207,7 +219,6 @@ export const usePedidosController = () => {
     }
   };
 
-
   const registrarAbono = async (pedidoId, montoAbono, metodoPago) => {
     const monto = parseFloat(montoAbono);
     if (!monto || monto <= 0) return;
@@ -216,23 +227,31 @@ export const usePedidosController = () => {
       const toastId = toast.loading('Procesando pago...');
       await registrarAbonoReal(pedidoId, monto); 
 
-      setPedidos(pedidos.map(p => {
-        if (p.id === pedidoId) {
-          return {
-            ...p,
-            abonos: [...(p.abonos || []), { id: Date.now().toString(), fecha: new Date().toISOString(), monto: monto, metodo: metodoPago }]
-          };
-        }
-        return p;
-      }));
+      const pedidoActual = pedidos.find(p => p.id === pedidoId);
+      
+      const pedidoActualizado = {
+         ...pedidoActual,
+         abonos: [...(pedidoActual.abonos || []), { id: Date.now().toString(), fecha: new Date().toISOString(), monto: monto, metodo: metodoPago }]
+      };
 
-      toast.success('Abono registrado correctamente', { id: toastId });
+      setPedidos(pedidos.map(p => p.id === pedidoId ? pedidoActualizado : p));
+
       setAbonoModal({ isOpen: false, pedido: null });
       
-      // Si el modal de detalles está abierto viendo este pedido, lo cerramos para evitar desincronización
       if (detalleModal.isOpen && detalleModal.pedido?.id === pedidoId) {
         cerrarDetalles();
       }
+
+      // 🔥 LÓGICA DE NOTIFICACIONES CORREGIDA
+      const finanzasActualizadas = calcularFinanzas(pedidoActualizado);
+      if (finanzasActualizadas.estaLiquidado) {
+         toast.dismiss(toastId); // ❌ BORRAMOS EL TOAST
+         setIsSuccessScreenOpen(true); // ✅ MOSTRAMOS LA PANTALLA GIGANTE
+         setTimeout(() => setIsSuccessScreenOpen(false), 2500);
+      } else {
+         toast.success('Abono registrado correctamente', { id: toastId }); // ✅ SOLO SE MUESTRA SI AÚN DEBE DINERO
+      }
+
     } catch (error) {
       console.error("Error al registrar abono:", error);
       toast.error('No se pudo guardar el pago');
@@ -254,10 +273,11 @@ export const usePedidosController = () => {
     abonoModal, setAbonoModal, abonoForm, setAbonoForm, abrirModalAbono, 
     ticketModal, abrirTicket, cerrarTicket,
     confirmModal, pedirConfirmacion, cerrarConfirmacion, ejecutarAccionConfirmada,
-    detalleModal, abrirDetalles, cerrarDetalles,  // 🚀 Nuevas variables exportadas
-    pedidoAEditar, iniciarEdicion,                // 🚀 Nuevas variables exportadas
+    detalleModal, abrirDetalles, cerrarDetalles,  
+    pedidoAEditar, iniciarEdicion,                
     calcularFinanzas, 
-    guardarPedido,  // 🚀 Reemplaza a agregarNuevoPedido
-    registrarAbono
+    guardarPedido,  
+    registrarAbono,
+    isSuccessScreenOpen
   };
 };

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
-import toast from 'react-hot-toast'; // 🔥 NUEVO: Importamos los mensajes emergentes
+import toast from 'react-hot-toast';
 
 export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [dbProducts, setDbProducts] = useState([]); 
@@ -436,12 +436,16 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); 
   };
 
-  // 🔥 NUEVO: Ahora manda el toast.success
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
     try {
-      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { cuentaName: nombreCuenta, isFullPayment: false });
+      const method = paymentDetails?.method || 'efectivo'; 
+      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { 
+        cuentaName: nombreCuenta, 
+        isFullPayment: false,
+        paymentMethod: method 
+      });
       setPaidAccounts(prev => [...prev, nombreCuenta]);
-      toast.success(`Cuenta "${nombreCuenta}" pagada correctamente.`);
+      // 🔥 Eliminado: toast.success(`Cuenta "${nombreCuenta}" pagada correctamente.`);
       if (onComplete) onComplete();
     } catch (error) { 
       console.error("Error al pagar cuenta parcial", error);
@@ -449,15 +453,18 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  // 🔥 NUEVO: Ahora manda el toast.success
   const handleCheckout = async (paymentDetails, onComplete) => {
     try {
       if (cart.some(p => !p.enviadoCocina)) {
          await new Promise(resolve => simulateKitchenSend(resolve));
       }
-      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { isFullPayment: true });
+      const method = paymentDetails?.method || 'efectivo';
+      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/pay`, { 
+        isFullPayment: true,
+        paymentMethod: method
+      });
       setOrderStatus('PAID');
-      toast.success('Mesa cobrada en su totalidad.');
+      // 🔥 Eliminado: toast.success('Mesa cobrada en su totalidad.');
       if (onComplete) onComplete();
     } catch (error) { 
       console.error("Error al finalizar pago total", error);
@@ -480,7 +487,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  // 🔥 NUEVO: Esta lógica ahora EXCLUYE las cuentas que ya están en "paidAccounts"
   const total = useMemo(() => {
     return cart
       .filter(item => !paidAccounts.includes(item.cuenta || 'General'))

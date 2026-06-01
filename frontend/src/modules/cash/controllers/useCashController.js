@@ -7,17 +7,15 @@ export const useCashController = (user) => {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
-    // Forzamos a que agarre tu fecha local (Ej: YYYY-MM-DD)
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
 
-  // --- NUEVO ESTADO PARA CONTROLAR EL MODAL ELEGANTE ---
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
-    actionType: null, // Puede ser 'CANCEL' o 'RESTORE'
+    actionType: null, 
     transactionId: null,
     title: '',
     message: ''
@@ -26,11 +24,12 @@ export const useCashController = (user) => {
   const fetchTransactions = async (date) => {
     setLoading(true);
     try {
-      // 🔥 CORRECCIÓN: Agregamos &type=INCOME para que ignore los Gastos Operativos (EXPENSE)
       const response = await api.get(`/cash?date=${date}&type=INCOME`);
       setTransactions(response.data);
+      toast.dismiss('fetch-cash-error'); // Quitamos el error si esta vez sí tuvo éxito
     } catch (error) {
-      toast.error('Error al cargar los movimientos de caja');
+      // 🔥 SOLUCIÓN: Le ponemos un "id" para que react-hot-toast no lo duplique jamás
+      toast.error('Error al cargar los movimientos de caja', { id: 'fetch-cash-error' });
     } finally {
       setLoading(false);
     }
@@ -40,7 +39,6 @@ export const useCashController = (user) => {
     fetchTransactions(selectedDate);
   }, [selectedDate]);
 
-  // --- PREPARAMOS LA ANULACIÓN (Abre el modal) ---
   const requestCancelTransaction = (id) => {
     if (user?.role !== 'Administrador') {
       toast.error('Acceso denegado: Solo el Administrador puede anular.');
@@ -55,7 +53,6 @@ export const useCashController = (user) => {
     });
   };
 
-  // --- PREPARAMOS LA RESTAURACIÓN (Abre el modal) ---
   const requestRestoreTransaction = (id) => {
     if (user?.role !== 'Administrador') {
       toast.error('Acceso denegado: Solo el Administrador puede restaurar.');
@@ -70,17 +67,15 @@ export const useCashController = (user) => {
     });
   };
 
-  // --- CERRAR EL MODAL SIN HACER NADA ---
   const closeConfirmModal = () => {
     setConfirmModal({ isOpen: false, actionType: null, transactionId: null, title: '', message: '' });
   };
 
-  // --- EJECUTAR LA ACCIÓN UNA VEZ QUE EL CLIENTE DICE "SÍ" EN EL MODAL ---
   const executeConfirmAction = async () => {
     const { actionType, transactionId } = confirmModal;
     if (!transactionId) return;
 
-    closeConfirmModal(); // Escondemos el modal de inmediato para dar sensación de rapidez
+    closeConfirmModal(); 
 
     try {
       if (actionType === 'CANCEL') {
@@ -101,7 +96,6 @@ export const useCashController = (user) => {
     if (tx.status === 'CANCELLED') {
       acc.anulados += val;
     } else {
-      // 🔥 DOBLE SEGURIDAD: Solo suma si de verdad el movimiento es un INGRESO
       if (tx.type === 'INCOME') {
         acc.total += val;
         if (tx.source === 'CAFETERIA') acc.cafeteria += val;

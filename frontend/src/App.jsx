@@ -162,6 +162,8 @@ function App() {
 
   const menuConfig = [
     { id: 'caja', label: 'Caja', icon: Wallet },
+
+    { id: 'reportes', label: 'Reportes', icon: PieChart },
     
     {
       id: 'cafeteria_group',
@@ -193,8 +195,8 @@ function App() {
       icon: Package,
       isGroup: true,
       children: [
-        { id: 'inventario', label: 'Catálogo Kardex', icon: Package },
-        { id: 'arqueo', label: 'Arqueos', icon: ClipboardCheck },
+        { id: 'inventario', label: 'Almacén', icon: Package },
+        { id: 'arqueo', label: 'Arqueo Insumos', icon: ClipboardCheck },
       ]
     },
 
@@ -209,7 +211,6 @@ function App() {
       ]
     },
 
-    { id: 'reportes', label: 'Reportes', icon: PieChart },
     {
       id: 'sistema_group',
       label: 'Sistema',

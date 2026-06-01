@@ -1,21 +1,20 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon, Filter } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useReportsController } from '../controllers/useReportsController';
 import { useTheme } from '../../../hooks/useTheme';
 
 // Paleta de colores adaptativa
 const COLORS = {
-  primary: ['#f97316', '#fb923c', '#fdba74'], // Naranjas
-  lya: ['#4A2B29', '#E6CCB2', '#DDB892'], // Corporativo LyA
-  opex: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'], // Rojo, Azul, Verde, Ambar, Morado, Rosa, Cyan
-  opexLya: ['#4A2B29', '#DDB892', '#8A3A3A', '#4682B4', '#556B2F', '#9E6A55', '#6b7280'], // Vino, Beige, Rojo Ladrillo, Azul Acero, Verde Olivo, Terracota, Gris Oscuro
+  primary: ['#f97316', '#fb923c', '#fdba74'], 
+  lya: ['#4A2B29', '#E6CCB2', '#DDB892'], 
+  opex: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'], 
+  opexLya: ['#4A2B29', '#DDB892', '#8A3A3A', '#4682B4', '#556B2F', '#9E6A55', '#6b7280'], 
   success: '#10b981',
   danger: '#ef4444'
 };
 
-// Diccionario sincronizado EXACTAMENTE con tu ExpensesPage.jsx y la BD
 const OPEX_TRANSLATIONS = {
   'PAYROLL': 'Nómina / Sueldos',
   'UTILITIES': 'Servicios (Luz, Agua, Gas)',
@@ -26,7 +25,6 @@ const OPEX_TRANSLATIONS = {
   'NONE': 'Sin Categoría'
 };
 
-// KPICard extraída y animada
 const KPICard = ({ title, amount, icon: Icon, type, delay }) => {
   const isPositive = type === 'income' || (type === 'profit' && amount >= 0);
   const isNegative = type === 'expense' || (type === 'profit' && amount < 0);
@@ -62,8 +60,10 @@ const KPICard = ({ title, amount, icon: Icon, type, delay }) => {
 export const ReportsPage = () => {
   const { theme } = useTheme();
   const { loading, dateRange, setDateRange, chartData } = useReportsController();
+  
+  // 🔥 Por defecto ahora es Top 5 para una vista más rápida y limpia
+  const [productFilter, setProductFilter] = useState('5');
 
-  // Adaptación de colores
   const gridColor = theme === 'dark' ? '#374151' : theme === 'lya' ? '#E6CCB2' : '#e5e7eb';
   const textColor = theme === 'dark' ? '#9ca3af' : theme === 'lya' ? '#4A2B29' : '#6b7280';
   const getPieColors = () => theme === 'lya' ? COLORS.lya : COLORS.primary;
@@ -76,6 +76,29 @@ export const ReportsPage = () => {
     }));
   };
 
+  const processedProducts = useMemo(() => {
+    if (!chartData.productSales) return [];
+    
+    let list = [...chartData.productSales];
+    
+    list.sort((a, b) => b.cantidad - a.cantidad);
+
+    if (productFilter === 'SOLD') {
+      list = list.filter(p => p.cantidad > 0);
+    } else if (productFilter !== 'ALL') {
+      list = list.slice(0, parseInt(productFilter));
+    }
+    
+    return list;
+  }, [chartData.productSales, productFilter]);
+
+  const chartDisplayedProducts = useMemo(() => {
+    return [...processedProducts].reverse();
+  }, [processedProducts]);
+
+  const dynamicChartHeight = Math.max(300, chartDisplayedProducts.length * 35);
+
+
   if (loading || !chartData.kpis) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
@@ -84,7 +107,6 @@ export const ReportsPage = () => {
     );
   }
 
-  // Traducción OPEX
   const translatedOpexData = chartData.opexData?.map(item => {
     const safeName = item.name ? item.name.toUpperCase() : 'NONE';
     return {
@@ -92,11 +114,6 @@ export const ReportsPage = () => {
       name: OPEX_TRANSLATIONS[safeName] || item.name 
     };
   }) || [];
-
-  // 🔥 TODOS los productos
-  const allProductsChart = chartData.productSales || [];
-  // Calculamos una altura dinámica: 35px por cada producto, mínimo 300px
-  const dynamicChartHeight = Math.max(300, allProductsChart.length * 35);
 
   return (
     <motion.div 
@@ -240,116 +257,129 @@ export const ReportsPage = () => {
           </motion.div>
         </div>
 
-        {/* 🔥 GRÁFICA DE RENDIMIENTO DE TODOS LOS PRODUCTOS (CON SCROLL DINÁMICO) */}
+        {/* 🔥 SECCIÓN DE PRODUCTOS (GRÁFICA Y TABLA CONTROLADAS POR EL FILTRO) */}
         <motion.div 
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }} 
           transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.45 }}
-          className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300"
-        >
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text transition-colors">Rendimiento Gráfico del Menú</h3>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">
-              Representación visual de todas las ventas ordenadas por unidades (incluye productos sin movimiento).
-            </p>
-          </div>
-          
-          <div className="w-full border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl overflow-y-auto hide-scrollbar max-h-[500px]">
-            {allProductsChart.length > 0 ? (
-              <div style={{ height: dynamicChartHeight, width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                  <BarChart layout="vertical" data={allProductsChart} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} vertical={true}/>
-                    <XAxis type="number" stroke={textColor} fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      stroke={textColor} 
-                      fontSize={11} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      width={140} 
-                      tickFormatter={(val) => val.length > 18 ? val.substring(0, 17) + '...' : val}
-                    />
-                    <RechartsTooltip 
-                      cursor={{fill: theme === 'dark' ? '#374151' : '#f3f4f6', opacity: 0.4}} 
-                      contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }}
-                    />
-                    <Bar 
-                      dataKey="cantidad" 
-                      name="Unidades Vendidas" 
-                      fill={theme === 'lya' ? '#DDB892' : '#8b5cf6'} 
-                      radius={[0, 6, 6, 0]} 
-                      barSize={18} 
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-gray-400 dark:text-gray-500 font-bold text-sm transition-colors">
-                No hay productos registrados en el menú.
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* TABLA DE RENDIMIENTO COMPLETO (Se mantiene por si quieres ver el $ exacto) */}
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.50 }} 
           className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden transition-colors duration-300"
         >
-          <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors">
-             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text transition-colors">Desglose Financiero del Menú</h3>
-             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Detalle monetario exacto por artículo.</p>
+          {/* Cabecera compartida con Filtro */}
+          <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+             <div>
+               <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text transition-colors">Rendimiento y Desglose del Menú</h3>
+               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Análisis visual y financiero de los productos vendidos.</p>
+             </div>
+
+             {/* 🔥 Menú desplegable para filtrar la cantidad con la opción Top 5 */}
+             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 shadow-inner w-full md:w-auto">
+               <Filter size={16} className="text-gray-400" />
+               <span className="text-xs font-bold text-gray-500 mr-1">Mostrar:</span>
+               <select 
+                  value={productFilter} 
+                  onChange={(e) => setProductFilter(e.target.value)}
+                  className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer border-none focus:ring-0 appearance-none"
+               >
+                  <option value="5">Top 5 más vendidos</option>
+                  <option value="10">Top 10 más vendidos</option>
+                  <option value="20">Top 20 más vendidos</option>
+                  <option value="50">Top 50 más vendidos</option>
+                  <option value="SOLD">Solo productos vendidos</option>
+                  <option value="ALL">Todo el catálogo completo</option>
+               </select>
+             </div>
           </div>
           
-          <div className="overflow-x-auto hide-scrollbar max-h-[400px]">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 sticky top-0 z-10">
-                <tr className="border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs uppercase tracking-wider font-bold transition-colors">
-                  <th className="p-5">Producto</th>
-                  <th className="p-5">Departamento</th>
-                  <th className="p-5 text-right">Cantidad</th>
-                  <th className="p-5 text-right">Ingreso Generado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
-                <AnimatePresence mode="popLayout">
-                  {chartData.productSales.map((prod, index) => (
-                    <motion.tr 
-                      key={prod.name + index}
-                      layout 
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.02, 0.2) }}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 lya:hover:bg-lya-bg/40 transition-colors"
-                    >
-                      <td className="p-5">
-                        <div className="font-bold text-sm text-gray-800 dark:text-gray-100 lya:text-lya-text flex items-center gap-2 transition-colors">
-                          {prod.cantidad === 0 && <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" title="Sin rotación"></span>}
-                          {prod.name}
-                        </div>
-                      </td>
-                      <td className="p-5">
-                        <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors">
-                          {prod.departamento}
-                        </span>
-                      </td>
-                      <td className="p-5 text-right font-black text-lg text-gray-900 dark:text-white lya:text-lya-text transition-colors">
-                        {prod.cantidad}
-                      </td>
-                      <td className="p-5 text-right">
-                        <span className={`font-black transition-colors ${prod.ingreso > 0 ? 'text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary' : 'text-gray-400 dark:text-gray-600'}`}>
-                          ${prod.ingreso.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              </tbody>
-            </table>
+          {/* Contenedor Flex para la Gráfica y la Tabla */}
+          <div className="p-6 flex flex-col gap-6">
+            
+            {/* GRÁFICA */}
+            <div className="w-full border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl overflow-y-auto hide-scrollbar max-h-[400px]">
+              {chartDisplayedProducts.length > 0 ? (
+                <div style={{ height: dynamicChartHeight, width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <BarChart layout="vertical" data={chartDisplayedProducts} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} vertical={true}/>
+                      <XAxis type="number" stroke={textColor} fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        stroke={textColor} 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        width={140} 
+                        tickFormatter={(val) => val.length > 18 ? val.substring(0, 17) + '...' : val}
+                      />
+                      <RechartsTooltip 
+                        cursor={{fill: theme === 'dark' ? '#374151' : '#f3f4f6', opacity: 0.4}} 
+                        contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }}
+                      />
+                      <Bar 
+                        dataKey="cantidad" 
+                        name="Unidades Vendidas" 
+                        fill={theme === 'lya' ? '#DDB892' : '#8b5cf6'} 
+                        radius={[0, 6, 6, 0]} 
+                        barSize={18} 
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500 font-bold text-sm transition-colors">
+                  No hay productos registrados en esta vista.
+                </div>
+              )}
+            </div>
+
+            {/* TABLA DE RENDIMIENTO */}
+            <div className="overflow-x-auto hide-scrollbar border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl max-h-[400px]">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 sticky top-0 z-10">
+                  <tr className="border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs uppercase tracking-wider font-bold transition-colors">
+                    <th className="p-4">Producto</th>
+                    <th className="p-4 text-center">Clasificación</th>
+                    <th className="p-4 text-right">Cant. Vendida</th>
+                    <th className="p-4 text-right">Ingreso Bruto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
+                  <AnimatePresence mode="popLayout">
+                    {processedProducts.map((prod, index) => (
+                      <motion.tr 
+                        key={prod.name + index}
+                        layout 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.01, 0.1) }}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800/40 lya:hover:bg-lya-bg/40 transition-colors"
+                      >
+                        <td className="p-4">
+                          <div className="font-bold text-sm text-gray-800 dark:text-gray-100 lya:text-lya-text flex items-center gap-2 transition-colors">
+                            {prod.cantidad === 0 && <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" title="Sin rotación"></span>}
+                            {index + 1}. {prod.name}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors">
+                            {prod.departamento}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right font-black text-base text-gray-900 dark:text-white lya:text-lya-text transition-colors">
+                          {prod.cantidad}
+                        </td>
+                        <td className="p-4 text-right">
+                          <span className={`font-black transition-colors ${prod.ingreso > 0 ? 'text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary' : 'text-gray-400 dark:text-gray-600'}`}>
+                            ${prod.ingreso.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </span>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+
           </div>
         </motion.div>
 

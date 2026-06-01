@@ -1,4 +1,3 @@
-// src/modules/pasteleria/views/PasteleriaDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -21,7 +20,8 @@ export default function PasteleriaDashboard() {
     confirmModal, pedirConfirmacion, cerrarConfirmacion, ejecutarAccionConfirmada,
     detalleModal, abrirDetalles, cerrarDetalles, 
     pedidoAEditar, iniciarEdicion,               
-    calcularFinanzas, guardarPedido, registrarAbono
+    calcularFinanzas, guardarPedido, registrarAbono,
+    isSuccessScreenOpen 
   } = usePedidosController();
 
   const [transferInfo, setTransferInfo] = useState(null);
@@ -255,6 +255,39 @@ export default function PasteleriaDashboard() {
           </motion.div>
         )}
       </div>
+
+      {/* 🔥 NUEVO: Pantalla de Éxito idéntica a Cafetería, texto de Pastelería */}
+      <AnimatePresence>
+        {isSuccessScreenOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 dark:bg-black/60 lya:bg-black/50 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-8 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col items-center text-center"
+            >
+              <motion.div 
+                initial={{ scale: 0 }} 
+                animate={{ scale: 1, rotate: 360 }} 
+                transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
+                className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 lya:bg-lya-primary/20 lya:text-lya-primary rounded-full flex items-center justify-center mb-6 shadow-inner"
+              >
+                <CheckCircle2 size={50} strokeWidth={2.5} />
+              </motion.div>
+              <h2 className="text-3xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-3">¡Pedido Liquidado!</h2>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed">
+                El abono cubre el total de la deuda.<br/>El cliente ya no debe nada por este pastel.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {confirmModal.isOpen && (

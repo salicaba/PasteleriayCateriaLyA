@@ -21,11 +21,16 @@ const Transaction = sequelize.define('Transaction', {
     type: DataTypes.ENUM('CAFETERIA', 'PASTELERIA', 'MANUAL'),
     allowNull: false,
   },
-  expenseCategory: { // 🔥 NUEVO: Categoría de Egresos (OPEX)
+  expenseCategory: {
     type: DataTypes.ENUM('NONE', 'PAYROLL', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'MARKETING', 'OTHER'),
     defaultValue: 'NONE',
     allowNull: false,
     comment: 'NONE (para ingresos). PAYROLL (Sueldos), UTILITIES (Servicios), MAINTENANCE (Mantenimiento), SUPPLIES (Limpieza/Insumos no contables), MARKETING, OTHER.'
+  },
+  paymentMethod: { // 🔥 NUEVO: Registrar método de pago en DB
+    type: DataTypes.ENUM('CASH', 'TRANSFER', 'CARD'),
+    defaultValue: 'CASH',
+    allowNull: true,
   },
   amount: {
     type: DataTypes.DECIMAL(10, 2),

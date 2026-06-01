@@ -27,8 +27,21 @@ async function main() {
     await PasteleriaOrder.sync({ alter: true });
     await GlobalOption.sync({ alter: true });
     
+    // 🔥 SOLUCIÓN DEFINITIVA PARA AÑADIR LA COLUMNA:
+    // Evitamos "alter: true" en Transaction usando SQL puro para no chocar con el límite de 64 keys de MySQL
+    try {
+      await sequelize.query("ALTER TABLE Transactions ADD COLUMN paymentMethod ENUM('CASH', 'TRANSFER', 'CARD') DEFAULT 'CASH';");
+      console.log('✅ Columna paymentMethod añadida con éxito a Transactions.');
+    } catch (e) {
+      // Si el error es porque la columna ya existe, lo ignoramos de forma segura
+      if (e.original && e.original.code === 'ER_DUP_FIELDNAME') {
+        console.log('⚡ La columna paymentMethod ya existía en Transactions (omitido).');
+      } else {
+        console.log('⚠️ Aviso SQL (puede que la columna ya exista):', e.message);
+      }
+    }
+    
     // 4. Sincronizar el resto NORMALMENTE (Sin alter)
-    // Al quitar los alter:true de Transaction y OrderItem evitamos el error de los 64 índices
     await sequelize.sync();
     console.log('✅ Modelos sincronizados con la base de datos.');
 

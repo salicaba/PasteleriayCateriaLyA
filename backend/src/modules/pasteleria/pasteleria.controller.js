@@ -1,6 +1,6 @@
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
-import Transaction from '../cash/Transaction.model.js'; // <-- IMPORTAMOS EL MODELO DE CAJA
+import Transaction from '../cash/Transaction.model.js'; 
 
 // Obtener todos los pedidos
 export const getPedidos = async (req, res) => {
@@ -15,40 +15,41 @@ export const getPedidos = async (req, res) => {
   }
 };
 
-// Crear un nuevo pedido (¡AHORA INTERCEPTA ANTICIPOS PARA LA CAJA!)
+// Crear un nuevo pedido
 export const createPedido = async (req, res) => {
   try {
-    // Detectamos quién está creando el pedido
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
-    
-    // Extraemos los abonos (anticipos) del resto de los datos
     const { abonos, ...pedidoData } = req.body;
 
-    // 🔥 CORRECCIÓN: Generador de folio único idéntico al de Cafetería (Ej. PED-839210452)
     const randomNum = Math.floor(100 + Math.random() * 900);
     const newId = `PED-${Date.now().toString().slice(-6)}${randomNum}`;
 
     let abonosParaGuardar = [];
 
-    // Si el formulario envió un anticipo inicial
     if (abonos && Array.isArray(abonos) && abonos.length > 0) {
       for (const abono of abonos) {
         const montoAbono = parseFloat(abono.monto);
         if (montoAbono > 0) {
-          // 1. Registramos el anticipo en la CAJA
+          
+          let dbMethod = 'CASH';
+          if (abono.metodo === 'transferencia') dbMethod = 'TRANSFER';
+          else if (abono.metodo === 'tarjeta') dbMethod = 'CARD'; 
+
           const tx = await Transaction.create({
             source: 'PASTELERIA',
+            paymentMethod: dbMethod, 
             amount: montoAbono,
-            description: `Anticipo Pedido ${newId}`,
+            // 🔥 Modificado: Ya no incluye el método en texto
+            description: `Anticipo Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
             referenceId: newId,
             createdBy: userId
           });
           
-          // 2. Lo guardamos en la tarjeta del pedido usando el ID exacto de la caja (para poder anularlo después)
           abonosParaGuardar.push({
             id: tx.id,
             fecha: abono.fecha || new Date().toISOString(),
-            monto: montoAbono
+            monto: montoAbono,
+            metodo: abono.metodo || 'efectivo' 
           });
         }
       }
@@ -57,7 +58,7 @@ export const createPedido = async (req, res) => {
     const nuevoPedido = await PasteleriaOrder.create({
       id: newId,
       ...pedidoData,
-      abonos: abonosParaGuardar // Guardamos el pedido ya enlazado con la caja
+      abonos: abonosParaGuardar 
     });
 
     res.status(201).json({ data: nuevoPedido });
@@ -71,9 +72,8 @@ export const createPedido = async (req, res) => {
 export const addAbono = async (req, res) => {
   try {
     const { id } = req.params;
-    const { monto } = req.body;
+    const { monto, metodo } = req.body; 
     
-    // Detectamos quién está cobrando
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
     const pedido = await PasteleriaOrder.findByPk(id);
@@ -81,21 +81,31 @@ export const addAbono = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    // 1. Registramos el movimiento en caja
+    let dbMethod = 'CASH';
+    if (metodo === 'transferencia') dbMethod = 'TRANSFER';
+    else if (metodo === 'tarjeta') dbMethod = 'CARD';
+
+    const abonosActuales = pedido.abonos || [];
+    const totalPagado = abonosActuales.reduce((sum, ab) => sum + parseFloat(ab.monto), 0) + parseFloat(monto);
+    const costoTotal = parseFloat(pedido.costoTotal) || 0;
+    const isLiquidacion = totalPagado >= costoTotal;
+    const tipoMovimiento = isLiquidacion ? 'Liquidación' : 'Abono';
+
     const tx = await Transaction.create({
       source: 'PASTELERIA',
+      paymentMethod: dbMethod, 
       amount: parseFloat(monto),
-      description: `Abono/Liquidación Pedido ${pedido.id}`,
+      // 🔥 Modificado: Ya no incluye el método en texto
+      description: `${tipoMovimiento} Pedido: ${pedido.cliente} ${pedido.id}`,
       referenceId: pedido.id,
       createdBy: userId
     });
 
-    const abonosActuales = pedido.abonos || [];
-    // 2. Vinculamos el abono al ticket de la caja
     const nuevoAbono = {
       id: tx.id, 
       fecha: new Date().toISOString(),
-      monto: parseFloat(monto)
+      monto: parseFloat(monto),
+      metodo: metodo || 'efectivo'
     };
 
     pedido.abonos = [...abonosActuales, nuevoAbono];
@@ -170,13 +180,12 @@ export const printPedidoTicket = async (req, res) => {
     const porcionesSeguras = Array.isArray(pedido.porciones) ? pedido.porciones.join(' / ') : (pedido.porciones || '');
     const saboresSeguros = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
-    // Dibujamos el ticket a mano en la consola sin usar librerías externas
     console.log(`\n==========================================`);
-    console.log(`                   𝓛𝔂𝓐`);
-    console.log(`          Pastelería & Cafetería`);
-    console.log(`           Pijijiapan, Chiapas`);
+    console.log(`                  𝓛𝔂𝓐`);
+    console.log(`         Pastelería & Cafetería`);
+    console.log(`          Pijijiapan, Chiapas`);
     console.log(`------------------------------------------`);
-    console.log(`           COMPROBANTE DE PEDIDO`);
+    console.log(`          COMPROBANTE DE PEDIDO`);
     console.log(`                ${pedido.id}`);
     console.log(`------------------------------------------`);
     console.log(`Cliente:  ${pedido.cliente || 'Público General'}`);
