@@ -1,7 +1,7 @@
-// src/modules/cafeteria/controllers/useMesasController.js
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { fetchActiveOrders } from '../models/mesasModel.js';
 import client from '../../../api/client.js';
+import { socket } from '../../../api/socket.js'; // <-- IMPORTAMOS EL SOCKET
 
 export const useMesasController = () => {
   const [mesas, setMesas] = useState([]);
@@ -18,11 +18,9 @@ export const useMesasController = () => {
       ]);
       
       const catalog = tablesRes.data || [];
-      // Ordenamos las órdenes por fecha de creación para que el número sea correlativo
       const orders = (activeOrders || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
       const mergedMesas = catalog.map(table => {
-        // Enlaza la orden con la mesa usando el tableId nativo
         const order = orders.find(o => o.tableId === table.id);
         
         let cuentasActivas = 0;
@@ -48,15 +46,12 @@ export const useMesasController = () => {
         };
       });
 
-      // 🔥 CORRECCIÓN: Garantizamos que TODOS los pedidos digan "Llevar #"
       const paraLlevarOrders = orders.filter(o => o.orderType === 'LLEVAR').map((o, index) => {
           const cuentasSet = new Set(['General']);
           if (o.items) o.items.forEach(item => cuentasSet.add(item.cuenta || 'General'));
           if (o.paidAccounts) o.paidAccounts.forEach(acc => cuentasSet.add(acc));
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
-          
-          // Red de seguridad: Si el ticket ya trae "Llevar", lo dejamos. Si no, se lo forzamos.
           const numeroFinal = rawTicketId.toLowerCase().includes('llevar') 
                ? rawTicketId 
                : `Llevar #${index + 1} - ${rawTicketId}`;
@@ -86,11 +81,20 @@ export const useMesasController = () => {
     }
   }, []);
 
-  // Recarga silenciosa en segundo plano (Polling)
+  // 🔥 NUEVA LÓGICA DE TIEMPO REAL CON WEBSOCKETS (Sustituye al Polling)
   useEffect(() => { 
     loadMesas(); 
-    const intervalId = setInterval(loadMesas, 3000);
-    return () => clearInterval(intervalId);
+    
+    // Escuchar el evento que emite el backend
+    socket.on('pos:update', () => {
+      console.log('🔄 WebSockets: Cambios detectados en el POS, recargando...');
+      loadMesas();
+    });
+
+    // Cleanup para evitar listeners duplicados si el componente se desmonta
+    return () => {
+      socket.off('pos:update');
+    };
   }, [loadMesas]);
 
   const mesasFiltradas = useMemo(() => mesas.filter(m => m.zona === zonaActiva), [mesas, zonaActiva]);
@@ -120,7 +124,8 @@ export const useMesasController = () => {
           tableId: null 
       });
 
-      await loadMesas();
+      // No necesitamos llamar a loadMesas() aquí porque al hacer el POST, 
+      // el backend emitirá 'pos:update' y el socket recargará automáticamente la tabla.
       
       return { 
         id: res.data.order.id, 

@@ -1,3 +1,4 @@
+import { getIO } from '../../config/socket.js'; // <-- AÑADIR ESTO ARRIBA DEL TODO
 import Order from './Order.model.js';
 import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
@@ -30,6 +31,9 @@ export const createOrder = async (req, res) => {
       status: 'OPEN', 
       totalAmount: 0 
     });
+    
+    // 🔥 AÑADIDO: Notificar a todos los clientes que hay una nueva orden
+    getIO().emit('pos:update');
     
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
   } catch (error) { 
@@ -67,6 +71,9 @@ export const addItemsToOrder = async (req, res) => {
       where: { orderId },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
+
+    // 🔥 AÑADIDO: Notificar que se añadieron productos a una orden (Actualiza carrito)
+    getIO().emit('pos:update');
 
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems });
   } catch (error) { 
@@ -167,6 +174,9 @@ export const payOrder = async (req, res) => {
       });
     }
 
+    // 🔥 AÑADIDO: Notificar que se realizó un pago (actualiza visualmente si fue parcial/total)
+    getIO().emit('pos:update');
+
     res.json({ message: 'Pago registrado con éxito en Caja', order });
   } catch (error) { 
     res.status(500).json({ message: 'Error al procesar pago', error: error.message }); 
@@ -187,6 +197,9 @@ export const closeOrder = async (req, res) => {
     if (order.tableId) {
       await Table.update({ status: 'active' }, { where: { id: order.tableId } });
     }
+
+    // 🔥 AÑADIDO: Notificar que la mesa se cerró y liberó
+    getIO().emit('pos:update');
 
     res.json({ message: 'Mesa liberada y orden archivada.' });
   } catch (error) { 
@@ -239,6 +252,9 @@ export const createTable = async (req, res) => {
       qrToken: `qr-${Date.now()}-${nextNumber}` 
     });
     
+    // 🔥 AÑADIDO: Opcional pero útil, refresca la vista si el admin crea una nueva mesa
+    getIO().emit('pos:update');
+
     res.status(201).json(newTable);
   } catch (error) { 
     res.status(500).json({ message: 'Error al crear mesa', error: error.message }); 
@@ -262,6 +278,9 @@ export const deleteTable = async (req, res) => {
       }
     }
     
+    // 🔥 AÑADIDO: Opcional pero útil, refresca la vista si el admin borra una mesa
+    getIO().emit('pos:update');
+
     res.json({ message: 'Mesa eliminada y re-indexada correctamente' });
   } catch (error) { 
     res.status(500).json({ message: 'Error al eliminar mesa', error: error.message }); 
@@ -348,6 +367,9 @@ export const moveItemAccount = async (req, res) => {
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
     
+    // 🔥 AÑADIDO: Notificar que se movieron productos entre cuentas
+    getIO().emit('pos:update');
+
     res.json({ message: 'Producto movido y agrupado con éxito', orderItems: allItems });
   } catch (error) {
     res.status(500).json({ message: 'Error al mover producto', error: error.message });
@@ -753,7 +775,7 @@ export const shareOrderTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-slate-300/50 active:scale-95 transition-all duration-200 flex items-center gap-3 text-sm uppercase tracking-wider">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x x="6" y="14" width="12" height="8"></rect></svg>
           Guardar Ticket en PDF
         </button>
       </div>

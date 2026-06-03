@@ -1,3 +1,4 @@
+import { getIO } from '../../config/socket.js'; // <-- 🔥 AÑADIDO: Importamos el WebSocket
 import OrderItem from '../pos/OrderItem.model.js';
 import Order from '../pos/Order.model.js';
 import Product from '../menu/Product.model.js';
@@ -57,6 +58,9 @@ export const updateKitchenStatus = async (req, res) => {
 
     item.kitchenStatus = status;
     await item.save();
+
+    // 🔥 AÑADIDO: Avisar al instante a TODAS las pantallas (Mesero y Caja) que el platillo cambió
+    getIO().emit('pos:update');
 
     res.json({ message: `Estado actualizado a ${status}`, item });
   } catch (error) {
