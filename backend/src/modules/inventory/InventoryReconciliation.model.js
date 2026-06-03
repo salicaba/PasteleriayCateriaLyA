@@ -10,14 +10,12 @@ const InventoryReconciliation = sequelize.define('InventoryReconciliation', {
   status: {
     type: DataTypes.ENUM('DRAFT', 'COMPLETED'),
     allowNull: false,
-    defaultValue: 'DRAFT',
-    comment: 'DRAFT: En proceso de conteo. COMPLETED: Arqueo cerrado y aplicado al Kardex.',
+    defaultValue: 'DRAFT'
   },
   totalConsumptionValue: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
-    defaultValue: 0,
-    comment: 'Suma del valor financiero de todo el insumo consumido (COGS)',
+    defaultValue: 0
   },
   notes: {
     type: DataTypes.TEXT,

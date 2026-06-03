@@ -3,15 +3,20 @@ import { Server } from 'socket.io';
 let io;
 
 export const initSocket = (server) => {
-  // En producción, tomaremos la URL de Vercel. En local, permitimos todo temporalmente.
-  const allowedOrigin = process.env.FRONTEND_URL || '*';
+  const allowedOrigins = [
+    process.env.FRONTEND_URL, 
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ];
 
   io = new Server(server, {
     cors: {
-      origin: allowedOrigin,
+      origin: allowedOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true
-    }
+    },
+    // Recomendado para evitar desconexiones en la nube (Render)
+    pingTimeout: 60000, 
   });
 
   io.on('connection', (socket) => {

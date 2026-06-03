@@ -24,8 +24,7 @@ const Transaction = sequelize.define('Transaction', {
   expenseCategory: {
     type: DataTypes.ENUM('NONE', 'PAYROLL', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'MARKETING', 'OTHER'),
     defaultValue: 'NONE',
-    allowNull: false,
-    comment: 'NONE (para ingresos). PAYROLL (Sueldos), UTILITIES (Servicios), MAINTENANCE (Mantenimiento), SUPPLIES (Limpieza/Insumos no contables), MARKETING, OTHER.'
+    allowNull: false
   },
   paymentMethod: { // 🔥 NUEVO: Registrar método de pago en DB
     type: DataTypes.ENUM('CASH', 'TRANSFER', 'CARD'),

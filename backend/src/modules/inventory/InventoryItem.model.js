@@ -13,32 +13,27 @@ const InventoryItem = sequelize.define('InventoryItem', {
   },
   sku: {
     type: DataTypes.STRING,
-    unique: true,
     allowNull: true,
-    comment: 'Código único interno o código de barras',
   },
   unit: {
     type: DataTypes.ENUM('kg', 'g', 'l', 'ml', 'pza', 'caja'),
     allowNull: false,
-    defaultValue: 'pza',
-    comment: 'Unidad de medida base para las recetas',
+    defaultValue: 'pza'
   },
   currentStock: {
-    type: DataTypes.DECIMAL(10, 3), // Soporta hasta 3 decimales (ej. 1.500 kg)
+    type: DataTypes.DECIMAL(10, 3), 
     allowNull: false,
     defaultValue: 0,
   },
   minimumStock: {
     type: DataTypes.DECIMAL(10, 3),
     allowNull: false,
-    defaultValue: 0,
-    comment: 'Punto de reorden para alertas del dashboard',
+    defaultValue: 0
   },
   averageCost: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
-    defaultValue: 0,
-    comment: 'Costo Promedio Ponderado para fines contables',
+    defaultValue: 0
   },
   isActive: {
     type: DataTypes.BOOLEAN,
@@ -47,6 +42,12 @@ const InventoryItem = sequelize.define('InventoryItem', {
 }, {
   tableName: 'inventory_items',
   timestamps: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['sku']
+    }
+  ]
 });
 
-export default InventoryItem; // <-- La clave mágica de ES Modules
+export default InventoryItem;

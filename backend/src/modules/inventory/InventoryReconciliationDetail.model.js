@@ -9,28 +9,23 @@ const InventoryReconciliationDetail = sequelize.define('InventoryReconciliationD
   },
   logicalStock: {
     type: DataTypes.DECIMAL(10, 3),
-    allowNull: false,
-    comment: 'Lo que el sistema dice que debería haber (Stock Teórico)',
+    allowNull: false
   },
   physicalStock: {
     type: DataTypes.DECIMAL(10, 3),
-    allowNull: false,
-    comment: 'Lo que el usuario contó físicamente',
+    allowNull: false
   },
   difference: {
     type: DataTypes.DECIMAL(10, 3),
-    allowNull: false,
-    comment: 'physicalStock - logicalStock (Si es negativo, hubo consumo)',
+    allowNull: false
   },
   averageCostAtTime: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    comment: 'El costo promedio del insumo en el instante del arqueo',
+    allowNull: false
   },
   totalDifferenceCost: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    comment: 'Valor monetario de la diferencia (difference * averageCostAtTime)',
+    allowNull: false
   }
 }, {
   tableName: 'inventory_reconciliation_details',

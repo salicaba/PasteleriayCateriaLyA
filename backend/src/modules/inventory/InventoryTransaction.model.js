@@ -8,30 +8,24 @@ const InventoryTransaction = sequelize.define('InventoryTransaction', {
     autoIncrement: true,
   },
   type: {
-    // 🔥 Añadimos CONSUMPTION para registrar lo consumido tras un arqueo
     type: DataTypes.ENUM('IN', 'OUT', 'WASTE', 'ADJUSTMENT', 'CONSUMPTION'),
-    allowNull: false,
-    comment: 'IN (Compra), OUT (Salida), WASTE (Merma), ADJUSTMENT (Ajuste manual), CONSUMPTION (Consumo por Arqueo)',
+    allowNull: false
   },
   quantity: {
     type: DataTypes.DECIMAL(10, 3),
-    allowNull: false,
-    comment: 'Cantidad afectada (siempre positiva, el type define si suma o resta)',
+    allowNull: false
   },
   unitCost: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    comment: 'Costo unitario al momento de la transacción',
+    allowNull: false
   },
   totalCost: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    comment: 'quantity * unitCost',
+    allowNull: false
   },
   reference: {
     type: DataTypes.STRING,
-    allowNull: true,
-    comment: 'Ej: ID del Arqueo, Número de Factura del Proveedor, etc.',
+    allowNull: true
   },
   notes: {
     type: DataTypes.TEXT,
