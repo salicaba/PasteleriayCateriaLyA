@@ -89,8 +89,9 @@ export const getDashboardData = async (req, res) => {
         where: { status: 'COMPLETED' } 
       }],
       attributes: [
-        [fn('SUM', literal('CASE WHEN difference < 0 THEN totalDifferenceCost ELSE 0 END')), 'totalMermas'],
-        [fn('SUM', literal('CASE WHEN difference > 0 THEN totalDifferenceCost ELSE 0 END')), 'totalSobrantes']
+        // 🔥 CORRECCIÓN AQUÍ: Comillas dobles agregadas a "difference" y "totalDifferenceCost"
+        [fn('SUM', literal('CASE WHEN "difference" < 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalMermas'],
+        [fn('SUM', literal('CASE WHEN "difference" > 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalSobrantes']
       ],
       raw: true
     });
@@ -133,7 +134,8 @@ export const getDashboardData = async (req, res) => {
         model: InventoryReconciliation, as: 'reconciliation', attributes: [], 
         where: { status: 'COMPLETED' } 
       }],
-      attributes: [[fn('SUM', literal('CASE WHEN difference < 0 THEN totalDifferenceCost ELSE 0 END')), 'totalMermas']],
+      // 🔥 CORRECCIÓN AQUÍ: También aplicamos las comillas en el cálculo anterior
+      attributes: [[fn('SUM', literal('CASE WHEN "difference" < 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalMermas']],
       raw: true
     });
     const prevTotalMermas = Math.abs(parseFloat(prevInventoryStats[0]?.totalMermas || 0));

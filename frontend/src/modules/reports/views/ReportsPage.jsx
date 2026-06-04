@@ -68,6 +68,18 @@ const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
   );
 };
 
+// 🔥 NUEVO COMPONENTE: Estado vacío para las gráficas
+const EmptyChartState = ({ message }) => (
+  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-800/20 lya:bg-lya-bg/30 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl transition-colors">
+    <svg className="w-10 h-10 text-gray-300 dark:text-gray-600 lya:text-lya-text/20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+    <p className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 font-bold text-sm text-center px-4">
+      {message}
+    </p>
+  </div>
+);
+
 export const ReportsPage = () => {
   const { theme } = useTheme();
   const { loading, dateRange, setDateRange, chartData, exportToExcel, exportToPDF } = useReportsController();
@@ -205,24 +217,28 @@ export const ReportsPage = () => {
         >
           <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-6 transition-colors">Tendencia de Ingresos Diarios</h3>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-              <AreaChart data={chartData.dailySales} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={theme === 'lya' ? '#4A2B29' : '#f97316'} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={theme === 'lya' ? '#4A2B29' : '#f97316'} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis dataKey="name" stroke={textColor} fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                <YAxis stroke={textColor} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
-                <RechartsTooltip 
-                  contentStyle={{ backgroundColor: theme === 'dark' ? '#111827' : theme === 'lya' ? '#FDF8F5' : '#ffffff', borderRadius: '16px', border: `1px solid ${gridColor}`, color: textColor, fontWeight: 'bold' }}
-                  itemStyle={{ color: textColor }}
-                />
-                <Area type="monotone" dataKey="Total" stroke={theme === 'lya' ? '#4A2B29' : '#f97316'} strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartData.dailySales?.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                <AreaChart data={chartData.dailySales} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={theme === 'lya' ? '#4A2B29' : '#f97316'} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={theme === 'lya' ? '#4A2B29' : '#f97316'} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                  <XAxis dataKey="name" stroke={textColor} fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                  <YAxis stroke={textColor} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: theme === 'dark' ? '#111827' : theme === 'lya' ? '#FDF8F5' : '#ffffff', borderRadius: '16px', border: `1px solid ${gridColor}`, color: textColor, fontWeight: 'bold' }}
+                    itemStyle={{ color: textColor }}
+                  />
+                  <Area type="monotone" dataKey="Total" stroke={theme === 'lya' ? '#4A2B29' : '#f97316'} strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartState message="No hay ventas registradas en este periodo" />
+            )}
           </div>
         </motion.div>
 
@@ -231,38 +247,46 @@ export const ReportsPage = () => {
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.3 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300">
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-4 transition-colors">Ingresos por Origen</h3>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <PieChart>
-                  <Pie data={chartData.incomeSource} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {chartData.incomeSource.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={getPieColors()[index % getPieColors().length]} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip formatter={(value) => `$${value}`} contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }} />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: textColor }} />
-                </PieChart>
-              </ResponsiveContainer>
+              {chartData.incomeSource?.some(item => item.value > 0) ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <PieChart>
+                    <Pie data={chartData.incomeSource} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      {chartData.incomeSource.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getPieColors()[index % getPieColors().length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip formatter={(value) => `$${value}`} contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }} />
+                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: textColor }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChartState message="No hay ingresos registrados" />
+              )}
             </div>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.35 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300">
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-4 transition-colors">Métodos de Pago</h3>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <BarChart data={chartData.paymentMethods} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
-                  <XAxis dataKey="name" stroke={textColor} fontSize={12} tickLine={false} axisLine={false}/>
-                  <RechartsTooltip formatter={(value) => `$${value}`} cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }}/>
-                  <Bar dataKey="value" fill={theme === 'lya' ? '#E6CCB2' : '#8b5cf6'} radius={[8, 8, 0, 0]} barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartData.paymentMethods?.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <BarChart data={chartData.paymentMethods} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
+                    <XAxis dataKey="name" stroke={textColor} fontSize={12} tickLine={false} axisLine={false}/>
+                    <RechartsTooltip formatter={(value) => `$${value}`} cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }}/>
+                    <Bar dataKey="value" fill={theme === 'lya' ? '#E6CCB2' : '#8b5cf6'} radius={[8, 8, 0, 0]} barSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChartState message="Sin métodos de pago registrados" />
+              )}
             </div>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.4 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300">
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-4 transition-colors">Gastos Operativos</h3>
             <div className="h-[250px]">
-               {translatedOpexData.length > 0 ? (
+               {translatedOpexData?.length > 0 ? (
                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <PieChart>
                       <Pie data={translatedOpexData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
@@ -275,9 +299,7 @@ export const ReportsPage = () => {
                     </PieChart>
                  </ResponsiveContainer>
                ) : (
-                  <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 font-bold text-sm transition-colors">
-                    Sin gastos registrados
-                  </div>
+                 <EmptyChartState message="No hay gastos operativos registrados" />
                )}
             </div>
           </motion.div>
@@ -317,7 +339,7 @@ export const ReportsPage = () => {
           <div className="p-6 flex flex-col gap-6">
             
             <div className="w-full border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl overflow-y-auto hide-scrollbar max-h-[400px]">
-              {chartDisplayedProducts.length > 0 ? (
+              {chartDisplayedProducts?.length > 0 ? (
                 <div style={{ height: dynamicChartHeight, width: '100%' }}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <BarChart layout="vertical" data={chartDisplayedProducts} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
@@ -348,8 +370,8 @@ export const ReportsPage = () => {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500 font-bold text-sm transition-colors">
-                  No hay productos registrados en esta vista.
+                <div className="h-[300px]">
+                  <EmptyChartState message="No hay productos registrados en esta vista." />
                 </div>
               )}
             </div>
