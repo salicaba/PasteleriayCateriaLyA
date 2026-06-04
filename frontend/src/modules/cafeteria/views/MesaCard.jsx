@@ -1,4 +1,4 @@
-// src/modules/cafeteria/views/MesaCard.jsx
+// frontend/src/modules/cafeteria/views/MesaCard.jsx
 import React, { useMemo } from 'react';
 import { UtensilsCrossed, ShoppingBag, ChefHat, Check } from 'lucide-react';
 
@@ -6,7 +6,6 @@ export const MesaCard = ({ mesa, onClick }) => {
   const isOcupada = mesa.estado === 'ocupada';
   const isLlevar = mesa.zona === 'llevar';
 
-  // Lógica inteligente para saber cuántos productos faltan por preparar
   const { pendientes, totalItems } = useMemo(() => {
     if (!mesa.items || mesa.items.length === 0) return { pendientes: 0, totalItems: 0 };
     
@@ -18,40 +17,31 @@ export const MesaCard = ({ mesa, onClick }) => {
     return { pendientes: pend, totalItems: mesa.items.length };
   }, [mesa.items]);
 
-  // Separamos el nombre y teléfono basado en la estructura de `mesa.numero`
   const { idPrincipal, nombreCliente, telefonoCliente } = useMemo(() => {
     const rawNumero = String(mesa.numero || '');
     
-    // Si no es un pedido para llevar, devolvemos el número tal cual
     if (!isLlevar) return { idPrincipal: rawNumero, nombreCliente: '', telefonoCliente: '' };
 
-    // Estructura esperada de backend: "L-XX - Nombre - Teléfono"
     const partes = rawNumero.split(' - ');
     
-    // Limpiamos la palabra "Llevar" y cualquier "#" extra que venga de la base de datos
+    // Limpieza agresiva: quitamos "Llevar", "L-" y "#" para quedarnos SOLO con el número
     let id = partes[0] || 'Pedido';
-    id = id.replace(/Llevar\s*#?/i, '').trim(); 
+    id = id.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim(); 
     
-    // Si solo hay 1 o 2 partes, no hay teléfono
     if (partes.length < 3) {
        return { idPrincipal: id, nombreCliente: partes[1] || 'Mostrador', telefonoCliente: '' };
     }
 
-    // Si tiene las 3 partes (ID, Nombre, Teléfono), extraemos el teléfono limpio
     const rawTel = partes[partes.length - 1];
     const telLimpio = rawTel.replace(/\D/g, ''); 
     
-    // Validamos longitud para asumir que es un teléfono
     if (telLimpio.length >= 10) {
       const nombre = partes.slice(1, -1).join(' - ');
       return { idPrincipal: id, nombreCliente: nombre, telefonoCliente: rawTel };
     }
 
-    // Si la última parte no parece teléfono, asumimos que es parte del nombre
     return { idPrincipal: id, nombreCliente: partes.slice(1).join(' - '), telefonoCliente: '' };
-
   }, [mesa.numero, isLlevar]);
-
 
   return (
     <div 
@@ -62,7 +52,6 @@ export const MesaCard = ({ mesa, onClick }) => {
           : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
       }`}
     >
-      {/* Barra de Acento Lateral */}
       <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors ${
         isOcupada 
           ? 'bg-blue-500 dark:bg-blue-400 lya:bg-lya-primary' 
@@ -70,8 +59,6 @@ export const MesaCard = ({ mesa, onClick }) => {
       }`} />
 
       <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full">
-        
-        {/* Parte Superior: Título e Ícono */}
         <div className="flex justify-between items-start">
           <div className="z-10">
             <span className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 block ${
@@ -82,8 +69,8 @@ export const MesaCard = ({ mesa, onClick }) => {
             <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
               isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
             }`}>
-              {/* CORRECCIÓN: Renderizado uniforme con el prefijo "#" para Llevar y Salón */}
-              {isLlevar ? `LLEVAR #${idPrincipal.replace(/^L-?/i, '')}` : `#${idPrincipal}`}
+              {/* Ahora SÓLO muestra el "#" y el número limpio */}
+              #{idPrincipal}
             </h3>
           </div>
           
@@ -96,7 +83,6 @@ export const MesaCard = ({ mesa, onClick }) => {
           </div>
         </div>
 
-        {/* Centro: Total y Datos del Cliente */}
         <div className="mt-2 mb-2 flex flex-col gap-1">
           {isOcupada ? (
             <>
@@ -124,7 +110,6 @@ export const MesaCard = ({ mesa, onClick }) => {
           )}
         </div>
 
-        {/* Parte Inferior: Cuentas y Estado de Cocina */}
         {isOcupada && (
           <div className="flex justify-between items-center mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70">

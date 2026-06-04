@@ -134,10 +134,15 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     toggleItemTakeaway
   };
 
-  // 🔥 NUEVA LÓGICA DE EXTRACCIÓN (Igual a la de MesaCard)
+  // 🔥 LÓGICA DE EXTRACCIÓN Y LIMPIEZA CORREGIDA
   const partesNumero = (mesa.numero || '').toString().split(' - ');
-  const numeroReal = partesNumero[0] || 'Pedido'; 
+  let numeroReal = partesNumero[0] || 'Pedido'; 
   
+  // Limpiamos la redundancia si es para llevar
+  if (isLlevar) {
+    numeroReal = numeroReal.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim();
+  }
+
   let nombreCliente = 'MOSTRADOR';
   let telefonoCliente = '';
 
@@ -153,7 +158,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     }
   }
 
-  const tableTitle = isLlevar ? `Llevar #${numeroReal}` : `Mesa ${numeroReal}`;
+  // Ahora tableTitle se arma siempre limpio
+  const tableTitle = isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`;
 
   return (
     <AnimatePresence>
@@ -246,7 +252,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                       <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
                         <button className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 shadow-sm active:scale-90 transition-transform"><ChevronDown size={20} /></button>
                         <div>
-                          {/* 🔥 VISTA MÓVIL: Agregado Nombre y Teléfono en píldoras */}
                           <span className="font-bold text-gray-700 dark:text-white lya:text-lya-text block leading-tight flex items-center gap-2 flex-wrap">
                             <span>{tableTitle}</span>
                             {isLlevar && nombreCliente !== 'MOSTRADOR' && (
@@ -298,7 +303,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                      )}
                   </h3>
                   
-                  {/* 🔥 VISTA DESKTOP: Agregado Nombre y Teléfono en píldoras */}
                   {isLlevar && nombreCliente !== 'MOSTRADOR' && (
                      <div className="flex gap-2 mt-1.5 flex-wrap">
                        <span className="px-2 py-0.5 bg-orange-500 lya:bg-lya-secondary text-white lya:text-lya-surface text-[10px] font-black rounded-full uppercase tracking-wider flex items-center gap-1">
