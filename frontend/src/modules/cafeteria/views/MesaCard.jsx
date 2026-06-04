@@ -18,7 +18,7 @@ export const MesaCard = ({ mesa, onClick }) => {
     return { pendientes: pend, totalItems: mesa.items.length };
   }, [mesa.items]);
 
-  // 🔥 CORRECCIÓN: Separamos el nombre y teléfono basado en la nueva estructura de `mesa.numero`
+  // Separamos el nombre y teléfono basado en la estructura de `mesa.numero`
   const { idPrincipal, nombreCliente, telefonoCliente } = useMemo(() => {
     const rawNumero = String(mesa.numero || '');
     
@@ -28,8 +28,7 @@ export const MesaCard = ({ mesa, onClick }) => {
     // Estructura esperada de backend: "L-XX - Nombre - Teléfono"
     const partes = rawNumero.split(' - ');
     
-    // El ID siempre es la primera parte. 
-    // 🔥 CORRECCIÓN: Limpiamos la palabra "Llevar" y cualquier "#" extra que venga de la base de datos para que quede solo el número
+    // Limpiamos la palabra "Llevar" y cualquier "#" extra que venga de la base de datos
     let id = partes[0] || 'Pedido';
     id = id.replace(/Llevar\s*#?/i, '').trim(); 
     
@@ -39,13 +38,11 @@ export const MesaCard = ({ mesa, onClick }) => {
     }
 
     // Si tiene las 3 partes (ID, Nombre, Teléfono), extraemos el teléfono limpio
-    // El teléfono siempre va a ser la última parte de la cadena, limpia de espacios y caracteres no numéricos
     const rawTel = partes[partes.length - 1];
     const telLimpio = rawTel.replace(/\D/g, ''); 
     
-    // Si la última parte parece un teléfono válido (ej: al menos 10 dígitos)
+    // Validamos longitud para asumir que es un teléfono
     if (telLimpio.length >= 10) {
-      // Todo lo que esté en medio es el nombre
       const nombre = partes.slice(1, -1).join(' - ');
       return { idPrincipal: id, nombreCliente: nombre, telefonoCliente: rawTel };
     }
@@ -85,7 +82,8 @@ export const MesaCard = ({ mesa, onClick }) => {
             <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
               isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
             }`}>
-              #{idPrincipal}
+              {/* CORRECCIÓN: Renderizado uniforme con el prefijo "#" para Llevar y Salón */}
+              {isLlevar ? `LLEVAR #${idPrincipal.replace(/^L-?/i, '')}` : `#${idPrincipal}`}
             </h3>
           </div>
           
@@ -98,7 +96,7 @@ export const MesaCard = ({ mesa, onClick }) => {
           </div>
         </div>
 
-        {/* Centro: Total y Datos del Cliente estructurados verticalmente */}
+        {/* Centro: Total y Datos del Cliente */}
         <div className="mt-2 mb-2 flex flex-col gap-1">
           {isOcupada ? (
             <>
@@ -106,7 +104,6 @@ export const MesaCard = ({ mesa, onClick }) => {
                 ${Number(mesa.total || 0).toFixed(2)}
               </span>
               
-              {/* Renderizado dinámico de Nombre y Teléfono en tarjetas "Para Llevar" */}
               {isLlevar && nombreCliente && nombreCliente !== 'Mostrador' && (
                 <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1">
@@ -130,7 +127,6 @@ export const MesaCard = ({ mesa, onClick }) => {
         {/* Parte Inferior: Cuentas y Estado de Cocina */}
         {isOcupada && (
           <div className="flex justify-between items-center mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
-            {/* Cuentas activas */}
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70">
               <span className="w-5 h-5 rounded flex items-center justify-center font-bold text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 lya:bg-lya-primary/20 lya:text-lya-primary">
                 {mesa.cuentasActivas || 1}
@@ -138,7 +134,6 @@ export const MesaCard = ({ mesa, onClick }) => {
               <span className="font-medium">Cuentas</span>
             </div>
 
-            {/* Cocina */}
             {totalItems > 0 && (
               <div className="text-[11px] font-bold">
                 {pendientes > 0 ? (
