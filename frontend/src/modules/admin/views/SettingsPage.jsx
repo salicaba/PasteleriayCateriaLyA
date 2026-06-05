@@ -124,10 +124,9 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       newAccounts = [...accounts, { ...form, id: Date.now().toString() }];
     }
     
-    setAccounts(newAccounts); // Actualiza la UI
-    resetForm(); // Limpia los inputs
+    setAccounts(newAccounts); 
+    resetForm(); 
     
-    // 🚀 ENVÍA DIRECTO A LA BASE DE DATOS
     await saveSettingsToDB({ bank_accounts: newAccounts }); 
   };
 
@@ -623,7 +622,11 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">Apariencia</h2>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-5 flex-1">Personaliza los colores del sistema POS.</p>
-                <div className="w-full h-[56px]"><ThemeSelector /></div>
+                
+                {/* 🔥 HACK DE CSS: Envolvemos ThemeSelector para forzarlo a ser idéntico al control de Tamaño */}
+                <div className="flex bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg rounded-xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 h-[56px] w-full [&>div]:w-full [&>div]:h-full [&>div]:bg-transparent [&>div]:border-none [&>div]:p-0 [&>div]:flex [&>div]:gap-0 [&_button]:flex-1 [&_button]:h-full [&_button]:rounded-lg [&_button]:text-sm [&_button]:font-bold [&_button]:flex [&_button]:items-center [&_button]:justify-center">
+                  <ThemeSelector />
+                </div>
               </section>
 
               <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col">
