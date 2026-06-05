@@ -45,7 +45,6 @@ export const createCategory = async (req, res) => {
   }
 };
 
-// Añadir en backend/src/modules/menu/menu.controller.js
 export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -61,9 +60,8 @@ export const updateCategory = async (req, res) => {
   }
 };
 
-// 🔥 ENDPOINT PARA REORDENAMIENTO (Drag & Drop)
 export const reorderCategories = async (req, res) => {
-  const { items } = req.body; // Formato: [{ id: 'uuid-1', order: 0 }, ...]
+  const { items } = req.body; 
 
   const transaction = await sequelize.transaction();
 
@@ -105,12 +103,10 @@ export const deleteCategory = async (req, res) => {
   }
 };
 
-
 // ==========================================
 // 🍔 GESTIÓN DE PRODUCTOS
 // ==========================================
 
-// GET: Todos pueden ver el menú (Owner y Employee)
 export const getProducts = async (req, res) => {
   try {
     const products = await Product.findAll({
@@ -123,9 +119,9 @@ export const getProducts = async (req, res) => {
   }
 };
 
-// POST: Solo Owner puede crear productos
 export const createProduct = async (req, res) => {
   try {
+    // 🔥 BLINDAJE PARA CREAR: Extraemos requiereCocina y departamento
     const { 
       name, 
       description, 
@@ -134,7 +130,9 @@ export const createProduct = async (req, res) => {
       controlarStock, 
       stockQuantity, 
       categoryId,
-      opciones // 🔥 AQUÍ ESTÁ EL FIX: Le decimos al backend que reciba las opciones
+      opciones,
+      departamento,
+      requiereCocina 
     } = req.body;
     
     const newProduct = await Product.create({
@@ -145,7 +143,9 @@ export const createProduct = async (req, res) => {
       controlarStock,
       stockQuantity,
       categoryId,
-      opciones // 🔥 Y que las guarde en MySQL
+      opciones,
+      departamento, 
+      requiereCocina 
     });
 
     res.status(201).json({ message: 'Producto creado', product: newProduct });
@@ -154,25 +154,49 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// PUT: Actualizar producto (Recomendado tenerlo para tu Modal de Edición)
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    
+    // 🔥 BLINDAJE PARA EDITAR: Extraemos requiereCocina y departamento
+    const { 
+      name, 
+      description, 
+      basePrice, 
+      imageUrl, 
+      controlarStock, 
+      stockQuantity, 
+      categoryId, 
+      opciones, 
+      departamento, 
+      requiereCocina 
+    } = req.body;
 
     const product = await Product.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    await product.update(updateData);
+    await product.update({
+      name, 
+      description, 
+      basePrice, 
+      imageUrl, 
+      controlarStock, 
+      stockQuantity, 
+      categoryId, 
+      opciones, 
+      departamento, 
+      requiereCocina
+    });
+    
     res.json({ message: 'Producto actualizado', product });
   } catch (error) {
+    console.error('Error al actualizar el producto:', error);
     res.status(500).json({ message: 'Error al actualizar producto', error: error.message });
   }
 };
 
-// DELETE: Eliminación lógica (Soft Delete) o física
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -182,9 +206,7 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    // Eliminación lógica (recomendado para POS)
     await product.update({ isActive: false });
-    // O si prefieres física: await product.destroy();
 
     res.json({ message: 'Producto eliminado (desactivado)' });
   } catch (error) {
@@ -198,7 +220,7 @@ export const deleteProduct = async (req, res) => {
 export const getGlobalOptions = async (req, res) => {
   try {
     const options = await GlobalOption.findAll({
-      order: [['order', 'ASC']] // 🔥 Ahora siempre devolverá ordenado
+      order: [['order', 'ASC']]
     });
     res.json(options);
   } catch (error) {
@@ -209,12 +231,11 @@ export const getGlobalOptions = async (req, res) => {
 export const createGlobalOption = async (req, res) => {
   try {
     const { tipo } = req.body;
-    // Obtener el order más alto actual para ese tipo específico
     const maxOrder = await GlobalOption.max('order', { where: { tipo } }) || 0;
     
     const newOption = await GlobalOption.create({
       ...req.body,
-      order: maxOrder + 1 // Ponerlo al final
+      order: maxOrder + 1
     });
     res.status(201).json(newOption);
   } catch (error) {
@@ -222,7 +243,6 @@ export const createGlobalOption = async (req, res) => {
   }
 };
 
-// 🔥 NUEVO: Función para reordenar las opciones globales
 export const reorderGlobalOptions = async (req, res) => {
   const { items } = req.body;
   const transaction = await sequelize.transaction();

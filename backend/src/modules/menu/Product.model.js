@@ -46,6 +46,11 @@ const Product = sequelize.define('Product', {
     allowNull: false,
     defaultValue: 'cafeteria', // Por defecto todo va a cafetería
   },
+  // 🔥 NUEVO CAMPO: Para separar Vitrina de Cocina
+  requiereCocina: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true, // Por defecto asumimos que se prepara en cocina. En vitrina será false.
+  },
   opciones: {
     type: DataTypes.JSON,
     allowNull: true,

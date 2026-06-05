@@ -15,7 +15,10 @@ export const fetchProducts = async () => {
       controlarStock: p.controlarStock,
       detalles: '',
       variantes: p.variants || [],
-      opciones: p.opciones || null
+      opciones: p.opciones || null,
+      // 🔥 AQUÍ ESTÁ LA MAGIA: Pasamos el dato de cocina al Punto de Venta
+      requiereCocina: p.requiereCocina,
+      departamento: p.departamento
     }));
   } catch (error) {
     console.error("Error al obtener los productos:", error);
@@ -28,7 +31,7 @@ export const fetchCategories = async () => {
   try {
     const response = await client.get('/menu/categories');
     
-    // Formateamos lo que llega de MySQL
+    // Formateamos lo que llega de MySQL/PostgreSQL
     const categoriasBD = response.data.map(c => ({
       id: c.id,     // UUID real
       name: c.name  // Ej: "Bebidas", "Postres", etc.

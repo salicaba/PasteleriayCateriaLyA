@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { motion } from 'framer-motion';
-import { X, Upload, RotateCw, Package, Folder, Settings2, CheckCircle2, Star, Store } from 'lucide-react';
+import { X, Upload, RotateCw, Package, Folder, Settings2, CheckCircle2, Star, Store, ChefHat } from 'lucide-react';
 import clsx from 'clsx';
 
 const createImage = (url) => new Promise((resolve, reject) => {
@@ -73,7 +73,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? '') : '',
     imageUrl: initialData?.imageUrl || initialData?.image || null,
     isActive: initialData?.isActive !== undefined ? initialData.isActive : (initialData?.disponible !== undefined ? initialData.disponible : true),
-    departamento: initialData?.departamento || 'cafeteria', // <-- NUEVO ESTADO PARA DEPARTAMENTO
+    departamento: initialData?.departamento || 'cafeteria',
+    requiereCocina: initialData?.requiereCocina !== undefined ? initialData.requiereCocina : true,
     opciones: normalizeOptions(initialData?.opciones)
   });
 
@@ -201,7 +202,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                     />
                   </div>
                   
-                  {/* SECCIÓN DIVIDIDA: CATEGORÍA Y DEPARTAMENTO FINANCIERO */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-gray-400 lya:text-lya-text/50 uppercase ml-1">Categoría Visual</label>
@@ -230,7 +230,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                           className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none cursor-pointer transition-all font-medium"
                         >
                           <option value="cafeteria">Caja Cafetería</option>
-                          <option value="pasteleria">Caja Pastelería (Vitrina)</option>
+                          <option value="pasteleria">Caja Pastelería</option>
                         </select>
                       </div>
                     </div>
@@ -249,10 +249,11 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                         />
                       </div>
                     </div>
+                    
                     <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 rounded-2xl p-3 flex flex-col justify-center transition-colors">
                       <div className="flex items-center justify-between px-1 mb-2">
                         <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase">Controlar Inventario</label>
-                        <button onClick={() => setFormData({...formData, controlarStock: !formData.controlarStock})} className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 ${formData.controlarStock ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'}`}>
+                        <button type="button" onClick={() => setFormData({...formData, controlarStock: !formData.controlarStock})} className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 ${formData.controlarStock ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'}`}>
                           <div className={`w-4 h-4 bg-white lya:bg-lya-surface rounded-full shadow-md transform transition-transform ${formData.controlarStock ? 'translate-x-5' : 'translate-x-0'}`} />
                         </button>
                       </div>
@@ -269,6 +270,31 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       )}
                     </div>
                   </div>
+
+                  {/* 🔥 BLOQUE CORREGIDO: SWITCH DE COCINA CON DISEÑO UNIFICADO */}
+                  <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 rounded-2xl p-3 flex flex-col justify-center transition-colors mt-2">
+                    <div className="flex items-center justify-between px-1">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase flex items-center gap-1.5">
+                          <ChefHat size={14} className={formData.requiereCocina ? "text-orange-500 lya:text-lya-secondary" : "text-gray-400"} />
+                          Preparación en Cocina
+                        </label>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 leading-tight max-w-[280px]">
+                          {formData.requiereCocina 
+                            ? "Se enviará ticket a la pantalla de cocina." 
+                            : "Venta de vitrina. Se cobra y entrega al instante."}
+                        </p>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setFormData({...formData, requiereCocina: !formData.requiereCocina})} 
+                        className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 shrink-0 ${formData.requiereCocina ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'}`}
+                      >
+                        <div className={`w-4 h-4 bg-white lya:bg-lya-surface rounded-full shadow-md transform transition-transform ${formData.requiereCocina ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
@@ -322,6 +348,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                    )}
                                  >
                                    <button
+                                     type="button"
                                      onClick={() => toggleOption(tipo, opt)}
                                      className="flex items-start gap-2 text-sm font-bold w-full text-left outline-none"
                                    >
@@ -402,8 +429,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
             </div>
 
             <footer className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg flex gap-4 shrink-0 transition-colors">
-              <button onClick={onClose} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 lya:text-lya-text/60 lya:hover:bg-lya-surface rounded-2xl transition-colors">Cancelar</button>
-              <button onClick={handleSaveSubmit} className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl font-bold shadow-lg shadow-orange-500/30 lya:shadow-lya-primary/30 transition-all transform hover:-translate-y-0.5">
+              <button type="button" onClick={onClose} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 lya:text-lya-text/60 lya:hover:bg-lya-surface rounded-2xl transition-colors">Cancelar</button>
+              <button type="button" onClick={handleSaveSubmit} className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl font-bold shadow-lg shadow-orange-500/30 lya:shadow-lya-primary/30 transition-all transform hover:-translate-y-0.5">
                 {formData.id ? 'Actualizar Producto' : 'Guardar Producto'}
               </button>
             </footer>

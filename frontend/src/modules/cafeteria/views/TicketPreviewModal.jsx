@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/TicketPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Printer, X, MessageCircle } from 'lucide-react';
+import { Printer, X, MessageCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const TicketPreviewModal = ({ 
@@ -12,11 +12,10 @@ export const TicketPreviewModal = ({
   cuentaName, 
   onConfirmPrint, 
   onSendWhatsApp,
-  userName = 'Cajero en turno' // 🔥 NUEVO: Recibe el nombre del usuario, por defecto "Cajero en turno"
+  userName = 'Cajero en turno' // 🔥 NUEVO: Recibe el nombre del usuario
 }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   
-  // Efecto para auto-completar el teléfono si viene en el string de la mesa (Para Llevar)
   useEffect(() => {
     if (isOpen && mesa) {
       const partes = (mesa.numero || '').toString().split(' - ');
@@ -36,13 +35,13 @@ export const TicketPreviewModal = ({
   const itemsToPrint = cuentaName ? cart.filter(item => item.cuenta === cuentaName) : cart;
   const totalToPrint = itemsToPrint.reduce((acc, item) => acc + (item.precio * item.qty), 0);
 
-  // Cuentas únicas
   const cuentasActivas = Array.from(new Set(itemsToPrint.map(item => item.cuenta || 'General')));
 
   const isLlevar = mesa?.zona === 'llevar';
+  const isVitrina = mesa?.zona === 'vitrina'; // 🔥 Detectamos si es Vitrina
+
   const partesNumero = (mesa?.numero || '').toString().split(' - ');
   
-  // 🔥 CORRECCIÓN: Limpiamos la palabra "Llevar" para que quede solo el número
   let numeroReal = partesNumero[0] || 'Pedido';
   numeroReal = numeroReal.replace(/Llevar\s*#?/i, '').trim(); 
   
@@ -55,6 +54,19 @@ export const TicketPreviewModal = ({
       nombreCliente = partesNumero.slice(1).join(' - ');
     }
   }
+
+  // 🔥 MAGIA DE FOLIOS: Generamos un folio profesional basado en la Base de Datos
+  const generarFolio = () => {
+    if (mesa?.folio) return mesa.folio; // Si el backend ya mandara uno secuencial
+    if (mesa?.orderId) {
+       // Tomamos el primer bloque del UUID de la base de datos (Ej. 8f4a2b)
+       const shortId = mesa.orderId.split('-')[0].toUpperCase();
+       return isVitrina ? `MOS-${shortId}` : `CAF-${shortId}`;
+    }
+    return isVitrina ? 'MOS-000000' : 'CAF-000000';
+  };
+
+  const ticketFolio = generarFolio();
 
   const handlePhysicalPrint = () => {
     onConfirmPrint();
@@ -82,7 +94,7 @@ export const TicketPreviewModal = ({
         {/* CABECERA */}
         <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shrink-0">
           <h3 className="font-bold text-gray-700 dark:text-gray-200">
-            Comprobante Digital
+            {isVitrina ? 'Ticket de Mostrador' : 'Comprobante Digital'}
           </h3>
           <button 
             onClick={onClose} 
@@ -103,23 +115,29 @@ export const TicketPreviewModal = ({
             <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
               <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓐</h2>
               <p className="text-xs font-bold text-gray-600 uppercase mt-1">Pastelería & Cafetería</p>
-              <p className="text-xs text-gray-500 mt-1">Comprobante de Consumo</p>
+              <p className="text-xs text-gray-500 mt-1">Comprobante de Venta</p>
               <p className="text-sm font-bold mt-2 text-black">
                 {new Date().toLocaleDateString('es-MX')} {new Date().toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'})}
               </p>
             </div>
 
-            {/* Info de Mesa y Cliente */}
+            {/* Info de Mesa, Cliente y Folio */}
             <div className="space-y-2 mb-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Folio:</span> 
+                <span className="font-bold text-right text-black uppercase tracking-wider">{ticketFolio}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Atendido por:</span> 
                 <span className="font-bold text-right text-black capitalize">{userName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">{isLlevar ? 'Servicio:' : 'Servicio:'}</span> 
-                <span className="font-bold text-right text-black uppercase">{isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`}</span>
+                <span className="text-gray-500">{isVitrina ? 'Tipo:' : 'Servicio:'}</span> 
+                <span className="font-bold text-right text-black uppercase">
+                  {isVitrina ? 'Mostrador Express' : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`)}
+                </span>
               </div>
-              {isLlevar && nombreCliente !== 'MOSTRADOR' && (
+              {!isVitrina && isLlevar && nombreCliente !== 'MOSTRADOR' && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Cliente:</span> 
                   <span className="font-bold text-right text-black uppercase">{nombreCliente}</span>
@@ -153,7 +171,6 @@ export const TicketPreviewModal = ({
                     const accountItems = itemsToPrint.filter(item => (item.cuenta || 'General') === accName);
                     if (accountItems.length === 0) return null;
 
-                    // 🔥 LÓGICA DE AGRUPACIÓN (Suma cantidades de productos idénticos)
                     const groupedItems = [];
                     accountItems.forEach(item => {
                       const prepString = JSON.stringify(item.preparaciones || []);
@@ -182,9 +199,8 @@ export const TicketPreviewModal = ({
                             <tr>
                               <td className="font-bold align-top pt-2 text-black">{item.qty}x</td>
                               <td className="align-top pt-2 pr-1 break-words leading-tight">
-                                {item.isTakeaway && <span className="text-orange-500 mr-1 text-[10px] uppercase tracking-tighter">🛍️ Llevar</span>}
+                                {item.isTakeaway && <span className="text-orange-500 mr-1 text-[10px] uppercase tracking-tighter">🛍️</span>}
                                 {item.nombre}
-                                {/* 🔥 Muestra el precio unitario si hay más de 1 artículo igual */}
                                 {item.qty > 1 && (
                                   <div className="text-[10px] font-bold text-gray-500 mt-0.5">
                                     Unitario: ${Number(item.precio).toFixed(2)}
@@ -247,30 +263,44 @@ export const TicketPreviewModal = ({
         </div>
 
         {/* CONTROLES INFERIORES */}
-        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10 shrink-0 p-4 flex items-center gap-3">
-          <div className="flex-1 relative flex items-center">
-            <input 
-              type="tel" 
-              placeholder="Número de WhatsApp" 
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl pl-4 pr-12 py-3.5 text-xs sm:text-sm font-bold outline-none focus:border-green-500 text-gray-800 dark:text-white transition-colors"
-            />
+        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10 shrink-0 p-4 flex flex-col gap-3">
+          
+          <div className="flex items-center gap-3 w-full">
+            <div className="flex-1 relative flex items-center">
+              <input 
+                type="tel" 
+                placeholder="WhatsApp (10 dígitos)" 
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl pl-4 pr-12 py-3.5 text-xs sm:text-sm font-bold outline-none focus:border-green-500 text-gray-800 dark:text-white transition-colors"
+              />
+              <button 
+                onClick={handleWhatsAppClick}
+                disabled={phoneNumber.length < 10}
+                className="absolute right-1.5 p-2 bg-green-500 text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 hover:bg-green-600 active:scale-95 transition-all shadow-md shadow-green-500/20"
+                title="Enviar por WhatsApp"
+              >
+                <MessageCircle size={18} strokeWidth={2.5} />
+              </button>
+            </div>
+
             <button 
-              onClick={handleWhatsAppClick}
-              disabled={phoneNumber.length < 10}
-              className="absolute right-1.5 p-2 bg-green-500 text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 hover:bg-green-600 active:scale-95 transition-all shadow-md shadow-green-500/20"
+              onClick={handlePhysicalPrint}
+              className="py-3.5 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 shrink-0"
+              title="Imprimir Ticket Físico"
             >
-              <MessageCircle size={18} strokeWidth={2.5} />
+              <Printer size={20} />
             </button>
           </div>
-
+          
+          {/* 🔥 BOTÓN GRANDE PARA CERRAR LA VISTA */}
           <button 
-            onClick={handlePhysicalPrint}
-            className="py-3.5 px-5 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 shrink-0"
+            onClick={onClose}
+            className="w-full py-3 rounded-2xl font-black text-sm uppercase bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 transition-all flex justify-center items-center gap-2 border border-gray-200 dark:border-gray-600"
           >
-            <Printer size={20} />
+            <XCircle size={18} /> Cerrar Previsualización
           </button>
+          
         </div>
 
       </motion.div>

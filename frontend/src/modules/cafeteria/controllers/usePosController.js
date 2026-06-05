@@ -1,3 +1,4 @@
+// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
@@ -20,6 +21,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     if (!mesaInicial) return null;
     return todasLasMesas.find(m => m.id === mesaInicial.id) || mesaInicial;
   }, [mesaInicial, todasLasMesas]);
+
+  // 🔥 DETECTAMOS SI ESTAMOS EN MODO QUIOSCO / VITRINA
+  const isVitrina = mesaActual?.zona === 'vitrina';
 
   useEffect(() => {
     const loadData = async () => {
@@ -64,7 +68,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 kitchenStatus: item.kitchenStatus,
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway || false,
-                backendItemId: item.id
+                backendItemId: item.id,
+                // 🔥 Aseguramos la propiedad al cargar desde BD
+                requiereCocina: item.product?.requiereCocina !== false 
             };
         });
 
@@ -122,7 +128,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         preparaciones: [productWithDetails.detalles || {}], 
         enviadoCocina: false, 
         cuenta: targetCuenta, 
-        isTakeaway: productWithDetails.isTakeaway || false
+        isTakeaway: productWithDetails.isTakeaway || false,
+        // 🔥 INYECTAMOS LA BANDERA AL CARRITO (Por defecto true si no viene)
+        requiereCocina: productWithDetails.requiereCocina !== false
       }];
     });
   };
@@ -158,8 +166,23 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       }));
 
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
-      const allItemsFromDB = response.data.orderItems || [];
+      let allItemsFromDB = response.data.orderItems || [];
       
+      // 🚀 TRUCO MAESTRO: Auto-entregamos en la BD los productos que no requieren cocina
+      const itemsToAutoDeliver = allItemsFromDB.filter(dbItem => {
+         const localItem = itemsNuevos.find(n => n.id === dbItem.productId);
+         return localItem && localItem.requiereCocina === false;
+      });
+
+      if (itemsToAutoDeliver.length > 0) {
+         await Promise.all(itemsToAutoDeliver.map(async (dbItem) => {
+             try {
+                 await client.put(`/kitchen/tickets/${dbItem.id}/status`, { status: 'DELIVERED' });
+                 dbItem.kitchenStatus = 'DELIVERED'; // Actualizamos la variable local en memoria
+             } catch (e) { console.error("Error auto-entregando producto de vitrina", e); }
+         }));
+      }
+
       const updatedCart = allItemsFromDB.map(item => {
           let parsedPreps = [];
           if (item.notes) {
@@ -179,7 +202,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
               kitchenStatus: item.kitchenStatus,
               cuenta: item.cuenta || 'General',
               isTakeaway: item.isTakeaway || false,
-              backendItemId: item.id
+              backendItemId: item.id,
+              requiereCocina: itemsNuevos.find(n => n.id === item.productId)?.requiereCocina !== false
           };
       });
 
@@ -376,7 +400,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                     kitchenStatus: dbItem.kitchenStatus,
                     cuenta: dbItem.cuenta || 'General',
                     isTakeaway: dbItem.isTakeaway || false,
-                    backendItemId: dbItem.id
+                    backendItemId: dbItem.id,
+                    requiereCocina: dbItem.product?.requiereCocina !== false
                 };
             });
             setCart(prev => {
@@ -430,10 +455,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
+  // 🔥 MAGIA: Si no requiere cocina, lo damos por válido para cobrar al instante
   const validateAllDelivered = (cuentaName = null) => { 
     const itemsToCheck = cuentaName ? cart.filter(c => c.cuenta === cuentaName) : cart; 
     if (itemsToCheck.length === 0) return false;
-    return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); 
+    return itemsToCheck.every(item => 
+       item.requiereCocina === false || (item.enviadoCocina && item.kitchenStatus === 'DELIVERED')
+    ); 
   };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
@@ -445,7 +473,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         paymentMethod: method 
       });
       setPaidAccounts(prev => [...prev, nombreCuenta]);
-      // 🔥 Eliminado: toast.success(`Cuenta "${nombreCuenta}" pagada correctamente.`);
       if (onComplete) onComplete();
     } catch (error) { 
       console.error("Error al pagar cuenta parcial", error);
@@ -455,6 +482,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const handleCheckout = async (paymentDetails, onComplete) => {
     try {
+      // Si hay ítems sin enviar (incluyendo los de vitrina), los enviamos primero (auto-delivery)
       if (cart.some(p => !p.enviadoCocina)) {
          await new Promise(resolve => simulateKitchenSend(resolve));
       }
@@ -464,7 +492,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         paymentMethod: method
       });
       setOrderStatus('PAID');
-      // 🔥 Eliminado: toast.success('Mesa cobrada en su totalidad.');
       if (onComplete) onComplete();
     } catch (error) { 
       console.error("Error al finalizar pago total", error);
@@ -494,14 +521,26 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   }, [cart, paidAccounts]);
 
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
-  const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
+  
+  // 🔥 MAGIA: Ocultamos el botón "Enviar a Cocina" si TODOS los productos nuevos son de vitrina
+  const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina && p.requiereCocina !== false), [cart]);
+  
   const cuentasDisponibles = useMemo(() => Array.from(new Set([...nombresCuentas, ...cart.map(i => i.cuenta || 'General')])), [cart, nombresCuentas]);
   const getSubtotalByCuenta = (nombreCuenta) => cart.filter(item => item.cuenta === nombreCuenta).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
   const getProductQty = (id) => cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva).reduce((acc, item) => acc + item.qty, 0);
 
+  // 🔥 MAGIA: Si estamos en Vitrina, SOLO mostramos los productos que no requieren cocina
   const filteredProducts = useMemo(() => {
-    return dbProducts.filter(p => (categoriaActiva === 'todas' || p.categoria === categoriaActiva) && p.nombre.toLowerCase().includes(filtroTexto.toLowerCase()));
-  }, [filtroTexto, categoriaActiva, dbProducts]);
+    return dbProducts.filter(p => {
+       const matchText = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
+       const matchCat = categoriaActiva === 'todas' || p.categoria === categoriaActiva;
+       
+       if (isVitrina) {
+           return matchText && matchCat && p.requiereCocina === false;
+       }
+       return matchText && matchCat;
+    });
+  }, [filtroTexto, categoriaActiva, dbProducts, isVitrina]);
 
   return { 
     cart, total, unsentTotal, hasUnsentItems, addToCart, removeFromCart, deleteLine, moveItemToCuenta, toggleDeliveredStatus,

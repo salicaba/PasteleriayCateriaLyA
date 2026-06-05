@@ -1,14 +1,19 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { fetchActiveOrders } from '../models/mesasModel.js';
 import client from '../../../api/client.js';
-import { socket } from '../../../api/socket.js'; // <-- IMPORTAMOS EL SOCKET
+import { socket } from '../../../api/socket.js'; 
 
 export const useMesasController = () => {
   const [mesas, setMesas] = useState([]);
   const [zonaActiva, setZonaActiva] = useState('salon');
   const [isLoading, setIsLoading] = useState(true);
 
-  const zonas = [ { id: 'salon', label: 'Salón' }, { id: 'llevar', label: 'Para Llevar' } ];
+  // 🔥 CORRECCIÓN: Agregamos la tercera pestaña real aquí
+  const zonas = [ 
+    { id: 'salon', label: 'Salón' }, 
+    { id: 'llevar', label: 'Para Llevar' },
+    { id: 'vitrina', label: 'Mostrador' }
+  ];
 
   const loadMesas = useCallback(async () => {
     try {
@@ -46,22 +51,29 @@ export const useMesasController = () => {
         };
       });
 
-      const paraLlevarOrders = orders.filter(o => o.orderType === 'LLEVAR').map((o, index) => {
+      let indexLlevar = 1;
+      const paraLlevarOrders = orders.filter(o => o.orderType === 'LLEVAR').map(o => {
           const cuentasSet = new Set(['General']);
           if (o.items) o.items.forEach(item => cuentasSet.add(item.cuenta || 'General'));
           if (o.paidAccounts) o.paidAccounts.forEach(acc => cuentasSet.add(acc));
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
-          const numeroFinal = rawTicketId.toLowerCase().includes('llevar') 
-               ? rawTicketId 
-               : `Llevar #${index + 1} - ${rawTicketId}`;
+          const isVitrina = rawTicketId === 'VITRINA-EXPRESS';
+          
+          let numeroFinal = rawTicketId;
+          if (!isVitrina) {
+            numeroFinal = rawTicketId.toLowerCase().includes('llevar') 
+                 ? rawTicketId 
+                 : `Llevar #${indexLlevar} - ${rawTicketId}`;
+            indexLlevar++;
+          }
           
           return {
             id: o.id, 
-            identificadorLlevar: index + 1,
+            identificadorLlevar: isVitrina ? null : indexLlevar - 1,
             cliente: numeroFinal, 
             numero: numeroFinal, 
-            zona: 'llevar', 
+            zona: isVitrina ? 'vitrina' : 'llevar', 
             estado: 'ocupada', 
             total: Number(o.totalAmount) || 0,
             orderId: o.id, 
@@ -81,20 +93,10 @@ export const useMesasController = () => {
     }
   }, []);
 
-  // 🔥 NUEVA LÓGICA DE TIEMPO REAL CON WEBSOCKETS (Sustituye al Polling)
   useEffect(() => { 
     loadMesas(); 
-    
-    // Escuchar el evento que emite el backend
-    socket.on('pos:update', () => {
-      console.log('🔄 WebSockets: Cambios detectados en el POS, recargando...');
-      loadMesas();
-    });
-
-    // Cleanup para evitar listeners duplicados si el componente se desmonta
-    return () => {
-      socket.off('pos:update');
-    };
+    socket.on('pos:update', () => loadMesas());
+    return () => { socket.off('pos:update'); };
   }, [loadMesas]);
 
   const mesasFiltradas = useMemo(() => mesas.filter(m => m.zona === zonaActiva), [mesas, zonaActiva]);
@@ -107,10 +109,38 @@ export const useMesasController = () => {
     }; 
   }, [mesas]);
 
+  const nuevoPedidoVitrina = async () => {
+    try {
+      const ordenActiva = mesas.find(m => m.zona === 'vitrina' && m.estado === 'ocupada');
+      if (ordenActiva) return ordenActiva;
+
+      const res = await client.post('/pos/orders', { 
+          orderType: 'LLEVAR', 
+          ticketId: 'VITRINA-EXPRESS', 
+          tableId: null 
+      });
+
+      return { 
+        id: res.data.order.id, 
+        numero: 'VITRINA-EXPRESS', 
+        zona: 'vitrina', 
+        estado: 'ocupada', 
+        total: 0, 
+        orderId: res.data.order.id, 
+        items: [], 
+        cuentasActivas: 1, 
+        orderStatus: 'OPEN', 
+        paidAccounts: [] 
+      };
+    } catch (error) { 
+        return null; 
+    }
+  };
+
   const nuevoPedidoLlevar = async (nombreCliente, telefono) => {
     try {
       const currentOrders = await fetchActiveOrders();
-      const llevarOrdersCount = (currentOrders || []).filter(o => o.orderType === 'LLEVAR').length;
+      const llevarOrdersCount = (currentOrders || []).filter(o => o.orderType === 'LLEVAR' && o.ticketId !== 'VITRINA-EXPRESS').length;
       const nextNumber = llevarOrdersCount + 1;
 
       let formattedTicketId = `Llevar #${nextNumber} - ${nombreCliente}`;
@@ -123,9 +153,6 @@ export const useMesasController = () => {
           ticketId: formattedTicketId, 
           tableId: null 
       });
-
-      // No necesitamos llamar a loadMesas() aquí porque al hacer el POST, 
-      // el backend emitirá 'pos:update' y el socket recargará automáticamente la tabla.
       
       return { 
         id: res.data.order.id, 
@@ -140,7 +167,6 @@ export const useMesasController = () => {
         paidAccounts: [] 
       };
     } catch (error) { 
-        console.error("Error al crear pedido para llevar", error);
         return null; 
     }
   };
@@ -148,7 +174,7 @@ export const useMesasController = () => {
   return { 
     mesasFiltradas, stats, zonas, zonaActiva, setZonaActiva, 
     refresh: loadMesas, liberarMesa: loadMesas, 
-    actualizarEstadoMesa: loadMesas, pagoParcialMesa: loadMesas, 
-    nuevoPedidoLlevar, isLoading 
+    actualizarEstadoMesa: loadMesas, pagoParcialMesa: loadMesas, unirMesas: loadMesas, 
+    nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading 
   };
 };
