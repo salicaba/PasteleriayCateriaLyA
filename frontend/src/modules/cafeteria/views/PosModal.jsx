@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import client from '../../../api/client'; // 🔥 IMPORTANTE: Necesario para obtener la URL del Backend
 import { usePosController } from '../controllers/usePosController';
 import { ProductCard } from './ProductCard';
 import { TicketSidebar } from './TicketSidebar'; 
@@ -17,9 +18,27 @@ const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } }, exit: { y: "100%", opacity: 0 } };
 
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial, inline = false }) => {
-  // 🔥 LÓGICA DE USUARIO: Obtenemos el nombre del cajero que inició sesión
-  const userLocal = JSON.parse(localStorage.getItem('user') || '{}');
-  const nombreCajero = userLocal.name || userLocal.nombre || 'Cajero en turno';
+  
+  // Dentro de PosModal.jsx
+const getLoggedUserName = () => {
+  try {
+    const sessionStr = localStorage.getItem('lya_pos_session');
+    if (sessionStr) {
+      const { userData } = JSON.parse(sessionStr);
+      // 🔥 AQUÍ ESTÁ EL CAMBIO: .split(' ')[0] para tomar solo el primer nombre
+      if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
+      if (userData && userData.username) return userData.username;
+    }
+    const lyaUser = JSON.parse(localStorage.getItem('lya_user') || '{}');
+    if (lyaUser.fullName) return lyaUser.fullName.split(' ')[0];
+    if (lyaUser.username) return lyaUser.username;
+  } catch (e) {
+    console.error("Error leyendo sesión del cajero:", e);
+  }
+  return 'Cajero en turno';
+};
+
+  const nombreCajero = getLoggedUserName();
 
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -110,6 +129,42 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const isLlevar = mesa.zona === 'llevar';
   const isVitrina = mesa.zona === 'vitrina';
 
+  const partesNumero = (mesa.numero || '').toString().split(' - ');
+  let numeroReal = partesNumero[0] || 'Pedido'; 
+  
+  if (isLlevar) numeroReal = numeroReal.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim();
+  else if (isVitrina) numeroReal = 'Express';
+
+  const tableTitle = isVitrina ? `Mostrador ⚡` : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`);
+
+  // ==========================================
+  // 🔥 CORRECCIÓN: WHATSAPP CON ENLACE DIRECTO (PDF/HTML)
+  // ==========================================
+  const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint) => {
+    // 1. Obtenemos el ID de la orden (para armar el link)
+    const orderId = mesa?.orderId || mesa?.id;
+
+    // 2. Construimos la URL base del backend
+    const baseUrl = client.defaults.baseURL || (window.location.origin + '/api');
+    const absoluteUrl = baseUrl.startsWith('http') ? baseUrl : window.location.origin + baseUrl;
+    
+    // 3. Armamos el enlace final
+    const shareLink = `${absoluteUrl}/pos/orders/${orderId}/share`;
+
+    // 4. Mensaje exacto como lo querías
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+
+    const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
+    window.open(urlApiWhatsApp, '_blank');
+
+    setPaymentSuccessData({
+      title: '¡Abriendo WhatsApp!',
+      message: 'Redirigiendo al chat con el cliente...'
+    });
+
+    setTimeout(() => setPaymentSuccessData(null), 1800);
+  };
+
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -122,28 +177,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     isVitrina, 
     toggleItemTakeaway
   };
-
-  const partesNumero = (mesa.numero || '').toString().split(' - ');
-  let numeroReal = partesNumero[0] || 'Pedido'; 
-  
-  if (isLlevar) numeroReal = numeroReal.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim();
-  else if (isVitrina) numeroReal = 'Express';
-
-  let nombreCliente = 'MOSTRADOR';
-  let telefonoCliente = '';
-
-  if ((isLlevar || isVitrina) && partesNumero.length >= 2) {
-    const rawTel = partesNumero[partesNumero.length - 1];
-    const telLimpio = rawTel.replace(/\D/g, '');
-    if (partesNumero.length >= 3 && telLimpio.length >= 10) {
-       nombreCliente = partesNumero.slice(1, -1).join(' - ');
-       telefonoCliente = rawTel;
-    } else {
-       nombreCliente = partesNumero.slice(1).join(' - ');
-    }
-  }
-
-  const tableTitle = isVitrina ? `Mostrador ⚡` : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`);
 
   const posContent = (
     <div className={`relative w-full h-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg flex flex-col md:flex-row transition-colors duration-300 ${!inline ? 'md:rounded-3xl shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
@@ -206,7 +239,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         </AnimatePresence>
       )}
 
-      {/* 🔥 AQUÍ LE PASAMOS EL userName AL TICKET */}
+      {/* AQUÍ SE PASA AL TICKET PREVIEW CON LA FUNCIÓN CORRECTA */}
       <TicketPreviewModal 
         isOpen={!!previewTicketData} 
         onClose={() => setPreviewTicketData(null)} 
@@ -214,7 +247,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         mesa={mesa} 
         cuentaName={previewTicketData?.cuentaName} 
         onConfirmPrint={executeRealPrint} 
-        onSendWhatsApp={() => {}} 
+        onSendWhatsApp={handleSendWhatsAppTicket} 
         userName={nombreCajero} 
       />
 

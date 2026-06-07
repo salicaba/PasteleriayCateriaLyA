@@ -1,3 +1,4 @@
+// src/modules/pasteleria/views/TicketPasteleriaModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Printer, Cake, Landmark, MessageCircle } from 'lucide-react';
@@ -10,6 +11,28 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   const [transferInfo, setTransferInfo] = useState(null); 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+
+  // 🔥 LÓGICA DE USUARIO: Buscamos en la misma sesión global que usa App.jsx
+  // Dentro de TicketPasteleriaModal.jsx
+const getLoggedUserName = () => {
+  try {
+    const sessionStr = localStorage.getItem('lya_pos_session');
+    if (sessionStr) {
+      const { userData } = JSON.parse(sessionStr);
+      // 🔥 AQUÍ TAMBIÉN: .split(' ')[0]
+      if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
+      if (userData && userData.username) return userData.username;
+    }
+    const lyaUser = JSON.parse(localStorage.getItem('lya_user') || '{}');
+    if (lyaUser.fullName) return lyaUser.fullName.split(' ')[0];
+    if (lyaUser.username) return lyaUser.username;
+  } catch (e) {
+    console.error("Error leyendo sesión del cajero:", e);
+  }
+  return 'Cajero en turno';
+};
+
+  const nombreCajero = getLoggedUserName();
 
   useEffect(() => {
     if (isOpen) {
@@ -137,6 +160,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       </div>
 
                       <div className="space-y-2 mb-4">
+                        <div className="flex justify-between"><span className="text-gray-500">Atendido por:</span> <span className="font-bold text-right text-black capitalize">{nombreCajero}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Cliente:</span> <span className="font-bold text-right text-black uppercase">{pedido.cliente || 'Público'}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span> <span className="text-right">{pedido.telefono || 'N/A'}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Entrega:</span> <span className="font-bold text-right capitalize text-black">{fecha}</span></div>
