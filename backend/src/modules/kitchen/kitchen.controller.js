@@ -32,7 +32,8 @@ export const getKitchenTickets = async (req, res) => {
         {
           model: Product,
           as: 'product',
-          attributes: ['name']
+          // 👇 AQUÍ ESTÁ LA MAGIA: Agregamos requiereCocina para que el frontend lo lea
+          attributes: ['name', 'requiereCocina'] 
         }
       ],
       order: [['createdAt', 'ASC']]

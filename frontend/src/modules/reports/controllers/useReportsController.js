@@ -169,7 +169,7 @@ export const useReportsController = () => {
       }
       XLSX.utils.book_append_sheet(wb, wsGastos, 'Gastos Operativos');
 
-      XLSX.writeFile(wb, `Inteligencia_Negocios_LyA_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      XLSX.writeFile(wb, `Inteligencia_Negocios_𝓛𝔂𝓪_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast.success('Reporte Excel exportado correctamente');
     } catch (error) {
       console.error(error);
@@ -184,7 +184,7 @@ export const useReportsController = () => {
       
       doc.setFontSize(18);
       doc.setTextColor(74, 43, 41);
-      doc.text('Inteligencia de Negocios - LyA', 14, 22);
+      doc.text('Inteligencia de Negocios - 𝓛𝔂𝓪', 14, 22);
       
       doc.setFontSize(11);
       doc.setTextColor(100);
@@ -231,7 +231,7 @@ export const useReportsController = () => {
         });
       }
 
-      doc.save(`Inteligencia_Negocios_LyA_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      doc.save(`Inteligencia_Negocios_𝓛𝔂𝓪_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast.success('Reporte PDF exportado correctamente');
     } catch (error) {
       console.error(error);

@@ -50,7 +50,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/reports', reportsRoutes); 
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓐 operando correctamente' });
+  res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓪 operando correctamente' });
 });
 
 export default app;

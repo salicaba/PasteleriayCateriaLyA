@@ -319,7 +319,7 @@ function App() {
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/20 dark:border-gray-600 lya:border-lya-primary shadow-sm bg-white flex items-center justify-center shrink-0">
                   <img 
                     src={logoLyA} 
-                    alt="Logo LyA" 
+                    alt="Logo 𝓛𝔂𝓪" 
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -417,7 +417,7 @@ function App() {
                      className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text pb-1 font-bold"
                      style={{ letterSpacing: '-0.11em', transform: 'scaleX(0.95)' }}
                    >
-                     𝓛𝔂𝓐
+                     𝓛𝔂𝓪
                    </span>
                  </div>
 

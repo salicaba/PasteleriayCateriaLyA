@@ -113,7 +113,7 @@ export const TicketPreviewModal = ({
 
             {/* Header del Ticket */}
             <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
-              <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓐</h2>
+              <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
               <p className="text-xs font-bold text-gray-600 uppercase mt-1">Pastelería & Cafetería</p>
               <p className="text-xs text-gray-500 mt-1">Comprobante de Venta</p>
               <p className="text-sm font-bold mt-2 text-black">

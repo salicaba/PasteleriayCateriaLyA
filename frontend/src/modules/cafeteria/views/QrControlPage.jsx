@@ -194,7 +194,7 @@ export const QrControlPage = () => {
                   <Smartphone className="w-10 h-10 text-orange-500 lya:text-lya-secondary" />
                 </div>
                 
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2 print:text-black text-3xl print:mb-4">Mostrador LyA</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2 print:text-black text-3xl print:mb-4">Mostrador 𝓛𝔂𝓪</h2>
                 
                 <p className="no-print text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-6">QR único para que los clientes en fila puedan escanear el menú.</p>
                 

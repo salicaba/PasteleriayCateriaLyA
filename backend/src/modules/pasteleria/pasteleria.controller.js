@@ -181,7 +181,7 @@ export const printPedidoTicket = async (req, res) => {
     const saboresSeguros = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
     console.log(`\n==========================================`);
-    console.log(`                  𝓛𝔂𝓐`);
+    console.log(`                  𝓛𝔂𝓪`);
     console.log(`         Pastelería & Cafetería`);
     console.log(`          Pijijiapan, Chiapas`);
     console.log(`------------------------------------------`);
@@ -256,7 +256,7 @@ export const sharePedidoTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Comprobante de Pedido - 𝓛𝔂𝓐</title>
+      <title>Comprobante de Pedido - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
@@ -273,7 +273,7 @@ export const sharePedidoTicket = async (req, res) => {
       <div class="w-full max-w-md bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 mt-4 mb-24 relative print-card transition-all duration-300">
         
         <div class="text-center mb-6">
-          <h1 class="text-5xl font-black text-amber-600 mb-2" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓐</h1>
+          <h1 class="text-5xl font-black text-amber-600 mb-2" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
           <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
           <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
         </div>

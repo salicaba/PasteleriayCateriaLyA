@@ -9,10 +9,37 @@ import client from '../../../api/client';
 
 const motivationalPhrases = [
   "Preparando el aroma de un gran día...",
-  "Encendiendo los hornos de 𝓛𝔂𝓐...",
+  "Encendiendo los hornos de 𝓛𝔂𝓪...",
   "La magia dulce está por comenzar...",
   "Alistando todo para un turno excelente...",
-  "Un buen café, una sonrisa y a triunfar..."
+  "Un buen café, una sonrisa y a triunfar...",
+
+  "Cada taza cuenta una historia...",
+  "Transformando granos en momentos especiales...",
+  "Hoy es un buen día para crear sonrisas...",
+  "La pasión se sirve caliente...",
+  "Comenzando un nuevo día lleno de oportunidades...",
+  "Preparando experiencias inolvidables...",
+  "El éxito se construye una orden a la vez...",
+  "Donde hay café, hay inspiración...",
+  "Horneando felicidad para nuestros clientes...",
+  "La excelencia está en los pequeños detalles...",
+  "Un equipo increíble está por entrar en acción...",
+  "Cargando energía para un día extraordinario...",
+  "Las mejores historias comienzan con un café...",
+  "Listos para servir con pasión y calidad...",
+  "Cada cliente merece lo mejor de nosotros...",
+  "Con dedicación, todo sabe mejor...",
+  "Creando momentos dulces desde temprano...",
+  "La constancia de hoy es el éxito de mañana...",
+  "Preparando sabores que alegran el día...",
+  "El esfuerzo de cada día deja huella...",
+  "La receta perfecta lleva pasión y compromiso...",
+  "Dando lo mejor en cada preparación...",
+  "Grandes metas comienzan con pequeños pasos...",
+  "Iniciando la jornada con actitud positiva...",
+  "Porque cada detalle cuenta...",
+  "Café listo, actitud lista, ¡a brillar!"
 ];
 
 export const LoginScreen = ({ onLogin }) => {
@@ -106,7 +133,7 @@ export const LoginScreen = ({ onLogin }) => {
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-2xl mb-8"
             >
-              <img src={logoLyA} alt="Pastelería LyA" className="w-full h-full object-cover" />
+              <img src={logoLyA} alt="Pastelería 𝓛𝔂𝓪" className="w-full h-full object-cover" />
             </motion.div>
             
             <motion.h1 
@@ -114,7 +141,7 @@ export const LoginScreen = ({ onLogin }) => {
               className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-4"
               style={{ letterSpacing: '-0.05em' }}
             >
-              𝓛𝔂𝓐
+              𝓛𝔂𝓪
             </motion.h1>
 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="flex flex-col items-center gap-4">
@@ -139,7 +166,7 @@ export const LoginScreen = ({ onLogin }) => {
             </div>
             <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-3">Sin Conexión</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed">
-              El sistema de 𝓛𝔂𝓐 no puede comunicarse con el servidor. Revisa tu internet o asegúrate de que el equipo central esté encendido.
+              El sistema de 𝓛𝔂𝓪 no puede comunicarse con el servidor. Revisa tu internet o asegúrate de que el equipo central esté encendido.
             </p>
             <button 
               onClick={runSystemCheck}
@@ -161,10 +188,10 @@ export const LoginScreen = ({ onLogin }) => {
               
               <div className="flex flex-col items-center mb-8">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-xl mb-6">
-                  <img src={logoLyA} alt="Pastelería LyA" className="w-full h-full object-cover" />
+                  <img src={logoLyA} alt="Pastelería 𝓛𝔂𝓪" className="w-full h-full object-cover" />
                 </div>
                 <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2" style={{ letterSpacing: '-0.05em' }}>
-                  𝓛𝔂𝓐
+                  𝓛𝔂𝓪
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium uppercase tracking-widest">
                   Punto de Venta
@@ -255,7 +282,7 @@ export const LoginScreen = ({ onLogin }) => {
       
       <div className="absolute bottom-6 text-center w-full pointer-events-none z-0">
         <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/40 tracking-wider">
-          SISTEMA POS <b>𝓛𝔂𝓐</b> • VERSIÓN 1.0.0
+          SISTEMA POS <b>𝓛𝔂𝓪</b> • VERSIÓN 1.0.0
         </p>
       </div>
     </div>

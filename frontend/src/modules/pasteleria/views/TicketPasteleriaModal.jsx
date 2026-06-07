@@ -61,7 +61,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       cuentasTexto += `\n💡 _Importante: En el *concepto* de tu pago, por favor escribe tu folio: *${pedido.id}*_`;
     }
     
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓐 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
     
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
@@ -130,7 +130,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       
                       <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                         <Cake size={32} className="mx-auto mb-2 text-gray-800" />
-                        <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓐</h2>
+                        <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
                         <p className="text-xs font-bold text-gray-600 uppercase">Pastelería & Cafetería</p>
                         <p className="text-xs text-gray-500 mt-1">Comprobante de Pedido</p>
                         <p className="text-lg font-bold mt-2 text-black">{pedido.id}</p>

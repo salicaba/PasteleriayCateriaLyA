@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "API REST para Pastelería y Cafetería LyA",
+  "description": "API REST para Pastelería y Cafetería 𝓛𝔂𝓪",
   "main": "src/server.js",
   "type": "module",
   "scripts": {

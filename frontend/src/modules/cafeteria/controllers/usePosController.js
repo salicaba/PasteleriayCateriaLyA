@@ -1,4 +1,3 @@
-// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
@@ -22,7 +21,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     return todasLasMesas.find(m => m.id === mesaInicial.id) || mesaInicial;
   }, [mesaInicial, todasLasMesas]);
 
-  // 🔥 DETECTAMOS SI ESTAMOS EN MODO QUIOSCO / VITRINA
   const isVitrina = mesaActual?.zona === 'vitrina';
 
   useEffect(() => {
@@ -69,7 +67,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway || false,
                 backendItemId: item.id,
-                // 🔥 Aseguramos la propiedad al cargar desde BD
                 requiereCocina: item.product?.requiereCocina !== false 
             };
         });
@@ -129,7 +126,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         enviadoCocina: false, 
         cuenta: targetCuenta, 
         isTakeaway: productWithDetails.isTakeaway || false,
-        // 🔥 INYECTAMOS LA BANDERA AL CARRITO (Por defecto true si no viene)
         requiereCocina: productWithDetails.requiereCocina !== false
       }];
     });
@@ -168,20 +164,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
       let allItemsFromDB = response.data.orderItems || [];
       
-      // 🚀 TRUCO MAESTRO: Auto-entregamos en la BD los productos que no requieren cocina
-      const itemsToAutoDeliver = allItemsFromDB.filter(dbItem => {
-         const localItem = itemsNuevos.find(n => n.id === dbItem.productId);
-         return localItem && localItem.requiereCocina === false;
-      });
-
-      if (itemsToAutoDeliver.length > 0) {
-         await Promise.all(itemsToAutoDeliver.map(async (dbItem) => {
-             try {
-                 await client.put(`/kitchen/tickets/${dbItem.id}/status`, { status: 'DELIVERED' });
-                 dbItem.kitchenStatus = 'DELIVERED'; // Actualizamos la variable local en memoria
-             } catch (e) { console.error("Error auto-entregando producto de vitrina", e); }
-         }));
-      }
+      // 🔥 ELIMINADO: El "Truco Maestro" que auto-entregaba los productos de vitrina ya no está aquí.
+      // Ahora TODO entra a cocina para que ellos lo despachen.
 
       const updatedCart = allItemsFromDB.map(item => {
           let parsedPreps = [];
@@ -455,13 +439,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  // 🔥 MAGIA: Si no requiere cocina, lo damos por válido para cobrar al instante
+  // 🔥 ACTUALIZADO: Para cobrar, absolutamente TODOS los productos deben haber sido entregados por cocina/barra
   const validateAllDelivered = (cuentaName = null) => { 
     const itemsToCheck = cuentaName ? cart.filter(c => c.cuenta === cuentaName) : cart; 
     if (itemsToCheck.length === 0) return false;
-    return itemsToCheck.every(item => 
-       item.requiereCocina === false || (item.enviadoCocina && item.kitchenStatus === 'DELIVERED')
-    ); 
+    return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); 
   };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
@@ -482,7 +464,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const handleCheckout = async (paymentDetails, onComplete) => {
     try {
-      // Si hay ítems sin enviar (incluyendo los de vitrina), los enviamos primero (auto-delivery)
+      // Si hay ítems sin enviar (incluyendo los de vitrina), los enviamos primero
       if (cart.some(p => !p.enviadoCocina)) {
          await new Promise(resolve => simulateKitchenSend(resolve));
       }
@@ -522,14 +504,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   
-  // 🔥 MAGIA: Ocultamos el botón "Enviar a Cocina" si TODOS los productos nuevos son de vitrina
-  const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina && p.requiereCocina !== false), [cart]);
+  // 🔥 ACTUALIZADO: El botón "Enviar a Cocina" debe aparecer siempre que haya productos sin enviar, sin importar si son de vitrina o no.
+  const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
   
   const cuentasDisponibles = useMemo(() => Array.from(new Set([...nombresCuentas, ...cart.map(i => i.cuenta || 'General')])), [cart, nombresCuentas]);
   const getSubtotalByCuenta = (nombreCuenta) => cart.filter(item => item.cuenta === nombreCuenta).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
   const getProductQty = (id) => cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva).reduce((acc, item) => acc + item.qty, 0);
 
-  // 🔥 MAGIA: Si estamos en Vitrina, SOLO mostramos los productos que no requieren cocina
   const filteredProducts = useMemo(() => {
     return dbProducts.filter(p => {
        const matchText = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase());

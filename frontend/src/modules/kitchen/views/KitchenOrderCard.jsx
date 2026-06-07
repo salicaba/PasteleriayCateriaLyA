@@ -1,6 +1,5 @@
-// src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Timer, Check, ChefHat, CheckCircle, Flame, BellRing, ShoppingBag } from 'lucide-react';
+import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllReady }) => {
@@ -111,7 +110,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
         />
       </div>
 
-      {/* CABECERA ULTRA COMPACTA */}
       <div className="pt-4 pb-3 px-4 flex justify-between items-center relative z-10">
         <h3 className={`text-xl sm:text-2xl font-black uppercase tracking-tighter bg-gradient-to-br bg-clip-text text-transparent ${urgency.textGlow}`}>
           {getDisplayTitle()}
@@ -138,7 +136,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
                   : 'bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 hover:shadow-sm hover:border-blue-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/40'
               }`}
             >
-              {/* BURBUJA DE CANTIDAD MÁS PEQUEÑA */}
               <div className={`relative w-8 h-8 mt-0.5 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
                 isReady 
                   ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 scale-95' 
@@ -152,7 +149,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
               </div>
               
               <div className="flex-1 min-w-0">
-                {/* NOMBRE DEL ITEM SIN TRUNCAR */}
                 <p className={`text-sm sm:text-[15px] font-bold uppercase leading-snug break-words transition-all duration-300 ${
                   isReady 
                     ? 'line-through text-gray-400 dark:text-gray-500 decoration-2 decoration-gray-400/50' 
@@ -161,22 +157,32 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
                   {item.nombre}
                 </p>
 
-                {/* 🔥 NUEVO: ETIQUETA VISUAL PARA COCINA SI ES PARA LLEVAR */}
-                {item.isTakeaway && (
-                  <div className="mt-1">
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {/* 🔥 ETIQUETA VISUAL PARA LLEVAR */}
+                  {item.isTakeaway && (
                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
-                       isReady 
-                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
-                        : 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400'
+                        isReady 
+                          ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
+                          : 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400'
                     }`}>
                       <ShoppingBag size={10} /> Empacar Llevar
                     </span>
-                  </div>
-                )}
+                  )}
+                  
+                  {/* 🔥 ETIQUETA VISUAL PARA SOLO SERVIR (Productos de vitrina) */}
+                  {!item.requiereCocina && (
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
+                       isReady 
+                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
+                        : 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
+                    }`}>
+                      Solo Servir
+                    </span>
+                  )}
+                </div>
                 
                 {item.preparaciones && item.preparaciones.length > 0 && (
                   <div className={`mt-1 flex flex-wrap gap-1 transition-opacity duration-300 ${isReady ? 'opacity-40' : 'opacity-100'}`}>
-                    {/* 🔥 CORRECCIÓN: .slice(0,1) para no repetir configuraciones visualmente en cocina */}
                     {item.preparaciones.slice(0, 1).map((prep, idx) => (
                       <React.Fragment key={idx}>
                         {prep.tamano && prep.tamano !== 'Estándar' && (
@@ -204,7 +210,6 @@ export const KitchenOrderCard = ({ order, onToggleItem, onComplete, onMarkAllRea
         })}
       </div>
 
-      {/* BOTONES MÁS DELGADOS */}
       <div className="p-2.5 bg-transparent pt-0">
         {allReady ? (
           <button 

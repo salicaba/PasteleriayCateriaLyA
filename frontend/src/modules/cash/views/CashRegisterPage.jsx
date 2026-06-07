@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
-import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, RefreshCw, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark } from 'lucide-react';
+import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const CashRegisterPage = ({ user }) => {
@@ -135,7 +135,6 @@ export const CashRegisterPage = ({ user }) => {
           <h2 className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 lya:text-blue-600">${paymentStats.digital.toFixed(2)}</h2>
         </motion.div>
         
-        {/* 🔥 Tarjeta de Cafetería con sus colores */}
         <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all hover:-translate-y-1">
           <div className="flex items-center gap-2 text-orange-500 mb-1">
             <Coffee size={14}/> 
@@ -144,7 +143,6 @@ export const CashRegisterPage = ({ user }) => {
           <h2 className="text-xl font-extrabold text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C]">${resumen.cafeteria.toFixed(2)}</h2>
         </motion.div>
 
-        {/* 🔥 Tarjeta de Pastelería con sus colores */}
         <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all hover:-translate-y-1">
           <div className="flex items-center gap-2 text-pink-500 mb-1">
             <Cake size={14}/> 
@@ -190,17 +188,6 @@ export const CashRegisterPage = ({ user }) => {
       </div>
 
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4">
-        <AnimatePresence>
-          {loading && (
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-20 flex items-center justify-center lya:bg-lya-surface/50"
-            >
-              <RefreshCw className="animate-spin text-orange-500 lya:text-lya-primary" size={36} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
         <div className="overflow-y-auto custom-scrollbar flex-1">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-10 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
@@ -322,7 +309,7 @@ export const CashRegisterPage = ({ user }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 dark:bg-black/60 lya:bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 dark:bg-black/60 lya:bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -365,6 +352,40 @@ export const CashRegisterPage = ({ user }) => {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔥 PANTALLA DE CARGA TEMÁTICA (Taza de café brincando) */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-gray-50/60 dark:bg-gray-950/60 lya:bg-lya-bg/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center"
+          >
+            <div className="relative flex flex-col items-center">
+              {/* Taza saltando */}
+              <motion.div 
+                animate={{ y: [0, -22, 0] }} 
+                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }} 
+                className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-full shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 z-10"
+              >
+                <Coffee size={36} className="text-orange-500 lya:text-lya-primary" />
+              </motion.div>
+              
+              {/* Sombra de la taza */}
+              <motion.div
+                animate={{ scale: [1, 0.5, 1], opacity: [0.2, 0.05, 0.2] }}
+                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
+                className="w-10 h-2 bg-black rounded-[100%] mt-3 blur-[2px]"
+              />
+            </div>
+
+            <p className="mt-5 text-base font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 animate-pulse tracking-wide">
+              Preparando información...
+            </p>
           </motion.div>
         )}
       </AnimatePresence>

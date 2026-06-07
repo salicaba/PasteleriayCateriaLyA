@@ -11,7 +11,7 @@ export const login = async (req, res) => {
     // pero ahora sabemos que el cajero pudo haber escrito su correo ahí.
     const { username, password } = req.body;
 
-    console.log(`Intento de acceso a 𝓛𝔂𝓐 -> Identificador: "${username}"`);
+    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}"`);
 
     // 1. Buscar al usuario en la base de datos (por Usuario O por Correo)
     const user = await User.findOne({ 

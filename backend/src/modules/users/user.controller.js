@@ -1,4 +1,3 @@
-// src/modules/users/user.controller.js
 import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 import User from './User.model.js';
@@ -37,14 +36,14 @@ export const createUser = async (req, res) => {
     // ENVIAR CORREO ANTES DE HASHEAR LA CONTRASEÑA
     if (email && process.env.MAIL_USER) {
       const mailOptions = {
-        from: `"Punto de Venta LyA" <${process.env.MAIL_USER}>`,
+        from: `"Punto de Venta 𝓛𝔂𝓪" <${process.env.MAIL_USER}>`,
         to: email,
-        subject: '¡Bienvenido al equipo de LyA! - Tus credenciales de acceso',
+        subject: '¡Bienvenido al equipo de 𝓛𝔂𝓪! - Tus credenciales de acceso',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
             <h2 style="color: #ea580c; text-align: center;">¡Hola, ${fullName}!</h2>
             <p style="font-size: 14px; color: #475569; line-height: 1.5;">
-              Se ha creado tu cuenta en el Sistema de Punto de Venta de <b>Pastelería y Cafetería LyA</b>. Estas son tus credenciales de acceso:
+              Se ha creado tu cuenta en el Sistema de Punto de Venta de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Estas son tus credenciales de acceso:
             </p>
             <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 5px 0; font-size: 14px;"><b>Usuario:</b> ${username}</p>
@@ -107,7 +106,7 @@ export const updateUser = async (req, res) => {
     let passwordChanged = false;
     let changesMade = false;
 
-    // 🔥 CORRECCIÓN: Convertimos el string vacío a null para evitar errores de validación en la BD
+    // Convertimos el string vacío a null para evitar errores de validación en la BD
     const parsedEmail = email === '' ? null : email;
 
     // Detectamos si algo realmente cambió comparando con el nuevo parsedEmail
@@ -124,7 +123,7 @@ export const updateUser = async (req, res) => {
       changesMade = true;
     }
 
-    // Si no detectó ningún cambio, cortamos la ejecución aquí (ahora sí funcionará perfecto)
+    // Si no detectó ningún cambio, cortamos la ejecución aquí
     if (!changesMade) {
       return res.json({ 
         changed: false, 
@@ -136,18 +135,18 @@ export const updateUser = async (req, res) => {
     // Si sí hubo cambios, guardamos en la base de datos
     await user.save();
 
-    // ENVIAR CORREO DE ACTUALIZACIÓN (usando el parsedEmail)
+    // ENVIAR CORREO DE ACTUALIZACIÓN
     const targetEmail = parsedEmail || user.email; 
     if (changesMade && targetEmail && process.env.MAIL_USER) {
       const mailOptions = {
-        from: `"Punto de Venta LyA" <${process.env.MAIL_USER}>`,
+        from: `"Punto de Venta 𝓛𝔂𝓪" <${process.env.MAIL_USER}>`,
         to: targetEmail,
-        subject: 'Actualización de tu cuenta en LyA',
+        subject: 'Actualización de tu cuenta en 𝓛𝔂𝓪',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
             <h2 style="color: #ea580c; text-align: center;">¡Hola, ${user.fullName}!</h2>
             <p style="font-size: 14px; color: #475569; line-height: 1.5;">
-              El administrador ha actualizado la información de tu cuenta en el Sistema de <b>Pastelería y Cafetería LyA</b>. Aquí están tus datos vigentes:
+              El administrador ha actualizado la información de tu cuenta en el Sistema de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Aquí están tus datos vigentes:
             </p>
             <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 5px 0; font-size: 14px;"><b>Usuario / Login:</b> ${user.username}</p>
@@ -180,7 +179,7 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// DELETE: Eliminación lógica (¡La que faltaba!)
+// DELETE: Eliminación lógica
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;

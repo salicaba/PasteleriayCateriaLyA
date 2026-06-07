@@ -9,7 +9,7 @@ export const ThemeSelector = () => {
   const themes = [
     { id: 'light', icon: Sun, label: 'Claro' },
     { id: 'dark', icon: Moon, label: 'Oscuro' },
-    { id: 'lya', icon: Cake, label: 'LyA' },
+    { id: 'lya', icon: Cake, label: '𝓛𝔂𝓪' },
   ];
 
   return (

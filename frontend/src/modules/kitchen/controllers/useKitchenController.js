@@ -33,13 +33,14 @@ export const useKitchenController = () => {
           id: item.id,
           nombre: item.product?.name || 'Producto',
           qty: item.quantity,
-          isTakeaway: item.isTakeaway, // 🔥 AQUÍ ABRIMOS LA TUBERÍA: Pasamos la variable a la vista
+          isTakeaway: item.isTakeaway, 
+          // 🔥 AQUÍ PASAMOS LA BANDERA A LA VISTA
+          requiereCocina: item.product?.requiereCocina !== false, 
           preparaciones: preps.map((p, i) => ({
             idPrep: `${item.id}-${i}`,
             tamano: p.tamano || 'Estándar',
             leche: p.leche,
             extras: p.extras || [],
-            // En KDS, "isReady" visualmente es cuando ya se preparó (PREPARING)
             isReady: item.kitchenStatus === 'PREPARING'
           })),
           kitchenStatus: item.kitchenStatus
@@ -59,7 +60,6 @@ export const useKitchenController = () => {
   return {
     orders: [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
     
-    // 🔥 FASE 1: Tachado individual (Cambia a PREPARING en BD)
     toggleItemReady: async (orderId, itemId) => {
         const order = orders.find(o => o.id === orderId);
         const item = order?.items.find(i => i.id === itemId);
@@ -85,8 +85,6 @@ export const useKitchenController = () => {
         } catch(e){ console.error("Error al marcar todo preparado"); }
     },
 
-    // 🔥 FASE 2: LISTO PARA ENTREGAR
-    // Pasa los productos a READY, haciéndolos desaparecer del KDS y aparecer al mesero.
     completeOrder: async (orderId) => {
         const order = orders.find(o => o.id === orderId);
         if(!order) return;

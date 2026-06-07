@@ -246,7 +246,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     const htmlContent = `
       <html>
         <head>
-          <title>Tarjetas de Pago - LyA</title>
+          <title>Tarjetas de Pago - 𝓛𝔂𝓪</title>
           <style>
             body { font-family: sans-serif; padding: 20px; background: white; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
@@ -265,7 +265,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
           <div class="grid">
             ${tarjetasArray.map(() => `
               <div class="card">
-                <div class="logo"> 𝓛𝔂𝓐 </div>
+                <div class="logo"> 𝓛𝔂𝓪 </div>
                 <div class="subtitle">Datos de Transferencia</div>
                 ${accounts.map(acc => `
                   <div class="bank">${acc.bank_name}</div>
@@ -669,7 +669,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
               <div className="bg-purple-500 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0"><Palette size={28} /></div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight leading-none">Interfaz y Pantalla</h1>
-                <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Personaliza el aspecto, colores y tamaño visual de 𝓛𝔂𝓐</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Personaliza el aspecto, colores y tamaño visual de 𝓛𝔂𝓪</p>
               </div>
             </div>
 
@@ -741,7 +741,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
               <div className="bg-gray-900 dark:bg-gray-700 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0"><Printer size={28} /></div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight leading-none">Administración de dispositivos físicos</h1>
-                <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Configuración de impresoras térmicas, lectores y periféricos locales de 𝓛𝔂𝓐</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Configuración de impresoras térmicas, lectores y periféricos locales de 𝓛𝔂𝓪</p>
               </div>
             </div>
 

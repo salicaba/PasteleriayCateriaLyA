@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon, Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon, Filter, Download, FileText, FileSpreadsheet, Coffee } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useReportsController } from '../controllers/useReportsController';
 import { useTheme } from '../../../hooks/useTheme';
@@ -28,7 +28,6 @@ const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
   const isPositive = type === 'income' || (type === 'profit' && amount >= 0);
   const isNegative = type === 'expense' || (type === 'profit' && amount < 0);
   
-  // Lógica de tendencias: Si suben ingresos/utilidad es bueno (+). Si suben gastos/mermas es malo (-)
   const isTrendGood = (type === 'income' || type === 'profit') ? trend >= 0 : trend <= 0;
   const TrendIcon = trend >= 0 ? TrendingUp : TrendingDown;
   
@@ -49,7 +48,6 @@ const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
           ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
         </h3>
         
-        {/* Renderizado condicional de Tendencias */}
         {trend !== undefined && !isNaN(trend) && (
           <div className={`mt-2 flex items-center text-xs font-black ${isTrendGood ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
             <TrendIcon size={14} className="mr-1" strokeWidth={3} />
@@ -68,7 +66,6 @@ const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
   );
 };
 
-// 🔥 NUEVO COMPONENTE: Estado vacío para las gráficas
 const EmptyChartState = ({ message }) => (
   <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-800/20 lya:bg-lya-bg/30 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl transition-colors">
     <svg className="w-10 h-10 text-gray-300 dark:text-gray-600 lya:text-lya-text/20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,7 +96,7 @@ export const ReportsPage = () => {
   };
 
   const processedProducts = useMemo(() => {
-    if (!chartData.productSales) return [];
+    if (!chartData?.productSales) return [];
     
     let list = [...chartData.productSales];
     list.sort((a, b) => b.cantidad - a.cantidad);
@@ -111,7 +108,7 @@ export const ReportsPage = () => {
     }
     
     return list;
-  }, [chartData.productSales, productFilter]);
+  }, [chartData?.productSales, productFilter]);
 
   const chartDisplayedProducts = useMemo(() => {
     return [...processedProducts].reverse();
@@ -119,21 +116,16 @@ export const ReportsPage = () => {
 
   const dynamicChartHeight = Math.max(300, chartDisplayedProducts.length * 35);
 
-  if (loading || !chartData.kpis) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
-  const translatedOpexData = chartData.opexData?.map(item => {
+  const translatedOpexData = chartData?.opexData?.map(item => {
     const safeName = item.name ? item.name.toUpperCase() : 'NONE';
     return {
       ...item,
       name: OPEX_TRANSLATIONS[safeName] || item.name 
     };
   }) || [];
+
+  const kpis = chartData?.kpis || { totalIncome: 0, netProfit: 0, totalOpex: 0, totalMermas: 0 };
+  const trends = chartData?.trends || {};
 
   return (
     <motion.div 
@@ -161,7 +153,6 @@ export const ReportsPage = () => {
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
           
-          {/* Botones de Exportación */}
           <div className="flex gap-2 w-full sm:w-auto">
              <button 
                 onClick={exportToPDF}
@@ -177,7 +168,6 @@ export const ReportsPage = () => {
              </button>
           </div>
 
-          {/* Date Picker */}
           <div className="flex items-center gap-3 w-full sm:w-auto bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2.5 shadow-inner transition-colors">
             <CalendarIcon size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 shrink-0" />
             <input 
@@ -204,10 +194,10 @@ export const ReportsPage = () => {
         
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <KPICard title="Ingresos Totales" amount={chartData.kpis.totalIncome} trend={chartData.trends?.income} icon={DollarSign} type="income" delay={0.05} />
-          <KPICard title="Utilidad Neta (Aprox)" amount={chartData.kpis.netProfit} trend={chartData.trends?.profit} icon={chartData.kpis.netProfit >= 0 ? TrendingUp : TrendingDown} type="profit" delay={0.1} />
-          <KPICard title="Gastos (OPEX)" amount={chartData.kpis.totalOpex} trend={chartData.trends?.opex} icon={Wallet} type="expense" delay={0.15} />
-          <KPICard title="Mermas (Kardex)" amount={chartData.kpis.totalMermas} trend={chartData.trends?.mermas} icon={PackageMinus} type="expense" delay={0.2} />
+          <KPICard title="Ingresos Totales" amount={kpis.totalIncome} trend={trends.income} icon={DollarSign} type="income" delay={0.05} />
+          <KPICard title="Utilidad Neta (Aprox)" amount={kpis.netProfit} trend={trends.profit} icon={kpis.netProfit >= 0 ? TrendingUp : TrendingDown} type="profit" delay={0.1} />
+          <KPICard title="Gastos (OPEX)" amount={kpis.totalOpex} trend={trends.opex} icon={Wallet} type="expense" delay={0.15} />
+          <KPICard title="Mermas (Kardex)" amount={kpis.totalMermas} trend={trends.mermas} icon={PackageMinus} type="expense" delay={0.2} />
         </div>
 
         {/* INGRESOS DIARIOS */}
@@ -217,7 +207,7 @@ export const ReportsPage = () => {
         >
           <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-6 transition-colors">Tendencia de Ingresos Diarios</h3>
           <div className="h-[300px] w-full">
-            {chartData.dailySales?.length > 0 ? (
+            {chartData?.dailySales?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <AreaChart data={chartData.dailySales} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
@@ -247,7 +237,7 @@ export const ReportsPage = () => {
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.3 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300">
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-4 transition-colors">Ingresos por Origen</h3>
             <div className="h-[250px]">
-              {chartData.incomeSource?.some(item => item.value > 0) ? (
+              {chartData?.incomeSource?.some(item => item.value > 0) ? (
                 <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <PieChart>
                     <Pie data={chartData.incomeSource} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
@@ -268,7 +258,7 @@ export const ReportsPage = () => {
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.35 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300">
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text mb-4 transition-colors">Métodos de Pago</h3>
             <div className="h-[250px]">
-              {chartData.paymentMethods?.length > 0 ? (
+              {chartData?.paymentMethods?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <BarChart data={chartData.paymentMethods} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
@@ -427,6 +417,41 @@ export const ReportsPage = () => {
         </motion.div>
 
       </div>
+
+      {/* 🔥 PANTALLA DE CARGA TEMÁTICA (Taza de café brincando) */}
+      <AnimatePresence>
+        {(loading || !chartData?.kpis) && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-gray-50/60 dark:bg-gray-950/60 lya:bg-lya-bg/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center"
+          >
+            <div className="relative flex flex-col items-center">
+              {/* Taza saltando */}
+              <motion.div 
+                animate={{ y: [0, -22, 0] }} 
+                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }} 
+                className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-full shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 z-10"
+              >
+                <Coffee size={36} className="text-orange-500 lya:text-lya-primary" />
+              </motion.div>
+              
+              {/* Sombra de la taza */}
+              <motion.div
+                animate={{ scale: [1, 0.5, 1], opacity: [0.2, 0.05, 0.2] }}
+                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
+                className="w-10 h-2 bg-black rounded-[100%] mt-3 blur-[2px]"
+              />
+            </div>
+
+            <p className="mt-5 text-base font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 animate-pulse tracking-wide">
+              Preparando información...
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 };
