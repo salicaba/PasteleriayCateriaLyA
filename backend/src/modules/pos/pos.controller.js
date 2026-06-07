@@ -631,6 +631,7 @@ export const shareOrderTicket = async (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Tu Ticket de Consumo - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
@@ -643,7 +644,7 @@ export const shareOrderTicket = async (req, res) => {
     </head>
     <body class="text-gray-800 antialiased flex flex-col items-center min-h-screen p-4 sm:p-6 select-none">
       
-      <div class="w-full max-w-md bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 mt-4 mb-24 relative print-card transition-all duration-300">
+      <div id="ticket-card" class="w-full max-w-md bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 mt-4 mb-24 relative print-card transition-all duration-300">
         
         <div class="text-center mb-6">
           <h1 class="text-5xl font-black text-amber-600 mb-2" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
@@ -703,7 +704,7 @@ export const shareOrderTicket = async (req, res) => {
                   quantity: item.quantity,
                   subtotal: Number(item.subtotal),
                   unitPrice: Number(item.subtotal) / item.quantity,
-                  isTakeaway: item.isTakeaway,
+                  isTakeaway: item.isTakeaway || false,
                   notes: notes
                 });
               }
@@ -774,11 +775,26 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
-        <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-slate-300/50 active:scale-95 transition-all duration-200 flex items-center gap-3 text-sm uppercase tracking-wider">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x x="6" y="14" width="12" height="8"></rect></svg>
+        <button onclick="descargarPDF()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-slate-300/50 active:scale-95 transition-all duration-200 flex items-center gap-3 text-sm uppercase tracking-wider">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
           Guardar Ticket en PDF
         </button>
       </div>
+
+      <script>
+        function descargarPDF() {
+          const element = document.getElementById('ticket-card');
+          const options = {
+            margin:       [12, 12, 12, 12],
+            filename:     'Ticket-Consumo-${orderId}.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 3, useCORS: true, logging: false },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          };
+          
+          html2pdf().set(options).from(element).save();
+        }
+      </script>
 
     </body>
     </html>

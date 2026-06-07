@@ -1,8 +1,14 @@
 import axios from 'axios';
 
+// 🔥 Detectamos si estamos en producción (Vercel) para usar Render
+// Si estamos probando en local, usa localhost:4000
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const defaultBaseUrl = isLocalhost 
+  ? 'http://localhost:4000/api' 
+  : 'https://lya-backend-2gay.onrender.com/api';
+
 const client = axios.create({
-  // Detecta automáticamente si estás en localhost o en una IP (ej. 192.168.1.5)
-  baseURL: import.meta.env.VITE_API_URL || `http://${window.location.hostname}:4000/api`,
+  baseURL: import.meta.env.VITE_API_URL || defaultBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },

@@ -71,9 +71,14 @@ const getLoggedUserName = () => {
       return;
     }
     
-    const baseUrl = client.defaults.baseURL || (window.location.origin + '/api');
-    const absoluteUrl = baseUrl.startsWith('http') ? baseUrl : window.location.origin + baseUrl;
-    const shareLink = `${absoluteUrl}/pasteleria/pedidos/${pedido.id}/share`;
+    // 🔥 CORRECCIÓN: Forzamos a usar el backend de Render para los enlaces de WhatsApp.
+    // Así, aunque cobres desde tu laptop local, el cliente recibe un enlace público que sí funciona.
+    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
+    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
+      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
+    }
+    
+    const shareLink = `${baseApiUrl}/pasteleria/pedidos/${pedido.id}/share`;
 
     let cuentasTexto = '';
     if (finanzas.deuda > 0 && transferInfo?.bank_accounts?.length > 0) {

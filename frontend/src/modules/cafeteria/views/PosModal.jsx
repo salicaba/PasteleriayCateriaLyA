@@ -141,17 +141,17 @@ const getLoggedUserName = () => {
   // 🔥 CORRECCIÓN: WHATSAPP CON ENLACE DIRECTO (PDF/HTML)
   // ==========================================
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint) => {
-    // 1. Obtenemos el ID de la orden (para armar el link)
     const orderId = mesa?.orderId || mesa?.id;
 
-    // 2. Construimos la URL base del backend
-    const baseUrl = client.defaults.baseURL || (window.location.origin + '/api');
-    const absoluteUrl = baseUrl.startsWith('http') ? baseUrl : window.location.origin + baseUrl;
+    // 🔥 CORRECCIÓN: Reemplazamos localhost por tu dominio en Render para que los clientes 
+    // puedan abrirlo en cualquier dispositivo sin problemas.
+    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
+    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
+      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
+    }
     
-    // 3. Armamos el enlace final
-    const shareLink = `${absoluteUrl}/pos/orders/${orderId}/share`;
+    const shareLink = `${baseApiUrl}/pos/orders/${orderId}/share`;
 
-    // 4. Mensaje exacto como lo querías
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
