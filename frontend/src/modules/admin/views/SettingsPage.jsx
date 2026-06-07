@@ -4,7 +4,8 @@ import {
   Save, Landmark, Plus, Trash2, Edit2, Check, Printer, 
   Settings, Sliders, Info, Palette, Monitor, 
   Maximize, Minimize, Layout, Wifi, Usb, 
-  RefreshCw, AlertCircle, Barcode, Keyboard, Users, Shield, UserX, UserCheck, MessageCircle
+  RefreshCw, AlertCircle, Barcode, Keyboard, Users, Shield, UserX, UserCheck, MessageCircle,
+  Mail, Eye, EyeOff // Nuevos íconos agregados para el formulario
 } from 'lucide-react';
 import client from '../../../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,15 +16,15 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const [accounts, setAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
   
-  // Estados de Configuración de Hardware
   const [printerConfig, setPrinterConfig] = useState({ type: 'usb', interface: '' });
   const [barcodeConfig, setBarcodeConfig] = useState({ autoAdd: true }); 
   const [lastScanned, setLastScanned] = useState(''); 
 
-  // --- CONTROL DE USUARIOS REALES (CONECTADO A BD) ---
+  // --- CONTROL DE USUARIOS ---
   const [systemUsers, setSystemUsers] = useState([]);
-  const [userForm, setUserForm] = useState({ id: '', fullName: '', username: '', password: '', role: 'Empleado', isActive: true });
+  const [userForm, setUserForm] = useState({ id: '', fullName: '', username: '', email: '', password: '', role: 'Empleado', isActive: true });
   const [editingUserId, setEditingUserId] = useState(null);
+  const [showPassword, setShowPassword] = useState(false); // 🔥 Estado para mostrar/ocultar contraseña
 
   const [isScanning, setIsScanning] = useState(false);
   const [detectedPorts, setDetectedPorts] = useState([]);
@@ -39,7 +40,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const [printQuantity, setPrintQuantity] = useState(2);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Helper inteligente para obtener iniciales
   const getInitials = (name) => {
     if (!name) return 'US';
     const cleanName = name.trim();
@@ -94,7 +94,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     }
   };
 
-  // Función universal para guardar en base de datos
   const saveSettingsToDB = async (payloadToOverride) => {
     setLoading(true);
     try {
@@ -103,7 +102,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
         printer_config: printerConfig,
         barcode_config: barcodeConfig,
         whatsapp_number: whatsappNumber,
-        ...payloadToOverride // Sobrescribe con los datos más recientes antes de que React actualice el estado visual
+        ...payloadToOverride 
       });
       toast.success("¡Configuración guardada en la Base de Datos!");
     } catch (e) {
@@ -113,7 +112,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   const handleSaveToServer = () => saveSettingsToDB({});
 
-  // --- MÉTODOS DE BASE DE DATOS: CUENTAS BANCARIAS (AUTO-GUARDADO) ---
   const handleAddOrUpdate = async () => {
     if (!form.bank_name || !form.account_number) return toast.error("Completa los campos obligatorios");
     
@@ -126,38 +124,50 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     
     setAccounts(newAccounts); 
     resetForm(); 
-    
     await saveSettingsToDB({ bank_accounts: newAccounts }); 
   };
 
   const editAccount = (acc) => { setEditingId(acc.id); setForm(acc); };
   const resetForm = () => { setEditingId(null); setForm({ id: '', bank_name: '', account_number: '', account_holder: '', clabe: '' }); };
-  
   const deleteAccount = async (id) => { 
     const newAccounts = accounts.filter(a => a.id !== id);
     setAccounts(newAccounts); 
     await saveSettingsToDB({ bank_accounts: newAccounts });
   };
 
-  // --- CRUD REAL CON BASE DE DATOS: CONTROL DE USUARIOS ---
+  // --- CRUD USUARIOS ---
   const handleUserSubmit = async () => {
     if (!userForm.fullName || !userForm.username) return toast.error("Nombre completo y nombre de usuario requeridos");
     if (!editingUserId && !userForm.password) return toast.error("La contraseña es requerida para nuevos usuarios");
 
+    // 🔥 Se eliminó la validación que forzaba a usar @gmail.com
+    // Ahora el sistema acepta Hotmail, Outlook, Yahoo, etc.
+
     setLoading(true);
+    const toastId = toast.loading(editingUserId ? 'Verificando datos...' : 'Creando usuario y enviando correo...');
+    
     try {
       if (editingUserId) {
-        await client.put(`/users/${editingUserId}`, userForm);
-        toast.success("Usuario actualizado en la base de datos");
+        const response = await client.put(`/users/${editingUserId}`, userForm);
+        
+        // Magia Visual: Si el backend dice que no hubo cambios, mostramos información (ℹ️)
+        if (response.data && response.data.changed === false) {
+          toast.success(response.data.message, { id: toastId, icon: 'ℹ️' });
+        } else {
+          toast.success(response.data.message || "Usuario actualizado en la base de datos", { id: toastId });
+        }
+
       } else {
         await client.post('/users', userForm);
-        toast.success("¡Nuevo personal registrado en base de datos!");
+        toast.success("¡Personal registrado y credenciales enviadas!", { id: toastId });
       }
+
       resetUserForm();
       const resUsers = await client.get('/users');
       if (Array.isArray(resUsers.data)) setSystemUsers(resUsers.data);
+
     } catch (e) {
-      toast.error(e.response?.data?.message || "Error al procesar la transacción de usuario");
+      toast.error(e.response?.data?.message || "Error al procesar la transacción", { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -176,12 +186,14 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
   const editUser = (usr) => {
     setEditingUserId(usr.id);
-    setUserForm({ id: usr.id, fullName: usr.fullName, username: usr.username, role: usr.role, isActive: usr.isActive, password: '' }); 
+    setUserForm({ id: usr.id, fullName: usr.fullName, username: usr.username, email: usr.email || '', role: usr.role, isActive: usr.isActive, password: '' }); 
+    setShowPassword(false); // Reseteamos la vista al editar
   };
 
   const resetUserForm = () => {
     setEditingUserId(null);
-    setUserForm({ id: '', fullName: '', username: '', password: '', role: 'Empleado', isActive: true });
+    setUserForm({ id: '', fullName: '', username: '', email: '', password: '', role: 'Empleado', isActive: true });
+    setShowPassword(false);
   };
 
   // --- MANIPULACIÓN DEL HARDWARE ---
@@ -284,7 +296,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       <div className="max-w-7xl mx-auto w-full space-y-6 pb-20">
         
         {/* ==========================================================
-            VISTA INDEPENDIENTE: CONTROL DE USUARIOS
+            VISTA: CONTROL DE USUARIOS
         ========================================================== */}
         {activeTab === 'usuarios' && (
           <motion.div 
@@ -303,7 +315,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   Control de Usuarios
                 </h1>
                 <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">
-                  Administra accesos, contraseñas y roles del personal de 𝓛𝔂𝓐
+                  Administra accesos y envía credenciales por correo.
                 </p>
               </div>
             </div>
@@ -316,30 +328,69 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                 </h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Nombre Completo</label>
-                    <input type="text" value={userForm.fullName} onChange={e => setUserForm({...userForm, fullName: e.target.value})} placeholder="Ej. Juan Pérez Maza"
+                    <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Nombre (Identificar)</label>
+                    <input type="text" value={userForm.fullName} onChange={e => setUserForm({...userForm, fullName: e.target.value})} placeholder="Ej. Juan Pérez"
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Nombre de Usuario (Login)</label>
-                    <input type="text" value={userForm.username} onChange={e => setUserForm({...userForm, username: e.target.value})} placeholder="Ej. juan_pos"
+                    <input type="text" value={userForm.username} onChange={e => setUserForm({...userForm, username: e.target.value})} placeholder="Ej. Juanito"
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm font-mono" />
                   </div>
+                  
+                  {/* 🔥 NUEVO CAMPO DE CORREO GMAIL */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Correo Electrónico (Notificación)</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail size={16} className="text-gray-400" />
+                      </div>
+                      <input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="empleado@gmail.com"
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" />
+                    </div>
+                  </div>
+
+                  {/* 🔥 CONTRASEÑA CON OJITO */}
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Contraseña de Acceso</label>
-                    <input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} 
-                      placeholder={editingUserId ? "Dejar vacío para no cambiar" : "Mínimo 6 caracteres"}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" />
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        value={userForm.password} 
+                        onChange={e => setUserForm({...userForm, password: e.target.value})} 
+                        placeholder={editingUserId ? "Dejar vacío para no cambiar" : "Mínimo 6 caracteres"}
+                        className="w-full pl-4 pr-12 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)} 
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors outline-none"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
+
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Rol Asignado</label>
-                    <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm font-bold"
-                    >
-                      <option value="Empleado">Empleado</option>
-                      <option value="Administrador">Administrador</option>
-                    </select>
+                    <div className="relative">
+                      <select 
+                        value={userForm.role} 
+                        onChange={e => setUserForm({...userForm, role: e.target.value})}
+                        className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm font-bold appearance-none cursor-pointer"
+                      >
+                        <option value="Empleado">Empleado</option>
+                        <option value="Administrador">Administrador</option>
+                      </select>
+                      {/* Flechita personalizada Neo-Bento */}
+                      <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                      </div>
+                    </div>
                   </div>
+
                   <div className="pt-2 flex gap-2">
                     {editingUserId && (
                       <button onClick={resetUserForm} className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded-xl text-xs hover:bg-gray-200 transition-colors">
@@ -349,7 +400,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     <button onClick={handleUserSubmit} disabled={loading}
                       className="flex-[2] py-3 bg-blue-600 lya:bg-lya-primary text-white font-bold rounded-xl text-xs shadow-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <Save size={14} /> {editingUserId ? 'Guardar Cambios' : 'Registrar Empleado'}
+                      <Save size={14} /> {editingUserId ? 'Guardar Cambios' : 'Crear y Enviar Correo'}
                     </button>
                   </div>
                 </div>
@@ -404,6 +455,13 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                             </button>
                           </div>
                         </div>
+
+                        {/* Mostrar el correo si lo tiene */}
+                        {usr.email && (
+                          <div className="mb-3 text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 rounded-md px-2 py-1">
+                            <Mail size={12} /> <span className="truncate">{usr.email}</span>
+                          </div>
+                        )}
 
                         <div className="pt-3 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between">
                           <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md ${usr.role === 'Administrador' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>

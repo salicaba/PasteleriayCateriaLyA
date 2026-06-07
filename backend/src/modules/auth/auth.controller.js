@@ -1,17 +1,27 @@
 // src/modules/auth/auth.controller.js
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize'; // 🔥 Importamos los operadores lógicos de Sequelize
 import User from '../users/User.model.js';
 
 // POST: Iniciar sesión
 export const login = async (req, res) => {
   try {
+    // El frontend sigue enviando el campo como 'username', 
+    // pero ahora sabemos que el cajero pudo haber escrito su correo ahí.
     const { username, password } = req.body;
 
-    console.log(`Intento de acceso a 𝓛𝔂𝓐 -> Usuario: "${username}"`);
+    console.log(`Intento de acceso a 𝓛𝔂𝓐 -> Identificador: "${username}"`);
 
-    // 1. Buscar al usuario en la base de datos
-    const user = await User.findOne({ where: { username } });
+    // 1. Buscar al usuario en la base de datos (por Usuario O por Correo)
+    const user = await User.findOne({ 
+      where: { 
+        [Op.or]: [
+          { username: username },
+          { email: username }
+        ]
+      } 
+    });
     
     // Si no existe o está inactivo, devolvemos el mismo error genérico por seguridad
     if (!user || !user.isActive) {
@@ -25,20 +35,21 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
     }
 
-    // 3. Generar el Token (JWT) incluyendo el nombre completo
+    // 3. Generar el Token (JWT) incluyendo los datos clave
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
       process.env.JWT_SECRET,
       { expiresIn: '12h' }
     );
 
-    // Devolvemos el fullName al frontend
+    // Devolvemos la info al frontend
     res.json({
       message: 'Login exitoso',
       token,
       user: {
         id: user.id,
         username: user.username,
+        email: user.email, // Devolvemos también el correo por si el frontend lo necesita
         role: user.role,
         fullName: user.fullName
       }
@@ -48,7 +59,7 @@ export const login = async (req, res) => {
   }
 };
 
-// POST: Registro de prueba (Modificado para recibir fullName)
+// POST: Registro de prueba
 export const registerTestUser = async (req, res) => {
   try {
     const { fullName, username, password, role } = req.body;

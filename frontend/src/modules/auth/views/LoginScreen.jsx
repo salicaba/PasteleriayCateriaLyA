@@ -1,7 +1,8 @@
 // src/modules/auth/views/LoginScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2 } from 'lucide-react';
+// 🔥 Añadimos Eye y EyeOff
+import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import logoLyA from '../../../assets/logo.jpeg'; 
 import client from '../../../api/client'; 
@@ -17,6 +18,8 @@ const motivationalPhrases = [
 export const LoginScreen = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  // 🔥 Nuevo estado para controlar la visibilidad
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotMode, setShowForgotMode] = useState(false);
   const [bootState, setBootState] = useState('booting'); 
@@ -59,7 +62,6 @@ export const LoginScreen = ({ onLogin }) => {
       const response = await client.post('/auth/login', { username, password });
       
       if (response.data && response.data.user) {
-        // 🔥 CORRECCIÓN AQUÍ: Guardamos el Token en el navegador para que Axios lo pueda usar
         localStorage.setItem('lya_token', response.data.token);
 
         const loggedUser = response.data.user;
@@ -183,7 +185,7 @@ export const LoginScreen = ({ onLogin }) => {
                           <User size={18} className="text-gray-400 dark:text-gray-500" />
                         </div>
                         <input 
-                          type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Nombre de usuario" 
+                          type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Usuario o Correo Electrónico" 
                           className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
                         />
                       </div>
@@ -192,10 +194,19 @@ export const LoginScreen = ({ onLogin }) => {
                         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                           <Lock size={18} className="text-gray-400 dark:text-gray-500" />
                         </div>
+                        {/* 🔥 Ajustamos el type, el pr-12 para dar espacio al ícono y añadimos el botón */}
                         <input 
-                          type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" 
-                          className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
+                          type={showPassword ? "text" : "password"} 
+                          value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" 
+                          className="w-full pl-12 pr-12 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 lya:hover:text-lya-primary transition-colors focus:outline-none"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                       </div>
                     </div>
 

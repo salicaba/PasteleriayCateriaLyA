@@ -28,7 +28,7 @@
 .theme-lya ::-webkit-scrollbar-thumb { @apply bg-lya-secondary; }
 .theme-lya ::-webkit-scrollbar-thumb:hover { @apply bg-lya-primary; }
 
-/* 🔥 NUEVO: Clase para ocultar el scrollbar visualmente sin perder la función de scroll */
+/* 🔥 NUEVO: Ocultar el ojito nativo de Chromium/Edge para inputs de contraseña */
 @layer utilities {
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
@@ -36,5 +36,11 @@
   .hide-scrollbar {
     -ms-overflow-style: none; /* IE y Edge */
     scrollbar-width: none; /* Firefox */
+  }
+
+  /* Desactiva el icono de revelar contraseña por defecto */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
   }
 }
