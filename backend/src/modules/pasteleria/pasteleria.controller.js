@@ -1,3 +1,4 @@
+// backend/src/modules/pasteleria/pasteleria.controller.js
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
 import Transaction from '../cash/Transaction.model.js'; 
@@ -39,7 +40,6 @@ export const createPedido = async (req, res) => {
             source: 'PASTELERIA',
             paymentMethod: dbMethod, 
             amount: montoAbono,
-            // 🔥 Modificado: Ya no incluye el método en texto
             description: `Anticipo Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
             referenceId: newId,
             createdBy: userId
@@ -95,7 +95,6 @@ export const addAbono = async (req, res) => {
       source: 'PASTELERIA',
       paymentMethod: dbMethod, 
       amount: parseFloat(monto),
-      // 🔥 Modificado: Ya no incluye el método en texto
       description: `${tipoMovimiento} Pedido: ${pedido.cliente} ${pedido.id}`,
       referenceId: pedido.id,
       createdBy: userId
@@ -181,7 +180,7 @@ export const printPedidoTicket = async (req, res) => {
     const saboresSeguros = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
     console.log(`\n==========================================`);
-    console.log(`                  𝓛𝔂𝓪`);
+    console.log(`                  𝓛𝔂𝓐`);
     console.log(`         Pastelería & Cafetería`);
     console.log(`          Pijijiapan, Chiapas`);
     console.log(`------------------------------------------`);
@@ -256,7 +255,7 @@ export const sharePedidoTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Comprobante de Pedido - 𝓛𝔂𝓪</title>
+      <title>Comprobante de Pedido - 𝓛𝔂𝓐</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -266,13 +265,13 @@ export const sharePedidoTicket = async (req, res) => {
         @media print { .no-print { display: none !important; } }
       </style>
     </head>
-    <body class="text-gray-800 antialiased flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 select-none">
+    <body class="text-gray-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
-            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓐</h1>
             <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
             <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
@@ -351,6 +350,8 @@ export const sharePedidoTicket = async (req, res) => {
 
         </div>
       </div>
+
+      <div class="h-32 w-full shrink-0 no-print"></div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="flex gap-3 w-full max-w-sm px-4">

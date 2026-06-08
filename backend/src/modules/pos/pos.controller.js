@@ -1,5 +1,5 @@
 // backend/src/modules/pos/pos.controller.js
-import { Op, Sequelize } from 'sequelize'; // <-- 🔥 NUEVO: Importación para el buscador corto
+import { Op, Sequelize } from 'sequelize';
 import { getIO } from '../../config/socket.js'; 
 import Order from './Order.model.js';
 import OrderItem from './OrderItem.model.js';
@@ -401,7 +401,7 @@ export const printOrderTicket = async (req, res) => {
     printer.alignCenter();
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
-    printer.println("𝓛𝔂𝓪"); 
+    printer.println("𝓛𝔂𝓐"); 
     
     printer.setTextNormal();
     printer.bold(true);
@@ -563,11 +563,9 @@ export const shareOrderTicket = async (req, res) => {
     let { orderId } = req.params;
     const { cuenta } = req.query; 
 
-    // 🔥 MAGIA DE ENLACE CORTO 🔥
-    // Si nos llega un ID cortito (ej. 932da3ef) que no es un UUID completo (36 caracteres)
+    // 🔥 Búsqueda del ticket corto 🔥
     if (orderId && orderId.length < 36) {
       const foundOrder = await Order.findOne({
-        // Buscamos el UUID completo que empiece con este código corto
         where: Sequelize.where(
           Sequelize.cast(Sequelize.col('id'), 'varchar'),
           { [Op.like]: `${orderId}%` }
@@ -576,7 +574,7 @@ export const shareOrderTicket = async (req, res) => {
       });
 
       if (foundOrder) {
-        orderId = foundOrder.id; // Restauramos el UUID completo para hacer la búsqueda normal
+        orderId = foundOrder.id; 
       } else {
         return res.status(404).send('<h1>Ticket no encontrado o expirado</h1>');
       }
@@ -630,7 +628,7 @@ export const shareOrderTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Tu Ticket de Consumo - 𝓛𝔂𝓪</title>
+      <title>Tu Ticket de Consumo - 𝓛𝔂𝓐</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -640,13 +638,13 @@ export const shareOrderTicket = async (req, res) => {
         @media print { .no-print { display: none !important; } }
       </style>
     </head>
-    <body class="text-gray-800 antialiased flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 select-none">
+    <body class="text-gray-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
-            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓐</h1>
             <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
             <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
@@ -773,6 +771,8 @@ export const shareOrderTicket = async (req, res) => {
 
         </div>
       </div>
+
+      <div class="h-32 w-full shrink-0 no-print"></div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="flex gap-3 w-full max-w-sm px-4">
