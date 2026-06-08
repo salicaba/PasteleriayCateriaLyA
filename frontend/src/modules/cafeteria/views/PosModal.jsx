@@ -19,22 +19,22 @@ const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opac
 
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial, inline = false }) => {
   
-const getLoggedUserName = () => {
-  try {
-    const sessionStr = localStorage.getItem('lya_pos_session');
-    if (sessionStr) {
-      const { userData } = JSON.parse(sessionStr);
-      if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
-      if (userData && userData.username) return userData.username;
+  const getLoggedUserName = () => {
+    try {
+      const sessionStr = localStorage.getItem('lya_pos_session');
+      if (sessionStr) {
+        const { userData } = JSON.parse(sessionStr);
+        if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
+        if (userData && userData.username) return userData.username;
+      }
+      const lyaUser = JSON.parse(localStorage.getItem('lya_user') || '{}');
+      if (lyaUser.fullName) return lyaUser.fullName.split(' ')[0];
+      if (lyaUser.username) return lyaUser.username;
+    } catch (e) {
+      console.error("Error leyendo sesión del cajero:", e);
     }
-    const lyaUser = JSON.parse(localStorage.getItem('lya_user') || '{}');
-    if (lyaUser.fullName) return lyaUser.fullName.split(' ')[0];
-    if (lyaUser.username) return lyaUser.username;
-  } catch (e) {
-    console.error("Error leyendo sesión del cajero:", e);
-  }
-  return 'Cajero en turno';
-};
+    return 'Cajero en turno';
+  };
 
   const nombreCajero = getLoggedUserName();
 
@@ -136,19 +136,22 @@ const getLoggedUserName = () => {
   const tableTitle = isVitrina ? `Mostrador ⚡` : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`);
 
   // ==========================================
-  // 🔥 WHATSAPP: URL DIRECTA Y MÁS CORTA
+  // 🔥 AQUÍ ESTÁ EL CAMBIO: URL CORTA DE VERDAD
   // ==========================================
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint) => {
     const orderId = mesa?.orderId || mesa?.id;
 
-    // OBLIGAMOS a que el enlace apunte al servidor backend de Render directamente.
-    // Esto evita que Vercel intercepte el link y abra la pantalla de inicio de sesión.
-    const backendUrl = 'https://lya-backend-2gay.onrender.com/api';
+    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
+    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
+      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
+    }
     
-    // Nueva ruta acortada: /pos/ticket/ID
-    const shareLink = `${backendUrl}/pos/ticket/${orderId}`;
+    // 🔥 SOLO TOMAMOS LA PRIMERA PARTE DEL CÓDIGO 🔥
+    // De: "932da3ef-9ff5-430c-a45e-f3a9879441a9" se transforma en: "932da3ef"
+    const shortId = orderId.split('-')[0];
+    
+    const shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
 
-    // Estilizamos el nombre como 𝓛𝔂𝓪 tal como prefieres
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;

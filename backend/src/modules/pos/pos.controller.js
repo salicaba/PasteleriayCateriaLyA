@@ -1,4 +1,6 @@
-import { getIO } from '../../config/socket.js'; // <-- AÑADIR ESTO ARRIBA DEL TODO
+// backend/src/modules/pos/pos.controller.js
+import { Op, Sequelize } from 'sequelize'; // <-- 🔥 NUEVO: Importación para el buscador corto
+import { getIO } from '../../config/socket.js'; 
 import Order from './Order.model.js';
 import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
@@ -32,9 +34,7 @@ export const createOrder = async (req, res) => {
       totalAmount: 0 
     });
     
-    // 🔥 AÑADIDO: Notificar a todos los clientes que hay una nueva orden
     getIO().emit('pos:update');
-    
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
   } catch (error) { 
     res.status(500).json({ message: 'Error al crear orden', error: error.message }); 
@@ -72,9 +72,7 @@ export const addItemsToOrder = async (req, res) => {
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
 
-    // 🔥 AÑADIDO: Notificar que se añadieron productos a una orden (Actualiza carrito)
     getIO().emit('pos:update');
-
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems });
   } catch (error) { 
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
@@ -136,23 +134,17 @@ export const payOrder = async (req, res) => {
       identificador = `Mesa #${numMesa}`;
     }
 
-    // Detectar el método de pago
     let dbMethod = 'CASH';
     if (paymentMethod === 'transferencia' || paymentMethod === 'TRANSFER') dbMethod = 'TRANSFER';
     else if (paymentMethod === 'tarjeta' || paymentMethod === 'CARD') dbMethod = 'CARD';
 
-    // Construcción de la descripción (completamente limpia del método de pago)
     if (isFullPayment) {
       const unpaidItems = order.items.filter(i => !paidAccounts.includes(i.cuenta));
       amountToRegister = unpaidItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
-      
       desc = `Pago de Consumo (${identificador})  ${folioUnico}`; 
-      
     } else if (cuentaName) {
       amountToRegister = order.items.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
-      
       desc = `Pago de Consumo (${identificador}) Cuenta: ${cuentaName}  ${folioUnico}`;
-      
       if (!paidAccounts.includes(cuentaName)) paidAccounts.push(cuentaName);
     }
 
@@ -174,9 +166,7 @@ export const payOrder = async (req, res) => {
       });
     }
 
-    // 🔥 AÑADIDO: Notificar que se realizó un pago (actualiza visualmente si fue parcial/total)
     getIO().emit('pos:update');
-
     res.json({ message: 'Pago registrado con éxito en Caja', order });
   } catch (error) { 
     res.status(500).json({ message: 'Error al procesar pago', error: error.message }); 
@@ -198,9 +188,7 @@ export const closeOrder = async (req, res) => {
       await Table.update({ status: 'active' }, { where: { id: order.tableId } });
     }
 
-    // 🔥 AÑADIDO: Notificar que la mesa se cerró y liberó
     getIO().emit('pos:update');
-
     res.json({ message: 'Mesa liberada y orden archivada.' });
   } catch (error) { 
     res.status(500).json({ message: 'Error al cerrar mesa', error: error.message }); 
@@ -252,9 +240,7 @@ export const createTable = async (req, res) => {
       qrToken: `qr-${Date.now()}-${nextNumber}` 
     });
     
-    // 🔥 AÑADIDO: Opcional pero útil, refresca la vista si el admin crea una nueva mesa
     getIO().emit('pos:update');
-
     res.status(201).json(newTable);
   } catch (error) { 
     res.status(500).json({ message: 'Error al crear mesa', error: error.message }); 
@@ -278,9 +264,7 @@ export const deleteTable = async (req, res) => {
       }
     }
     
-    // 🔥 AÑADIDO: Opcional pero útil, refresca la vista si el admin borra una mesa
     getIO().emit('pos:update');
-
     res.json({ message: 'Mesa eliminada y re-indexada correctamente' });
   } catch (error) { 
     res.status(500).json({ message: 'Error al eliminar mesa', error: error.message }); 
@@ -367,9 +351,7 @@ export const moveItemAccount = async (req, res) => {
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
     
-    // 🔥 AÑADIDO: Notificar que se movieron productos entre cuentas
     getIO().emit('pos:update');
-
     res.json({ message: 'Producto movido y agrupado con éxito', orderItems: allItems });
   } catch (error) {
     res.status(500).json({ message: 'Error al mover producto', error: error.message });
@@ -578,8 +560,27 @@ export const printOrderTicket = async (req, res) => {
 // ==========================================
 export const shareOrderTicket = async (req, res) => {
   try {
-    const { orderId } = req.params;
+    let { orderId } = req.params;
     const { cuenta } = req.query; 
+
+    // 🔥 MAGIA DE ENLACE CORTO 🔥
+    // Si nos llega un ID cortito (ej. 932da3ef) que no es un UUID completo (36 caracteres)
+    if (orderId && orderId.length < 36) {
+      const foundOrder = await Order.findOne({
+        // Buscamos el UUID completo que empiece con este código corto
+        where: Sequelize.where(
+          Sequelize.cast(Sequelize.col('id'), 'varchar'),
+          { [Op.like]: `${orderId}%` }
+        ),
+        attributes: ['id']
+      });
+
+      if (foundOrder) {
+        orderId = foundOrder.id; // Restauramos el UUID completo para hacer la búsqueda normal
+      } else {
+        return res.status(404).send('<h1>Ticket no encontrado o expirado</h1>');
+      }
+    }
 
     const order = await Order.findByPk(orderId, {
       include: [
