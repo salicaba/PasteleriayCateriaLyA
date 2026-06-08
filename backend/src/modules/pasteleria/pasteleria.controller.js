@@ -264,93 +264,94 @@ export const sharePedidoTicket = async (req, res) => {
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
         @media print {
           .no-print { display: none !important; }
-          .print-card { box-shadow: none !important; border: none !important; padding: 0 !important; background: white !important; }
-          body { background: white !important; }
         }
       </style>
     </head>
-    <body class="text-gray-800 antialiased flex flex-col items-center min-h-screen p-4 sm:p-6 select-none">
+    <body class="text-gray-800 antialiased flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 select-none">
       
-      <div id="ticket-card" class="w-full max-w-md bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 mt-4 mb-24 relative print-card transition-all duration-300">
+      <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
         
-        <div class="text-center mb-6">
-          <h1 class="text-5xl font-black text-amber-600 mb-2" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
-          <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
-          <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
-        </div>
-
-        <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
-
-        <div class="text-center mb-6">
-          <p class="text-xs font-black uppercase text-slate-400 tracking-wider">Folio de Pedido</p>
-          <p class="text-2xl font-black text-slate-900">${pedido.id}</p>
-        </div>
-
-        <div class="space-y-3 text-sm font-medium text-slate-600 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <div class="flex justify-between">
-            <span class="text-slate-400">Cliente:</span>
-            <span class="text-slate-900 font-bold capitalize text-right">${pedido.cliente || 'Público General'}</span>
+        <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
+          
+          <div class="text-center mb-6">
+            <h1 class="text-5xl font-black text-amber-600 mb-2" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+            <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
+            <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">Entrega:</span>
-            <span class="text-amber-600 font-black capitalize text-right">${fechaStr}</span>
+
+          <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
+
+          <div class="text-center mb-6">
+            <p class="text-xs font-black uppercase text-slate-400 tracking-wider">Folio de Pedido</p>
+            <p class="text-2xl font-black text-slate-900">${pedido.id}</p>
           </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">Tipo:</span>
-            <span class="text-slate-900 font-bold uppercase text-right">${pedido.tipoEntrega || 'sucursal'}</span>
+
+          <div class="space-y-3 text-sm font-medium text-slate-600 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div class="flex justify-between">
+              <span class="text-slate-400">Cliente:</span>
+              <span class="text-slate-900 font-bold capitalize text-right">${pedido.cliente || 'Público General'}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Entrega:</span>
+              <span class="text-amber-600 font-black capitalize text-right">${fechaStr}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Tipo:</span>
+              <span class="text-slate-900 font-bold uppercase text-right">${pedido.tipoEntrega || 'sucursal'}</span>
+            </div>
           </div>
-        </div>
 
-        <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
+          <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
-        <div class="space-y-3 mb-6">
-          <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalles del Pedido</h3>
-          <p class="text-sm"><span class="font-bold text-slate-400">Categoría:</span> <span class="font-bold text-slate-800">${pedido.categoria || 'Pastel'}</span></p>
-          ${porcionesHtml ? `<p class="text-sm"><span class="font-bold text-slate-400">Tamaño:</span> <span class="font-bold text-slate-800">${porcionesHtml}</span></p>` : ''}
-          ${saboresHtml ? `<p class="text-sm"><span class="font-bold text-slate-400">Sabores:</span> <span class="font-bold text-slate-800">${saboresHtml}</span></p>` : ''}
-          <p class="text-sm text-slate-600 italic mt-2 bg-amber-50/50 p-3 rounded-xl border border-amber-100">"${pedido.descripcion || 'Sin detalles adicionales'}"</p>
-        </div>
-
-        <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
-
-        <div class="space-y-2 mb-4">
-          <div class="flex justify-between text-sm">
-            <span class="font-bold text-slate-400">Costo Total:</span>
-            <span class="font-bold text-slate-800">$${costoTotal.toFixed(2)}</span>
+          <div class="space-y-3 mb-6">
+            <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalles del Pedido</h3>
+            <p class="text-sm"><span class="font-bold text-slate-400">Categoría:</span> <span class="font-bold text-slate-800">${pedido.categoria || 'Pastel'}</span></p>
+            ${porcionesHtml ? `<p class="text-sm"><span class="font-bold text-slate-400">Tamaño:</span> <span class="font-bold text-slate-800">${porcionesHtml}</span></p>` : ''}
+            ${saboresHtml ? `<p class="text-sm"><span class="font-bold text-slate-400">Sabores:</span> <span class="font-bold text-slate-800">${saboresHtml}</span></p>` : ''}
+            <p class="text-sm text-slate-600 italic mt-2 bg-amber-50/50 p-3 rounded-xl border border-amber-100">"${pedido.descripcion || 'Sin detalles adicionales'}"</p>
           </div>
-          <div class="flex justify-between text-sm">
-            <span class="font-bold text-emerald-500">Abonado:</span>
-            <span class="font-bold text-emerald-600">$${totalPagado.toFixed(2)}</span>
+
+          <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
+
+          <div class="space-y-2 mb-4">
+            <div class="flex justify-between text-sm">
+              <span class="font-bold text-slate-400">Costo Total:</span>
+              <span class="font-bold text-slate-800">$${costoTotal.toFixed(2)}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="font-bold text-emerald-500">Abonado:</span>
+              <span class="font-bold text-emerald-600">$${totalPagado.toFixed(2)}</span>
+            </div>
           </div>
-        </div>
 
-        <div class="flex justify-between items-baseline mb-6 pt-3 border-t border-slate-100">
-          <span class="text-base font-black text-slate-900 uppercase tracking-tight">Resta por pagar</span>
-          <span class="text-3xl font-black ${deuda > 0 ? 'text-red-500' : 'text-emerald-500'} tracking-tighter">$${deuda.toFixed(2)}</span>
-        </div>
-
-        ${deuda > 0 && bankAccounts.length > 0 ? `
-          <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6">
-             <p class="text-xs font-black text-blue-800 uppercase text-center mb-3">Datos para Depósito / Transferencia</p>
-             <div class="space-y-3">
-               ${bankAccounts.map(acc => `
-                 <div class="text-[11px] bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                    <p class="font-black uppercase text-blue-900 mb-1">${acc.bank_name}</p>
-                    ${acc.account_holder ? `<div class="flex justify-between text-slate-600"><span class="font-medium">Titular:</span><span class="font-bold text-slate-800">${acc.account_holder}</span></div>` : ''}
-                    ${acc.account_number ? `<div class="flex justify-between text-slate-600"><span class="font-medium">Cuenta:</span><span class="font-bold text-slate-800">${acc.account_number}</span></div>` : ''}
-                    ${acc.clabe ? `<div class="flex justify-between text-slate-600"><span class="font-medium">CLABE:</span><span class="font-bold text-slate-800">${acc.clabe}</span></div>` : ''}
-                 </div>
-               `).join('')}
-             </div>
-             <p class="text-[10px] text-center mt-3 text-blue-700 font-bold italic">Importante: En el concepto de pago coloca tu folio: <span class="bg-blue-200 text-blue-900 px-1 rounded">${pedido.id}</span></p>
+          <div class="flex justify-between items-baseline mb-6 pt-3 border-t border-slate-100">
+            <span class="text-base font-black text-slate-900 uppercase tracking-tight">Resta por pagar</span>
+            <span class="text-3xl font-black ${deuda > 0 ? 'text-red-500' : 'text-emerald-500'} tracking-tighter">$${deuda.toFixed(2)}</span>
           </div>
-        ` : ''}
 
-        <div class="text-center mt-6 space-y-1">
-          <p class="font-extrabold text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
-          ${deuda > 0 ? '<p class="text-xs text-red-400 font-bold mt-1">El pedido debe estar liquidado al momento de su entrega.</p>' : '<p class="text-xs text-emerald-500 font-bold mt-1">¡Pedido totalmente liquidado!</p>'}
+          ${deuda > 0 && bankAccounts.length > 0 ? `
+            <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6">
+               <p class="text-xs font-black text-blue-800 uppercase text-center mb-3">Datos para Depósito / Transferencia</p>
+               <div class="space-y-3">
+                 ${bankAccounts.map(acc => `
+                   <div class="text-[11px] bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+                      <p class="font-black uppercase text-blue-900 mb-1">${acc.bank_name}</p>
+                      ${acc.account_holder ? `<div class="flex justify-between text-slate-600"><span class="font-medium">Titular:</span><span class="font-bold text-slate-800">${acc.account_holder}</span></div>` : ''}
+                      ${acc.account_number ? `<div class="flex justify-between text-slate-600"><span class="font-medium">Cuenta:</span><span class="font-bold text-slate-800">${acc.account_number}</span></div>` : ''}
+                      ${acc.clabe ? `<div class="flex justify-between text-slate-600"><span class="font-medium">CLABE:</span><span class="font-bold text-slate-800">${acc.clabe}</span></div>` : ''}
+                   </div>
+                 `).join('')}
+               </div>
+               <p class="text-[10px] text-center mt-3 text-blue-700 font-bold italic">Importante: En el concepto de pago coloca tu folio: <span class="bg-blue-200 text-blue-900 px-1 rounded">${pedido.id}</span></p>
+            </div>
+          ` : ''}
+
+          <div class="text-center mt-6 space-y-1">
+            <p class="font-extrabold text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
+            ${deuda > 0 ? '<p class="text-xs text-red-400 font-bold mt-1">El pedido debe estar liquidado al momento de su entrega.</p>' : '<p class="text-xs text-emerald-500 font-bold mt-1">¡Pedido totalmente liquidado!</p>'}
+          </div>
+
         </div>
-
       </div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
@@ -364,14 +365,14 @@ export const sharePedidoTicket = async (req, res) => {
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
           const options = {
-            margin:       [12, 12, 12, 12],
+            margin:       [4, 4, 4, 4],
             filename:     'Ticket-Pedido-${pedido.id}.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 3, useCORS: true, logging: false },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            // 🔥 Ajustado a tamaño real de comanda compacta térmica (85mm de ancho continuo)
+            jsPDF:        { unit: 'mm', format: [85, 230], orientation: 'portrait' }
           };
           
-          // Ejecuta la renderización limpia del elemento DOM a archivo descargable
           html2pdf().set(options).from(element).save();
         }
       </script>
