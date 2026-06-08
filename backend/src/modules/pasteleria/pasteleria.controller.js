@@ -365,19 +365,21 @@ export const sharePedidoTicket = async (req, res) => {
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
           
-          // 1. Calculamos la altura real del diseño en la pantalla (en pixeles)
-          const heightPx = element.offsetHeight;
+          // 1. Calculamos la altura total real del diseño web
+          const heightPx = element.scrollHeight;
           
-          // 2. Convertimos de pixeles a milímetros (1px ≈ 0.264583mm) y damos 15mm de margen inferior
-          const heightMm = (heightPx * 0.264583) + 15;
+          // 2. Convertimos a milímetros y le damos 2mm de respiro al final
+          const heightMm = (heightPx * 0.264583) + 2;
           
           const options = {
-            margin:       [4, 4, 4, 4],
+            margin:       0, // 🔥 CERO MÁRGENES: Evita que se cree una segunda hoja
             filename:     'Ticket-Pedido-${pedido.id}.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
+            image:        { type: 'jpeg', quality: 1 },
             html2canvas:  { scale: 3, useCORS: true, logging: false },
-            // 🔥 El secreto: Ancho fijo de 85mm, pero la altura ahora es la variable calculada
-            jsPDF:        { unit: 'mm', format: [85, heightMm], orientation: 'portrait' }
+            // 🔥 HOJA INFINITA: Ancho de 85mm y el alto exacto de tu contenido
+            jsPDF:        { unit: 'mm', format: [85, heightMm], orientation: 'portrait' },
+            // 🔥 Bloqueo absoluto de saltos de página
+            pagebreak:    { mode: 'avoid-all' }
           };
           
           html2pdf().set(options).from(element).save();

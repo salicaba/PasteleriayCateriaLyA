@@ -786,19 +786,20 @@ export const shareOrderTicket = async (req, res) => {
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
           
-          // 1. Calculamos la altura real del diseño en la pantalla (en pixeles)
-          const heightPx = element.offsetHeight;
+          // 1. Calculamos la altura total real del diseño web
+          const heightPx = element.scrollHeight;
           
-          // 2. Convertimos de pixeles a milímetros y damos margen inferior
-          const heightMm = (heightPx * 0.264583) + 15;
+          // 2. Convertimos a milímetros y le damos 2mm de respiro al final
+          const heightMm = (heightPx * 0.264583) + 2;
           
           const options = {
-            margin:       [4, 4, 4, 4],
+            margin:       0, // 🔥 CERO MÁRGENES
             filename:     'Ticket-Consumo-${orderId}.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
+            image:        { type: 'jpeg', quality: 1 },
             html2canvas:  { scale: 3, useCORS: true, logging: false },
-            // 🔥 Ancho fijo de 80mm para barra, altura totalmente adaptable
-            jsPDF:        { unit: 'mm', format: [80, heightMm], orientation: 'portrait' }
+            // 🔥 HOJA INFINITA: Ancho de 80mm (estándar de barra) y alto exacto
+            jsPDF:        { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
+            pagebreak:    { mode: 'avoid-all' }
           };
           
           html2pdf().set(options).from(element).save();
