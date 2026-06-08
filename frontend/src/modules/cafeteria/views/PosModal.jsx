@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import client from '../../../api/client'; // 🔥 IMPORTANTE: Necesario para obtener la URL del Backend
+import client from '../../../api/client'; 
 import { usePosController } from '../controllers/usePosController';
 import { ProductCard } from './ProductCard';
 import { TicketSidebar } from './TicketSidebar'; 
@@ -19,13 +19,11 @@ const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opac
 
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial, inline = false }) => {
   
-  // Dentro de PosModal.jsx
 const getLoggedUserName = () => {
   try {
     const sessionStr = localStorage.getItem('lya_pos_session');
     if (sessionStr) {
       const { userData } = JSON.parse(sessionStr);
-      // 🔥 AQUÍ ESTÁ EL CAMBIO: .split(' ')[0] para tomar solo el primer nombre
       if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
       if (userData && userData.username) return userData.username;
     }
@@ -138,21 +136,20 @@ const getLoggedUserName = () => {
   const tableTitle = isVitrina ? `Mostrador ⚡` : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`);
 
   // ==========================================
-  // 🔥 CORRECCIÓN: WHATSAPP CON ENLACE DIRECTO (PDF/HTML)
+  // 🔥 WHATSAPP: URL DIRECTA Y MÁS CORTA
   // ==========================================
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint) => {
     const orderId = mesa?.orderId || mesa?.id;
 
-    // 🔥 CORRECCIÓN: Reemplazamos localhost por tu dominio en Render para que los clientes 
-    // puedan abrirlo en cualquier dispositivo sin problemas.
-    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
-    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
-      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
-    }
+    // OBLIGAMOS a que el enlace apunte al servidor backend de Render directamente.
+    // Esto evita que Vercel intercepte el link y abra la pantalla de inicio de sesión.
+    const backendUrl = 'https://lya-backend-2gay.onrender.com/api';
     
-    const shareLink = `${baseApiUrl}/pos/orders/${orderId}/share`;
+    // Nueva ruta acortada: /pos/ticket/ID
+    const shareLink = `${backendUrl}/pos/ticket/${orderId}`;
 
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+    // Estilizamos el nombre como 𝓛𝔂𝓪 tal como prefieres
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
@@ -239,7 +236,6 @@ const getLoggedUserName = () => {
         </AnimatePresence>
       )}
 
-      {/* AQUÍ SE PASA AL TICKET PREVIEW CON LA FUNCIÓN CORRECTA */}
       <TicketPreviewModal 
         isOpen={!!previewTicketData} 
         onClose={() => setPreviewTicketData(null)} 
