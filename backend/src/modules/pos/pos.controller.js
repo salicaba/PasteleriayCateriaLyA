@@ -785,13 +785,20 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
+          
+          // 1. Calculamos la altura real del diseño en la pantalla (en pixeles)
+          const heightPx = element.offsetHeight;
+          
+          // 2. Convertimos de pixeles a milímetros y damos margen inferior
+          const heightMm = (heightPx * 0.264583) + 15;
+          
           const options = {
             margin:       [4, 4, 4, 4],
             filename:     'Ticket-Consumo-${orderId}.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 3, useCORS: true, logging: false },
-            // 🔥 Ajustado a tamaño real de ticket térmico estándar de 80mm de ancho
-            jsPDF:        { unit: 'mm', format: [80, 180], orientation: 'portrait' }
+            // 🔥 Ancho fijo de 80mm para barra, altura totalmente adaptable
+            jsPDF:        { unit: 'mm', format: [80, heightMm], orientation: 'portrait' }
           };
           
           html2pdf().set(options).from(element).save();

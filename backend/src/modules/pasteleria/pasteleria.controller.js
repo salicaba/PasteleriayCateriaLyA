@@ -364,13 +364,20 @@ export const sharePedidoTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
+          
+          // 1. Calculamos la altura real del diseño en la pantalla (en pixeles)
+          const heightPx = element.offsetHeight;
+          
+          // 2. Convertimos de pixeles a milímetros (1px ≈ 0.264583mm) y damos 15mm de margen inferior
+          const heightMm = (heightPx * 0.264583) + 15;
+          
           const options = {
             margin:       [4, 4, 4, 4],
             filename:     'Ticket-Pedido-${pedido.id}.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 3, useCORS: true, logging: false },
-            // 🔥 Ajustado a tamaño real de comanda compacta térmica (85mm de ancho continuo)
-            jsPDF:        { unit: 'mm', format: [85, 230], orientation: 'portrait' }
+            // 🔥 El secreto: Ancho fijo de 85mm, pero la altura ahora es la variable calculada
+            jsPDF:        { unit: 'mm', format: [85, heightMm], orientation: 'portrait' }
           };
           
           html2pdf().set(options).from(element).save();
