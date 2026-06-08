@@ -576,7 +576,6 @@ export const printOrderTicket = async (req, res) => {
 // ==========================================
 // 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE (WHATSAPP/PDF)
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE (WHATSAPP/PDF)
 export const shareOrderTicket = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -596,9 +595,6 @@ export const shareOrderTicket = async (req, res) => {
     if (!order) {
       return res.status(404).send('<h1>Ticket no encontrado o expirado</h1>');
     }
-
-    // 🔥 Obtener todas las cuentas disponibles para los botones
-    const todasLasCuentas = Array.from(new Set(order.items.map(i => i.cuenta || 'General')));
 
     let cashierName = 'Sistema';
     try {
@@ -620,7 +616,7 @@ export const shareOrderTicket = async (req, res) => {
       year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    const cuentasUnicasEnVista = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
+    const cuentasUnicas = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
@@ -640,56 +636,185 @@ export const shareOrderTicket = async (req, res) => {
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
         @media print { .no-print { display: none !important; } }
       </style>
     </head>
-    <body class="text-gray-800 antialiased flex flex-col items-center min-h-screen p-4 sm:p-6">
+    <body class="text-gray-800 antialiased flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 pb-32 select-none">
       
-      ${todasLasCuentas.length > 1 ? `
-      <div class="flex gap-2 mb-6 overflow-x-auto scrollbar-hide w-full max-w-md">
-        ${todasLasCuentas.map(acc => `
-          <button onclick="window.location.href='?cuenta=${encodeURIComponent(acc)}'" 
-            class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all border ${
-              (cuenta || 'General') === acc 
-                ? 'bg-amber-600 text-white border-amber-600 shadow-md' 
-                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-            }">
-            ${acc}
-          </button>
-        `).join('')}
-      </div>` : ''}
-
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
-        <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative">
+        <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
             <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
             <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
+            <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
 
+          <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
+
           <div class="space-y-2 text-sm font-medium text-slate-600 mb-6">
-            <div class="flex justify-between"><span>Servicio:</span><span class="text-slate-900 font-black">${identificadorMesa}</span></div>
-            ${cuenta ? `<div class="flex justify-between"><span>Cuenta:</span><span class="text-amber-600 font-black uppercase">${cuenta}</span></div>` : ''}
+            <div class="flex justify-between items-center">
+              <span>Fecha de emisión:</span>
+              <span class="text-slate-900 font-bold">${dateStr}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span>Atendido por:</span>
+              <span class="text-slate-900 font-bold capitalize">${cashierName}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span>Servicio:</span>
+              <span class="text-slate-900 font-black uppercase tracking-wide">${identificadorMesa}</span>
+            </div>
+            ${cuenta ? `
+            <div class="flex justify-between items-center">
+              <span>Cuenta de:</span>
+              <span class="text-amber-600 font-black uppercase">${cuenta}</span>
+            </div>` : ''}
           </div>
 
           <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
           <div class="space-y-6">
-            ${cuentasUnicasEnVista.map(accName => {
+            <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalle de consumo</h3>
+            
+            ${cuentasUnicas.map(accName => {
               const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
-              // ... (aquí va tu lógica de renderizado de tabla que ya tenías)
+              if (accountItemsRaw.length === 0) return '';
+
+              const groupedAccountItems = [];
+              accountItemsRaw.forEach(item => {
+                let notes = '[]';
+                try { 
+                  const parsed = JSON.parse(item.notes || '[]');
+                  notes = JSON.stringify(Array.isArray(parsed) ? parsed : [parsed]);
+                } catch(e){}
+                
+                const key = `${item.productId}-${item.isTakeaway}-${notes}`;
+                const existing = groupedAccountItems.find(g => g.key === key);
+                
+                if (existing) {
+                  existing.quantity += item.quantity;
+                  existing.subtotal += Number(item.subtotal);
+                } else {
+                  groupedAccountItems.push({
+                    key,
+                    product: item.product,
+                    quantity: item.quantity,
+                    subtotal: Number(item.subtotal),
+                    unitPrice: Number(item.subtotal) / item.quantity,
+                    isTakeaway: item.isTakeaway || false,
+                    notes: notes
+                  });
+                }
+              });
+
+              return `
+                <div class="space-y-3">
+                  ${cuentasUnicas.length > 1 && !cuenta ? `
+                    <div class="text-xs font-extrabold text-slate-400 bg-slate-50 px-3 py-1 rounded-lg uppercase tracking-wide">
+                      ● Cuenta: ${accName}
+                    </div>
+                  ` : ''}
+                  
+                  ${groupedAccountItems.map(item => {
+                    let preps = [];
+                    try { preps = JSON.parse(item.notes); } catch(e){}
+
+                    return `
+                    <div class="flex items-start gap-3 text-sm px-1">
+                      <span class="font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-lg text-xs mt-0.5">${item.quantity}x</span>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-bold text-slate-900 break-words">
+                          ${item.isTakeaway ? '<span class="text-orange-500 mr-1 text-[11px] uppercase tracking-tighter bg-orange-50 px-1 rounded">🛍️ Llevar</span>' : ''}
+                          ${item.product?.name || 'Producto'}
+                        </p>
+                        ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-0.5 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
+                        ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-400 font-medium font-italic">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
+                      </div>
+                      <span class="font-bold text-slate-900 shrink-0">$${Number(item.subtotal).toFixed(2)}</span>
+                    </div>
+                    `;
+                  }).join('')}
+                </div>
+              `;
             }).join('')}
           </div>
-          
+
+          <div class="border-t-2 border-dashed border-slate-200 my-6"></div>
+
+          ${cuentasUnicas.length > 1 && !cuenta ? `
+            <div class="space-y-2 text-xs font-semibold text-slate-500 mb-4 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+              <p class="font-black text-slate-400 uppercase tracking-wider mb-2 text-[10px]">Resumen por Cuentas</p>
+              ${cuentasUnicas.map(accName => {
+                const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+                return `
+                  <div class="flex justify-between">
+                    <span class="uppercase">${accName}:</span>
+                    <span class="font-bold text-slate-800">$${subTotalAcc.toFixed(2)}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            <div class="border-t border-slate-100 my-4"></div>
+          ` : ''}
+
+          <div class="flex justify-between items-baseline mb-4">
+            <span class="text-base font-black text-slate-900 uppercase tracking-tight">Total Consumido</span>
+            <span class="text-3xl font-black text-slate-900 tracking-tighter">$${totalAmount.toFixed(2)}</span>
           </div>
+
+          <div class="border-t border-slate-100 my-4"></div>
+
+          <div class="text-center mt-6 space-y-1">
+            <p class="font-extrabold text-slate-800 text-sm">¡Muchas gracias por tu preferencia!</p>
+            <p class="text-xs text-slate-400 font-medium">Este documento es un comprobante digital de caja.</p>
+          </div>
+
+        </div>
       </div>
-      </body>
+
+      <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
+        <div class="flex gap-3 w-full max-w-sm px-4">
+          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+            📥 PDF
+          </button>
+          <button onclick="descargarImagen()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+            📸 Imagen
+          </button>
+        </div>
+      </div>
+
+      <script>
+        function descargarPDF() {
+          const element = document.getElementById('ticket-card');
+          const heightMm = (element.scrollHeight * 0.264583) + 2;
+          const options = {
+            margin: 0,
+            filename: 'Ticket-Consumo-${orderId}.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { scale: 3, useCORS: true },
+            jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
+            pagebreak: { mode: 'avoid-all' }
+          };
+          html2pdf().set(options).from(element).save();
+        }
+
+        function descargarImagen() {
+          const element = document.getElementById('ticket-card');
+          html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'Ticket-Consumo-${orderId}.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          });
+        }
+      </script>
+    </body>
     </html>
     `;
 
     res.status(200).send(htmlResponse);
   } catch (error) {
-    res.status(500).send('<h3>Error al renderizar</h3>');
+    res.status(500).send('<h3>Error al renderizar el ticket digital</h3>');
   }
 };
