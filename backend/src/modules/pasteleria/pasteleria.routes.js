@@ -1,3 +1,4 @@
+// backend/src/modules/pasteleria/pasteleria.routes.js
 import { Router } from 'express';
 import { 
   getPedidos, 
@@ -15,7 +16,10 @@ const router = Router();
 // ==========================================
 // 🌍 RUTAS PÚBLICAS (No requieren sesión)
 // ==========================================
-// La ponemos ANTES del verifyToken para que cualquier cliente en WhatsApp pueda ver su ticket
+// 🟢 NUEVA RUTA: Más corta, elegante y directa para el cliente
+router.get('/ticket/:id', sharePedidoTicket);
+
+// La mantenemos por si hay algún link viejo en un chat de WhatsApp
 router.get('/pedidos/:id/share', sharePedidoTicket);
 
 

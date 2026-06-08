@@ -1,4 +1,4 @@
-// src/modules/pasteleria/views/TicketPasteleriaModal.jsx
+// frontend/src/modules/pasteleria/views/TicketPasteleriaModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Printer, Cake, Landmark, MessageCircle } from 'lucide-react';
@@ -12,25 +12,22 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   const [phoneNumber, setPhoneNumber] = useState('');
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
 
-  // 🔥 LÓGICA DE USUARIO: Buscamos en la misma sesión global que usa App.jsx
-  // Dentro de TicketPasteleriaModal.jsx
-const getLoggedUserName = () => {
-  try {
-    const sessionStr = localStorage.getItem('lya_pos_session');
-    if (sessionStr) {
-      const { userData } = JSON.parse(sessionStr);
-      // 🔥 AQUÍ TAMBIÉN: .split(' ')[0]
-      if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
-      if (userData && userData.username) return userData.username;
+  const getLoggedUserName = () => {
+    try {
+      const sessionStr = localStorage.getItem('lya_pos_session');
+      if (sessionStr) {
+        const { userData } = JSON.parse(sessionStr);
+        if (userData && userData.fullName) return userData.fullName.split(' ')[0]; 
+        if (userData && userData.username) return userData.username;
+      }
+      const lyaUser = JSON.parse(localStorage.getItem('lya_user') || '{}');
+      if (lyaUser.fullName) return lyaUser.fullName.split(' ')[0];
+      if (lyaUser.username) return lyaUser.username;
+    } catch (e) {
+      console.error("Error leyendo sesión del cajero:", e);
     }
-    const lyaUser = JSON.parse(localStorage.getItem('lya_user') || '{}');
-    if (lyaUser.fullName) return lyaUser.fullName.split(' ')[0];
-    if (lyaUser.username) return lyaUser.username;
-  } catch (e) {
-    console.error("Error leyendo sesión del cajero:", e);
-  }
-  return 'Cajero en turno';
-};
+    return 'Cajero en turno';
+  };
 
   const nombreCajero = getLoggedUserName();
 
@@ -71,14 +68,14 @@ const getLoggedUserName = () => {
       return;
     }
     
-    // 🔥 CORRECCIÓN: Forzamos a usar el backend de Render para los enlaces de WhatsApp.
-    // Así, aunque cobres desde tu laptop local, el cliente recibe un enlace público que sí funciona.
+    // Forzamos a usar el backend de Render para los enlaces de WhatsApp
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
     if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
       baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
     }
     
-    const shareLink = `${baseApiUrl}/pasteleria/pedidos/${pedido.id}/share`;
+    // 🟢 AQUÍ ESTÁ EL CAMBIO: Usamos la ruta corta que creamos en el backend
+    const shareLink = `${baseApiUrl}/pasteleria/ticket/${pedido.id}`;
 
     let cuentasTexto = '';
     if (finanzas.deuda > 0 && transferInfo?.bank_accounts?.length > 0) {
@@ -89,7 +86,7 @@ const getLoggedUserName = () => {
       cuentasTexto += `\n💡 _Importante: En el *concepto* de tu pago, por favor escribe tu folio: *${pedido.id}*_`;
     }
     
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes el enlace directo para visualizar y descargar tu ticket de consumo en formato PDF:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
     
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
