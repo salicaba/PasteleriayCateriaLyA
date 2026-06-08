@@ -258,10 +258,12 @@ export const sharePedidoTicket = async (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Comprobante de Pedido - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        @media print { .no-print { display: none !important; } }
       </style>
     </head>
     <body class="text-gray-800 antialiased flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 select-none">
@@ -350,35 +352,42 @@ export const sharePedidoTicket = async (req, res) => {
         </div>
       </div>
 
-      <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
-        <button onclick="descargarImagen()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-slate-300/50 active:scale-95 transition-all duration-200 flex items-center gap-3 text-sm uppercase tracking-wider">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          Descargar Ticket (Imagen)
-        </button>
+      <div class="fixed bottom-6 left-0 right-0 flex flex-col gap-2 items-center p-4 no-print z-50">
+        <div class="flex gap-3">
+          <button onclick="descargarPDF()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-6 py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-wider">
+            📥 PDF
+          </button>
+          <button onclick="descargarImagen()" class="bg-amber-600 hover:bg-amber-700 text-white font-black px-6 py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-wider">
+            📸 Imagen
+          </button>
+        </div>
       </div>
 
       <script>
+        function descargarPDF() {
+          const element = document.getElementById('ticket-card');
+          const heightMm = (element.scrollHeight * 0.264583) + 2;
+          const options = {
+            margin: 0,
+            filename: 'Ticket-Pedido-${pedido.id}.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { scale: 3, useCORS: true },
+            jsPDF: { unit: 'mm', format: [85, heightMm], orientation: 'portrait' },
+            pagebreak: { mode: 'avoid-all' }
+          };
+          html2pdf().set(options).from(element).save();
+        }
+
         function descargarImagen() {
           const element = document.getElementById('ticket-card');
-          
-          // Tomamos una "foto" del elemento con html2canvas
-          html2canvas(element, { 
-            scale: 3, // Alta calidad
-            useCORS: true, 
-            backgroundColor: '#ffffff' // Fondo blanco asegurado
-          }).then(canvas => {
-            // Convertimos el canvas a una URL de datos tipo PNG
-            const imgData = canvas.toDataURL('image/png');
-            
-            // Creamos un enlace invisible y forzamos la descarga
+          html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket-Pedido-${pedido.id}.png';
-            link.href = imgData;
+            link.href = canvas.toDataURL('image/png');
             link.click();
           });
         }
       </script>
-
     </body>
     </html>
     `;
