@@ -631,19 +631,15 @@ export const shareOrderTicket = async (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Tu Ticket de Consumo - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        @media print {
-          .no-print { display: none !important; }
-        }
       </style>
     </head>
     <body class="text-gray-800 antialiased flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 select-none">
       
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
-        
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
@@ -776,33 +772,27 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
-        <button onclick="descargarPDF()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-slate-300/50 active:scale-95 transition-all duration-200 flex items-center gap-3 text-sm uppercase tracking-wider">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-          Guardar Ticket en PDF
+        <button onclick="descargarImagen()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 py-4 rounded-2xl shadow-xl hover:shadow-slate-300/50 active:scale-95 transition-all duration-200 flex items-center gap-3 text-sm uppercase tracking-wider">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Descargar Ticket (Imagen)
         </button>
       </div>
 
       <script>
-        function descargarPDF() {
+        function descargarImagen() {
           const element = document.getElementById('ticket-card');
           
-          // 1. Calculamos la altura total real del diseño web
-          const heightPx = element.scrollHeight;
-          
-          // 2. Convertimos a milímetros y le damos 2mm de respiro al final
-          const heightMm = (heightPx * 0.264583) + 2;
-          
-          const options = {
-            margin:       0, // 🔥 CERO MÁRGENES
-            filename:     'Ticket-Consumo-${orderId}.pdf',
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { scale: 3, useCORS: true, logging: false },
-            // 🔥 HOJA INFINITA: Ancho de 80mm (estándar de barra) y alto exacto
-            jsPDF:        { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
-            pagebreak:    { mode: 'avoid-all' }
-          };
-          
-          html2pdf().set(options).from(element).save();
+          html2canvas(element, { 
+            scale: 3, 
+            useCORS: true, 
+            backgroundColor: '#ffffff' 
+          }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = 'Ticket-Consumo-${orderId}.png';
+            link.href = imgData;
+            link.click();
+          });
         }
       </script>
 
