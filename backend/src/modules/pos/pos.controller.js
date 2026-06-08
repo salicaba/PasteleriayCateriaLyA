@@ -561,7 +561,7 @@ export const printOrderTicket = async (req, res) => {
 export const shareOrderTicket = async (req, res) => {
   try {
     let { orderId } = req.params;
-    const { cuenta } = req.query; 
+    let cuentaSeleccionada = req.query.cuenta || 'Todas';
 
     // 🔥 Búsqueda del ticket corto 🔥
     if (orderId && orderId.length < 36) {
@@ -605,9 +605,14 @@ export const shareOrderTicket = async (req, res) => {
       }
     } catch(e) {}
 
-    let itemsFiltrados = order.items || [];
-    if (cuenta && cuenta !== 'General') {
-      itemsFiltrados = itemsFiltrados.filter(i => i.cuenta === cuenta);
+    let allItems = order.items || [];
+    // Obtenemos todas las cuentas de la mesa para armar el selector
+    const cuentasDisponibles = Array.from(new Set(allItems.map(i => i.cuenta || 'General')));
+
+    // Filtramos los items dependiendo de qué cuenta se seleccionó en el desplegable
+    let itemsFiltrados = allItems;
+    if (cuentaSeleccionada !== 'Todas') {
+      itemsFiltrados = allItems.filter(i => (i.cuenta || 'General') === cuentaSeleccionada);
     }
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
@@ -615,7 +620,7 @@ export const shareOrderTicket = async (req, res) => {
       year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    const cuentasUnicas = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
+    const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
@@ -664,19 +669,36 @@ export const shareOrderTicket = async (req, res) => {
               <span>Servicio:</span>
               <span class="text-slate-900 font-black uppercase tracking-wide">${identificadorMesa}</span>
             </div>
-            ${cuenta ? `
+            ${cuentaSeleccionada !== 'Todas' ? `
             <div class="flex justify-between items-center">
               <span>Cuenta de:</span>
-              <span class="text-amber-600 font-black uppercase">${cuenta}</span>
+              <span class="text-amber-600 font-black uppercase">${cuentaSeleccionada}</span>
             </div>` : ''}
           </div>
+
+          ${cuentasDisponibles.length > 1 ? `
+          <div class="mb-6 no-print bg-amber-50/50 p-4 rounded-2xl border border-amber-100 shadow-sm">
+            <label class="block text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 text-center">👀 Ver cuenta de:</label>
+            <div class="relative">
+              <select onchange="window.location.href='?cuenta=' + encodeURIComponent(this.value)" class="w-full bg-white border border-amber-200 text-slate-800 text-sm font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 appearance-none text-center shadow-sm cursor-pointer">
+                <option value="Todas" ${cuentaSeleccionada === 'Todas' ? 'selected' : ''}>🌟 Todas las cuentas (General)</option>
+                ${cuentasDisponibles.map(c => `
+                  <option value="${c}" ${cuentaSeleccionada === c ? 'selected' : ''}>👤 Cuenta: ${c}</option>
+                `).join('')}
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-amber-600">
+                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+              </div>
+            </div>
+          </div>
+          ` : ''}
 
           <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
           <div class="space-y-6">
             <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalle de consumo</h3>
             
-            ${cuentasUnicas.map(accName => {
+            ${cuentasAVisualizar.map(accName => {
               const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
               if (accountItemsRaw.length === 0) return '';
 
@@ -709,7 +731,7 @@ export const shareOrderTicket = async (req, res) => {
 
               return `
                 <div class="space-y-3">
-                  ${cuentasUnicas.length > 1 && !cuenta ? `
+                  ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
                     <div class="text-xs font-extrabold text-slate-400 bg-slate-50 px-3 py-1 rounded-lg uppercase tracking-wide">
                       ● Cuenta: ${accName}
                     </div>
@@ -741,10 +763,10 @@ export const shareOrderTicket = async (req, res) => {
 
           <div class="border-t-2 border-dashed border-slate-200 my-6"></div>
 
-          ${cuentasUnicas.length > 1 && !cuenta ? `
+          ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
             <div class="space-y-2 text-xs font-semibold text-slate-500 mb-4 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
               <p class="font-black text-slate-400 uppercase tracking-wider mb-2 text-[10px]">Resumen por Cuentas</p>
-              ${cuentasUnicas.map(accName => {
+              ${cuentasAVisualizar.map(accName => {
                 const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
                 return `
                   <div class="flex justify-between">
