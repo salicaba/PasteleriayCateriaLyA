@@ -773,12 +773,12 @@ export const shareOrderTicket = async (req, res) => {
         </div>
       </div>
 
-      <div class="fixed bottom-6 left-0 right-0 flex flex-col gap-2 items-center p-4 no-print z-50">
-        <div class="flex gap-3">
-          <button onclick="descargarPDF()" class="bg-slate-900 hover:bg-slate-800 text-white font-black px-6 py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-wider">
+      <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
+        <div class="flex gap-3 w-full max-w-sm px-4">
+          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             📥 PDF
           </button>
-          <button onclick="descargarImagen()" class="bg-amber-600 hover:bg-amber-700 text-white font-black px-6 py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-wider">
+          <button onclick="descargarImagen()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             📸 Imagen
           </button>
         </div>
