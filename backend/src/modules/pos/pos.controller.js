@@ -606,10 +606,8 @@ export const shareOrderTicket = async (req, res) => {
     } catch(e) {}
 
     let allItems = order.items || [];
-    // Obtenemos todas las cuentas de la mesa para armar el selector
     const cuentasDisponibles = Array.from(new Set(allItems.map(i => i.cuenta || 'General')));
 
-    // Filtramos los items dependiendo de qué cuenta se seleccionó en el desplegable
     let itemsFiltrados = allItems;
     if (cuentaSeleccionada !== 'Todas') {
       itemsFiltrados = allItems.filter(i => (i.cuenta || 'General') === cuentaSeleccionada);
@@ -646,6 +644,24 @@ export const shareOrderTicket = async (req, res) => {
     <body class="text-gray-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
+        
+        ${cuentasDisponibles.length > 1 ? `
+        <div class="w-full mb-4 no-print bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200 shadow-sm">
+          <label class="block text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 text-center">👀 Ver cuenta de:</label>
+          <div class="relative">
+            <select onchange="window.location.href='?cuenta=' + encodeURIComponent(this.value)" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 appearance-none text-center shadow-sm cursor-pointer">
+              <option value="Todas" ${cuentaSeleccionada === 'Todas' ? 'selected' : ''}>🌟 Todas las cuentas (General)</option>
+              ${cuentasDisponibles.map(c => `
+                <option value="${c}" ${cuentaSeleccionada === c ? 'selected' : ''}>👤 Cuenta: ${c}</option>
+              `).join('')}
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+              <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
@@ -675,23 +691,6 @@ export const shareOrderTicket = async (req, res) => {
               <span class="text-amber-600 font-black uppercase">${cuentaSeleccionada}</span>
             </div>` : ''}
           </div>
-
-          ${cuentasDisponibles.length > 1 ? `
-          <div class="mb-6 no-print bg-amber-50/50 p-4 rounded-2xl border border-amber-100 shadow-sm">
-            <label class="block text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 text-center">👀 Ver cuenta de:</label>
-            <div class="relative">
-              <select onchange="window.location.href='?cuenta=' + encodeURIComponent(this.value)" class="w-full bg-white border border-amber-200 text-slate-800 text-sm font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 appearance-none text-center shadow-sm cursor-pointer">
-                <option value="Todas" ${cuentaSeleccionada === 'Todas' ? 'selected' : ''}>🌟 Todas las cuentas (General)</option>
-                ${cuentasDisponibles.map(c => `
-                  <option value="${c}" ${cuentaSeleccionada === c ? 'selected' : ''}>👤 Cuenta: ${c}</option>
-                `).join('')}
-              </select>
-              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-amber-600">
-                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-              </div>
-            </div>
-          </div>
-          ` : ''}
 
           <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
