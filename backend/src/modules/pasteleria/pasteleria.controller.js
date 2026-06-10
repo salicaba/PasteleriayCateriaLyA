@@ -343,6 +343,16 @@ export const sharePedidoTicket = async (req, res) => {
             </div>
           ` : ''}
 
+          <div class="text-center space-y-2 mt-2 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest">Ubicación de entrega / Sucursal</p>
+            <p class="text-xs text-slate-600 font-medium leading-relaxed">
+              Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
+            </p>
+            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all">
+              📍 Cómo llegar en Maps
+            </a>
+          </div>
+
           <div class="text-center mt-6 space-y-1">
             <p class="font-extrabold text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
             ${deuda > 0 ? '<p class="text-xs text-red-400 font-bold mt-1">El pedido debe estar liquidado al momento de su entrega.</p>' : '<p class="text-xs text-emerald-500 font-bold mt-1">¡Pedido totalmente liquidado!</p>'}

@@ -563,7 +563,6 @@ export const shareOrderTicket = async (req, res) => {
     let { orderId } = req.params;
     let cuentaSeleccionada = req.query.cuenta || 'Todas';
 
-    // 🔥 Búsqueda del ticket corto 🔥
     if (orderId && orderId.length < 36) {
       const foundOrder = await Order.findOne({
         where: Sequelize.where(
@@ -784,6 +783,16 @@ export const shareOrderTicket = async (req, res) => {
           </div>
 
           <div class="border-t border-slate-100 my-4"></div>
+
+          <div class="text-center space-y-2 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest">Visítanos en</p>
+            <p class="text-xs text-slate-600 font-medium leading-relaxed">
+              Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
+            </p>
+            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all">
+              📍 Ver en Google Maps
+            </a>
+          </div>
 
           <div class="text-center mt-6 space-y-1">
             <p class="font-extrabold text-slate-800 text-sm">¡Muchas gracias por tu preferencia!</p>

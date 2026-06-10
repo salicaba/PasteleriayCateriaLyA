@@ -257,7 +257,7 @@ export const TicketPreviewModal = ({
             {/* Footer */}
             <div className="text-center mt-6 text-xs text-gray-500 font-bold">
               <p>¡Muchas gracias por tu preferencia!</p>
-              <p className="mt-1 text-[10px] font-normal text-gray-400">Este documento es una previsualización de caja.</p>
+              <p className="mt-1 text-[10px] font-normal text-gray-400">Este documento es un comprabante de caja.</p>
             </div>
           </div>
         </div>
