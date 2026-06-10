@@ -275,7 +275,7 @@ export const sharePedidoTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Comprobante de Pedido - 𝓛𝔂𝓐</title>
+      <title>Comprobante de Pedido - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
