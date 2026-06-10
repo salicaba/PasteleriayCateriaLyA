@@ -197,7 +197,7 @@ export const printPedidoTicket = async (req, res) => {
     const saboresSeguros = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
     console.log(`\n==========================================`);
-    console.log(`                  𝓛𝔂𝓐`);
+    console.log(`                  𝓛𝔂�`);
     console.log(`         Pastelería & Cafetería`);
     console.log(`          Pijijiapan, Chiapas`);
     console.log(`------------------------------------------`);
@@ -291,7 +291,7 @@ export const sharePedidoTicket = async (req, res) => {
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
-            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓐</h1>
+            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂�</h1>
             <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
             <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
