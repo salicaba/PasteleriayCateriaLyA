@@ -1,12 +1,11 @@
+// src/modules/pasteleria/models/pedidosModel.js
 import client from '../../../api/client.js';
 
-// AQUÍ ESTABA EL DETALLE: Agregamos "/pedidos" a la ruta base
 const API_URL = '/pasteleria/pedidos'; 
 
 export const fetchPedidosPasteleria = async () => {
   try {
     const response = await client.get(API_URL);
-    // Devuelve el array de pedidos que viene dentro de 'data'
     return response.data.data;
   } catch (error) {
     console.error("Error al obtener los pedidos desde la BD:", error);
@@ -36,7 +35,6 @@ export const registrarAbonoReal = async (id, monto) => {
 
 export const actualizarEstadoPedidoReal = async (id, estado) => {
   try {
-    // Usamos PUT para que coincida exactamente con tu router.put del backend
     const response = await client.put(`${API_URL}/${id}/estado`, { estado });
     return response.data.data; 
   } catch (error) {
@@ -52,5 +50,16 @@ export const editarPedidoReal = async (id, pedidoData) => {
   } catch (error) {
     console.error("Error al editar el pedido en la BD:", error);
     throw error;
+  }
+};
+
+// 🔥 NUEVA FUNCIÓN: Trae el pedido completo (CON imagen)
+export const fetchPedidoByIdReal = async (id) => {
+  try {
+    const response = await client.get(`${API_URL}/${id}`);
+    return response.data.data;
+  } catch (error) {
+    console.error("Error al obtener los detalles del pedido:", error);
+    return null;
   }
 };

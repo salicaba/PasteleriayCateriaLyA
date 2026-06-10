@@ -3,16 +3,33 @@ import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
 import Transaction from '../cash/Transaction.model.js'; 
 
-// Obtener todos los pedidos
+// Obtener todos los pedidos (SIN IMÁGENES para carga instantánea)
 export const getPedidos = async (req, res) => {
   try {
     const pedidos = await PasteleriaOrder.findAll({
+      attributes: { exclude: ['imagenesReferencia'] }, // 🔥 Excluimos el arreglo JSON
       order: [['fechaEntrega', 'ASC']]
     });
     res.json({ data: pedidos });
   } catch (error) {
     console.error("Error al obtener pedidos:", error);
     res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// Obtener un solo pedido (CON IMÁGENES)
+export const getPedidoById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pedido = await PasteleriaOrder.findByPk(id);
+    
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+    res.json({ data: pedido });
+  } catch (error) {
+    console.error("Error al obtener el pedido individual:", error);
+    res.status(500).json({ message: "Error al obtener el pedido" });
   }
 };
 
@@ -156,9 +173,7 @@ export const updatePedido = async (req, res) => {
   }
 };
 
-// ==========================================
-// 🖨️ IMPRIMIR TICKET (MOCK NATIVO EN CONSOLA)
-// ==========================================
+// Imprimir ticket simulado
 export const printPedidoTicket = async (req, res) => {
   try {
     const { id } = req.params;
@@ -180,7 +195,7 @@ export const printPedidoTicket = async (req, res) => {
     const saboresSeguros = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
     console.log(`\n==========================================`);
-    console.log(`                  𝓛𝔂𝓐`);
+    console.log(`                  \uD835\uDCDB\uD835\uDCFE\uD835\uDC00`);
     console.log(`         Pastelería & Cafetería`);
     console.log(`          Pijijiapan, Chiapas`);
     console.log(`------------------------------------------`);
@@ -203,14 +218,6 @@ export const printPedidoTicket = async (req, res) => {
     console.log(`------------------------------------------`);
     console.log(`RESTA:        $${deuda.toFixed(2)}`);
     console.log(`------------------------------------------`);
-    if (deuda > 0) {
-      console.log(`    El pedido debe estar liquidado al`);
-      console.log(`          momento de su entrega.`);
-    }
-    console.log(`          *** TICKET SIMULADO ***`);
-    console.log(`        ¡Gracias por su preferencia!`);
-    console.log(`==========================================\n`);
-
     res.json({ message: 'Ticket de pastelería enviado a impresión simulada exitosamente' });
   } catch (error) {
     console.error('❌ Error al intentar simular la impresión del ticket:', error);
@@ -218,9 +225,7 @@ export const printPedidoTicket = async (req, res) => {
   }
 };
 
-// ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL (HTML/WHATSAPP)
-// ==========================================
+// Generar vista del ticket digital público
 export const sharePedidoTicket = async (req, res) => {
   try {
     const { id } = req.params;
@@ -249,13 +254,17 @@ export const sharePedidoTicket = async (req, res) => {
     const porcionesHtml = Array.isArray(pedido.porciones) ? pedido.porciones.join(' / ') : (pedido.porciones || '');
     const saboresHtml = Array.isArray(pedido.saborPan) ? pedido.saborPan.join(' / ') : (pedido.saborPan || '');
 
+    // Extraemos la primera imagen si existe para el ticket digital
+    const tieneImagenes = pedido.imagenesReferencia && Array.isArray(pedido.imagenesReferencia) && pedido.imagenesReferencia.length > 0;
+    const primeraImagen = tieneImagenes ? pedido.imagenesReferencia[0] : null;
+
     const htmlResponse = `
     <!DOCTYPE html>
     <html lang="es">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Comprobante de Pedido - 𝓛𝔂𝓐</title>
+      <title>Comprobante de Pedido - \uD835\uDCDB\uD835\uDCFE\uD835\uDC00</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -266,12 +275,11 @@ export const sharePedidoTicket = async (req, res) => {
       </style>
     </head>
     <body class="text-gray-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
-      
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
-            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓐</h1>
+            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">\uD835\uDCDB\uD835\uDCFE\uD835\uDC00</h1>
             <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
             <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
@@ -282,6 +290,12 @@ export const sharePedidoTicket = async (req, res) => {
             <p class="text-xs font-black uppercase text-slate-400 tracking-wider">Folio de Pedido</p>
             <p class="text-2xl font-black text-slate-900">${pedido.id}</p>
           </div>
+
+          ${primeraImagen ? `
+          <div class="w-full h-48 rounded-2xl overflow-hidden mb-6 shadow-sm border border-slate-100">
+            <img src="${primeraImagen}" class="w-full h-full object-cover" alt="Referencia Pastel" />
+          </div>
+          ` : ''}
 
           <div class="space-y-3 text-sm font-medium text-slate-600 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
             <div class="flex justify-between">
@@ -365,12 +379,8 @@ export const sharePedidoTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="flex gap-3 w-full max-w-sm px-4">
-          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-            📥 PDF
-          </button>
-          <button onclick="descargarImagen()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-            📸 Imagen
-          </button>
+          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">📥 PDF</button>
+          <button onclick="descargarImagen()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">📸 Imagen</button>
         </div>
       </div>
 

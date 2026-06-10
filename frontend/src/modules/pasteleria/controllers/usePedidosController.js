@@ -1,3 +1,4 @@
+// src/modules/pasteleria/controllers/usePedidosController.js
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { 
@@ -5,7 +6,8 @@ import {
   actualizarEstadoPedidoReal,
   crearPedidoReal,
   registrarAbonoReal,
-  editarPedidoReal 
+  editarPedidoReal,
+  fetchPedidoByIdReal
 } from '../models/pedidosModel';
 
 export const usePedidosController = () => {
@@ -144,11 +146,22 @@ export const usePedidosController = () => {
     }
   };
 
-  const abrirDetalles = (pedido) => setDetalleModal({ isOpen: true, pedido });
+  const abrirDetalles = async (pedidoLigero) => {
+    setDetalleModal({ isOpen: true, pedido: pedidoLigero }); 
+    const pedidoCompleto = await fetchPedidoByIdReal(pedidoLigero.id);
+    if (pedidoCompleto) {
+      setDetalleModal(prev => ({ isOpen: prev.isOpen, pedido: pedidoCompleto }));
+    }
+  };
+
   const cerrarDetalles = () => setDetalleModal({ isOpen: false, pedido: null });
 
-  const iniciarEdicion = (pedido) => {
-    setPedidoAEditar(pedido);
+  const iniciarEdicion = async (pedidoLigero) => {
+    const toastId = toast.loading('Cargando información del pedido...');
+    const pedidoCompleto = await fetchPedidoByIdReal(pedidoLigero.id);
+    toast.dismiss(toastId);
+    
+    setPedidoAEditar(pedidoCompleto || pedidoLigero);
     setIsModalOpen(true);
   };
 
@@ -182,7 +195,11 @@ export const usePedidosController = () => {
       if (pedidoAEditar) {
         pedidoResult = await editarPedidoReal(pedidoAEditar.id, pedidoAEnviar);
         const dataActualizada = pedidoResult.data || pedidoResult;
-        setPedidos(pedidos.map(p => p.id === pedidoAEditar.id ? dataActualizada : p));
+        
+        // 🔥 ACTUALIZADO: Excluimos de la RAM local las imágenes en plural
+        const { imagenesReferencia, ...dataActualizadaLigera } = dataActualizada;
+        
+        setPedidos(pedidos.map(p => p.id === pedidoAEditar.id ? dataActualizadaLigera : p));
         
         const finanzasEditado = calcularFinanzas(dataActualizada);
         if (finanzasEditado.estaLiquidado) {
@@ -196,12 +213,15 @@ export const usePedidosController = () => {
       } else {
         pedidoResult = await crearPedidoReal(pedidoAEnviar);
         const dataGuardada = pedidoResult.data || pedidoResult;
-        setPedidos([dataGuardada, ...pedidos]);
         
-        // 🔥 Controlamos la notificación al crear
+        // 🔥 ACTUALIZADO: Excluimos de la RAM local las imágenes en plural
+        const { imagenesReferencia, ...dataGuardadaLigera } = dataGuardada;
+        
+        setPedidos([dataGuardadaLigera, ...pedidos]);
+        
         const finanzasCreado = calcularFinanzas(dataGuardada);
         if (finanzasCreado.estaLiquidado) {
-           toast.dismiss(toastId); // Quitamos la notificación si liquidó todo en el anticipo
+           toast.dismiss(toastId);
            setIsSuccessScreenOpen(true);
            setTimeout(() => setIsSuccessScreenOpen(false), 2500);
         } else {
@@ -235,21 +255,19 @@ export const usePedidosController = () => {
       };
 
       setPedidos(pedidos.map(p => p.id === pedidoId ? pedidoActualizado : p));
-
       setAbonoModal({ isOpen: false, pedido: null });
       
       if (detalleModal.isOpen && detalleModal.pedido?.id === pedidoId) {
         cerrarDetalles();
       }
 
-      // 🔥 LÓGICA DE NOTIFICACIONES CORREGIDA
       const finanzasActualizadas = calcularFinanzas(pedidoActualizado);
       if (finanzasActualizadas.estaLiquidado) {
-         toast.dismiss(toastId); // ❌ BORRAMOS EL TOAST
-         setIsSuccessScreenOpen(true); // ✅ MOSTRAMOS LA PANTALLA GIGANTE
+         toast.dismiss(toastId); 
+         setIsSuccessScreenOpen(true); 
          setTimeout(() => setIsSuccessScreenOpen(false), 2500);
       } else {
-         toast.success('Abono registrado correctamente', { id: toastId }); // ✅ SOLO SE MUESTRA SI AÚN DEBE DINERO
+         toast.success('Abono registrado correctamente', { id: toastId }); 
       }
 
     } catch (error) {

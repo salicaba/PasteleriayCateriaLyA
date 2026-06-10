@@ -6,6 +6,41 @@ import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
 
+// 🔥 Skeleton exclusivo para el Calendario Neo-Bento
+const PasteleriaCalendarSkeleton = () => (
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-32 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-48 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+        </div>
+      </div>
+      <div className="w-full md:w-64 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+    </div>
+
+    <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
+      <div className="w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 flex flex-col shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <div className="w-48 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+        </div>
+        <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr">
+          {[...Array(35)].map((_, i) => <div key={i} className="bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-border/20 rounded-2xl animate-pulse" />)}
+        </div>
+      </div>
+
+      <div className="w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 flex flex-col shadow-sm">
+         <div className="w-40 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse mb-6" />
+         <div className="flex-1 space-y-4">
+           {[...Array(4)].map((_, i) => <div key={i} className="h-32 bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-border/20 rounded-2xl animate-pulse" />)}
+         </div>
+      </div>
+    </div>
+  </motion.div>
+);
+
 export default function PasteleriaCalendar() {
   const { 
     pedidos, loading, 
@@ -15,13 +50,14 @@ export default function PasteleriaCalendar() {
     pedidoAEditar, iniciarEdicion, calcularFinanzas, guardarPedido 
   } = usePedidosController();
 
+  // 🔥 TODOS los useState definidos antes del loading
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  
   const [showMobileList, setShowMobileList] = useState(false);
   const [fechaBusqueda, setFechaBusqueda] = useState('');
 
-  if (loading) return null;
+  // AHORA SÍ: Cortamos si está cargando
+  if (loading) return <PasteleriaCalendarSkeleton />;
 
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
@@ -81,7 +117,6 @@ export default function PasteleriaCalendar() {
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
-      {/* HEADER FIJO */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-emerald-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-emerald-500/20 lya:shadow-lya-primary/20">
@@ -93,7 +128,6 @@ export default function PasteleriaCalendar() {
           </div>
         </div>
 
-        {/* BUSCADOR RÁPIDO DE FECHAS */}
         <div className="w-full md:w-auto flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-2 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-emerald-500/30 transition-all">
           <div className="bg-white dark:bg-gray-700 lya:bg-lya-surface p-2 rounded-xl text-emerald-500 lya:text-lya-primary shadow-sm">
              <Search size={16} />
@@ -112,7 +146,6 @@ export default function PasteleriaCalendar() {
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
         
-        {/* LADO IZQUIERDO: Calendario */}
         <div className={`w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 shadow-xl overflow-y-auto custom-scrollbar 
           ${showMobileList ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
           <div className="flex justify-between items-center mb-6">
@@ -181,7 +214,6 @@ export default function PasteleriaCalendar() {
           </div>
         </div>
 
-        {/* LADO DERECHO: Lista de Entregas del Día */}
         <div className={`w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 shadow-xl overflow-hidden h-full
           ${showMobileList ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'}`}>
           
@@ -200,7 +232,6 @@ export default function PasteleriaCalendar() {
             </div>
           </div>
 
-          {/* 🔥 MODIFICACIÓN AQUI: Ocultamos la barra visualmente pero mantenemos el overflow */}
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <AnimatePresence mode="popLayout">
               {pedidosSeleccionados.length === 0 ? (

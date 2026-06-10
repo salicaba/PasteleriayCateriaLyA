@@ -3,6 +3,48 @@ import { useCashController } from '../controllers/useCashController';
 import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const CashRegisterSkeleton = () => (
+  <motion.div 
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
+  >
+    {/* Header Skeleton */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-24 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+        </div>
+      </div>
+      <div className="flex gap-3 w-full md:w-auto">
+        <div className="w-full sm:w-20 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+        <div className="w-full sm:w-40 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+      </div>
+    </div>
+
+    {/* KPIs Skeleton */}
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className={`h-32 rounded-3xl p-5 animate-pulse ${i===0 ? 'col-span-2 md:col-span-1 bg-gray-300 dark:bg-gray-800 lya:bg-lya-border/40' : 'bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`} />
+      ))}
+    </div>
+
+    {/* Filter Row Skeleton */}
+    <div className="mb-4 h-16 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse" />
+
+    {/* Table Skeleton */}
+    <div className="flex-1 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col">
+      <div className="h-12 bg-gray-100/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30" />
+      <div className="p-4 space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    </div>
+  </motion.div>
+);
+
 export const CashRegisterPage = ({ user }) => {
   const { 
     transactions, loading, selectedDate, setSelectedDate, resumen, 
@@ -20,11 +62,6 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  const filteredTransactions = transactions.filter(tx => {
-    if (filterSource === 'ALL') return true;
-    return tx.source === filterSource;
-  });
-
   const getPaymentInfo = (tx) => {
     const methodStr = String(tx.paymentMethod || '').toUpperCase();
     
@@ -41,6 +78,7 @@ export const CashRegisterPage = ({ user }) => {
     return { label: 'Efectivo', icon: Banknote, color: 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-700', bg: 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-emerald-100' };
   };
 
+  // 🔥 SOLUCIÓN: Declaramos useMemo ANTES del return de carga.
   const activeTransactions = transactions.filter(tx => tx.status === 'ACTIVE');
   const paymentStats = useMemo(() => {
     return activeTransactions.reduce((acc, tx) => {
@@ -53,6 +91,14 @@ export const CashRegisterPage = ({ user }) => {
       return acc;
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
+
+  // 🔥 AHORA SÍ: El return temprano ocurre después de que todos los hooks (useState, useMemo) fueron declarados.
+  if (loading) return <CashRegisterSkeleton />;
+
+  const filteredTransactions = transactions.filter(tx => {
+    if (filterSource === 'ALL') return true;
+    return tx.source === filterSource;
+  });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -355,41 +401,6 @@ export const CashRegisterPage = ({ user }) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* 🔥 PANTALLA DE CARGA TEMÁTICA (Taza de café brincando) */}
-      <AnimatePresence>
-        {loading && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-gray-50/60 dark:bg-gray-950/60 lya:bg-lya-bg/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center"
-          >
-            <div className="relative flex flex-col items-center">
-              {/* Taza saltando */}
-              <motion.div 
-                animate={{ y: [0, -22, 0] }} 
-                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }} 
-                className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-full shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 z-10"
-              >
-                <Coffee size={36} className="text-orange-500 lya:text-lya-primary" />
-              </motion.div>
-              
-              {/* Sombra de la taza */}
-              <motion.div
-                animate={{ scale: [1, 0.5, 1], opacity: [0.2, 0.05, 0.2] }}
-                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
-                className="w-10 h-2 bg-black rounded-[100%] mt-3 blur-[2px]"
-              />
-            </div>
-
-            <p className="mt-5 text-base font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 animate-pulse tracking-wide">
-              Preparando información...
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </motion.div>
   );
 };

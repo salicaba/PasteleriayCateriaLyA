@@ -11,16 +11,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
   const [formData, setFormData] = useState({
     cliente: '', telefono: '', descripcion: '', categoria: '',
     porciones: [], saborPan: [], tipoEntrega: 'sucursal', direccion: '', fechaEntrega: '', costoTotal: '', anticipo: '',
-    imagenReferencia: null 
+    imagenesReferencia: [] // 🔥 Cambiado de objeto único a arreglo
   });
 
-  // Arreglos simples de strings: ['Vainilla', 'Chocolate']
   const [porcionesTags, setPorcionesTags] = useState([]);
   const [saboresTags, setSaboresTags] = useState([]);
-  
   const [customPorcion, setCustomPorcion] = useState('');
   const [customSabor, setCustomSabor] = useState('');
-
   const [metodoPagoAnticipo, setMetodoPagoAnticipo] = useState('efectivo');
   const [transferInfo, setTransferInfo] = useState(null);
 
@@ -39,8 +36,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             fechaFormateada = `${year}-${month}-${day}T${hours}:${minutes}`;
           }
         }
-        setFormData({ ...pedidoAEditar, fechaEntrega: fechaFormateada });
-        // Usamos los arreglos directamente
+        setFormData({ 
+          ...pedidoAEditar, 
+          fechaEntrega: fechaFormateada,
+          imagenesReferencia: Array.isArray(pedidoAEditar.imagenesReferencia) ? pedidoAEditar.imagenesReferencia : []
+        });
         setPorcionesTags(Array.isArray(pedidoAEditar.porciones) ? pedidoAEditar.porciones : []);
         setSaboresTags(Array.isArray(pedidoAEditar.saborPan) ? pedidoAEditar.saborPan : []);
       } else {
@@ -61,7 +61,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
           cliente: '', telefono: '', descripcion: '', categoria: catDefecto,
           porciones: [], saborPan: [], tipoEntrega: 'sucursal', 
           direccion: '', fechaEntrega: defaultDate, costoTotal: '', anticipo: '',
-          imagenReferencia: null 
+          imagenesReferencia: []
         });
         setPorcionesTags([]);
         setSaboresTags([]);
@@ -70,7 +70,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
       setCustomSabor('');
       setMetodoPagoAnticipo('efectivo');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, pedidoAEditar]);
 
   useEffect(() => {
@@ -79,20 +78,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
   }, [isOpen, metodoPagoAnticipo, pedidoAEditar]);
 
-  // Función mágica simplificada: Agrega o quita el tag de la lista
   const toggleTag = (stateArray, setState, nombre, isAddOnly = false) => {
     if (stateArray.includes(nombre)) {
-      if (!isAddOnly) setState(stateArray.filter(t => t !== nombre)); // Desmarcar
+      if (!isAddOnly) setState(stateArray.filter(t => t !== nombre)); 
     } else {
-      setState([...stateArray, nombre]); // Marcar
+      setState([...stateArray, nombre]); 
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     let datosFinales = { ...formData };
-    
-    // Guardamos los arreglos de tags directamente
     datosFinales.porciones = porcionesTags;
     datosFinales.saborPan = saboresTags;
     
@@ -114,16 +110,31 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
   const anticipo = !pedidoAEditar ? (parseFloat(formData.anticipo) || 0) : 0; 
   const deuda = Math.max(costo - anticipo, 0);
 
+  // 🔥 GESTOR MULTI-IMÁGENES (MAX 3)
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files);
+    const espacioDisponible = 3 - formData.imagenesReferencia.length;
+    const archivosAProcesar = files.slice(0, espacioDisponible);
+
+    archivosAProcesar.forEach(file => {
       const reader = new FileReader();
-      reader.onloadend = () => setFormData({ ...formData, imagenReferencia: reader.result });
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          imagenesReferencia: [...prev.imagenesReferencia, reader.result].slice(0, 3)
+        }));
+      };
       reader.readAsDataURL(file);
-    }
+    });
   };
 
-  // Componente Reutilizable: Botones simples de selección
+  const removeImage = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      imagenesReferencia: prev.imagenesReferencia.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
   const renderSelectorInteractivos = (opcionesBase, seleccionados, setSeleccionados, customInput, setCustomInput, Icono, placeholder) => (
     <div className="space-y-3 p-3 bg-white dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-2xl">
       <div className="flex flex-wrap gap-2">
@@ -144,21 +155,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
               </button>
             )
          })}
-         
-         {/* Render de tags personalizados que agregaste a mano */}
          {seleccionados.filter(s => !opcionesBase.includes(s)).map(custom => (
             <button
               key={custom}
               type="button"
               onClick={() => toggleTag(seleccionados, setSeleccionados, custom)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all border outline-none active:scale-95 bg-purple-50 border-purple-500 text-purple-800 dark:bg-purple-900/30 dark:border-purple-500 dark:text-purple-300 lya:bg-lya-secondary/10 lya:border-lya-secondary lya:text-lya-secondary shadow-sm"
-              title="Haz clic para eliminar"
             >
-              {custom} <X size={14} className="opacity-70 hover:opacity-100 transition-opacity"/>
+              {custom} <X size={14} className="opacity-70"/>
             </button>
          ))}
       </div>
-
       <div className="flex relative items-center pt-1">
         <Icono className="absolute left-3 text-gray-400" size={16} />
         <input type="text" placeholder={placeholder} value={customInput} onChange={(e) => setCustomInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); if(e.target.value.trim()){ toggleTag(seleccionados, setSeleccionados, e.target.value.trim(), true); setCustomInput(''); } } }} 
@@ -176,12 +183,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
             className="fixed inset-0 m-auto w-full max-w-5xl h-fit max-h-[90vh] bg-white dark:bg-gray-900 lya:bg-lya-bg border border-white/20 dark:border-white/10 rounded-[2rem] shadow-2xl z-50 overflow-hidden flex flex-col"
           >
             <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-              <h2 className="text-2xl font-bold dark:text-white lya:text-lya-text flex items-center gap-2">
+              <h2 className="text-2xl font-bold dark:text-white lya:text-lya-text">
                 <span className="bg-gradient-to-r from-emerald-500 to-teal-400 lya:from-lya-primary lya:to-lya-secondary text-transparent bg-clip-text">
                   {pedidoAEditar ? `Editar Pedido: ${pedidoAEditar.id}` : 'Agendar Nuevo Pedido'}
                 </span>
               </h2>
-              <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:hover:text-lya-primary bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface rounded-full transition-colors"><X size={20} /></button>
+              <button type="button" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:hover:text-lya-primary bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface rounded-full transition-colors"><X size={20} /></button>
             </div>
 
             <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
@@ -196,9 +203,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1">
-                      <Tag size={12} className="text-emerald-500 lya:text-lya-primary" /> Categoría (Solo 1)
-                    </label>
+                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1"><Tag size={12} className="text-emerald-500 lya:text-lya-primary" /> Categoría (Solo 1)</label>
                     <div className="flex flex-wrap gap-2 p-1">
                       {config.categorias.map(cat => (
                         <button type="button" key={cat.id} onClick={() => setFormData({...formData, categoria: cat.nombre})}
@@ -211,35 +216,43 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1">
-                      <Hash size={12} className="text-emerald-500 lya:text-lya-primary" /> Tamaños / Porciones (Selecciona varios)
-                    </label>
+                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1"><Hash size={12} className="text-emerald-500 lya:text-lya-primary" /> Tamaños / Porciones (Selecciona varios)</label>
                     {renderSelectorInteractivos(config.tamanos, porcionesTags, setPorcionesTags, customPorcion, setCustomPorcion, Hash, "+ Otro tamaño y presiona Enter")}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1">
-                      <Layers size={12} className="text-emerald-500 lya:text-lya-primary" /> Sabores (Selecciona varios)
-                    </label>
+                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1"><Layers size={12} className="text-emerald-500 lya:text-lya-primary" /> Sabores (Selecciona varios)</label>
                     {renderSelectorInteractivos(config.sabores, saboresTags, setSaboresTags, customSabor, setCustomSabor, Layers, "+ Otro sabor y presiona Enter")}
                   </div>
 
                   <textarea name="descripcion" required rows="3" placeholder="Instrucciones especiales de decoración, dedicatoria..." value={formData.descripcion} onChange={handleChange} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none" />
                   
-                  {formData.imagenReferencia ? (
-                    <div className="relative w-full h-40 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-inner group">
-                      <img src={formData.imagenReferencia} alt="Referencia" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button type="button" onClick={() => setFormData({ ...formData, imagenReferencia: null })} className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-lg"><X size={20} /></button>
-                      </div>
+                  {/* 🔥 ZONA REFACTORIZADA: GALERÍA DE MÁXIMO 3 IMÁGENES */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase block">Fotos de Referencia ({formData.imagenesReferencia.length}/3)</label>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <AnimatePresence mode="popLayout">
+                        {formData.imagenesReferencia.map((img, idx) => (
+                          <motion.div key={idx} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="relative aspect-square rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm group">
+                            <img src={img} alt={`Ref ${idx + 1}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button type="button" onClick={() => removeImage(idx)} className="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors shadow-md"><X size={14} /></button>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+
+                      {formData.imagenesReferencia.length < 3 && (
+                        <label className="aspect-square border-2 border-dashed border-gray-300 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 lya:text-lya-text/40 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer group">
+                          <Camera size={20} className="group-hover:text-emerald-500 lya:group-hover:text-lya-primary transition-colors mb-1" />
+                          <span className="text-[10px] font-bold text-center px-1">Añadir foto</span>
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                        </label>
+                      )}
                     </div>
-                  ) : (
-                    <label className="w-full border-2 border-dashed border-gray-300 dark:border-gray-700 lya:border-lya-border/50 rounded-xl py-4 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:bg-gray-50 dark:hover:bg-gray-800/50 lya:hover:bg-lya-surface/50 transition-colors cursor-pointer group">
-                      <Camera size={24} className="mb-2 group-hover:text-emerald-500 lya:group-hover:text-lya-primary transition-colors" />
-                      <span className="text-sm font-medium group-hover:text-emerald-600 dark:group-hover:text-emerald-400 lya:group-hover:text-lya-primary transition-colors">Añadir foto de referencia (Opcional)</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                    </label>
-                  )}
+                  </div>
+
                 </div>
 
                 <div className="space-y-5">
@@ -320,7 +333,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                                     </div>
                                   </motion.div>
                                 )}
-                                
                                 {metodoPagoAnticipo === 'efectivo' && (
                                   <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
                                     <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/10 lya:bg-lya-primary/10 rounded-xl border border-emerald-100 dark:border-emerald-800/50 lya:border-lya-primary/20">
@@ -346,7 +358,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
               </form>
             </div>
 
-            <div className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-gray-50/50 dark:bg-black/20 lya:bg-lya-surface/50 shrink-0 flex justify-end gap-4">
+            <div className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-gray-50/50 dark:bg-black/20 lya:bg-slate-50 shrink-0 flex justify-end gap-4">
               <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-gray-500 lya:text-lya-text/60 hover:bg-gray-200 dark:hover:bg-gray-800 lya:hover:bg-lya-bg transition-colors">Cancelar</button>
               <button type="submit" form="pedidoForm" className="bg-gradient-to-r from-emerald-500 to-teal-500 lya:from-lya-primary lya:to-lya-secondary text-white lya:text-lya-surface font-bold px-8 py-3 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 hover:scale-[1.02] transition-transform active:scale-95">
                 {pedidoAEditar ? 'Guardar Cambios' : 'Confirmar y Agendar'}

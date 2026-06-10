@@ -77,6 +77,47 @@ const EmptyChartState = ({ message }) => (
   </div>
 );
 
+const ReportsSkeleton = () => (
+  <motion.div 
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
+  >
+    {/* Header Skeleton */}
+    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-48 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+        </div>
+      </div>
+      <div className="flex gap-4 w-full xl:w-auto">
+        <div className="w-full sm:w-32 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+        <div className="w-full sm:w-64 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+      </div>
+    </div>
+
+    <div className="flex-1 overflow-y-auto hide-scrollbar pb-24 space-y-6 pr-1">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-28 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
+        ))}
+      </div>
+      
+      {/* Big Chart Skeleton */}
+      <div className="h-[300px] bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
+      
+      {/* 3 Small Charts Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-[300px] bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
+        ))}
+      </div>
+    </div>
+  </motion.div>
+);
+
 export const ReportsPage = () => {
   const { theme } = useTheme();
   const { loading, dateRange, setDateRange, chartData, exportToExcel, exportToPDF } = useReportsController();
@@ -95,6 +136,7 @@ export const ReportsPage = () => {
     }));
   };
 
+  // 🔥 SOLUCIÓN: Los useMemo ahora están declarados ANTES del return temprano.
   const processedProducts = useMemo(() => {
     if (!chartData?.productSales) return [];
     
@@ -113,6 +155,9 @@ export const ReportsPage = () => {
   const chartDisplayedProducts = useMemo(() => {
     return [...processedProducts].reverse();
   }, [processedProducts]);
+
+  // 🔥 AHORA SÍ: Validamos el estado de carga
+  if (loading || !chartData?.kpis) return <ReportsSkeleton />;
 
   const dynamicChartHeight = Math.max(300, chartDisplayedProducts.length * 35);
 
@@ -417,41 +462,6 @@ export const ReportsPage = () => {
         </motion.div>
 
       </div>
-
-      {/* 🔥 PANTALLA DE CARGA TEMÁTICA (Taza de café brincando) */}
-      <AnimatePresence>
-        {(loading || !chartData?.kpis) && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-gray-50/60 dark:bg-gray-950/60 lya:bg-lya-bg/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center"
-          >
-            <div className="relative flex flex-col items-center">
-              {/* Taza saltando */}
-              <motion.div 
-                animate={{ y: [0, -22, 0] }} 
-                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }} 
-                className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-full shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 z-10"
-              >
-                <Coffee size={36} className="text-orange-500 lya:text-lya-primary" />
-              </motion.div>
-              
-              {/* Sombra de la taza */}
-              <motion.div
-                animate={{ scale: [1, 0.5, 1], opacity: [0.2, 0.05, 0.2] }}
-                transition={{ repeat: Infinity, duration: 0.8, ease: "easeInOut" }}
-                className="w-10 h-2 bg-black rounded-[100%] mt-3 blur-[2px]"
-              />
-            </div>
-
-            <p className="mt-5 text-base font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 animate-pulse tracking-wide">
-              Preparando información...
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </motion.div>
   );
 };

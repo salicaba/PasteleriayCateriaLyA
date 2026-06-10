@@ -1,21 +1,26 @@
 // src/modules/pasteleria/views/DetallePedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark, MessageCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark, MessageCircle, Image as ImageIcon } from 'lucide-react';
 import client from '../../../api/client'; 
 
 export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
   const [transferInfo, setTransferInfo] = useState(null);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0); // 🔥 Pestaña activa de la galería
 
   useEffect(() => {
     if (isOpen) {
       client.get('/settings')
         .then(res => { if (res.data) setTransferInfo(res.data); })
         .catch(err => console.error("Error al cargar datos bancarios:", err));
+      setActivePhotoIdx(0); // Resetear al abrir un nuevo pedido
     }
-  }, [isOpen]);
+  }, [isOpen, pedido?.id]);
 
   if (!pedido) return null;
+
+  const isImageLoading = pedido.imagenesReferencia === undefined;
+  const tieneImagenes = pedido.imagenesReferencia && Array.isArray(pedido.imagenesReferencia) && pedido.imagenesReferencia.length > 0;
 
   const finanzas = calcularFinanzas(pedido);
   const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -53,18 +58,54 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+              
+              {/* 🔥 NUEVO COMPONENTE BENTO DE GALERÍA MULTI-FOTO */}
               <div className="space-y-3">
                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                  <Camera size={14} /> Imagen de Referencia
+                  <Camera size={14} /> Imágenes de Referencia
                 </label>
-                {pedido.imagenReferencia ? (
-                  <div className="w-full h-80 rounded-[2rem] overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl">
-                    <img src={pedido.imagenReferencia} alt="Referencia" className="w-full h-full object-cover" />
+                
+                {isImageLoading ? (
+                  <div className="w-full h-80 rounded-[2rem] bg-gray-100/50 dark:bg-gray-800/30 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700">
+                    <ImageIcon size={48} className="mb-3 text-emerald-500/50 lya:text-lya-primary/50 animate-bounce" />
+                    <p className="text-sm font-bold text-gray-400 lya:text-lya-text/50 animate-pulse">Obteniendo galería en alta calidad...</p>
+                  </div>
+                ) : tieneImagenes ? (
+                  <div className="space-y-3">
+                    <div className="w-full h-80 rounded-[2rem] overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl bg-gray-50 dark:bg-gray-950">
+                      <AnimatePresence mode="wait">
+                        <motion.img 
+                          key={activePhotoIdx}
+                          initial={{ opacity: 0, scale: 0.98 }} 
+                          animate={{ opacity: 1, scale: 1 }} 
+                          exit={{ opacity: 0, scale: 1.02 }}
+                          transition={{ duration: 0.2 }}
+                          src={pedido.imagenesReferencia[activePhotoIdx]} 
+                          alt={`Referencia ${activePhotoIdx + 1}`} 
+                          className="w-full h-full object-cover" 
+                        />
+                      </AnimatePresence>
+                    </div>
+                    
+                    {/* Selectores de pestañas estilo Neo-Bento para las imágenes */}
+                    {pedido.imagenesReferencia.length > 1 && (
+                      <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
+                        {pedido.imagenesReferencia.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setActivePhotoIdx(idx)}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                          >
+                            Foto {idx + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="w-full h-40 rounded-[2rem] bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700">
                     <CameraOff size={48} className="mb-2 opacity-20" />
-                    <p className="text-sm font-medium">Sin imagen de referencia</p>
+                    <p className="text-sm font-medium">Sin imágenes de referencia</p>
                   </div>
                 )}
               </div>
@@ -118,14 +159,12 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   <Layers size={18} className="text-emerald-500" /> Especificaciones Técnicas
                 </h3>
                 <div className="grid grid-cols-1 gap-4">
-                  
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Categoría</p>
                     <span className="inline-block bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800/50">
                       {pedido.categoria || 'Pastel'}
                     </span>
                   </div>
-
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Porciones / Tamaño</p>
                     <div className="flex flex-wrap gap-2">
@@ -173,7 +212,6 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                     <Landmark size={18} className="text-purple-500" /> Cuentas para Transferencia
                   </h3>
                   
-                  {/* 🚀 BANNER NEO-BENTO PARA RECORDATORIO DE WHATSAPP 🚀 */}
                   {transferInfo?.whatsapp_number && (
                     <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
                       <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">

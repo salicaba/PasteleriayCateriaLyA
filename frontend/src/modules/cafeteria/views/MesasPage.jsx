@@ -7,16 +7,67 @@ import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal'; 
 import { NuevoPedidoLlevarModal } from './NuevoPedidoLlevarModal';
 
+const MesasSkeleton = () => (
+  <motion.div 
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
+  >
+    {/* Header Skeleton */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-32 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-48 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+        </div>
+      </div>
+      <div className="w-full md:w-72 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+    </div>
+
+    {/* Tabs Skeleton */}
+    <div className="flex gap-2 mb-6 overflow-hidden">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse shrink-0" />
+      ))}
+    </div>
+
+    {/* Grid Skeleton */}
+    <div className="flex-1 overflow-hidden">
+      <div className="h-full overflow-y-auto overflow-x-hidden custom-scrollbar pb-24">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 items-start auto-rows-max">
+          {[...Array(12)].map((_, i) => (
+            <div key={i} className="aspect-square bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-full animate-pulse" />
+                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-full animate-pulse" />
+              </div>
+              <div className="space-y-3 mt-4 w-full">
+                <div className="w-full h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
+                <div className="w-2/3 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </motion.div>
+);
+
 export const MesasPage = () => {
+  // 🔥 SOLUCIÓN 1: Usamos 'isLoading' en lugar de 'loading'
   const { 
     mesasFiltradas, stats, liberarMesa, actualizarEstadoMesa, unirMesas, pagoParcialMesa,
-    zonas, zonaActiva, setZonaActiva, nuevoPedidoLlevar, nuevoPedidoVitrina 
+    zonas, zonaActiva, setZonaActiva, nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading 
   } = useMesasController();
   
+  // 🔥 SOLUCIÓN 2: Todos los useState ANTES del return temprano
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [ordenVitrina, setOrdenVitrina] = useState(null); 
   const [busqueda, setBusqueda] = useState('');
   const [isModalLlevarOpen, setIsModalLlevarOpen] = useState(false);
+
+  // AHORA SÍ: Cortamos la ejecución si está cargando
+  if (isLoading) return <MesasSkeleton />;
 
   const mesasVisibles = mesasFiltradas.filter(mesa => 
     (mesa?.numero || '').toString().toLowerCase().includes(busqueda.toLowerCase())
@@ -66,7 +117,6 @@ export const MesasPage = () => {
         )}
       </header>
 
-      {/* 🔥 CORRECCIÓN: min-h-[48px] evita que la fila colapse cuando no está el botón */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 shrink-0 min-h-[48px]">
         <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 p-1 rounded-2xl overflow-x-auto">
           {zonas && zonas.map(zona => (
@@ -89,7 +139,6 @@ export const MesasPage = () => {
           ))}
         </div>
 
-        {/* 🔥 CORRECCIÓN: Animación para el botón, así no empuja todo de golpe */}
         <AnimatePresence>
           {zonaActiva === 'llevar' && (
             <motion.button 
@@ -140,7 +189,6 @@ export const MesasPage = () => {
              </motion.div>
           ) : (
              <motion.div 
-               // 🔥 CORRECCIÓN CLAVE: El key dinámico destruye la vista anterior y mata a las tarjetas fantasma
                key={`vista-grid-${zonaActiva}`}
                variants={viewVariants}
                initial="hidden"
@@ -148,7 +196,6 @@ export const MesasPage = () => {
                exit="exit"
                className="h-full overflow-y-auto overflow-x-hidden custom-scrollbar pb-24"
              >
-                {/* 🔥 CORRECCIÓN: Agregado 'relative' para contener a las tarjetas cuando haces una búsqueda con la lupa */}
                 <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 items-start auto-rows-max relative">
                   <AnimatePresence mode='popLayout'>
                     {mesasVisibles.map(mesa => (

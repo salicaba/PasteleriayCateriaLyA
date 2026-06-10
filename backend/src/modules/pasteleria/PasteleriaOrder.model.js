@@ -1,9 +1,10 @@
+// backend/src/modules/pasteleria/PasteleriaOrder.model.js
 import { DataTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 
 const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
   id: {
-    type: DataTypes.STRING, // Usamos STRING para guardar formatos como "PED-001"
+    type: DataTypes.STRING,
     primaryKey: true,
   },
   cliente: {
@@ -14,7 +15,7 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  categoria: { // 🚀 NUEVO CAMPO AÑADIDO
+  categoria: { 
     type: DataTypes.STRING,
     defaultValue: 'Pastel',
   },
@@ -54,9 +55,9 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     type: DataTypes.JSON, 
     defaultValue: [],
   },
-  imagenReferencia: {
-    type: DataTypes.TEXT('long'),
-    allowNull: true,
+  imagenesReferencia: { // 🔥 CAMPO ACTUALIZADO A JSON ARRAY
+    type: DataTypes.JSON,
+    defaultValue: [],
   }
 }, {
   timestamps: true,
