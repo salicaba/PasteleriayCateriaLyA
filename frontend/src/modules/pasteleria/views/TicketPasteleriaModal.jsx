@@ -1,4 +1,4 @@
-// frontend/src/modules/pasteleria/views/TicketPasteleriaModal.jsx
+// src/modules/pasteleria/views/TicketPasteleriaModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Printer, Cake, Landmark, MessageCircle } from 'lucide-react';
@@ -59,22 +59,17 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
   const costoTotalNum = parseFloat(pedido.costoTotal) || 0;
 
-  // ==========================================
-  // 🔥 LÓGICA WHATSAPP
-  // ==========================================
   const handleWhatsAppClick = () => {
     if (phoneNumber.trim().length < 10) {
       toast.error('Por favor, ingresa un número de celular válido a 10 dígitos.');
       return;
     }
     
-    // Forzamos a usar el backend de Render para los enlaces de WhatsApp
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
     if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
       baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
     }
     
-    // 🟢 AQUÍ ESTÁ EL CAMBIO: Usamos la ruta corta que creamos en el backend
     const shareLink = `${baseApiUrl}/pasteleria/ticket/${pedido.id}`;
 
     let cuentasTexto = '';
@@ -85,8 +80,10 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       });
       cuentasTexto += `\n💡 _Importante: En el *concepto* de tu pago, por favor escribe tu folio: *${pedido.id}*_`;
     }
+
+    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓐 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
     
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
@@ -102,9 +99,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
     }, 1800); 
   };
 
-  // ==========================================
-  // 🖨️ LÓGICA IMPRESIÓN
-  // ==========================================
   const handlePrint = async () => {
     setPaymentSuccessData({
       title: '¡Enviado a Impresora!',
@@ -155,7 +149,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       
                       <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                         <Cake size={32} className="mx-auto mb-2 text-gray-800" />
-                        <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
+                        <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓐</h2>
                         <p className="text-xs font-bold text-gray-600 uppercase">Pastelería & Cafetería</p>
                         <p className="text-xs text-gray-500 mt-1">Comprobante de Pedido</p>
                         <p className="text-lg font-bold mt-2 text-black">{pedido.id}</p>
