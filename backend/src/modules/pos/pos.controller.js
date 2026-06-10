@@ -644,7 +644,7 @@ export const shareOrderTicket = async (req, res) => {
       
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
         
-        ${cuentasDisponibles.length > 1 ? `
+        ${(cuentasDisponibles.length > 1 && cuentaSeleccionada === 'Todas') ? `
         <div class="w-full mb-4 no-print bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200 shadow-sm">
           <label class="block text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 text-center">👀 Ver cuenta de:</label>
           <div class="relative">
@@ -821,7 +821,7 @@ export const shareOrderTicket = async (req, res) => {
           const heightMm = (element.scrollHeight * 0.264583) + 2;
           const options = {
             margin: 0,
-            filename: 'Ticket-Consumo-${orderId}.pdf',
+            filename: 'Ticket-Consumo-\${orderId}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { scale: 3, useCORS: true },
             jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
@@ -834,7 +834,7 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
           html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = 'Ticket-Consumo-${orderId}.png';
+            link.download = 'Ticket-Consumo-\${orderId}.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
           });

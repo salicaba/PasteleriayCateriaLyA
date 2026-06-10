@@ -24,7 +24,6 @@ export const TicketSidebar = ({
   const scrollContainerRef = useRef(null);
   const [cuentasOcultas, setCuentasOcultas] = useState([]);
 
-  // Si es Vitrina, forzamos que solo haya 'General'
   const activeAcc = cuentaActiva || 'General';
   const availableAccs = (isLlevar || isVitrina) ? ['General'] : (cuentasDisponibles || ['General']);
 
@@ -195,34 +194,43 @@ export const TicketSidebar = ({
                         )}
                       </div>
                     </div>
-                    <div className="text-right pointer-events-none">
-                      <span className="block text-lg font-black text-gray-900 dark:text-white">
+                    
+                    <div className="flex flex-col items-end gap-1 pointer-events-none">
+                      <span className="block text-lg font-black text-gray-900 dark:text-white leading-none mb-1">
                         ${subtotalCuenta.toFixed(2)}
                       </span>
-                      {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && subtotalCuenta > 0 && !isVitrina && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onPayCuenta && onPayCuenta(cuentaName); }}
-                          className="pointer-events-auto text-[9px] font-black bg-blue-500 text-white px-2 py-1 rounded-lg shadow-md active:scale-90 transition-transform uppercase mt-1 inline-block"
-                        >
-                          Cobrar este
-                        </button>
-                      )}
-                      {isCuentaPagada && (
-                        <div className="flex justify-end gap-1 mt-1">
+                      
+                      <div className="flex gap-1 flex-wrap justify-end pointer-events-auto">
+                        {/* BOTÓN COBRAR (Solo si no está pagada) */}
+                        {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && subtotalCuenta > 0 && !isVitrina && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onPayCuenta && onPayCuenta(cuentaName); }}
+                            className="text-[9px] font-black bg-blue-500 hover:bg-blue-600 text-white px-2 py-1.5 rounded-lg shadow-sm active:scale-95 transition-colors uppercase"
+                          >
+                            Cobrar este
+                          </button>
+                        )}
+                        
+                        {/* BOTÓN TICKET (Siempre visible si hay productos en la cuenta, pagado o no) */}
+                        {items.length > 0 && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
-                            className="pointer-events-auto text-[9px] font-black bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-lg uppercase flex gap-1 items-center active:scale-95"
+                            className="text-[9px] font-black bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-2 py-1.5 rounded-lg uppercase flex gap-1 items-center active:scale-95 transition-colors"
                           >
                             <Printer size={10}/> Ticket
                           </button>
+                        )}
+
+                        {/* BOTÓN LIBERAR (Solo si ya se pagó) */}
+                        {isCuentaPagada && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
-                            className="pointer-events-auto text-[9px] font-black bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-lg uppercase flex gap-1 items-center active:scale-95 hover:bg-red-100"
+                            className="text-[9px] font-black bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-2 py-1.5 rounded-lg uppercase flex gap-1 items-center active:scale-95 transition-colors"
                           >
                             <XCircle size={10}/> Liberar
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -251,17 +259,6 @@ export const TicketSidebar = ({
                             : "bg-white dark:bg-gray-800 border-transparent shadow-sm hover:shadow-md"
                         )}
                       >
-                        <AnimatePresence>
-                          {isTransferMode && !isVitrina && (
-                            <motion.div 
-                              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                              className="absolute inset-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm flex flex-col justify-center p-2 rounded-2xl"
-                            >
-                              {/* Lógica de mover omitida para brevedad si es Vitrina */}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
                         <div className="flex gap-3">
                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-950 flex-shrink-0 border border-gray-100 dark:border-gray-700 flex items-center justify-center relative group-hover:shadow-inner">
                             {item.imagen || item.image ? (
@@ -320,7 +317,6 @@ export const TicketSidebar = ({
 
                             <div className="mt-2 flex items-center justify-between">
                               <div className="flex items-center gap-1.5">
-                                {/* 🔥 AQUI OCULTAMOS TODAS LAS ETIQUETAS DE COCINA SI ES VITRINA */}
                                 {!isVitrina && (
                                   item.enviadoCocina ? (
                                     <button 
@@ -412,14 +408,13 @@ export const TicketSidebar = ({
       </div>
 
       <div className="p-5 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-30 shrink-0 transition-colors">
-        
         {isCompletamentePagada ? (
            <div className="flex gap-3 animate-fade-in">
               <button 
                 onClick={() => onPrintTicket()} 
                 className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-gray-100 text-gray-700 active:scale-95 transition-transform"
               >
-                <Printer size={18} /><span>Ticket</span>
+                <Printer size={18} /><span>Ticket Completo</span>
               </button>
               <button 
                 onClick={onCloseTable} 
@@ -436,7 +431,6 @@ export const TicketSidebar = ({
                  <span>{isVitrina ? 'Total de Productos' : (isLlevar ? 'Subtotal Pedido' : 'Subtotal Mesa')}</span>
                  <span>${isVitrina ? (mesaTotal + unsentTotal).toFixed(2) : mesaTotal.toFixed(2)}</span>
                </div>
-               {/* 🔥 OCULTAMOS LA ETIQUETA 'Por Enviar' EN VITRINA */}
                {!isVitrina && hasUnsentItems && (
                  <div className="flex justify-between items-center text-orange-500 text-xs font-black uppercase tracking-wider">
                    <span>Por enviar</span>
@@ -451,10 +445,7 @@ export const TicketSidebar = ({
                </div>
              </div>
              
-             {/* 🔥 CONTENEDOR DE BOTONES INFERIORES */}
              <div className="flex gap-3">
-               
-               {/* 🔥 OCULTAMOS EL BOTÓN 'Enviar a Cocina' SI ES VITRINA */}
                {!isVitrina && (
                  <button 
                    onClick={onSendToKitchen} 
@@ -471,7 +462,6 @@ export const TicketSidebar = ({
                  </button>
                )}
                
-               {/* 🔥 EL BOTÓN DE COBRAR SE ESTIRA AL 100% SI ES VITRINA */}
                <button 
                  onClick={onCheckout} 
                  disabled={cart.length === 0 && mesaTotal === 0 && unsentTotal === 0}
