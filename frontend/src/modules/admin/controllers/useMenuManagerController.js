@@ -16,7 +16,6 @@ export const useMenuManagerController = () => {
   const [categoryToEdit, setCategoryToEdit] = useState(null); 
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   
-  // 🔥 NUEVO: Estado para el modal de eliminar producto
   const [productToDelete, setProductToDelete] = useState(null);
 
   const loadData = useCallback(async () => {
@@ -130,7 +129,6 @@ export const useMenuManagerController = () => {
     }
   };
 
-  // 🔥 FIX: Lógica real para eliminar producto
   const requestRemoveProduct = (id) => setProductToDelete(id);
   const cancelRemoveProduct = () => setProductToDelete(null);
   
@@ -148,7 +146,6 @@ export const useMenuManagerController = () => {
     }
   };
 
-  // 🔥 FIX: Lógica real para Apagar/Encender producto
   const toggleAvailability = async (id) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
@@ -189,14 +186,13 @@ export const useMenuManagerController = () => {
     }
   };
 
-  // 🔥 NUEVO: Función para guardar el reordenamiento de opciones en la base de datos
   const handleDragEndOptionsAPI = async (newList) => {
     try {
       const payload = newList.map((opt, index) => ({ id: opt.id, order: index }));
       await adminMenuModel.reorderGlobalOptions(payload);
     } catch (error) {
       toast.error('Error al guardar orden de opciones');
-      loadData(); // Si falla, recargamos para restaurar el orden original
+      loadData(); 
     }
   };
 
@@ -208,16 +204,17 @@ export const useMenuManagerController = () => {
     editingProduct, openModal, closeModal: () => setIsModalOpen(false),
     saveProduct, saveCategory, handleDragEndAPI,
     
-    // Funciones de productos
     productToDelete, requestRemoveProduct, confirmRemoveProduct, cancelRemoveProduct,
     deleteProduct: requestRemoveProduct,
     toggleAvailability,
     
-    // 🔥 Nuevos exports para las opciones globales
     globalOptions, 
     setGlobalOptions, 
     saveGlobalOption, 
     removeGlobalOption,
-    handleDragEndOptionsAPI
+    handleDragEndOptionsAPI,
+
+    // 🔥 AQUÍ ESTABA EL ERROR: Exportamos isLoading para que la vista sepa cuándo mostrar el esqueleto
+    isLoading
   };
 };

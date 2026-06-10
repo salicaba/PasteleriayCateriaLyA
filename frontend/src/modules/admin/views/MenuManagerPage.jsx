@@ -2,14 +2,43 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-// 🔥 Añadimos rectSortingStrategy a los imports de dnd-kit
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
-// 🔥 Importamos el nuevo componente arrastrable para las opciones
 import { SortableOptionItem } from './SortableOptionItem';
+
+const MenuManagerSkeleton = () => (
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-48 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+        </div>
+      </div>
+      <div className="flex gap-3 w-full md:w-auto">
+        <div className="w-full sm:w-32 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+        <div className="w-full sm:w-32 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+        <div className="w-full sm:w-40 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+      </div>
+    </div>
+    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20 space-y-10">
+      {[1, 2, 3].map(cat => (
+        <div key={cat} className="space-y-4">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse mb-4" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(prod => (
+              <div key={prod} className="h-28 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </motion.div>
+);
 
 export const MenuManagerPage = () => {
   const {
@@ -19,9 +48,8 @@ export const MenuManagerPage = () => {
     categoryToEdit, setCategoryToEdit,
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
     productToDelete, confirmRemoveProduct, cancelRemoveProduct,
-    
-    // 🔥 Asegúrate de incluir las funciones nuevas exportadas del hook
-    globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI
+    globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
+    isLoading // 🔥 Ahora sí la recibimos del controlador
   } = useMenuManagerController();
 
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -38,6 +66,10 @@ export const MenuManagerPage = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // 🔥 VALIDACIÓN CORRECTA DE CARGA
+  const isPageLoading = isLoading;
+  if (isPageLoading) return <MenuManagerSkeleton />;
+
   // Drag & Drop para Categorías
   const handleDragEnd = (event) => {
     const { active, over } = event;
@@ -50,25 +82,18 @@ export const MenuManagerPage = () => {
     }
   };
 
-  // 🔥 Drag & Drop para Opciones Globales (NUEVO)
+  // Drag & Drop para Opciones Globales
   const handleDragEndOptions = (event, tipo) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      // Filtramos solo las opciones del tipo que estamos moviendo
       const tipoOptions = globalOptions.filter(o => o.tipo === tipo);
       const oldIndex = tipoOptions.findIndex(o => o.id === active.id);
       const newIndex = tipoOptions.findIndex(o => o.id === over.id);
 
-      // Reordenamos
       const newTipoOptions = arrayMove(tipoOptions, oldIndex, newIndex);
-      
-      // Mantenemos las opciones de los otros tipos sin cambios
       const otherOptions = globalOptions.filter(o => o.tipo !== tipo);
       
-      // Actualizamos el estado local
       setGlobalOptions([...otherOptions, ...newTipoOptions]);
-      
-      // Llamamos a la API para persistir el orden
       if (handleDragEndOptionsAPI) handleDragEndOptionsAPI(newTipoOptions);
     }
   };
@@ -288,7 +313,7 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 🔥 MODAL DE OPCIONES GLOBALES ACTUALIZADO */}
+      {/* MODAL DE OPCIONES GLOBALES */}
       <AnimatePresence>
         {isOptionsManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
@@ -357,7 +382,6 @@ export const MenuManagerPage = () => {
                           Aún no has registrado {tipo}.
                         </p>
                       ) : (
-                        /* 🔥 Contenedor arrastrable (Drag & Drop) */
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEndOptions(e, tipo)}>
                           <SortableContext items={opcionesDelTipo.map(o => o.id)} strategy={rectSortingStrategy}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

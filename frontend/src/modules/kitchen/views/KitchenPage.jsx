@@ -1,17 +1,50 @@
+// src/modules/kitchen/views/KitchenPage.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKitchenController } from '../controllers/useKitchenController';
 import { KitchenOrderCard } from './KitchenOrderCard';
 import { Flame, UtensilsCrossed, ShoppingBag } from 'lucide-react';
 
-export const KitchenPage = () => {
-  // 🔥 Extraemos markAllReady del controlador
-  const { orders, toggleItemReady, completeOrder, markAllReady } = useKitchenController();
+const KitchenSkeleton = () => (
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-6 overflow-hidden">
+    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4 md:mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-40 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
+        </div>
+      </div>
+      <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
+    </div>
+    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
+      {[1, 2].map(col => (
+        <div key={col} className="flex-1 flex flex-col bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden">
+          <div className="h-14 bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 p-4 animate-pulse flex justify-between">
+            <div className="w-32 h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 rounded-md" />
+            <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 rounded-full" />
+          </div>
+          <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+            {[1, 2, 3].map(card => (
+              <div key={card} className="h-40 bg-gray-200/50 dark:bg-gray-800/50 lya:bg-lya-border/20 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </motion.div>
+);
 
-  // Estado para controlar qué vista se muestra en móviles
+export const KitchenPage = () => {
+  const { orders, toggleItemReady, completeOrder, markAllReady, loading, isLoading } = useKitchenController();
+
+  // 🔥 HOOKS A SALVO
   const [vistaMovilActiva, setVistaMovilActiva] = useState('salon');
 
-  // Separar órdenes por tipo
+  // AHORA SÍ: Cortamos si está cargando
+  const isPageLoading = loading || isLoading || !orders;
+  if (isPageLoading) return <KitchenSkeleton />;
+
   const ordersMesa = orders.filter(o => o.tipo !== 'llevar');
   const ordersLlevar = orders.filter(o => o.tipo === 'llevar');
 
@@ -23,7 +56,6 @@ export const KitchenPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-6 transition-colors duration-300 overflow-hidden"
     >
       
-      {/* HEADER FIJO */}
       <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4 md:mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 relative z-10 shrink-0">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-primary/10 p-3.5 rounded-xl text-orange-500 lya:text-lya-primary border border-orange-500/20 lya:border-lya-primary/20">
@@ -46,7 +78,6 @@ export const KitchenPage = () => {
         </div>
       </header>
 
-      {/* BOTONES DE NAVEGACIÓN (SÓLO MÓVIL) */}
       {orders.length > 0 && (
         <div className="md:hidden flex bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 p-1.5 rounded-xl mb-4 shrink-0">
           <button
@@ -74,10 +105,8 @@ export const KitchenPage = () => {
         </div>
       )}
 
-      {/* ÁREA DE CONTENIDO */}
       <div className="flex-1 overflow-hidden">
         {orders.length === 0 ? (
-          // ESTADO VACÍO (ANIMADO)
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -91,14 +120,11 @@ export const KitchenPage = () => {
             <p className="text-lg font-medium">Esperando nuevas tandas de comandas...</p>
           </motion.div>
         ) : (
-          // VISTA DIVIDIDA (DESKTOP) / ALTERNADA (MÓVIL)
           <div className="h-full flex flex-col md:flex-row gap-6">
             
-            {/* ---------------- COLUMNA 1: SALÓN ---------------- */}
             <div className={`flex-1 flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 shadow-sm overflow-hidden ${
               vistaMovilActiva === 'salon' ? 'flex' : 'hidden md:flex'
             }`}>
-              {/* Header de Columna Salón */}
               <div className="bg-emerald-50 dark:bg-emerald-900/10 lya:bg-lya-secondary/10 border-b border-emerald-100 dark:border-emerald-900/20 lya:border-lya-secondary/20 p-4 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2">
                   <UtensilsCrossed size={20} className="text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary" />
@@ -109,7 +135,6 @@ export const KitchenPage = () => {
                 </span>
               </div>
               
-              {/* Lista Scrollable de Salón con Animaciones Consistentes */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-gray-50/50 dark:bg-transparent lya:bg-lya-bg/30">
                 {ordersMesa.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-400 lya:text-lya-text/50 text-sm font-medium">Sin comandas de salón</div>
@@ -139,11 +164,9 @@ export const KitchenPage = () => {
               </div>
             </div>
 
-            {/* ---------------- COLUMNA 2: PARA LLEVAR ---------------- */}
             <div className={`flex-1 flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 shadow-sm overflow-hidden ${
               vistaMovilActiva === 'llevar' ? 'flex' : 'hidden md:flex'
             }`}>
-              {/* Header de Columna Para Llevar */}
               <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-4 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2">
                   <ShoppingBag size={20} className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70" />
@@ -151,7 +174,6 @@ export const KitchenPage = () => {
                 </div>
               </div>
               
-              {/* Lista Scrollable Para Llevar con Animaciones Consistentes */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-gray-50/50 dark:bg-transparent lya:bg-lya-bg/30">
                 {ordersLlevar.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-400 lya:text-lya-text/50 text-sm font-medium">Sin pedidos para llevar</div>

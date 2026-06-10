@@ -1,6 +1,7 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
-import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle } from 'lucide-react';
+// 🔥 Añadimos Phone y User a los iconos
+import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle, Phone, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -17,7 +18,6 @@ import { TicketPreviewModal } from './TicketPreviewModal';
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } }, exit: { y: "100%", opacity: 0 } };
 
-// 🔥 Mini-esqueleto para renderizar productos de forma fluida
 const ProductSkeleton = () => (
   <div className="bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl p-4 flex flex-col justify-between h-48 border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shadow-sm">
     <div className="flex justify-between items-start mb-2">
@@ -52,7 +52,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   const nombreCajero = getLoggedUserName();
 
-  const [isRendering, setIsRendering] = useState(true); // 🔥 Estado para evitar congelamientos
+  const [isRendering, setIsRendering] = useState(true);
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -72,14 +72,13 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     toggleItemTakeaway 
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
-  // 🔥 Retrasamos un instante la carga pesada del grid
   useEffect(() => {
     if (isOpen) {
       setIsRendering(true);
       const timer = setTimeout(() => setIsRendering(false), 250); 
       return () => clearTimeout(timer);
     }
-  }, [isOpen, categoriaActiva]); // Volvemos a mostrar skeleton si cambian de categoría rápido
+  }, [isOpen, categoriaActiva]); 
 
   const handleConfirmOption = (productWithOptions) => { addToCart(productWithOptions); setSelectedProduct(null); };
 
@@ -153,11 +152,45 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   const partesNumero = (mesa.numero || '').toString().split(' - ');
   let numeroReal = partesNumero[0] || 'Pedido'; 
-  
-  if (isLlevar) numeroReal = numeroReal.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim();
-  else if (isVitrina) numeroReal = 'Express';
 
-  const tableTitle = isVitrina ? `Mostrador ⚡` : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`);
+  if (!isLlevar && !isVitrina) {
+    numeroReal = numeroReal.replace(/#/g, '').trim();
+  }
+
+  // 🔥 NUEVO COMPONENTE: Dibuja la cabecera de forma súper elegante
+  const HeaderTitle = () => {
+    if (isVitrina) return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mostrador ⚡</h3>;
+    
+    if (isLlevar) {
+      const folio = partesNumero[0]; // Ej: "Llevar #1"
+      const nombreCliente = partesNumero[1]; // Ej: "Juan Pérez"
+      const telCliente = partesNumero[2]; // Ej: "9876543210"
+
+      return (
+        <div className="flex flex-col gap-2">
+          <h3 className="font-extrabold text-gray-900 dark:text-orange-500 text-xl flex items-center gap-2">
+            {folio}
+          </h3>
+          {(nombreCliente || telCliente) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {nombreCliente && (
+                <span className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                  <User size={14} className="text-orange-500" /> {nombreCliente}
+                </span>
+              )}
+              {telCliente && (
+                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 lya:text-lya-text/70 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                  <Phone size={12} className="text-orange-500" /> {telCliente}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mesa #{numeroReal}</h3>;
+  };
 
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint) => {
     const orderId = mesa?.orderId || mesa?.id;
@@ -237,10 +270,11 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
       </div>
 
       <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col">
+        {/* 🔥 AQUÍ USAMOS LA NUEVA CABECERA */}
         <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 border-b border-orange-500/10 dark:border-orange-500/20 flex justify-between items-start">
            <div>
-              <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">{tableTitle}</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}</p>
+              <HeaderTitle />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium">{isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}</p>
            </div>
         </div>
         <div className="flex-1 overflow-hidden h-full"><TicketSidebar {...sidebarProps} /></div>

@@ -1,25 +1,34 @@
+// src/modules/cafeteria/views/NuevoPedidoLlevarModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, X, Phone } from 'lucide-react';
+import { ShoppingBag, X, Phone, Loader2 } from 'lucide-react'; // 🔥 Importamos el Loader2
 
 export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
   const [nombreCliente, setNombreCliente] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🔥 Nuevo estado para bloquear el botón
 
-  // Limpiar los inputs cada vez que se abre el modal
   useEffect(() => {
     if (isOpen) {
       setNombreCliente('');
       setTelefono('');
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (nombreCliente.trim()) {
-      // Pasamos ambos valores al componente padre
-      onSubmit(nombreCliente.trim(), telefono.trim());
-      onClose();
+    if (nombreCliente.trim() && !isSubmitting) {
+      setIsSubmitting(true); // 🔥 Bloqueamos el botón
+      try {
+        // Esperamos a que termine de crearse en la base de datos
+        await onSubmit(nombreCliente.trim(), telefono.trim());
+        onClose(); // Cerramos el modal solo cuando ya se creó con éxito
+      } catch (error) {
+        console.error("Error al crear el pedido:", error);
+      } finally {
+        setIsSubmitting(false); // Desbloqueamos por si hubo error
+      }
     }
   };
 
@@ -38,7 +47,8 @@ export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
             <div className="bg-orange-500 lya:bg-lya-primary p-6 text-center relative">
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
+                disabled={isSubmitting} // Deshabilitar si está cargando
+                className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors disabled:opacity-50"
               >
                 <X size={24} />
               </button>
@@ -68,10 +78,11 @@ export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
                 <input
                   type="text"
                   autoFocus
+                  disabled={isSubmitting} // Deshabilitar si está cargando
                   placeholder="Ej. Juan Pérez"
                   value={nombreCliente}
                   onChange={(e) => setNombreCliente(e.target.value)}
-                  className="w-full text-center text-xl font-bold p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl focus:border-orange-500 lya:focus:border-lya-primary focus:ring-0 outline-none transition-colors dark:text-white lya:text-lya-text placeholder-gray-300 dark:placeholder-gray-600 shadow-inner"
+                  className="w-full text-center text-xl font-bold p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl focus:border-orange-500 lya:focus:border-lya-primary focus:ring-0 outline-none transition-colors dark:text-white lya:text-lya-text placeholder-gray-300 dark:placeholder-gray-600 shadow-inner disabled:opacity-50"
                 />
                 
                 {/* Input Opcional: Teléfono */}
@@ -79,10 +90,11 @@ export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={20} />
                   <input
                     type="tel"
+                    disabled={isSubmitting} // Deshabilitar si está cargando
                     placeholder="Celular (Opcional)"
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}
-                    className="w-full text-center text-lg font-bold p-4 pl-10 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl focus:border-orange-500 lya:focus:border-lya-primary focus:ring-0 outline-none transition-colors dark:text-white lya:text-lya-text placeholder-gray-300 dark:placeholder-gray-600 shadow-inner"
+                    className="w-full text-center text-lg font-bold p-4 pl-10 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl focus:border-orange-500 lya:focus:border-lya-primary focus:ring-0 outline-none transition-colors dark:text-white lya:text-lya-text placeholder-gray-300 dark:placeholder-gray-600 shadow-inner disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -90,24 +102,33 @@ export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
               {/* --- BOTONES DE ACCIÓN --- */}
               <div className="flex gap-3 w-full">
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={!isSubmitting ? { scale: 0.95 } : {}}
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-3.5 px-4 font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 rounded-xl transition-colors"
+                  disabled={isSubmitting} // Deshabilitar si está cargando
+                  className="flex-1 py-3.5 px-4 font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 rounded-xl transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </motion.button>
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={!isSubmitting && nombreCliente.trim() ? { scale: 0.95 } : {}}
                   type="submit"
-                  disabled={!nombreCliente.trim()}
-                  className={`flex-1 py-3.5 px-4 font-bold text-white rounded-xl transition-all shadow-md ${
-                    nombreCliente.trim()
+                  disabled={!nombreCliente.trim() || isSubmitting}
+                  className={`flex-1 py-3.5 px-4 font-bold text-white rounded-xl transition-all shadow-md flex justify-center items-center gap-2 ${
+                    nombreCliente.trim() && !isSubmitting
                       ? 'bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:opacity-90 shadow-orange-500/30'
                       : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed shadow-none'
                   }`}
                 >
-                  Confirmar
+                  {/* 🔥 Renderizado Dinámico del Botón */}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    'Confirmar'
+                  )}
                 </motion.button>
               </div>
             </form>
