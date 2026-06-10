@@ -5,6 +5,7 @@ import {
   QrCode, RefreshCw, Trash2, Smartphone, 
   Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X 
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 
 const QrControlSkeleton = () => (
@@ -26,9 +27,9 @@ const QrControlSkeleton = () => (
       <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
     </div>
     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="flex flex-wrap gap-6">
         {[1, 2, 3, 4, 5, 6].map(mesa => (
-          <div key={mesa} className="h-64 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse flex flex-col p-6">
+          <div key={mesa} className="w-full max-w-[300px] h-72 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse flex flex-col p-6">
             <div className="flex justify-between w-full mb-4">
                <div className="w-24 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
@@ -49,10 +50,8 @@ export const QrControlPage = () => {
     addMesa, removeMesa 
   } = useQrController();
 
-  // 🔥 HOOKS A SALVO: Declarado antes de validar si carga
   const [previewMesa, setPreviewMesa] = useState(null);
 
-  // AHORA SÍ: Cortamos si está cargando
   const isPageLoading = loading || isLoading || !zonas;
   if (isPageLoading) return <QrControlSkeleton />;
 
@@ -72,7 +71,6 @@ export const QrControlPage = () => {
           aside, header.h-16 { display: none !important; }
           .no-print { display: none !important; }
           
-          /* Estructura del Ticket con Borde de Recorte */
           .print-card {
             background-color: #ffffff !important;
             max-width: 10.5cm !important;
@@ -140,7 +138,8 @@ export const QrControlPage = () => {
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 
               exit={{ opacity: 0, y: -10 }}
-              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start auto-rows-max ${previewMesa ? 'no-print' : ''}`}
+              /* Modificado para que las tarjetas no crezcan demasiado: auto-fill con minmax controlando el ancho */
+              className={`grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 items-start auto-rows-max ${previewMesa ? 'no-print' : ''}`}
             >
               <AnimatePresence mode='popLayout'>
                 {mesas.map((mesa) => (
@@ -151,7 +150,8 @@ export const QrControlPage = () => {
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
                     transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                    className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-3xl shadow-sm relative group overflow-hidden flex flex-col"
+                    /* max-w-[300px] evita que la tarjeta se vuelva gigante en monitores grandes */
+                    className="w-full max-w-[300px] mx-auto md:mx-0 bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-3xl shadow-sm relative group overflow-hidden flex flex-col"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
@@ -169,8 +169,14 @@ export const QrControlPage = () => {
                       </button>
                     </div>
                     
-                    <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-2xl flex items-center justify-center py-6 mb-4 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors">
-                       <QrCode className="w-24 h-24 text-gray-300 dark:text-gray-600 lya:text-lya-text/20" />
+                    <div className="w-full bg-white rounded-2xl flex items-center justify-center py-6 mb-4 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors">
+                       <QRCodeSVG 
+                         value={`https://lya.menu/m/${mesa.number}`} 
+                         size={110} 
+                         bgColor="#ffffff" 
+                         fgColor="#000000" 
+                         level="Q"
+                       />
                     </div>
                     
                     <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-3 rounded-xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-4 group-hover:border-orange-500/30 lya:group-hover:border-lya-secondary/50 transition-colors">
@@ -198,7 +204,7 @@ export const QrControlPage = () => {
               {mesas.length === 0 && (
                 <motion.div 
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="col-span-full py-20 flex flex-col items-center text-gray-400 lya:text-lya-text/50"
+                  className="col-span-full py-20 flex flex-col items-center justify-center w-full text-gray-400 lya:text-lya-text/50"
                 >
                   <LayoutGrid size={48} className="mb-4 opacity-20" />
                   <p className="font-medium text-lg">No hay mesas en el sistema.</p>
@@ -214,23 +220,30 @@ export const QrControlPage = () => {
               exit={{ opacity: 0, x: -20 }}
               className={`flex justify-center print:fixed print:inset-0 print:items-start print:bg-white ${previewMesa ? 'no-print' : ''}`}
             >
-              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-8 max-w-md w-full shadow-xl flex flex-col items-center text-center print-card print:bg-white">
+              {/* Tarjeta del mostrador reducida a max-w-[340px] para que no sea muy ancha */}
+              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-8 max-w-[340px] w-full shadow-xl flex flex-col items-center text-center print-card print:bg-white">
                 
                 <div className="no-print bg-orange-500/10 lya:bg-lya-secondary/10 p-4 rounded-full mb-4">
                   <Smartphone className="w-10 h-10 text-orange-500 lya:text-lya-secondary" />
                 </div>
                 
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2 print:text-black text-3xl print:mb-4">Mostrador 𝓛𝔂𝓪</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2 print:text-black text-3xl print:mb-4">Mostrador 𝓛𝔂𝓐</h2>
                 
                 <p className="no-print text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-6">QR único para que los clientes en fila puedan escanear el menú.</p>
                 
-                <div className="hidden print:block mb-8 px-4">
-                  <p className="text-xl font-bold italic print:text-black mb-2">"Evita la fila, ordena desde tu celular"</p>
-                  <p className="text-sm print:text-gray-800">Escanea este código para ver nuestro menú de repostería y bebidas.</p>
+                <div className="hidden print:block mb-8 px-2">
+                  <p className="text-xl font-bold italic print:text-black mb-2">"Evita la fila..."</p>
+                  <p className="text-sm print:text-gray-800">Ordena desde tu celular.</p>
                 </div>
 
-                <div className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl flex items-center justify-center py-10 mb-4 border-2 border-dashed border-gray-300 dark:border-gray-700 lya:border-lya-border/40 print:py-8 print:bg-white print:border-none">
-                   <QrCode className="w-32 h-32 text-gray-300 dark:text-gray-700 lya:text-lya-text/30 print:text-black print:bg-white rounded-lg" />
+                <div className="w-full bg-white rounded-2xl flex items-center justify-center py-8 mb-4 border-2 border-dashed border-gray-300 dark:border-gray-700 lya:border-lya-border/40 print:py-8 print:bg-white print:border-none">
+                   <QRCodeSVG 
+                     value="https://lya.menu/llevar" 
+                     size={140} 
+                     bgColor="#ffffff" 
+                     fgColor="#000000" 
+                     level="Q"
+                   />
                 </div>
 
                 <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-3 w-full rounded-xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-6 print:bg-white print:border-none">
@@ -264,7 +277,8 @@ export const QrControlPage = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl relative z-10 w-full max-w-sm flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/20 print-card print:bg-white"
+              /* El modal central también ajustado para no exceder los 340px */
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/20 print-card print:bg-white"
             >
               <button 
                 onClick={() => setPreviewMesa(null)} 
@@ -278,22 +292,28 @@ export const QrControlPage = () => {
               </div>
               
               <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white lya:text-lya-text mb-6 print:text-black print:text-4xl print:mb-4">
-                {previewMesa.isLlevar ? 'Mostrador LyA' : `Mesa ${previewMesa.number}`}
+                {previewMesa.isLlevar ? 'Mostrador 𝓛𝔂𝓐' : `Mesa ${previewMesa.number}`}
               </h2>
               
-              <div className="hidden print:block mb-8 px-2">
+              <div className="hidden print:block mb-6 px-2">
                  <p className="text-xl font-bold italic print:text-black mb-2">
                    {previewMesa.isLlevar ? '"Evita la fila..."' : '"Un dulce momento te espera..."'}
                  </p>
                  <p className="text-sm print:text-gray-800">
                    {previewMesa.isLlevar 
                      ? 'Ordena desde tu celular para retirar en mostrador.' 
-                     : 'Por favor, escanea este código con tu celular para ver nuestro menú y ordenar a tu mesa.'}
+                     : 'Escanea el código con tu celular para ordenar a tu mesa.'}
                  </p>
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-inner border border-gray-200 lya:border-lya-border/30 mb-6 flex items-center justify-center w-full print:bg-white print:border-none print:shadow-none print:p-0">
-                <QrCode className="w-48 h-48 text-gray-900 lya:text-lya-text print:text-black print:bg-white rounded-xl" />
+                <QRCodeSVG 
+                   value={previewMesa.isLlevar ? 'https://lya.menu/llevar' : `https://lya.menu/m/${previewMesa.number}`}
+                   size={200} 
+                   bgColor="#ffffff" 
+                   fgColor="#000000" 
+                   level="Q"
+                />
               </div>
 
               <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/20 mb-6 print:bg-white print:border-none">
