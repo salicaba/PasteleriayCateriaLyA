@@ -1,3 +1,4 @@
+// src/modules/pasteleria/views/PasteleriaConfigPage.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tags, Layers, Hash, Plus, Trash2, CheckCircle2, GripVertical } from 'lucide-react';
@@ -108,11 +109,53 @@ const SortableString = ({ item, field, deleteString }) => {
   );
 };
 
+// --- SKELETON DE CARGA PARA EL CATÁLOGO ---
+const PasteleriaConfigSkeleton = () => (
+  <motion.div 
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 overflow-hidden relative"
+  >
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <div className="flex items-center space-x-4">
+        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-32 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
+        </div>
+      </div>
+    </div>
+
+    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[1, 2, 3].map((col) => (
+          <div key={col} className="bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-6 shadow-sm flex flex-col">
+            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+              <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
+              <div className="w-24 h-6 rounded-lg bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
+            </div>
+            <div className="flex gap-2 mb-6">
+              <div className="flex-1 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
+              <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
+            </div>
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-12 w-full rounded-xl bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 animate-pulse" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </motion.div>
+);
+
 // --- PANTALLA PRINCIPAL ---
 
 export default function PasteleriaConfigPage() {
-  const { config, updateConfig } = usePasteleriaConfig();
+  // Obtenemos los estados, y prevemos variables de carga comunes
+  const { config, updateConfig, loading, isLoading } = usePasteleriaConfig();
   
+  // 🔥 Regla de Hooks: TODOS los useState y useSensors van ANTES del 'if' de carga
   const [newCategoria, setNewCategoria] = useState('');
   const [newTamano, setNewTamano] = useState('');
   const [newSabor, setNewSabor] = useState('');
@@ -121,6 +164,12 @@ export default function PasteleriaConfigPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // Determinamos si aún estamos esperando datos
+  const isPageLoading = loading || isLoading || !config;
+
+  // 🔥 AHORA SÍ: Cortamos y mostramos el Skeleton elegante si aún carga
+  if (isPageLoading) return <PasteleriaConfigSkeleton />;
 
   const handleDragEndCategorias = (event) => {
     const { active, over } = event;
@@ -191,7 +240,7 @@ export default function PasteleriaConfigPage() {
         </div>
       </header>
 
-      {/* NUEVO CONTENEDOR: Este es el único div que hace scroll y dibuja la barra de navegación lateral */}
+      {/* Este es el único div que hace scroll y dibuja la barra de navegación lateral */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4 min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
