@@ -6,14 +6,14 @@ import client from '../../../api/client';
 
 export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
   const [transferInfo, setTransferInfo] = useState(null);
-  const [activePhotoIdx, setActivePhotoIdx] = useState(0); // 🔥 Pestaña activa de la galería
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0); 
 
   useEffect(() => {
     if (isOpen) {
       client.get('/settings')
         .then(res => { if (res.data) setTransferInfo(res.data); })
         .catch(err => console.error("Error al cargar datos bancarios:", err));
-      setActivePhotoIdx(0); // Resetear al abrir un nuevo pedido
+      setActivePhotoIdx(0); 
     }
   }, [isOpen, pedido?.id]);
 
@@ -59,20 +59,20 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
               
-              {/* 🔥 NUEVO COMPONENTE BENTO DE GALERÍA MULTI-FOTO */}
               <div className="space-y-3">
                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                   <Camera size={14} /> Imágenes de Referencia
                 </label>
                 
                 {isImageLoading ? (
-                  <div className="w-full h-80 rounded-[2rem] bg-gray-100/50 dark:bg-gray-800/30 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700">
+                  <div className="w-full h-96 rounded-[2rem] bg-gray-100/50 dark:bg-gray-800/30 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700">
                     <ImageIcon size={48} className="mb-3 text-emerald-500/50 lya:text-lya-primary/50 animate-bounce" />
                     <p className="text-sm font-bold text-gray-400 lya:text-lya-text/50 animate-pulse">Obteniendo galería en alta calidad...</p>
                   </div>
                 ) : tieneImagenes ? (
                   <div className="space-y-3">
-                    <div className="w-full h-80 rounded-[2rem] overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl bg-gray-50 dark:bg-gray-950">
+                    {/* 🔥 AQUÍ ESTÁ EL CAMBIO: object-contain en lugar de object-cover y un fondo de marco elegante */}
+                    <div className="w-full h-96 rounded-[2rem] overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl bg-gray-100 dark:bg-black/50 p-2 flex items-center justify-center">
                       <AnimatePresence mode="wait">
                         <motion.img 
                           key={activePhotoIdx}
@@ -82,12 +82,11 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                           transition={{ duration: 0.2 }}
                           src={pedido.imagenesReferencia[activePhotoIdx]} 
                           alt={`Referencia ${activePhotoIdx + 1}`} 
-                          className="w-full h-full object-cover" 
+                          className="w-full h-full object-contain drop-shadow-lg rounded-xl" 
                         />
                       </AnimatePresence>
                     </div>
                     
-                    {/* Selectores de pestañas estilo Neo-Bento para las imágenes */}
                     {pedido.imagenesReferencia.length > 1 && (
                       <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
                         {pedido.imagenesReferencia.map((_, idx) => (

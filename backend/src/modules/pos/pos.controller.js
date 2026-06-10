@@ -401,7 +401,7 @@ export const printOrderTicket = async (req, res) => {
     printer.alignCenter();
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
-    printer.println("𝓛𝔂𝓐"); 
+    printer.println("𝓛𝔂𝓪"); 
     
     printer.setTextNormal();
     printer.bold(true);
@@ -630,7 +630,7 @@ export const shareOrderTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Tu Ticket de Consumo - 𝓛𝔂𝓐</title>
+      <title>Tu Ticket de Consumo - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -664,7 +664,7 @@ export const shareOrderTicket = async (req, res) => {
         <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
-            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓐</h1>
+            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
             <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
             <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
           </div>
