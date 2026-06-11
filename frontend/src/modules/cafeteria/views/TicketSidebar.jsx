@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { 
   Trash2, Minus, Plus, ShoppingBag, ChefHat, 
   CreditCard, Lock, User, UserPlus, GripVertical, 
-  ArrowRightLeft, Info, X, CheckCircle, Printer, XCircle
+  ArrowRightLeft, Info, X, CheckCircle, Printer, XCircle, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -13,9 +13,11 @@ export const TicketSidebar = ({
   onAdd, onRemove, onDelete, onSendToKitchen, onCheckout,
   cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem,
   orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus,
-  isLlevar, isVitrina, toggleItemTakeaway 
+  isLlevar, isVitrina, toggleItemTakeaway, cuentasTelefonos 
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
+  const [newCuentaPhone, setNewCuentaPhone] = useState('');
+  
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverCuenta, setDragOverCuenta] = useState(null);
   const [transferModeItemId, setTransferModeItemId] = useState(null);
@@ -33,8 +35,9 @@ export const TicketSidebar = ({
   const handleAddCuenta = (e) => {
     e.preventDefault();
     const name = newCuentaName.trim();
-    if (name && addNewCuenta) addNewCuenta(name);
+    if (name && addNewCuenta) addNewCuenta(name, newCuentaPhone);
     setNewCuentaName('');
+    setNewCuentaPhone('');
   };
 
   const getPrepStr = (item) => {
@@ -96,15 +99,28 @@ export const TicketSidebar = ({
                 value={newCuentaName} 
                 onChange={(e) => setNewCuentaName(e.target.value)}
                 disabled={isCompletamentePagada}
-                placeholder="Dividir cuenta (Nombre)..."
-                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-orange-500/50 transition-all border border-transparent disabled:opacity-50"
+                placeholder="Nombre"
+                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-10 pr-2 outline-none focus:ring-2 focus:ring-orange-500/50 transition-all border border-transparent disabled:opacity-50"
               />
               <UserPlus size={18} className="absolute left-3 top-3.5 text-gray-400" />
             </div>
+            
+            <div className="relative w-32 md:w-36">
+              <input 
+                type="tel" 
+                value={newCuentaPhone} 
+                onChange={(e) => setNewCuentaPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                disabled={isCompletamentePagada}
+                placeholder="Celular (Opc.)"
+                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text text-sm rounded-2xl py-3 pl-8 pr-2 outline-none focus:ring-2 focus:ring-orange-500/50 transition-all border border-transparent disabled:opacity-50"
+              />
+              <Phone size={14} className="absolute left-2.5 top-4 text-gray-400" />
+            </div>
+
             <button 
               type="submit" 
               disabled={!newCuentaName.trim() || isCompletamentePagada}
-              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-200 text-white px-5 rounded-2xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-50"
+              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-200 text-white px-4 rounded-2xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-50"
             >
               Añadir
             </button>
@@ -170,7 +186,7 @@ export const TicketSidebar = ({
                   >
                     <div className="flex items-center gap-3">
                       <div className={clsx(
-                        "p-2 rounded-xl transition-colors",
+                        "p-2 rounded-xl transition-colors shrink-0",
                         isCuentaPagada ? "bg-green-500 text-white"
                         : isDragTarget ? "bg-blue-500 text-white" 
                         : isActive ? "bg-orange-500 text-white" 
@@ -178,15 +194,26 @@ export const TicketSidebar = ({
                       )}>
                         {isCuentaPagada ? <CheckCircle size={18}/> : (isVitrina ? <ShoppingBag size={18}/> : <User size={18} className={isDragTarget ? "animate-bounce" : ""} />)}
                       </div>
-                      <div>
-                        <h4 className={clsx("font-black text-sm uppercase tracking-tight", 
-                          isCuentaPagada ? "text-gray-800 dark:text-gray-200"
-                          : isDragTarget ? "text-blue-600 dark:text-blue-400" 
-                          : isActive ? "text-orange-500" 
-                          : "text-gray-600 dark:text-gray-400"
-                        )}>
-                          {isVitrina ? 'Cuenta Express' : cuentaName}
-                        </h4>
+                      <div className="flex flex-col min-w-0">
+                        
+                        {/* 🔥 AQUÍ ESTÁ EL DISEÑO DEL NOMBRE + TELÉFONO */}
+                        <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                          <h4 className={clsx("font-black text-sm uppercase tracking-tight truncate max-w-[120px] sm:max-w-none", 
+                            isCuentaPagada ? "text-gray-800 dark:text-gray-200"
+                            : isDragTarget ? "text-blue-600 dark:text-blue-400" 
+                            : isActive ? "text-orange-500" 
+                            : "text-gray-600 dark:text-gray-400"
+                          )}>
+                            {isVitrina ? 'Cuenta Express' : cuentaName}
+                          </h4>
+                          
+                          {cuentasTelefonos?.[cuentaName] && (
+                            <span className="flex items-center gap-1 text-[10px] bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 px-1.5 py-0.5 rounded-md font-bold tracking-wider border border-green-200 dark:border-green-500/30 shadow-sm shrink-0">
+                              <Phone size={10} /> {cuentasTelefonos[cuentaName]}
+                            </span>
+                          )}
+                        </div>
+
                         {isCuentaPagada ? (
                            <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider">Cobrada</span>
                         ) : (
@@ -201,7 +228,6 @@ export const TicketSidebar = ({
                       </span>
                       
                       <div className="flex gap-1 flex-wrap justify-end pointer-events-auto">
-                        {/* BOTÓN COBRAR (Solo si no está pagada) */}
                         {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && subtotalCuenta > 0 && !isVitrina && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); onPayCuenta && onPayCuenta(cuentaName); }}
@@ -211,7 +237,6 @@ export const TicketSidebar = ({
                           </button>
                         )}
                         
-                        {/* BOTÓN TICKET (Siempre visible si hay productos en la cuenta, pagado o no) */}
                         {items.length > 0 && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
@@ -221,7 +246,6 @@ export const TicketSidebar = ({
                           </button>
                         )}
 
-                        {/* BOTÓN LIBERAR (Solo si ya se pagó) */}
                         {isCuentaPagada && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 

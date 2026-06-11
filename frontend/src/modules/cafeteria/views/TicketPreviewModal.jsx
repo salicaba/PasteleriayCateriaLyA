@@ -11,24 +11,28 @@ export const TicketPreviewModal = ({
   cart, 
   mesa, 
   cuentaName, 
+  telefonoPredeterminado = '', // 🔥 NUEVA PROPIEDAD
   onConfirmPrint, 
   onSendWhatsApp,
   userName = 'Cajero en turno'
 }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   
-  // Extraemos las cuentas dinámicas directamente de los items
   const uniqueAccounts = Array.from(new Set(cart.map(item => item.cuenta || 'General')));
   
-  // viewMode guardará 'Todas' o el nombre específico de la cuenta a mostrar/enviar
   const [viewMode, setViewMode] = useState('Todas');
   
   useEffect(() => {
     if (isOpen) {
-      // Si el botón presionado ya nos mandó una cuenta específica, la seleccionamos por defecto
       setViewMode(cuentaName || 'Todas');
       
-      // Intentar extraer el número de teléfono si es "Para Llevar"
+      // 🔥 Si viene un teléfono desde la cuenta que creamos, lo pegamos directo
+      if (telefonoPredeterminado) {
+        setPhoneNumber(telefonoPredeterminado);
+        return;
+      }
+      
+      // Si no hay teléfono predeterminado, buscamos si era pedido "Para llevar"
       if (mesa) {
         const partes = (mesa.numero || '').toString().split(' - ');
         if (mesa.zona === 'llevar' && partes.length > 2) {
@@ -41,15 +45,13 @@ export const TicketPreviewModal = ({
       }
       setPhoneNumber('');
     }
-  }, [isOpen, mesa, cuentaName]);
+  }, [isOpen, mesa, cuentaName, telefonoPredeterminado]); // 🔥 Lo agregamos como dependencia
 
   if (!isOpen) return null;
 
-  // Filtramos los items basándonos en la selección activa (viewMode)
   const itemsToPrint = viewMode === 'Todas' ? cart : cart.filter(item => (item.cuenta || 'General') === viewMode);
   const totalToPrint = itemsToPrint.reduce((acc, item) => acc + (item.precio * item.qty), 0);
   
-  // Las cuentas a dibujar dentro del ticket visualmente
   const accountsToRender = viewMode === 'Todas' ? uniqueAccounts : [viewMode];
 
   const isLlevar = mesa?.zona === 'llevar';
@@ -82,7 +84,6 @@ export const TicketPreviewModal = ({
   const ticketFolio = generarFolio();
 
   const handlePhysicalPrint = () => {
-    // Si queremos imprimir físicamente, mandamos el viewMode para saber si imprimir todo o parcial
     onConfirmPrint(viewMode === 'Todas' ? null : viewMode);
   };
 
@@ -92,7 +93,6 @@ export const TicketPreviewModal = ({
       return;
     }
     if (onSendWhatsApp) {
-      // Mandamos los items filtrados exactos y el nombre de la cuenta para que el mensaje se estructure bien
       onSendWhatsApp(phoneNumber, itemsToPrint, totalToPrint, viewMode === 'Todas' ? null : viewMode);
     }
   };
@@ -119,7 +119,7 @@ export const TicketPreviewModal = ({
           </button>
         </div>
 
-        {/* 🚀 SELECTOR DE CUENTAS (Solo aparece si hay > 1 cuenta en la mesa) */}
+        {/* SELECTOR DE CUENTAS */}
         {uniqueAccounts.length > 1 && (
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 shrink-0">
             <p className="text-[10px] uppercase font-bold text-gray-400 mb-2 tracking-wider">Seleccionar cuenta a mostrar / enviar:</p>
@@ -235,7 +235,6 @@ export const TicketPreviewModal = ({
 
                     return (
                       <React.Fragment key={accName}>
-                        {/* Solo pintamos el nombre de la cuenta si estamos en vista de "Todas" y hay más de una */}
                         {uniqueAccounts.length > 1 && viewMode === 'Todas' && (
                           <tr>
                             <td colSpan="3" className="text-[10px] font-bold text-gray-500 uppercase pt-2 pb-1 bg-gray-50 px-2 rounded">
@@ -280,7 +279,7 @@ export const TicketPreviewModal = ({
               </table>
             </div>
 
-            {/* Resumen por Cuentas (Solo visible en 'Todas' y si hay múltiples) */}
+            {/* Resumen por Cuentas */}
             {uniqueAccounts.length > 1 && viewMode === 'Todas' && (
               <div className="mb-4 text-xs text-gray-600">
                 <p className="font-bold border-b border-dashed border-gray-300 pb-1 mb-2 text-gray-500 uppercase tracking-wider text-[10px]">Resumen por Cuentas:</p>

@@ -1,6 +1,5 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
-// 🔥 Añadimos Phone y User a los iconos
 import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle, Phone, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -69,7 +68,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered,
-    toggleItemTakeaway 
+    toggleItemTakeaway, cuentasTelefonos
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
   useEffect(() => {
@@ -161,9 +160,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     if (isVitrina) return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mostrador ⚡</h3>;
     
     if (isLlevar) {
-      const folio = partesNumero[0]; // Ej: "Llevar #1"
-      const nombreCliente = partesNumero[1]; // Ej: "Juan Pérez"
-      const telCliente = partesNumero[2]; // Ej: "9876543210"
+      const folio = partesNumero[0]; 
+      const nombreCliente = partesNumero[1]; 
+      const telCliente = partesNumero[2]; 
 
       return (
         <div className="flex flex-col gap-2">
@@ -191,7 +190,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mesa #{numeroReal}</h3>;
   };
 
-  // 🔥 AQUÍ ESTÁ LA FUNCIÓN ACTUALIZADA (recibe el 4to parámetro: cuentaName)
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
     const orderId = mesa?.orderId || mesa?.id;
 
@@ -201,18 +199,14 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     }
     
     const shortId = orderId.split('-')[0];
-    
-    // 🔗 1. Armamos el enlace base
     let shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
     
-    // 🔗 2. Si viene una cuenta específica, se lo pegamos a la URL para que el backend lo lea
     if (cuentaName && cuentaName !== 'Todas') {
       shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
     }
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
 
-    // 💬 3. Hacemos que el mensaje diga "de la cuenta de Pedro" si aplica
     const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cuentaName}*` : '';
     
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
@@ -234,11 +228,13 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
-    orderStatus, paidAccounts, onPrintTicket: (c) => setPreviewTicketData({ cuentaName: c }), 
+    orderStatus, paidAccounts, 
+    onPrintTicket: (c) => setPreviewTicketData({ cuentaName: c, telefono: cuentasTelefonos[c] || '' }), 
     onCloseTable: finalizeTable, toggleDeliveredStatus, 
     isLlevar: (isLlevar || isVitrina), 
     isVitrina, 
-    toggleItemTakeaway
+    toggleItemTakeaway,
+    cuentasTelefonos // 🔥 LE PASAMOS EL DICCIONARIO DE TELÉFONOS AL SIDEBAR
   };
 
   const posContent = (
@@ -312,6 +308,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         cart={cart} 
         mesa={mesa} 
         cuentaName={previewTicketData?.cuentaName} 
+        telefonoPredeterminado={previewTicketData?.telefono}
         onConfirmPrint={executeRealPrint} 
         onSendWhatsApp={handleSendWhatsAppTicket} 
         userName={nombreCajero} 

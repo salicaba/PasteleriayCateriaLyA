@@ -15,7 +15,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [cuentaActiva, setCuentaActiva] = useState('General');
   const [nombresCuentas, setNombresCuentas] = useState(['General']);
   
-  // 🔥 NUEVO ESTADO: Para recordar el teléfono asociado a la cuenta
+  // 🔥 ESTADO DE TELÉFONOS
   const [cuentasTelefonos, setCuentasTelefonos] = useState({});
   
   const [filtroTexto, setFiltroTexto] = useState('');
@@ -40,16 +40,25 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     if (!isOpen) {
         setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
         setNombresCuentas(['General']); setCuentaActiva('General');
-        setCuentasTelefonos({}); // Limpiamos los teléfonos al cerrar
+        setCuentasTelefonos({});
         return;
     }
 
     let nuevasCuentas = new Set(['General']);
 
     if (mesaActual && mesaActual.estado === 'ocupada') {
-        setActiveOrderId(mesaActual.orderId);
+        const currentOrderId = mesaActual.orderId;
+        setActiveOrderId(currentOrderId);
         setOrderStatus(mesaActual.orderStatus || 'OPEN');
         setPaidAccounts(mesaActual.paidAccounts || []);
+
+        // 🔥 MAGIA: Recuperamos los teléfonos guardados de esta mesa
+        if (currentOrderId) {
+            const storedPhones = localStorage.getItem(`lya_phones_${currentOrderId}`);
+            if (storedPhones) {
+                try { setCuentasTelefonos(JSON.parse(storedPhones)); } catch(e) {}
+            }
+        }
 
         const dbItems = mesaActual.items || [];
         
@@ -403,15 +412,26 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  // 🔥 ACTUALIZADO: Ahora recibe nombre de cuenta y opcionalmente el teléfono
+  // 🔥 SOLUCIÓN AL BUG: Ahora siempre actualiza el teléfono, aunque la cuenta ya exista
   const addNewCuenta = (n, telefono = '') => { 
-    if(n.trim() && !nombresCuentas.includes(n.trim())) { 
-        setNombresCuentas(prev => [...prev, n.trim()]); 
-        setCuentaActiva(n.trim()); 
-        if (telefono) {
-          setCuentasTelefonos(prev => ({ ...prev, [n.trim()]: telefono }));
-        }
-    } 
+    const cuentaFormateada = n.trim();
+    if(!cuentaFormateada) return;
+
+    setCuentaActiva(cuentaFormateada);
+    
+    if (!nombresCuentas.includes(cuentaFormateada)) { 
+        setNombresCuentas(prev => [...prev, cuentaFormateada]); 
+    }
+
+    if (telefono) {
+        setCuentasTelefonos(prev => {
+          const newPhones = { ...prev, [cuentaFormateada]: telefono };
+          if (activeOrderId) {
+              localStorage.setItem(`lya_phones_${activeOrderId}`, JSON.stringify(newPhones));
+          }
+          return newPhones;
+        });
+    }
   };
 
   const toggleDeliveredStatus = async (groupedItem) => {
@@ -487,7 +507,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   };
 
   const handleCloseTable = async (onComplete) => {
-      if(activeOrderId) await client.put(`/pos/orders/${activeOrderId}/close`);
+      if(activeOrderId) {
+        await client.put(`/pos/orders/${activeOrderId}/close`);
+        localStorage.removeItem(`lya_phones_${activeOrderId}`); // Limpiamos memoria
+      }
       setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
       if(onComplete) onComplete();
   };
@@ -533,6 +556,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     dbCategories, orderStatus, paidAccounts, validateAllDelivered,
-    toggleItemTakeaway, cuentasTelefonos // Lo devolvemos para mandarlo al PosModal
+    toggleItemTakeaway, cuentasTelefonos 
   };
 };
