@@ -1,3 +1,4 @@
+// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
@@ -13,6 +14,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [cuentaActiva, setCuentaActiva] = useState('General');
   const [nombresCuentas, setNombresCuentas] = useState(['General']);
+  
+  // 🔥 NUEVO ESTADO: Para recordar el teléfono asociado a la cuenta
+  const [cuentasTelefonos, setCuentasTelefonos] = useState({});
+  
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
 
@@ -35,6 +40,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     if (!isOpen) {
         setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
         setNombresCuentas(['General']); setCuentaActiva('General');
+        setCuentasTelefonos({}); // Limpiamos los teléfonos al cerrar
         return;
     }
 
@@ -164,9 +170,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
       let allItemsFromDB = response.data.orderItems || [];
       
-      // 🔥 ELIMINADO: El "Truco Maestro" que auto-entregaba los productos de vitrina ya no está aquí.
-      // Ahora TODO entra a cocina para que ellos lo despachen.
-
       const updatedCart = allItemsFromDB.map(item => {
           let parsedPreps = [];
           if (item.notes) {
@@ -400,10 +403,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  const addNewCuenta = (n) => { 
+  // 🔥 ACTUALIZADO: Ahora recibe nombre de cuenta y opcionalmente el teléfono
+  const addNewCuenta = (n, telefono = '') => { 
     if(n.trim() && !nombresCuentas.includes(n.trim())) { 
         setNombresCuentas(prev => [...prev, n.trim()]); 
         setCuentaActiva(n.trim()); 
+        if (telefono) {
+          setCuentasTelefonos(prev => ({ ...prev, [n.trim()]: telefono }));
+        }
     } 
   };
 
@@ -439,7 +446,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
-  // 🔥 ACTUALIZADO: Para cobrar, absolutamente TODOS los productos deben haber sido entregados por cocina/barra
   const validateAllDelivered = (cuentaName = null) => { 
     const itemsToCheck = cuentaName ? cart.filter(c => c.cuenta === cuentaName) : cart; 
     if (itemsToCheck.length === 0) return false;
@@ -464,7 +470,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const handleCheckout = async (paymentDetails, onComplete) => {
     try {
-      // Si hay ítems sin enviar (incluyendo los de vitrina), los enviamos primero
       if (cart.some(p => !p.enviadoCocina)) {
          await new Promise(resolve => simulateKitchenSend(resolve));
       }
@@ -504,7 +509,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const unsentTotal = useMemo(() => cart.filter(p => !p.enviadoCocina).reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [cart]);
   
-  // 🔥 ACTUALIZADO: El botón "Enviar a Cocina" debe aparecer siempre que haya productos sin enviar, sin importar si son de vitrina o no.
   const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
   
   const cuentasDisponibles = useMemo(() => Array.from(new Set([...nombresCuentas, ...cart.map(i => i.cuenta || 'General')])), [cart, nombresCuentas]);
@@ -529,6 +533,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     dbCategories, orderStatus, paidAccounts, validateAllDelivered,
-    toggleItemTakeaway
+    toggleItemTakeaway, cuentasTelefonos // Lo devolvemos para mandarlo al PosModal
   };
 };
