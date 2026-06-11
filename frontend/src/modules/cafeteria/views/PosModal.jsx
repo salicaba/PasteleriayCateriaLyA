@@ -157,7 +157,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     numeroReal = numeroReal.replace(/#/g, '').trim();
   }
 
-  // 🔥 NUEVO COMPONENTE: Dibuja la cabecera de forma súper elegante
   const HeaderTitle = () => {
     if (isVitrina) return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mostrador ⚡</h3>;
     
@@ -192,7 +191,8 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mesa #{numeroReal}</h3>;
   };
 
-  const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint) => {
+  // 🔥 AQUÍ ESTÁ LA FUNCIÓN ACTUALIZADA (recibe el 4to parámetro: cuentaName)
+  const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
     const orderId = mesa?.orderId || mesa?.id;
 
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
@@ -201,11 +201,21 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     }
     
     const shortId = orderId.split('-')[0];
-    const shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
+    
+    // 🔗 1. Armamos el enlace base
+    let shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
+    
+    // 🔗 2. Si viene una cuenta específica, se lo pegamos a la URL para que el backend lo lea
+    if (cuentaName && cuentaName !== 'Todas') {
+      shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
+    }
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
 
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+    // 💬 3. Hacemos que el mensaje diga "de la cuenta de Pedro" si aplica
+    const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cuentaName}*` : '';
+    
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
@@ -270,7 +280,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
       </div>
 
       <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col">
-        {/* 🔥 AQUÍ USAMOS LA NUEVA CABECERA */}
         <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 border-b border-orange-500/10 dark:border-orange-500/20 flex justify-between items-start">
            <div>
               <HeaderTitle />
