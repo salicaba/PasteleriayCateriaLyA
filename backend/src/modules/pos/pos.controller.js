@@ -1,4 +1,3 @@
-// backend/src/modules/pos/pos.controller.js
 import { Op, Sequelize } from 'sequelize';
 import { getIO } from '../../config/socket.js'; 
 import Order from './Order.model.js';
@@ -10,11 +9,12 @@ import User from '../users/User.model.js';
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
 // ==========================================
-// 🛒 CREAR O RECUPERAR ORDEN (Evita duplicados)
+// 🛒 CREAR O RECUPERAR ORDEN (Folios Seguros)
 // ==========================================
 export const createOrder = async (req, res) => {
   try {
-    const { orderType, ticketId, tableId } = req.body;
+    const { orderType, tableId } = req.body;
+    let { ticketId } = req.body; // Puede traer el nombre del cliente desde el POS o QR
     const employeeId = req.user?.id || null; 
     const finalTableId = orderType === 'SALON' ? tableId : null;
 
@@ -25,9 +25,26 @@ export const createOrder = async (req, res) => {
       if (existingOrder) return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrder });
     }
 
+    // 🔥 GENERACIÓN DE FOLIO SEGURO PARA LLEVAR (Aplica a POS y QR)
+    let finalTicketId = null;
+    if (orderType === 'LLEVAR') {
+      const randomNum = Math.floor(1000 + Math.random() * 9000); 
+      const timeCode = Date.now().toString().slice(-2);
+      const folioSeguro = `${randomNum}${timeCode}`; // Ej. 45289
+      
+      // Limpiamos el texto por si ya traía la palabra "Llevar" desde el cajero
+      let nombreCliente = 'Cliente';
+      if (ticketId) {
+         nombreCliente = String(ticketId).replace(/Llevar\s*#?[0-9\-\s]*/i, '').trim();
+         if (!nombreCliente) nombreCliente = 'Cliente';
+      }
+      
+      finalTicketId = `Llevar #${folioSeguro} - ${nombreCliente}`;
+    }
+
     const newOrder = await Order.create({ 
       orderType, 
-      ticketId: orderType === 'LLEVAR' ? ticketId : null, 
+      ticketId: finalTicketId, 
       tableId: finalTableId, 
       createdBy: employeeId, 
       status: 'OPEN', 
