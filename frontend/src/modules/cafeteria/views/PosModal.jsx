@@ -68,7 +68,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered,
-    toggleItemTakeaway, cuentasTelefonos
+    toggleItemTakeaway, cuentasTelefonos,
+    // 🔥 CORRECCIÓN: Aquí es donde extraemos cancelAccountItems
+    deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
   useEffect(() => {
@@ -222,6 +224,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     setTimeout(() => setPaymentSuccessData(null), 1800);
   };
 
+  // 🔥 INYECTAMOS LAS FUNCIONES AL SIDEBAR
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -234,7 +237,11 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     isLlevar: (isLlevar || isVitrina), 
     isVitrina, 
     toggleItemTakeaway,
-    cuentasTelefonos // 🔥 LE PASAMOS EL DICCIONARIO DE TELÉFONOS AL SIDEBAR
+    cuentasTelefonos,
+    onDeliverAll: deliverAllActiveItems,         
+    onCancelItem: cancelItem,                    
+    onCancelFullOrder: cancelFullOrder,
+    onCancelAccount: cancelAccountItems   // 🔥 ¡Asegúrate de que esta línea esté aquí!
   };
 
   const posContent = (

@@ -22,11 +22,12 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: false,
   },
   expenseCategory: {
-    type: DataTypes.ENUM('NONE', 'PAYROLL', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'MARKETING', 'OTHER'),
+    // 🔥 Añadido 'REFUND' a las categorías
+    type: DataTypes.ENUM('NONE', 'PAYROLL', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'MARKETING', 'OTHER', 'REFUND'),
     defaultValue: 'NONE',
     allowNull: false
   },
-  paymentMethod: { // 🔥 NUEVO: Registrar método de pago en DB
+  paymentMethod: { 
     type: DataTypes.ENUM('CASH', 'TRANSFER', 'CARD'),
     defaultValue: 'CASH',
     allowNull: true,
@@ -40,7 +41,7 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: false,
   },
   referenceId: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING, // Aquí guardaremos el ID de la Orden al hacer un reembolso
     allowNull: true, 
   },
   status: {

@@ -1,4 +1,4 @@
-// src/modules/pos/Order.model.js
+// backend/src/modules/pos/Order.model.js
 import { DataTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 
@@ -21,7 +21,7 @@ const Order = sequelize.define('Order', {
     allowNull: true,
   },
   status: {
-    type: DataTypes.ENUM('OPEN', 'PAID', 'CLOSED', 'CANCELLED'), // Añadido PAID
+    type: DataTypes.ENUM('OPEN', 'PAID', 'CLOSED', 'CANCELLED'),
     defaultValue: 'OPEN',
   },
   totalAmount: {
@@ -29,11 +29,24 @@ const Order = sequelize.define('Order', {
     defaultValue: 0.00,
   },
   paidAccounts: {
-    type: DataTypes.JSON, // Para trackear qué cuentas individuales ya se pagaron
+    type: DataTypes.JSON, 
     allowNull: true,
     defaultValue: []
   },
   createdBy: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  // 🔥 NUEVOS CAMPOS PARA CANCELACIONES DE CUENTA COMPLETA
+  cancelledAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  cancelReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  cancelledBy: {
     type: DataTypes.UUID,
     allowNull: true,
   }

@@ -866,3 +866,268 @@ export const shareOrderTicket = async (req, res) => {
     res.status(500).send('<h3>Error al renderizar el ticket digital</h3>');
   }
 };
+
+// 📌 1. Marcar toda la orden como entregada (Botón "Todo Entregado")
+export const deliverAllItems = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await Order.findByPk(id);
+    if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
+
+    // Actualizamos todos los items activos que no estén entregados
+    await OrderItem.update(
+      { kitchenStatus: 'DELIVERED' },
+      { 
+        where: { 
+          orderId: id, 
+          status: 'ACTIVE',
+          kitchenStatus: ['PENDING', 'PREPARING', 'READY'] 
+        } 
+      }
+    );
+
+    // Emitimos evento por WebSockets para limpiar el KDS y actualizar POS
+    getIO().emit('orderDeliveredAll', { orderId: id });
+    getIO().emit('pos:update');
+
+    res.json({ message: 'Todos los productos han sido marcados como entregados' });
+  } catch (error) {
+    console.error('Error en deliverAllItems:', error);
+    res.status(500).json({ message: 'Error al marcar todo como entregado' });
+  }
+};
+
+// 📌 2. Cancelar un producto individual (con soporte para cantidades parciales)
+export const cancelOrderItem = async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const { cancelReason, cancelQty } = req.body; // 🔥 Ahora recibimos la cantidad a cancelar
+    const userId = req.user?.id; 
+
+    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id } });
+    if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
+
+    const order = await Order.findByPk(id);
+
+    // Calculamos cuánto vamos a cancelar realmente
+    const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
+    const isPartial = qtyToCancel < item.quantity;
+
+    // Calcular el precio unitario y el monto del reembolso
+    const unitPrice = Number(item.subtotal) / item.quantity;
+    const refundAmount = unitPrice * qtyToCancel;
+
+    // Verificamos si el producto o la cuenta ya estaban pagados
+    let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+
+    // Si estaba pagado, creamos el reembolso proporcional en Caja
+    if (wasPaid && refundAmount > 0) {
+      await Transaction.create({
+        type: 'EXPENSE',
+        source: 'CAFETERIA',
+        expenseCategory: 'REFUND',
+        amount: refundAmount,
+        description: `Reembolso por cancelación de producto en Ticket ${order.ticketId || id}`,
+        referenceId: order.id,
+        createdBy: userId
+      });
+    }
+
+    const previousKitchenStatus = item.kitchenStatus;
+    let notesArray = [];
+    try { notesArray = JSON.parse(item.notes || '[]'); } catch(e) {}
+    if (!Array.isArray(notesArray)) notesArray = [notesArray];
+
+    if (isPartial) {
+        // 🔥 SI ES PARCIAL: Dividimos las notas y creamos un registro nuevo cancelado
+        const cancelledNotes = notesArray.slice(0, qtyToCancel);
+        const remainingNotes = notesArray.slice(qtyToCancel);
+
+        await OrderItem.create({
+            orderId: item.orderId,
+            productId: item.productId,
+            quantity: qtyToCancel,
+            subtotal: refundAmount,
+            cuenta: item.cuenta,
+            isTakeaway: item.isTakeaway,
+            notes: JSON.stringify(cancelledNotes),
+            kitchenStatus: item.kitchenStatus,
+            status: 'CANCELLED',
+            cancelledAt: new Date(),
+            cancelReason: cancelReason || 'Cancelación parcial desde POS',
+            cancelledBy: userId
+        });
+
+        // Actualizamos el ítem original restándole la cantidad cancelada
+        await item.update({
+            quantity: item.quantity - qtyToCancel,
+            subtotal: Number(item.subtotal) - refundAmount,
+            notes: JSON.stringify(remainingNotes)
+        });
+    } else {
+        // 🔥 SI ES TOTAL: Solo cambiamos el estado
+        await item.update({
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelReason: cancelReason || 'Cancelación desde POS',
+          cancelledBy: userId
+        });
+    }
+
+    // Avisamos al KDS SÓLO si el producto NO había sido entregado
+    if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
+      getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
+    }
+
+    // Revisar si todos los items quedaron cancelados para cancelar la orden entera
+    const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
+    if (activeItems === 0 && order.status !== 'CLOSED') {
+      await order.update({ status: 'CANCELLED', cancelledAt: new Date(), cancelReason: 'Todos los productos fueron cancelados automáticamente', cancelledBy: userId });
+      if (order.tableId) await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+    }
+
+    // Retornar los ítems actualizados para que React no tenga que recargar toda la ventana
+    const allItems = await OrderItem.findAll({
+      where: { orderId: id },
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
+    });
+
+    getIO().emit('pos:update'); 
+    res.json({ message: 'Producto cancelado correctamente', wasRefunded: wasPaid, orderItems: allItems });
+  } catch (error) {
+    console.error('Error en cancelOrderItem:', error);
+    res.status(500).json({ message: 'Error al cancelar producto' });
+  }
+};
+
+// 📌 3. Cancelar cuenta completa (Efecto Cascada)
+export const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cancelReason } = req.body;
+    const userId = req.user?.id;
+
+    const order = await Order.findByPk(id, { include: [OrderItem] });
+    if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
+
+    if (order.status === 'CLOSED') {
+      return res.status(400).json({ message: 'No se puede cancelar una orden cerrada definitivamente' });
+    }
+
+    let totalRefund = 0;
+
+    // Cancelar todos los items activos en cascada
+    for (const item of order.OrderItems) {
+      if (item.status === 'ACTIVE') {
+        const previousKitchenStatus = item.kitchenStatus;
+        
+        // Calcular reembolsos individuales
+        let wasPaid = order.status === 'PAID' || 
+                      (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+        if (wasPaid) totalRefund += Number(item.subtotal);
+
+        await item.update({
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelReason: cancelReason || 'Cancelación de cuenta completa',
+          cancelledBy: userId
+        });
+
+        // Limpiar del KDS si no estaba entregado
+        if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
+          getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
+        }
+      }
+    }
+
+    // Generar 1 solo reembolso global en Caja si hubo dinero involucrado
+    if (totalRefund > 0) {
+      await Transaction.create({
+        type: 'EXPENSE',
+        source: 'CAFETERIA',
+        expenseCategory: 'REFUND',
+        amount: totalRefund,
+        description: `Reembolso total por cancelación de Orden ${order.ticketId || id}`,
+        referenceId: order.id,
+        createdBy: userId
+      });
+    }
+
+    // Cancelar la orden padre
+    await order.update({
+      status: 'CANCELLED',
+      cancelledAt: new Date(),
+      cancelReason: cancelReason || 'Cancelada desde POS',
+      cancelledBy: userId
+    });
+
+    // Liberar la mesa (Ajustado a tu modelo Table)
+    if (order.tableId) {
+      await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+    }
+
+    getIO().emit('pos:update'); // Refrescar el POS
+    res.json({ message: 'Cuenta cancelada completamente', refundedAmount: totalRefund });
+  } catch (error) {
+    console.error('Error en cancelOrder:', error);
+    res.status(500).json({ message: 'Error al cancelar la cuenta' });
+  }
+};
+
+// 📌 OBTENER RESUMEN DEL DÍA (Dashboard)
+export const getDailySummary = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Inicio del día local
+
+    // 1. Obtener todas las órdenes de hoy
+    const orders = await Order.findAll({
+      where: { createdAt: { [Op.gte]: today } },
+      include: [
+        { model: Table, as: 'table' },
+        { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['name'] }] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // 2. Obtener productos cancelados individualmente hoy
+    const cancelledItemsOnly = await OrderItem.findAll({
+      where: { status: 'CANCELLED', updatedAt: { [Op.gte]: today } },
+      include: [{ model: Product, as: 'product', attributes: ['name'] }],
+      order: [['updatedAt', 'DESC']]
+    });
+
+    // 3. Obtener el dinero en caja (Ingresos - Reembolsos)
+    const transactions = await Transaction.findAll({
+      where: { createdAt: { [Op.gte]: today }, source: 'CAFETERIA', status: 'ACTIVE' }
+    });
+
+    const totalCaja = transactions.reduce((acc, t) => {
+      if (t.type === 'INCOME') return acc + Number(t.amount);
+      if (t.type === 'EXPENSE' && t.expenseCategory === 'REFUND') return acc - Number(t.amount);
+      return acc;
+    }, 0);
+
+    // 4. Clasificar la información
+    const vendidosOrders = orders.filter(o => o.status === 'PAID' || o.status === 'CLOSED');
+    const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
+    
+    // Evitar contar doble los ítems de una orden que fue cancelada completa
+    const activeOrderIds = orders.filter(o => o.status !== 'CANCELLED').map(o => o.id);
+    const orphanCancelledItems = cancelledItemsOnly.filter(i => activeOrderIds.includes(i.orderId));
+
+    res.json({
+      totalCaja,
+      vendidosCount: vendidosOrders.length,
+      papeleraCount: cancelledOrders.length + orphanCancelledItems.reduce((acc, i) => acc + i.quantity, 0),
+      vendidosOrders,
+      cancelledOrders,
+      cancelledItems: orphanCancelledItems
+    });
+
+  } catch (error) {
+    console.error('Error al obtener resumen del día:', error);
+    res.status(500).json({ message: 'Error al obtener resumen del día' });
+  }
+};

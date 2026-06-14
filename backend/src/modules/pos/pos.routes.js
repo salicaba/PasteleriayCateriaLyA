@@ -1,6 +1,7 @@
 // backend/src/modules/pos/pos.routes.js
 import { Router } from 'express';
 import { 
+  getDailySummary,
   getActiveOrders, 
   createOrder, 
   addItemsToOrder,
@@ -12,7 +13,10 @@ import {
   deleteTable,
   moveItemAccount,
   printOrderTicket,
-  shareOrderTicket 
+  shareOrderTicket,
+  deliverAllItems, 
+  cancelOrderItem, 
+  cancelOrder 
 } from './pos.controller.js';
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
@@ -26,6 +30,7 @@ router.get('/orders/:orderId/share', shareOrderTicket);
 
 // 🔴 APLICAMOS EL MIDDLEWARE: Todo lo de abajo requerirá usuario logueado
 router.use(verifyToken);
+router.get('/orders/daily-summary', getDailySummary);
 
 // Rutas PROTEGIDAS (Ya tendrán req.user disponible)
 router.get('/orders/active', getActiveOrders);
@@ -39,7 +44,11 @@ router.post('/orders/:orderId/print', printOrderTicket);
 router.get('/tables', getTables);
 router.post('/tables', createTable);
 router.delete('/tables/:id', deleteTable);
-
 router.put('/orders/items/:itemId/move', moveItemAccount);
+
+// 🔥 NUEVAS RUTAS AJUSTADAS (Agregado el prefijo /orders para mantener la consistencia)
+router.put('/orders/:id/deliver-all', deliverAllItems);
+router.put('/orders/:id/items/:itemId/cancel', cancelOrderItem);
+router.put('/orders/:id/cancel', cancelOrder);
 
 export default router;

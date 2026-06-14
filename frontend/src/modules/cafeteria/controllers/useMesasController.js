@@ -1,3 +1,4 @@
+// src/modules/cafeteria/controllers/useMesasController.js
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { fetchActiveOrders } from '../models/mesasModel.js';
 import client from '../../../api/client.js';
@@ -8,7 +9,6 @@ export const useMesasController = () => {
   const [zonaActiva, setZonaActiva] = useState('salon');
   const [isLoading, setIsLoading] = useState(true);
 
-  // 🔥 CORRECCIÓN: Agregamos la tercera pestaña real aquí
   const zonas = [ 
     { id: 'salon', label: 'Salón' }, 
     { id: 'llevar', label: 'Para Llevar' },
@@ -99,6 +99,9 @@ export const useMesasController = () => {
     return () => { socket.off('pos:update'); };
   }, [loadMesas]);
 
+  // 🔥 NUEVO: Filtramos directamente para entregarlo a las secciones del Dashboard
+  const mesasSalon = useMemo(() => mesas.filter(m => m.zona === 'salon'), [mesas]);
+  const mesasLlevar = useMemo(() => mesas.filter(m => m.zona === 'llevar'), [mesas]);
   const mesasFiltradas = useMemo(() => mesas.filter(m => m.zona === zonaActiva), [mesas, zonaActiva]);
   
   const stats = useMemo(() => { 
@@ -175,6 +178,14 @@ export const useMesasController = () => {
     mesasFiltradas, stats, zonas, zonaActiva, setZonaActiva, 
     refresh: loadMesas, liberarMesa: loadMesas, 
     actualizarEstadoMesa: loadMesas, pagoParcialMesa: loadMesas, unirMesas: loadMesas, 
-    nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading 
+    nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading,
+
+    // 🔥 LAS PROPIEDADES QUE FALTABAN PARA EL NUEVO DASHBOARD
+    mesasSalon,
+    mesasLlevar,
+    handleLiberarMesa: loadMesas,
+    handleUpdateTotal: loadMesas,
+    handleUnirMesas: loadMesas,
+    handlePagoParcial: loadMesas
   };
 };

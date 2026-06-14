@@ -1,3 +1,4 @@
+// backend/src/modules/pos/OrderItem.model.js
 import { DataTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 
@@ -29,7 +30,7 @@ const OrderItem = sequelize.define('OrderItem', {
     type: DataTypes.STRING,
     defaultValue: 'General',
   },
-  isTakeaway: { // 🔥 NUEVO: Bandera para saber si se empaqueta
+  isTakeaway: { 
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
@@ -40,6 +41,23 @@ const OrderItem = sequelize.define('OrderItem', {
   kitchenStatus: {
     type: DataTypes.ENUM('PENDING', 'PREPARING', 'READY', 'DELIVERED'),
     defaultValue: 'PENDING',
+  },
+  // 🔥 NUEVOS CAMPOS PARA CANCELACIONES
+  status: {
+    type: DataTypes.ENUM('ACTIVE', 'CANCELLED'),
+    defaultValue: 'ACTIVE',
+  },
+  cancelledAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  cancelReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  cancelledBy: {
+    type: DataTypes.UUID, // ID del cajero/mesero que canceló
+    allowNull: true,
   }
 }, {
   timestamps: true,
