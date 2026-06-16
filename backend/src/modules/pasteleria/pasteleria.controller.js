@@ -139,6 +139,7 @@ export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
+    const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
     const pedido = await PasteleriaOrder.findByPk(id);
     if (!pedido) {
@@ -147,6 +148,41 @@ export const updateEstado = async (req, res) => {
 
     pedido.estado = estado;
     await pedido.save();
+
+    // 🔥 MAGIA: Sincronizar Caja Automáticamente
+    if (estado === 'cancelado') {
+      // Si se cancela el pedido, anulamos todas sus transacciones activas en la Caja
+      await Transaction.update(
+        { 
+          status: 'CANCELLED', 
+          cancelledBy: userId, 
+          cancelledAt: new Date() 
+        },
+        { 
+          where: { 
+            referenceId: pedido.id, 
+            source: 'PASTELERIA',
+            status: 'ACTIVE' 
+          } 
+        }
+      );
+    } else if (estado === 'pendiente') {
+      // Si se restaura el pedido, restauramos sus transacciones en la Caja
+      await Transaction.update(
+        { 
+          status: 'ACTIVE', 
+          cancelledBy: null, 
+          cancelledAt: null 
+        },
+        { 
+          where: { 
+            referenceId: pedido.id, 
+            source: 'PASTELERIA',
+            status: 'CANCELLED' 
+          } 
+        }
+      );
+    }
 
     res.json({ data: pedido });
   } catch (error) {

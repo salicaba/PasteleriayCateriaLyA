@@ -27,13 +27,11 @@ export const createOrder = async (req, res) => {
 
     let finalTicketId = null;
     if (orderType === 'LLEVAR') {
-      // 🔥 SI ES MOSTRADOR: Generamos un folio especial "MOSTRADOR CAF-XXXXXX"
       if (ticketId === 'VITRINA-EXPRESS' || ticketId === 'MOSTRADOR') {
         const randomNum = Math.floor(100 + Math.random() * 900);
         const timeCode = Date.now().toString().slice(-6);
         finalTicketId = `MOSTRADOR CAF-${timeCode}${randomNum}`;
       } else {
-        // 🔥 SI ES PARA LLEVAR REGULAR
         const randomNum = Math.floor(1000 + Math.random() * 9000); 
         const timeCode = Date.now().toString().slice(-2);
         const folioSeguro = `${randomNum}${timeCode}`;
@@ -145,11 +143,10 @@ export const payOrder = async (req, res) => {
     const folioUnico = `CAF-${Date.now().toString().slice(-6)}${randomNum}`;
     let desc = '';
 
-    // 🔥 IDENTIFICADOR PERFECTO PARA LA CAJA
     let identificador = '';
     if (order.orderType === 'LLEVAR') {
       if (order.ticketId && (order.ticketId.startsWith('MOSTRADOR') || order.ticketId.startsWith('VITRINA') || order.ticketId.startsWith('MOS-'))) {
-        identificador = 'MOSTRADOR'; // Forzamos a que en la caja diga (MOSTRADOR)
+        identificador = 'MOSTRADOR'; 
       } else {
         const rawId = String(order.ticketId || '');
         const partes = rawId.split(' - ');
@@ -455,14 +452,13 @@ export const printOrderTicket = async (req, res) => {
     printer.println(`Fecha de emision: ${new Date().toLocaleString()}`);
     printer.println(`Atendido por:     ${cashierName}`);
     
-    // 🔥 TITULO DEL TICKET AJUSTADO AL FORMATO "MOSTRADOR CAF-XXXX"
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
     let identificadorMesa = '';
 
     if (isLlevar) {
       if (rawId.startsWith('MOSTRADOR') || rawId.startsWith('VITRINA') || rawId.startsWith('MOS-')) {
-        identificadorMesa = rawId; // Literalmente imprime: MOSTRADOR CAF-123456
+        identificadorMesa = rawId; 
       } else {
         let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
         identificadorMesa = `Pedido #${idLimpio || 'Llevar'}`;
@@ -672,7 +668,6 @@ export const shareOrderTicket = async (req, res) => {
 
     const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
-    // 🔥 TITULO DEL TICKET DIGITAL IGUAL QUE EN FÍSICO
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
     let identificadorMesa = '';
@@ -1017,10 +1012,15 @@ export const cancelOrderItem = async (req, res) => {
       getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
     }
 
+    // 🔥 ACTUALIZAR EL TOTAL DE LA ORDEN MATEMÁTICAMENTE
+    const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
+    
     if (activeItems === 0 && order.status !== 'CLOSED') {
-      await order.update({ status: 'CANCELLED', cancelledAt: new Date(), cancelReason: 'Todos los productos fueron cancelados automáticamente', cancelledBy: userId });
+      await order.update({ status: 'CANCELLED', totalAmount: 0, cancelledAt: new Date(), cancelReason: 'Todos los productos fueron cancelados automáticamente', cancelledBy: userId });
       if (order.tableId) await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+    } else {
+      await order.update({ totalAmount: newTotal });
     }
 
     const allItems = await OrderItem.findAll({
@@ -1085,8 +1085,10 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
+    // 🔥 PONER EL TOTAL EN CERO AL CANCELAR TODA LA ORDEN
     await order.update({
       status: 'CANCELLED',
+      totalAmount: 0,
       cancelledAt: new Date(),
       cancelReason: cancelReason || 'Cancelada desde POS',
       cancelledBy: userId
@@ -1112,8 +1114,8 @@ export const getDailySummary = async (req, res) => {
 
     const orders = await Order.findAll({
       where: { createdAt: { [Op.gte]: today } },
+      // 🔥 ELIMINÉ LA CONSULTA A LA MESA AQUÍ PARA EVITAR EL EagerLoadingError
       include: [
-        { model: Table, as: 'table' },
         { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['name'] }] }
       ],
       order: [['createdAt', 'DESC']]
@@ -1127,7 +1129,7 @@ export const getDailySummary = async (req, res) => {
 
     const transactions = await Transaction.findAll({
       where: { createdAt: { [Op.gte]: today }, source: 'CAFETERIA', status: 'ACTIVE' },
-      order: [['createdAt', 'DESC']] // 🔥 Aseguramos que las más recientes salgan primero
+      order: [['createdAt', 'DESC']] // Aseguramos que las más recientes salgan primero
     });
 
     const totalCaja = transactions.reduce((acc, t) => {
@@ -1149,7 +1151,7 @@ export const getDailySummary = async (req, res) => {
       vendidosOrders,
       cancelledOrders,
       cancelledItems: orphanCancelledItems,
-      transactions // 🔥 ENVIAMOS LAS TRANSACCIONES PARA LA VISTA DETALLADA
+      transactions 
     });
 
   } catch (error) {
@@ -1194,6 +1196,10 @@ export const restoreOrderItem = async (req, res) => {
       cancelReason: null,
       cancelledBy: null
     });
+
+    // 🔥 RECALCULAR TOTAL AL RESTAURAR
+    const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
+    await order.update({ totalAmount: newTotal });
 
     getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
     getIO().emit('pos:update');
@@ -1249,8 +1255,12 @@ export const restoreOrder = async (req, res) => {
       });
     }
 
+    // 🔥 RECALCULAR TOTAL DE LA ORDEN AL RESTAURAR
+    const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
+
     await order.update({
       status: 'OPEN',
+      totalAmount: newTotal,
       cancelledAt: null,
       cancelReason: null,
       cancelledBy: null

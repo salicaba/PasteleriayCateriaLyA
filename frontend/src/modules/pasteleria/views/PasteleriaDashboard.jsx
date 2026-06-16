@@ -1,9 +1,10 @@
+// src/modules/pasteleria/views/PasteleriaDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  CalendarClock, Plus, Search, CheckCircle2, AlertTriangle, Wallet, Banknote,
-  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle
-} from 'lucide-react';
+  CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
+  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle, Loader2
+} from 'lucide-react'; // 🔥 Importamos 'Check' para el nuevo modal
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
@@ -77,10 +78,10 @@ export default function PasteleriaDashboard() {
     detalleModal, abrirDetalles, cerrarDetalles, 
     pedidoAEditar, iniciarEdicion,               
     calcularFinanzas, guardarPedido, registrarAbono,
-    isSuccessScreenOpen 
+    successScreen, 
+    isSubmitting 
   } = usePedidosController();
 
-  // 🔥 TODOS los useState y useEffect ANTES de comprobar el 'loading'
   const [transferInfo, setTransferInfo] = useState(null);
 
   useEffect(() => {
@@ -91,7 +92,6 @@ export default function PasteleriaDashboard() {
     }
   }, [abonoModal.isOpen, abonoForm.metodo]);
 
-  // AHORA SÍ: Retorno de carga
   if (loading) return <PasteleriaSkeleton />; 
 
   const getConfirmacionDetalles = () => {
@@ -314,32 +314,35 @@ export default function PasteleriaDashboard() {
         )}
       </div>
 
+      {/* 🔥 NUEVA PANTALLA DE ÉXITO ESTILO MODAL OSCURO (Como la imagen) */}
       <AnimatePresence>
-        {isSuccessScreenOpen && (
+        {successScreen.isOpen && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 dark:bg-black/60 lya:bg-black/50 backdrop-blur-md"
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 lya:bg-black/50 backdrop-blur-sm"
           >
             <motion.div 
-              initial={{ scale: 0.8, opacity: 0, y: 20 }} 
+              initial={{ scale: 0.9, opacity: 0, y: 10 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              exit={{ scale: 0.9, opacity: 0, y: 10 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-8 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col items-center text-center"
+              className="bg-white dark:bg-[#1a1f2e] lya:bg-lya-surface rounded-3xl p-10 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col items-center text-center"
             >
               <motion.div 
                 initial={{ scale: 0 }} 
-                animate={{ scale: 1, rotate: 360 }} 
+                animate={{ scale: 1 }} 
                 transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
-                className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 lya:bg-lya-primary/20 lya:text-lya-primary rounded-full flex items-center justify-center mb-6 shadow-inner"
+                className="w-20 h-20 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 lya:bg-lya-primary/20 lya:text-lya-primary rounded-full flex items-center justify-center mb-5"
               >
-                <CheckCircle2 size={50} strokeWidth={2.5} />
+                <Check size={48} strokeWidth={3} />
               </motion.div>
-              <h2 className="text-3xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-3">¡Pedido Liquidado!</h2>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed">
-                El abono cubre el total de la deuda.<br/>El cliente ya no debe nada por este pastel.
+              <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 uppercase tracking-wide">
+                {successScreen.title}
+              </h2>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70">
+                {successScreen.subtitle}
               </p>
             </motion.div>
           </motion.div>
@@ -364,8 +367,10 @@ export default function PasteleriaDashboard() {
                 )}
               </div>
               <div className="flex gap-3">
-                <button onClick={cerrarConfirmacion} className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-bold py-3 rounded-xl transition-colors">Volver</button>
-                <button onClick={ejecutarAccionConfirmada} className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 ${detallesModal.color}`}>Confirmar</button>
+                <button onClick={cerrarConfirmacion} disabled={isSubmitting} className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-bold py-3 rounded-xl transition-colors">Volver</button>
+                <button onClick={ejecutarAccionConfirmada} disabled={isSubmitting} className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'} ${detallesModal.color}`}>
+                  {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={24} /> : 'Confirmar'}
+                </button>
               </div>
             </motion.div>
           </div>
@@ -386,6 +391,7 @@ export default function PasteleriaDashboard() {
         onSave={guardarPedido} 
         fechaPredefinida={fechaPredefinida} 
         pedidoAEditar={pedidoAEditar}
+        isSubmitting={isSubmitting}
       />
       
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
@@ -559,8 +565,12 @@ export default function PasteleriaDashboard() {
                 </div>
 
                 <div className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0">
-                  <button type="submit" form="abonoForm" className="w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
-                    <CheckCircle2 size={20} /> Confirmar Pago
+                  <button type="submit" form="abonoForm" disabled={isSubmitting} className={`w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}>
+                    {isSubmitting ? (
+                      <><Loader2 className="animate-spin" size={20} /> Procesando pago...</>
+                    ) : (
+                      <><CheckCircle2 size={20} /> Confirmar Pago</>
+                    )}
                   </button>
                 </div>
               </motion.div>

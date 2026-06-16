@@ -13,6 +13,7 @@ import {
 export const usePedidosController = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   
   const [viewMode, setViewMode] = useState('grid'); 
   const [activeTab, setActiveTab] = useState('activos'); 
@@ -30,7 +31,8 @@ export const usePedidosController = () => {
   const [detalleModal, setDetalleModal] = useState({ isOpen: false, pedido: null });
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
 
-  const [isSuccessScreenOpen, setIsSuccessScreenOpen] = useState(false);
+  // 🔥 NUEVO ESTADO PARA LA PANTALLA DE ÉXITO TIPO CAFETERÍA
+  const [successScreen, setSuccessScreen] = useState({ isOpen: false, title: '', subtitle: '' });
 
   useEffect(() => {
     loadPedidos();
@@ -130,19 +132,22 @@ export const usePedidosController = () => {
     if (tipo === 'cancelar') nuevoEstado = 'cancelado';
     if (tipo === 'restaurar') nuevoEstado = 'pendiente';
 
+    setIsSubmitting(true);
     try {
-      const toastId = toast.loading(`Procesando...`);
+      // 🔥 Eliminado el toast.loading
       const pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, nuevoEstado);
       
       setPedidos(pedidos.map(p => p.id === pedido.id ? pedidoActualizado : p));
       cerrarConfirmacion();
 
-      if (tipo === 'entregar') toast.success('Pedido entregado con éxito', { id: toastId });
-      if (tipo === 'cancelar') toast.success('Pedido cancelado', { id: toastId });
-      if (tipo === 'restaurar') toast.success('Pedido restaurado', { id: toastId });
+      if (tipo === 'entregar') toast.success('Pedido entregado con éxito');
+      if (tipo === 'cancelar') toast.success('Pedido cancelado');
+      if (tipo === 'restaurar') toast.success('Pedido restaurado');
     } catch (error) {
       toast.error('Hubo un error al conectar con el servidor');
       cerrarConfirmacion();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -157,10 +162,7 @@ export const usePedidosController = () => {
   const cerrarDetalles = () => setDetalleModal({ isOpen: false, pedido: null });
 
   const iniciarEdicion = async (pedidoLigero) => {
-    const toastId = toast.loading('Cargando información del pedido...');
     const pedidoCompleto = await fetchPedidoByIdReal(pedidoLigero.id);
-    toast.dismiss(toastId);
-    
     setPedidoAEditar(pedidoCompleto || pedidoLigero);
     setIsModalOpen(true);
   };
@@ -178,8 +180,9 @@ export const usePedidosController = () => {
   };
 
   const guardarPedido = async (datosPedido) => {
+    setIsSubmitting(true);
     try {
-      const toastId = toast.loading(pedidoAEditar ? 'Actualizando pedido...' : 'Guardando pedido...');
+      // 🔥 Eliminado el toast.loading
       const anticipoNum = parseFloat(datosPedido.anticipo) || 0;
       
       let pedidoAEnviar = { ...datosPedido };
@@ -196,36 +199,32 @@ export const usePedidosController = () => {
         pedidoResult = await editarPedidoReal(pedidoAEditar.id, pedidoAEnviar);
         const dataActualizada = pedidoResult.data || pedidoResult;
         
-        // 🔥 ACTUALIZADO: Excluimos de la RAM local las imágenes en plural
         const { imagenesReferencia, ...dataActualizadaLigera } = dataActualizada;
         
         setPedidos(pedidos.map(p => p.id === pedidoAEditar.id ? dataActualizadaLigera : p));
         
         const finanzasEditado = calcularFinanzas(dataActualizada);
         if (finanzasEditado.estaLiquidado) {
-          toast.dismiss(toastId);
-          setIsSuccessScreenOpen(true);
-          setTimeout(() => setIsSuccessScreenOpen(false), 2500);
+          setSuccessScreen({ isOpen: true, title: '¡Pedido Liquidado!', subtitle: 'El pedido ha sido actualizado y el saldo está en $0.00' });
+          setTimeout(() => setSuccessScreen({ isOpen: false, title: '', subtitle: '' }), 2500);
         } else {
-          toast.success('Pedido actualizado correctamente', { id: toastId });
+          toast.success('Pedido actualizado correctamente');
         }
 
       } else {
         pedidoResult = await crearPedidoReal(pedidoAEnviar);
         const dataGuardada = pedidoResult.data || pedidoResult;
         
-        // 🔥 ACTUALIZADO: Excluimos de la RAM local las imágenes en plural
         const { imagenesReferencia, ...dataGuardadaLigera } = dataGuardada;
         
         setPedidos([dataGuardadaLigera, ...pedidos]);
         
         const finanzasCreado = calcularFinanzas(dataGuardada);
         if (finanzasCreado.estaLiquidado) {
-           toast.dismiss(toastId);
-           setIsSuccessScreenOpen(true);
-           setTimeout(() => setIsSuccessScreenOpen(false), 2500);
+           setSuccessScreen({ isOpen: true, title: '¡Pedido Pagado!', subtitle: 'El pedido fue creado y liquidado al 100%' });
+           setTimeout(() => setSuccessScreen({ isOpen: false, title: '', subtitle: '' }), 2500);
         } else {
-           toast.success('Pedido creado correctamente', { id: toastId });
+           toast.success('Pedido creado correctamente');
         }
       }
 
@@ -236,6 +235,8 @@ export const usePedidosController = () => {
     } catch (error) {
       console.error("Error guardando pedido:", error);
       toast.error('No se pudo guardar el pedido en la base de datos');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -243,8 +244,9 @@ export const usePedidosController = () => {
     const monto = parseFloat(montoAbono);
     if (!monto || monto <= 0) return;
 
+    setIsSubmitting(true);
     try {
-      const toastId = toast.loading('Procesando pago...');
+      // 🔥 Eliminado el toast.loading
       await registrarAbonoReal(pedidoId, monto); 
 
       const pedidoActual = pedidos.find(p => p.id === pedidoId);
@@ -262,17 +264,28 @@ export const usePedidosController = () => {
       }
 
       const finanzasActualizadas = calcularFinanzas(pedidoActualizado);
+      
+      // 🔥 ACTIVAMOS LA PANTALLA DE ÉXITO ESTILO CAFETERÍA
       if (finanzasActualizadas.estaLiquidado) {
-         toast.dismiss(toastId); 
-         setIsSuccessScreenOpen(true); 
-         setTimeout(() => setIsSuccessScreenOpen(false), 2500);
+         setSuccessScreen({ 
+            isOpen: true, 
+            title: '¡Pedido Liquidado!', 
+            subtitle: 'El abono cubre el total de la deuda. El cliente ya no debe nada.' 
+         });
       } else {
-         toast.success('Abono registrado correctamente', { id: toastId }); 
+         setSuccessScreen({ 
+            isOpen: true, 
+            title: '¡Abono Registrado!', 
+            subtitle: `Se agregó el pago de $${monto.toFixed(2)} correctamente.` 
+         });
       }
+      setTimeout(() => setSuccessScreen({ isOpen: false, title: '', subtitle: '' }), 2500);
 
     } catch (error) {
       console.error("Error al registrar abono:", error);
       toast.error('No se pudo guardar el pago');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -296,6 +309,7 @@ export const usePedidosController = () => {
     calcularFinanzas, 
     guardarPedido,  
     registrarAbono,
-    isSuccessScreenOpen
+    successScreen, // 🔥 EXPORTAMOS LA NUEVA VARIABLE
+    isSubmitting 
   };
 };

@@ -134,7 +134,6 @@ export const TicketSidebar = ({
     }
   };
 
-  // 🔥 NUEVO FLUJO GLOBAL DE CANCELACIÓN (MESA O CUENTAS)
   const handleCancelClick = () => {
     setModalCancelTarget('ALL');
     openConfirmModal({
@@ -161,8 +160,12 @@ export const TicketSidebar = ({
       red: { icon: "text-red-500", bg: "bg-red-100 dark:bg-red-900/30", btn: "bg-red-500 hover:bg-red-600 text-white" }
   };
 
-  // Identificar qué cuentas tienen productos enviados que se pueden cancelar
   const cuentasCancelables = Array.from(new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General')));
+
+  // 🔥 NUEVA LÓGICA: Identificar si hay items listos y si hay items cocinándose
+  const hasReadyItems = activeCart.some(i => i.enviadoCocina && i.kitchenStatus === 'READY');
+  const hasCookingItems = activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
+  const showDeliverAllBtn = activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative">
@@ -503,18 +506,26 @@ export const TicketSidebar = ({
            </div>
         ) : (
            <>
-             {/* 🔥 AQUÍ ESTÁ LA CORRECCIÓN: SE OCULTA ESTE BOTÓN SI ES MOSTRADOR */}
-             {!isVitrina && onDeliverAll && activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus)) && (
+             {/* 🔥 LÓGICA DE 'ENTREGAR TODA LA MESA' RESTRINGIDA */}
+             {!isVitrina && onDeliverAll && showDeliverAllBtn && (
                <button
+                  disabled={!hasReadyItems}
                   onClick={() => openConfirmModal({
                       title: 'Entregar Toda la Mesa',
-                      message: '¿Marcar TODOS los productos pendientes de la MESA como entregados?',
-                      icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar Todo',
+                      message: hasCookingItems 
+                        ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?'
+                        : '¿Confirmas que ya entregaste los productos listos a la mesa?',
+                      icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
                       onConfirm: () => onDeliverAll()
                   })}
-                  className="w-full mb-4 py-2.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-2 hover:bg-green-100 dark:hover:bg-green-800/40 active:scale-95 transition-all shadow-sm"
+                  className={clsx(
+                    "w-full mb-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-2 transition-all shadow-sm",
+                    hasReadyItems
+                      ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-800/40 active:scale-95 cursor-pointer"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed opacity-70"
+                  )}
                >
-                  <CheckCheck size={16} /> Entregar Toda La Mesa
+                  <CheckCheck size={16} /> {hasReadyItems ? 'Entregar Toda La Mesa' : 'Esperando a Cocina...'}
                </button>
              )}
              
@@ -535,7 +546,6 @@ export const TicketSidebar = ({
                </button>
              </div>
 
-             {/* 🔥 BOTÓN GLOBAL DE OPCIONES DE CANCELACIÓN */}
              {!isVitrina && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
                  <button 
                     onClick={handleCancelClick} 
@@ -548,7 +558,6 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* 🔥 RENDERIZADO DEL MODAL DE CONFIRMACIÓN CUSTOM */}
       <AnimatePresence>
         {modalConfig && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -568,7 +577,6 @@ export const TicketSidebar = ({
                 {modalConfig.message}
               </p>
 
-              {/* 🔥 RENDERIZADO ESPECIAL PARA CANCELAR ORDEN O CUENTA */}
               {modalConfig.type === 'cancelOrder' ? (
                 <div className="w-full mb-6 space-y-3">
                     <div className="text-left">

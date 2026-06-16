@@ -81,6 +81,9 @@ export const MesasPage = () => {
 
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
 
+  // 🔥 LÓGICA DE PROTECCIÓN MATEMÁTICA PARA LA PAPELERA
+  const activeOrderIds = [...mesasSalon, ...mesasLlevar].map(m => m.orderId || m.id).filter(Boolean);
+
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8">
       
@@ -267,25 +270,27 @@ export const MesasPage = () => {
                       <div>
                         <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Cuentas Canceladas</h3>
                         <div className="space-y-3">
-                          {dailySummary.cancelledOrders.map(order => (
-                            <div key={order.id} className="p-4 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 rounded-2xl group transition-all hover:border-red-300">
+                          {dailySummary.cancelledOrders.map(order => {
+                            return (
+                            <div key={order.id} className="p-4 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 rounded-2xl transition-all">
                               <div className="flex justify-between items-start mb-2">
                                 <span className="font-bold text-gray-900 dark:text-white">{order.ticketId || `Mesa ${order.table?.number}`}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
+                                  {/* 🔥 BOTÓN SIEMPRE VISIBLE */}
                                   <button 
                                     onClick={() => handleRestoreOrder(order.id)} 
-                                    className="p-1.5 bg-white dark:bg-gray-800 text-gray-400 hover:text-orange-500 rounded-lg shadow-sm active:scale-95 transition-all opacity-0 group-hover:opacity-100" 
+                                    className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all flex items-center gap-1.5" 
                                     title="Restaurar Cuenta Completa"
                                   >
-                                    <RotateCcw size={14} />
+                                    <RotateCcw size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Restaurar</span>
                                   </button>
                                 </div>
                               </div>
                               <p className="text-[11px] text-gray-500 leading-snug">Motivo: {order.cancelReason || 'Sin especificar'}</p>
                               <p className="text-[10px] text-gray-400 mt-2">{new Date(order.cancelledAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                             </div>
-                          ))}
+                          )})}
                         </div>
                       </div>
                     )}
@@ -294,25 +299,58 @@ export const MesasPage = () => {
                       <div>
                         <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Productos Cancelados</h3>
                         <div className="space-y-3">
-                          {dailySummary.cancelledItems.map(item => (
-                            <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between opacity-80 hover:opacity-100 transition-opacity group">
-                              <div>
+                          {dailySummary.cancelledItems.map(item => {
+                            const canRestore = activeOrderIds.includes(item.orderId);
+
+                            // 🔥 BÚSQUEDA DEL ORIGEN DE LA MESA
+                            let nombreOrigen = 'Origen Desconocido';
+                            const mesaActiva = [...mesasSalon, ...mesasLlevar].find(m => (m.orderId || m.id) === item.orderId);
+                            
+                            if (mesaActiva) {
+                                nombreOrigen = mesaActiva.zona === 'salon' ? `Mesa ${mesaActiva.numero}` : (mesaActiva.ticketId || `Llevar ${mesaActiva.numero}`);
+                            } else {
+                                const ordenCerrada = [...dailySummary.vendidosOrders, ...dailySummary.cancelledOrders].find(o => o.id === item.orderId);
+                                if (ordenCerrada) {
+                                    nombreOrigen = ordenCerrada.orderType === 'LLEVAR' ? ordenCerrada.ticketId : `Mesa ${ordenCerrada.table?.number || '?'}`;
+                                }
+                            }
+
+                            return (
+                            <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between opacity-90 transition-opacity">
+                              <div className="flex-1 pr-3">
                                 <p className="font-bold text-gray-800 dark:text-gray-200 text-sm"><span className="text-red-500">{item.quantity}x</span> {item.product?.name}</p>
-                                <p className="text-[10px] text-gray-500 uppercase mt-0.5">Cuenta: {item.cuenta}</p>
-                                <p className="text-[10px] text-gray-400 mt-1 italic">"{item.cancelReason || 'Sin motivo'}"</p>
+                                
+                                {/* 🔥 ORIGEN VISIBLE */}
+                                <div className="mt-1.5 mb-1 inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-700">
+                                  <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{nombreOrigen}</span>
+                                  <span className="mx-1.5 text-gray-300 dark:text-gray-600">•</span>
+                                  <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Cta: {item.cuenta}</span>
+                                </div>
+                                
+                                <p className="text-[10px] text-gray-400 italic leading-snug">"{item.cancelReason || 'Sin motivo'}"</p>
                               </div>
-                              <div className="flex flex-col items-end gap-2">
+                              <div className="flex flex-col items-end gap-2 shrink-0">
                                 <span className="text-sm font-black text-gray-400 line-through">${Number(item.subtotal).toFixed(2)}</span>
-                                <button 
-                                    onClick={() => handleRestoreItem(item.orderId, item.id)} 
-                                    className="p-1.5 bg-gray-50 dark:bg-gray-700 text-gray-400 hover:text-orange-500 rounded-lg shadow-sm active:scale-95 transition-all opacity-0 group-hover:opacity-100" 
-                                    title="Restaurar Producto"
-                                >
-                                    <RotateCcw size={14} />
-                                </button>
+                                {canRestore ? (
+                                    /* 🔥 BOTÓN SIEMPRE VISIBLE Y ESTILIZADO */
+                                    <button 
+                                        onClick={() => handleRestoreItem(item.orderId, item.id)} 
+                                        className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl border border-orange-200 dark:border-orange-800/50 shadow-sm hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all flex items-center gap-1.5" 
+                                        title="Restaurar Producto a la Orden Original"
+                                    >
+                                        <RotateCcw size={16} /> <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Restaurar</span>
+                                    </button>
+                                ) : (
+                                    <span 
+                                        className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md" 
+                                        title="No se puede restaurar porque la cuenta/mesa ya fue cerrada o finalizada."
+                                    >
+                                        Mesa Cerrada
+                                    </span>
+                                )}
                               </div>
                             </div>
-                          ))}
+                          )})}
                         </div>
                       </div>
                     )}

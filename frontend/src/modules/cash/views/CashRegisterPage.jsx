@@ -1,3 +1,4 @@
+// src/modules/cash/views/CashRegisterPage.jsx
 import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
 import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark } from 'lucide-react';
@@ -78,7 +79,7 @@ export const CashRegisterPage = ({ user }) => {
     return { label: 'Efectivo', icon: Banknote, color: 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-700', bg: 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-emerald-100' };
   };
 
-  // 🔥 SOLUCIÓN: Declaramos useMemo ANTES del return de carga.
+  // 🔥 SOLUCIÓN PROTEGIDA: Declaramos useMemo ANTES de cualquier return.
   const activeTransactions = transactions.filter(tx => tx.status === 'ACTIVE');
   const paymentStats = useMemo(() => {
     return activeTransactions.reduce((acc, tx) => {
@@ -92,7 +93,7 @@ export const CashRegisterPage = ({ user }) => {
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
 
-  // 🔥 AHORA SÍ: El return temprano ocurre después de que todos los hooks (useState, useMemo) fueron declarados.
+  // Si está cargando, mostramos el skeleton
   if (loading) return <CashRegisterSkeleton />;
 
   const filteredTransactions = transactions.filter(tx => {
@@ -267,7 +268,7 @@ export const CashRegisterPage = ({ user }) => {
 
                   return (
                     <motion.tr 
-                      key={tx.id}
+                      key={tx.id} // 🔥 AQUÍ ESTÁ LA MAGIA, CADA ABONO TIENE SU ID ÚNICO
                       layout
                       initial={{ opacity: 0, y: 15 }} 
                       animate={{ opacity: 1, y: 0 }} 
