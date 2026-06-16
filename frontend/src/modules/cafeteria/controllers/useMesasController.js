@@ -59,7 +59,7 @@ export const useMesasController = () => {
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
           
-          // 🔥 Identificamos el Mostrador por sus posibles prefijos
+          // Identificamos el Mostrador por sus posibles prefijos
           const isVitrina = rawTicketId.startsWith('MOSTRADOR') || rawTicketId.startsWith('VITRINA') || rawTicketId.startsWith('MOS-');
           
           let numeroFinal = rawTicketId;
@@ -118,7 +118,6 @@ export const useMesasController = () => {
       const ordenActiva = mesas.find(m => m.zona === 'vitrina' && m.estado === 'ocupada');
       if (ordenActiva) return ordenActiva;
 
-      // 🔥 Mandamos 'MOSTRADOR' para que el Backend genere el folio CAF-XXXX
       const res = await client.post('/pos/orders', { 
           orderType: 'LLEVAR', 
           ticketId: 'MOSTRADOR', 
@@ -182,6 +181,17 @@ export const useMesasController = () => {
     }
   };
 
+  // 🔥 NUEVA FUNCIÓN PARA CANCELAR DIRECTO DESDE LA TARJETA
+  const handleCancelOrder = async (orderId, reason = 'Cancelado desde vista general') => {
+    try {
+      await client.put(`/pos/orders/${orderId}/cancel`, { cancelReason: reason });
+      toast.success('Pedido para llevar eliminado correctamente');
+      loadMesas();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al eliminar el pedido');
+    }
+  };
+
   const handleRestoreOrder = async (orderId) => {
     try {
       await client.put(`/pos/orders/${orderId}/restore`);
@@ -216,6 +226,7 @@ export const useMesasController = () => {
     handleUpdateTotal: loadMesas,
     handleUnirMesas: loadMesas,
     handlePagoParcial: loadMesas,
+    handleCancelOrder, // Exportamos la función
     handleRestoreOrder,
     handleRestoreItem
   };

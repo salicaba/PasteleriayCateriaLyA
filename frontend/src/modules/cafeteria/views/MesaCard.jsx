@@ -1,8 +1,8 @@
 // frontend/src/modules/cafeteria/views/MesaCard.jsx
 import React, { useMemo } from 'react';
-import { UtensilsCrossed, ShoppingBag, ChefHat, Check } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2 } from 'lucide-react';
 
-export const MesaCard = ({ mesa, onClick }) => {
+export const MesaCard = ({ mesa, onClick, onCancel }) => {
   const isOcupada = mesa.estado === 'ocupada';
   const isLlevar = mesa.zona === 'llevar';
 
@@ -24,7 +24,6 @@ export const MesaCard = ({ mesa, onClick }) => {
 
     const partes = rawNumero.split(' - ');
     
-    // Limpieza agresiva: quitamos "Llevar", "L-" y "#" para quedarnos SOLO con el número
     let id = partes[0] || 'Pedido';
     id = id.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim(); 
     
@@ -69,17 +68,32 @@ export const MesaCard = ({ mesa, onClick }) => {
             <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
               isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
             }`}>
-              {/* Ahora SÓLO muestra el "#" y el número limpio */}
               #{idPrincipal}
             </h3>
           </div>
           
-          <div className={`p-2 rounded-xl transition-colors ${
-            isOcupada 
-              ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
-              : 'bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-border'
-          }`}>
-            {isLlevar ? <ShoppingBag size={20} strokeWidth={2} /> : <UtensilsCrossed size={20} strokeWidth={2} />}
+          <div className="flex items-center gap-1.5 z-20">
+            {isLlevar && onCancel && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); 
+                  // Ya no usamos window.confirm, directamente llamamos a onCancel
+                  onCancel();
+                }}
+                className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/20 lya:hover:bg-red-900/20 transition-colors"
+                title="Eliminar pedido"
+              >
+                <Trash2 size={18} strokeWidth={2} />
+              </button>
+            )}
+
+            <div className={`p-2 rounded-xl transition-colors ${
+              isOcupada 
+                ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
+                : 'bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-border'
+            }`}>
+              {isLlevar ? <ShoppingBag size={20} strokeWidth={2} /> : <UtensilsCrossed size={20} strokeWidth={2} />}
+            </div>
           </div>
         </div>
 

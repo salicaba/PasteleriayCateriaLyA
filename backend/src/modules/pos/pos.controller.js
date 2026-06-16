@@ -1043,7 +1043,11 @@ export const cancelOrder = async (req, res) => {
     const { cancelReason } = req.body;
     const userId = req.user?.id;
 
-    const order = await Order.findByPk(id, { include: [OrderItem] });
+    // 🔥 CORRECCIÓN: Se especifica { model: OrderItem, as: 'items' } para respetar el alias
+    const order = await Order.findByPk(id, { 
+      include: [{ model: OrderItem, as: 'items' }] 
+    });
+    
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
 
     if (order.status === 'CLOSED') {
@@ -1052,7 +1056,8 @@ export const cancelOrder = async (req, res) => {
 
     let totalRefund = 0;
 
-    for (const item of order.OrderItems) {
+    // 🔥 CORRECCIÓN: Ahora se itera sobre order.items en lugar de order.OrderItems
+    for (const item of order.items) {
       if (item.status === 'ACTIVE') {
         const previousKitchenStatus = item.kitchenStatus;
         
@@ -1085,7 +1090,7 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
-    // 🔥 PONER EL TOTAL EN CERO AL CANCELAR TODA LA ORDEN
+    // Poner el total en cero al cancelar toda la orden
     await order.update({
       status: 'CANCELLED',
       totalAmount: 0,
@@ -1106,57 +1111,64 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
-// 📌 OBTENER RESUMEN DEL DÍA (Dashboard)
+// ==========================================
+// 📊 OBTENER RESUMEN DIARIO (VENDIDOS Y PAPELERA)
+// ==========================================
 export const getDailySummary = async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Inicio del día local
+    // Importamos Op dinámicamente por si no está declarado al inicio del archivo
+    const { Op } = await import('sequelize'); 
 
-    const orders = await Order.findAll({
-      where: { createdAt: { [Op.gte]: today } },
-      // 🔥 ELIMINÉ LA CONSULTA A LA MESA AQUÍ PARA EVITAR EL EagerLoadingError
-      include: [
-        { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['name'] }] }
-      ],
+    // Configuramos el inicio y fin del día actual
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const dateFilter = { [Op.between]: [startOfDay, endOfDay] };
+
+    // 1. Órdenes Pagadas
+    const vendidosOrders = await Order.findAll({
+      where: { status: 'PAID', createdAt: dateFilter },
+      // required: false garantiza que si no tiene mesa (Llevar), igual aparezca
+      include: [{ model: Table, as: 'table', required: false }],
       order: [['createdAt', 'DESC']]
     });
 
-    const cancelledItemsOnly = await OrderItem.findAll({
-      where: { status: 'CANCELLED', updatedAt: { [Op.gte]: today } },
-      include: [{ model: Product, as: 'product', attributes: ['name'] }],
-      order: [['updatedAt', 'DESC']]
+    // 2. Órdenes Canceladas (LA PAPELERA)
+    const cancelledOrders = await Order.findAll({
+      where: { status: 'CANCELLED', cancelledAt: dateFilter },
+      // 🔥 AQUÍ ESTABA EL PROBLEMA: required: false permite que entren los Para Llevar
+      include: [{ model: Table, as: 'table', required: false }],
+      order: [['cancelledAt', 'DESC']]
     });
 
+    // 3. Productos Cancelados Sueltos
+    const cancelledItems = await OrderItem.findAll({
+      where: { status: 'CANCELLED', cancelledAt: dateFilter },
+      include: [{ model: Product, as: 'product' }],
+      order: [['cancelledAt', 'DESC']]
+    });
+
+    // 4. Transacciones del día
     const transactions = await Transaction.findAll({
-      where: { createdAt: { [Op.gte]: today }, source: 'CAFETERIA', status: 'ACTIVE' },
-      order: [['createdAt', 'DESC']] // Aseguramos que las más recientes salgan primero
+      where: { createdAt: dateFilter },
+      order: [['createdAt', 'DESC']]
     });
 
-    const totalCaja = transactions.reduce((acc, t) => {
-      if (t.type === 'INCOME') return acc + Number(t.amount);
-      if (t.type === 'EXPENSE' && t.expenseCategory === 'REFUND') return acc - Number(t.amount);
-      return acc;
-    }, 0);
-
-    const vendidosOrders = orders.filter(o => o.status === 'PAID' || o.status === 'CLOSED');
-    const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
-    
-    const activeOrderIds = orders.filter(o => o.status !== 'CANCELLED').map(o => o.id);
-    const orphanCancelledItems = cancelledItemsOnly.filter(i => activeOrderIds.includes(i.orderId));
-
+    // Enviamos todo al frontend
     res.json({
-      totalCaja,
       vendidosCount: vendidosOrders.length,
-      papeleraCount: cancelledOrders.length + orphanCancelledItems.reduce((acc, i) => acc + i.quantity, 0),
+      papeleraCount: cancelledOrders.length + cancelledItems.length,
       vendidosOrders,
       cancelledOrders,
-      cancelledItems: orphanCancelledItems,
-      transactions 
+      cancelledItems,
+      transactions
     });
-
   } catch (error) {
-    console.error('Error al obtener resumen del día:', error);
-    res.status(500).json({ message: 'Error al obtener resumen del día' });
+    console.error('Error en getDailySummary:', error);
+    res.status(500).json({ message: 'Error al obtener el resumen diario' });
   }
 };
 
@@ -1219,7 +1231,11 @@ export const restoreOrder = async (req, res) => {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    const order = await Order.findByPk(id, { include: [OrderItem] });
+    // 🔥 CORRECCIÓN: Se especifica el alias aquí también
+    const order = await Order.findByPk(id, { 
+      include: [{ model: OrderItem, as: 'items' }] 
+    });
+    
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
 
     if (order.tableId) {
@@ -1233,7 +1249,8 @@ export const restoreOrder = async (req, res) => {
 
     let totalRestoredAmount = 0;
 
-    for (const item of order.OrderItems) {
+    // 🔥 CORRECCIÓN: Y se cambia a order.items en el bucle
+    for (const item of order.items) {
       if (item.status === 'CANCELLED' && item.cancelReason === 'Cancelación de cuenta completa') {
         let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) totalRestoredAmount += Number(item.subtotal);
@@ -1255,7 +1272,7 @@ export const restoreOrder = async (req, res) => {
       });
     }
 
-    // 🔥 RECALCULAR TOTAL DE LA ORDEN AL RESTAURAR
+    // Recalcular total de la orden al restaurar
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
 
     await order.update({

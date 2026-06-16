@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket'; 
 
-// IMPORTA TUS COMPONENTES
 import { useMesasController } from '../controllers/useMesasController';
 import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal';
@@ -31,13 +30,18 @@ export const MesasPage = () => {
   const { 
     mesasSalon, mesasLlevar, isLoading, 
     handleLiberarMesa, handleUpdateTotal, handleUnirMesas, handlePagoParcial,
-    nuevoPedidoVitrina, nuevoPedidoLlevar, handleRestoreOrder, handleRestoreItem
+    nuevoPedidoVitrina, nuevoPedidoLlevar, handleRestoreOrder, handleRestoreItem,
+    handleCancelOrder
   } = useMesasController();
 
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [showLlevarModal, setShowLlevarModal] = useState(false);
   const [activeTab, setActiveTab] = useState('salon'); 
   
+  // 🔥 Estados para el Modal de Confirmación y su tiempo de carga
+  const [orderToCancel, setOrderToCancel] = useState(null);
+  const [isCanceling, setIsCanceling] = useState(false); // <--- NUEVO: Controla si está procesando
+
   const [dailySummary, setDailySummary] = useState({
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
   });
@@ -80,8 +84,6 @@ export const MesasPage = () => {
   }
 
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
-
-  // 🔥 LÓGICA DE PROTECCIÓN MATEMÁTICA PARA LA PAPELERA
   const activeOrderIds = [...mesasSalon, ...mesasLlevar].map(m => m.orderId || m.id).filter(Boolean);
 
   return (
@@ -213,7 +215,12 @@ export const MesasPage = () => {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {mesasLlevar.map(pedido => (
-                  <MesaCard key={pedido.id} mesa={pedido} onClick={() => setSelectedMesa(pedido)} />
+                  <MesaCard 
+                    key={pedido.id} 
+                    mesa={pedido} 
+                    onClick={() => setSelectedMesa(pedido)} 
+                    onCancel={() => setOrderToCancel(pedido)} 
+                  />
                 ))}
               </div>
             )}
@@ -221,7 +228,6 @@ export const MesasPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 🔥 LIBERANDO LOS MODALES CON CREATEPORTAL */}
       {typeof document !== 'undefined' && createPortal(
         <>
           {showLlevarModal && (
@@ -252,6 +258,73 @@ export const MesasPage = () => {
             />
           )}
 
+          {/* 🔥 MODAL DE CONFIRMACIÓN CON ESTADO DE CARGA ANIMADO */}
+          <AnimatePresence>
+            {orderToCancel && (
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  // Bloquea cerrar haciendo clic afuera si se está cancelando
+                  onClick={() => !isCanceling && setOrderToCancel(null)} 
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" 
+                />
+                <motion.div 
+                  initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+                  animate={{ scale: 1, opacity: 1, y: 0 }} 
+                  exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+                  className="relative z-10 w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 p-8 text-center flex flex-col items-center"
+                >
+                  <div className="w-16 h-16 bg-red-50 dark:bg-red-500/10 lya:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-5 shadow-sm">
+                    {isCanceling ? (
+                      <Loader2 size={32} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={32} strokeWidth={1.5} />
+                    )}
+                  </div>
+                  
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-3">
+                    {isCanceling ? 'Eliminando...' : '¿Eliminar Pedido?'}
+                  </h3>
+                  
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed">
+                    Estás a punto de cancelar y enviar a la papelera el pedido <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{orderToCancel.numero}</span>.
+                  </p>
+                  
+                  <div className="flex gap-3 w-full">
+                    <button 
+                      onClick={() => setOrderToCancel(null)}
+                      disabled={isCanceling}
+                      className={`flex-1 px-4 py-3.5 rounded-2xl font-bold text-sm bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text transition-colors ${isCanceling ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-95'}`}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      disabled={isCanceling}
+                      onClick={async () => {
+                        setIsCanceling(true); // Se bloquea UI
+                        await handleCancelOrder(orderToCancel.orderId, 'Pedido para llevar descartado');
+                        setIsCanceling(false); // Se libera UI
+                        setOrderToCancel(null); // Cierra modal
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg shadow-red-500/30 transition-all ${isCanceling ? 'bg-red-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'}`}
+                    >
+                      {isCanceling ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Espera...</span>
+                        </>
+                      ) : (
+                        'Sí, Eliminar'
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>
             {showPapelera && (
               <div className="fixed inset-0 z-[9990] flex justify-end overflow-hidden">
@@ -277,7 +350,6 @@ export const MesasPage = () => {
                                 <span className="font-bold text-gray-900 dark:text-white">{order.ticketId || `Mesa ${order.table?.number}`}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
-                                  {/* 🔥 BOTÓN SIEMPRE VISIBLE */}
                                   <button 
                                     onClick={() => handleRestoreOrder(order.id)} 
                                     className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all flex items-center gap-1.5" 
@@ -302,7 +374,6 @@ export const MesasPage = () => {
                           {dailySummary.cancelledItems.map(item => {
                             const canRestore = activeOrderIds.includes(item.orderId);
 
-                            // 🔥 BÚSQUEDA DEL ORIGEN DE LA MESA
                             let nombreOrigen = 'Origen Desconocido';
                             const mesaActiva = [...mesasSalon, ...mesasLlevar].find(m => (m.orderId || m.id) === item.orderId);
                             
@@ -320,7 +391,6 @@ export const MesasPage = () => {
                               <div className="flex-1 pr-3">
                                 <p className="font-bold text-gray-800 dark:text-gray-200 text-sm"><span className="text-red-500">{item.quantity}x</span> {item.product?.name}</p>
                                 
-                                {/* 🔥 ORIGEN VISIBLE */}
                                 <div className="mt-1.5 mb-1 inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-700">
                                   <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{nombreOrigen}</span>
                                   <span className="mx-1.5 text-gray-300 dark:text-gray-600">•</span>
@@ -332,7 +402,6 @@ export const MesasPage = () => {
                               <div className="flex flex-col items-end gap-2 shrink-0">
                                 <span className="text-sm font-black text-gray-400 line-through">${Number(item.subtotal).toFixed(2)}</span>
                                 {canRestore ? (
-                                    /* 🔥 BOTÓN SIEMPRE VISIBLE Y ESTILIZADO */
                                     <button 
                                         onClick={() => handleRestoreItem(item.orderId, item.id)} 
                                         className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl border border-orange-200 dark:border-orange-800/50 shadow-sm hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all flex items-center gap-1.5" 
