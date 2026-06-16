@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/CheckoutModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle } from 'lucide-react';
+import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2 } from 'lucide-react';
 import client from '../../../api/client'; 
 
 const modalVariants = {
@@ -19,6 +19,9 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
   const [cobroMode, setCobroMode] = useState('full');
   const [splitCount, setSplitCount] = useState(1);
   const [selectedCuenta, setSelectedCuenta] = useState('');
+  
+  // 🔥 NUEVO ESTADO PARA EL BOTÓN DE CARGA
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -27,6 +30,7 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
       setChange(0);
       setSplitCount(1);
       setTransferInfo(null);
+      setIsProcessing(false); // Reset al abrir
 
       if (initialTarget?.type === 'partial') {
         setCobroMode('nominal');
@@ -61,18 +65,27 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
     }
   }, [amountReceived, amountToPay, method]);
 
-  const handlePayment = () => {
+  // 🔥 AHORA ES UNA FUNCIÓN ASÍNCRONA PARA BLOQUEAR EL BOTÓN MIENTRAS CARGA
+  const handlePayment = async () => {
     if (amountToPay <= 0) return alert("No hay monto a cobrar en la selección actual.");
     if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return alert("El monto recibido es insuficiente.");
     
-    onConfirmPayment({ 
-      method, 
-      amountReceived: method === 'efectivo' ? amountReceived : amountToPay, 
-      change, 
-      amountPaid: amountToPay,
-      targetType: cobroMode === 'nominal' ? 'partial' : cobroMode === 'equal' ? 'equal' : 'full',
-      cuentaName: cobroMode === 'nominal' ? selectedCuenta : null
-    });
+    setIsProcessing(true); // Se bloquea el botón
+    
+    try {
+      await onConfirmPayment({ 
+        method, 
+        amountReceived: method === 'efectivo' ? amountReceived : amountToPay, 
+        change, 
+        amountPaid: amountToPay,
+        targetType: cobroMode === 'nominal' ? 'partial' : cobroMode === 'equal' ? 'equal' : 'full',
+        cuentaName: cobroMode === 'nominal' ? selectedCuenta : null
+      });
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setIsProcessing(false); // Se desbloquea si falla (si tiene éxito se cerrará de todas formas)
+    }
   };
 
   if (!isOpen) return null;
@@ -225,10 +238,19 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
         </div>
 
         <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
-          <button onClick={handlePayment} disabled={amountToPay <= 0 || (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay)}
+          <button onClick={handlePayment} disabled={isProcessing || amountToPay <= 0 || (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay)}
             className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/80 text-white font-bold text-lg rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>Confirmar Cobro de ${amountToPay.toFixed(2)}</span><CheckCircle size={20} />
+            {isProcessing ? (
+              <>
+                <Loader2 size={24} className="animate-spin" />
+                <span>Procesando Pago...</span>
+              </>
+            ) : (
+              <>
+                <span>Confirmar Cobro de ${amountToPay.toFixed(2)}</span><CheckCircle size={20} />
+              </>
+            )}
           </button>
         </div>
       </motion.div>

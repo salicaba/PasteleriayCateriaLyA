@@ -16,7 +16,9 @@ import {
   shareOrderTicket,
   deliverAllItems, 
   cancelOrderItem, 
-  cancelOrder 
+  cancelOrder,
+  restoreOrder,         // <-- NUEVO: Función para restaurar cuenta completa
+  restoreOrderItem      // <-- NUEVO: Función para restaurar producto individual
 } from './pos.controller.js';
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
@@ -46,9 +48,13 @@ router.post('/tables', createTable);
 router.delete('/tables/:id', deleteTable);
 router.put('/orders/items/:itemId/move', moveItemAccount);
 
-// 🔥 NUEVAS RUTAS AJUSTADAS (Agregado el prefijo /orders para mantener la consistencia)
+// 🔥 RUTAS DE CANCELACIÓN
 router.put('/orders/:id/deliver-all', deliverAllItems);
 router.put('/orders/:id/items/:itemId/cancel', cancelOrderItem);
 router.put('/orders/:id/cancel', cancelOrder);
+
+// ♻️ NUEVAS RUTAS DE RESTAURACIÓN (Papelera)
+router.put('/orders/:id/restore', restoreOrder);
+router.put('/orders/:id/items/:itemId/restore', restoreOrderItem);
 
 export default router;

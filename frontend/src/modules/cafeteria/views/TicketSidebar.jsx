@@ -353,7 +353,6 @@ export const TicketSidebar = ({
                             if (isCuentaPagada || isLlevar || isVitrina) return; 
                             setDraggedItem({ item, cuentaName }); 
                             e.dataTransfer.effectAllowed = 'move'; 
-                            setTransferModeItemId(null); 
                         }}
                         onDragEnd={() => setDraggedItem(null)}
                         className={clsx(
@@ -504,7 +503,8 @@ export const TicketSidebar = ({
            </div>
         ) : (
            <>
-             {onDeliverAll && activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus)) && (
+             {/* 🔥 AQUÍ ESTÁ LA CORRECCIÓN: SE OCULTA ESTE BOTÓN SI ES MOSTRADOR */}
+             {!isVitrina && onDeliverAll && activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus)) && (
                <button
                   onClick={() => openConfirmModal({
                       title: 'Entregar Toda la Mesa',
@@ -548,7 +548,7 @@ export const TicketSidebar = ({
         )}
       </div>
 
-      {/* 🔥 RENDERIZADO DEL MODAL DE CONFIRMACIÓN CUSTOM (AHORA SOPORTA SELECT Y CANCELACIÓN GLOBAL) */}
+      {/* 🔥 RENDERIZADO DEL MODAL DE CONFIRMACIÓN CUSTOM */}
       <AnimatePresence>
         {modalConfig && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

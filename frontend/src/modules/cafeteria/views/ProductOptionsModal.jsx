@@ -1,11 +1,13 @@
+// src/modules/cafeteria/views/ProductOptionsModal.jsx
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, Check, AlertCircle, ShoppingBag } from 'lucide-react'; // 🔥 NUEVO: Importamos ShoppingBag
+import { X, Check, AlertCircle, ShoppingBag } from 'lucide-react';
 import clsx from 'clsx';
 
-export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
+export const ProductOptionsModal = ({ product, isVitrina, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
-  const [isTakeaway, setIsTakeaway] = useState(false); // 🔥 NUEVO: Estado local para el switch "Para Llevar"
+  // 🔥 Si es Mostrador (isVitrina), se marca automáticamente para llevar
+  const [isTakeaway, setIsTakeaway] = useState(isVitrina || false);
 
   if (!product) return null;
 
@@ -51,7 +53,6 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
         if (mods.length > 0) return mods;
     }
 
-    // Si la BD no manda opciones, regresamos un arreglo vacío
     return [];
   }, [product]);
 
@@ -125,16 +126,17 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
          ...(lecheStr && { leche: lecheStr }),
          ...(extrasArr.length > 0 && { extras: extrasArr })
       },
-      isTakeaway, // 🔥 NUEVO: Pasamos el flag al carrito
+      isTakeaway, 
       uniqueId: Date.now()
     });
   };
 
   return (
-    <div className="absolute inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/40 lya:bg-black/50 backdrop-blur-[2px] pointer-events-auto" />
+    <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center pointer-events-none overflow-hidden">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 lya:bg-black/50 backdrop-blur-[2px] pointer-events-auto" />
 
-      <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative z-10 bg-white dark:bg-gray-800 lya:bg-lya-surface w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh] transition-colors lya:border lya:border-lya-border/40">
+      <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative z-10 bg-white dark:bg-gray-800 lya:bg-lya-surface w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[90dvh] md:max-h-[85vh] transition-colors lya:border lya:border-lya-border/40">
+        
         <div className="relative h-40 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg shrink-0 p-2 border-b border-gray-200 dark:border-gray-600 lya:border-lya-border/40">
           {product.image || product.imagen ? (
             <img src={product.image || product.imagen} className="w-full h-full object-contain drop-shadow-sm opacity-90" />
@@ -206,25 +208,27 @@ export const ProductOptionsModal = ({ product, onClose, onConfirm }) => {
             ))
           )}
 
-          {/* 🔥 NUEVO: SECCIÓN Opción "Para Llevar" a Nivel de Producto */}
-          <div className="mt-8 mb-2">
-            <label className="flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-500/30 bg-orange-50/50 dark:bg-orange-500/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform">
-              <input 
-                type="checkbox" 
-                checked={isTakeaway}
-                onChange={(e) => setIsTakeaway(e.target.checked)}
-                className="w-6 h-6 text-orange-500 bg-white border-orange-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-              />
-              <div className="flex flex-col">
-                <span className="font-black text-orange-900 dark:text-orange-300 text-sm flex items-center gap-2">
-                  <ShoppingBag size={16} /> Empaquetar para Llevar
-                </span>
-                <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 mt-0.5">
-                  Se enviará a cocina con indicación de empaque desechable.
-                </span>
-              </div>
-            </label>
-          </div>
+          {/* 🔥 OCULTAMOS EL BOTÓN DE "EMPACAR" SI ES MOSTRADOR */}
+          {!isVitrina && (
+            <div className="mt-8 mb-2">
+              <label className="flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-500/30 bg-orange-50/50 dark:bg-orange-500/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform">
+                <input 
+                  type="checkbox" 
+                  checked={isTakeaway}
+                  onChange={(e) => setIsTakeaway(e.target.checked)}
+                  className="w-6 h-6 text-orange-500 bg-white border-orange-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                />
+                <div className="flex flex-col">
+                  <span className="font-black text-orange-900 dark:text-orange-300 text-sm flex items-center gap-2">
+                    <ShoppingBag size={16} /> Empaquetar para Llevar
+                  </span>
+                  <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 mt-0.5">
+                    Se enviará a cocina con indicación de empaque desechable.
+                  </span>
+                </div>
+              </label>
+            </div>
+          )}
 
         </div>
 

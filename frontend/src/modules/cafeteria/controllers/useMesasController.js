@@ -1,8 +1,8 @@
 // src/modules/cafeteria/controllers/useMesasController.js
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { fetchActiveOrders } from '../models/mesasModel.js';
 import client from '../../../api/client.js';
 import { socket } from '../../../api/socket.js'; 
+import toast from 'react-hot-toast';
 
 export const useMesasController = () => {
   const [mesas, setMesas] = useState([]);
@@ -17,13 +17,13 @@ export const useMesasController = () => {
 
   const loadMesas = useCallback(async () => {
     try {
-      const [tablesRes, activeOrders] = await Promise.all([
+      const [tablesRes, activeOrdersRes] = await Promise.all([
         client.get('/pos/tables'), 
-        fetchActiveOrders()
+        client.get('/pos/orders/active')
       ]);
       
       const catalog = tablesRes.data || [];
-      const orders = (activeOrders || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const orders = (activeOrdersRes.data || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
       const mergedMesas = catalog.map(table => {
         const order = orders.find(o => o.tableId === table.id);
@@ -58,7 +58,9 @@ export const useMesasController = () => {
           if (o.paidAccounts) o.paidAccounts.forEach(acc => cuentasSet.add(acc));
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
-          const isVitrina = rawTicketId === 'VITRINA-EXPRESS';
+          
+          // 🔥 Identificamos el Mostrador por sus posibles prefijos
+          const isVitrina = rawTicketId.startsWith('MOSTRADOR') || rawTicketId.startsWith('VITRINA') || rawTicketId.startsWith('MOS-');
           
           let numeroFinal = rawTicketId;
           if (!isVitrina) {
@@ -99,7 +101,6 @@ export const useMesasController = () => {
     return () => { socket.off('pos:update'); };
   }, [loadMesas]);
 
-  // 🔥 NUEVO: Filtramos directamente para entregarlo a las secciones del Dashboard
   const mesasSalon = useMemo(() => mesas.filter(m => m.zona === 'salon'), [mesas]);
   const mesasLlevar = useMemo(() => mesas.filter(m => m.zona === 'llevar'), [mesas]);
   const mesasFiltradas = useMemo(() => mesas.filter(m => m.zona === zonaActiva), [mesas, zonaActiva]);
@@ -117,15 +118,16 @@ export const useMesasController = () => {
       const ordenActiva = mesas.find(m => m.zona === 'vitrina' && m.estado === 'ocupada');
       if (ordenActiva) return ordenActiva;
 
+      // 🔥 Mandamos 'MOSTRADOR' para que el Backend genere el folio CAF-XXXX
       const res = await client.post('/pos/orders', { 
           orderType: 'LLEVAR', 
-          ticketId: 'VITRINA-EXPRESS', 
+          ticketId: 'MOSTRADOR', 
           tableId: null 
       });
 
       return { 
         id: res.data.order.id, 
-        numero: 'VITRINA-EXPRESS', 
+        numero: res.data.order.ticketId, 
         zona: 'vitrina', 
         estado: 'ocupada', 
         total: 0, 
@@ -136,17 +138,21 @@ export const useMesasController = () => {
         paidAccounts: [] 
       };
     } catch (error) { 
+        toast.error('Error al abrir mostrador');
         return null; 
     }
   };
 
   const nuevoPedidoLlevar = async (nombreCliente, telefono) => {
     try {
-      const currentOrders = await fetchActiveOrders();
-      const llevarOrdersCount = (currentOrders || []).filter(o => o.orderType === 'LLEVAR' && o.ticketId !== 'VITRINA-EXPRESS').length;
+      const resOrders = await client.get('/pos/orders/active');
+      const currentOrders = resOrders.data || [];
+      const llevarOrdersCount = currentOrders.filter(o => o.orderType === 'LLEVAR' && !o.ticketId.startsWith('MOSTRADOR') && !o.ticketId.startsWith('VITRINA')).length;
       const nextNumber = llevarOrdersCount + 1;
 
-      let formattedTicketId = `Llevar #${nextNumber} - ${nombreCliente}`;
+      const nombreFinal = (nombreCliente && nombreCliente.trim() !== '') ? nombreCliente : 'Cliente';
+
+      let formattedTicketId = `Llevar #${nextNumber} - ${nombreFinal}`;
       if (telefono && telefono.trim() !== '') {
           formattedTicketId += ` - ${telefono}`;
       }
@@ -170,7 +176,33 @@ export const useMesasController = () => {
         paidAccounts: [] 
       };
     } catch (error) { 
+        console.error("Error creando pedido para llevar:", error);
+        toast.error('Error al crear pedido para llevar');
         return null; 
+    }
+  };
+
+  const handleRestoreOrder = async (orderId) => {
+    try {
+      await client.put(`/pos/orders/${orderId}/restore`);
+      toast.success('Cuenta restaurada correctamente');
+      loadMesas();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al restaurar la cuenta');
+    }
+  };
+
+  const handleRestoreItem = async (orderId, itemId) => {
+    try {
+      const res = await client.put(`/pos/orders/${orderId}/items/${itemId}/restore`);
+      if (res.data.wasRefundReversed) {
+        toast.success('Restaurado. Reembolso anulado en caja.');
+      } else {
+        toast.success('Producto restaurado correctamente');
+      }
+      loadMesas();
+    } catch (error) {
+      toast.error('Error al restaurar producto');
     }
   };
 
@@ -179,13 +211,12 @@ export const useMesasController = () => {
     refresh: loadMesas, liberarMesa: loadMesas, 
     actualizarEstadoMesa: loadMesas, pagoParcialMesa: loadMesas, unirMesas: loadMesas, 
     nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading,
-
-    // 🔥 LAS PROPIEDADES QUE FALTABAN PARA EL NUEVO DASHBOARD
-    mesasSalon,
-    mesasLlevar,
+    mesasSalon, mesasLlevar,
     handleLiberarMesa: loadMesas,
     handleUpdateTotal: loadMesas,
     handleUnirMesas: loadMesas,
-    handlePagoParcial: loadMesas
+    handlePagoParcial: loadMesas,
+    handleRestoreOrder,
+    handleRestoreItem
   };
 };

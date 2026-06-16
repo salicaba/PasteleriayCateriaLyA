@@ -14,7 +14,7 @@ import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer
 export const createOrder = async (req, res) => {
   try {
     const { orderType, tableId } = req.body;
-    let { ticketId } = req.body; // Puede traer el nombre del cliente desde el POS o QR
+    let { ticketId } = req.body;
     const employeeId = req.user?.id || null; 
     const finalTableId = orderType === 'SALON' ? tableId : null;
 
@@ -25,21 +25,25 @@ export const createOrder = async (req, res) => {
       if (existingOrder) return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrder });
     }
 
-    // 🔥 GENERACIÓN DE FOLIO SEGURO PARA LLEVAR (Aplica a POS y QR)
     let finalTicketId = null;
     if (orderType === 'LLEVAR') {
-      const randomNum = Math.floor(1000 + Math.random() * 9000); 
-      const timeCode = Date.now().toString().slice(-2);
-      const folioSeguro = `${randomNum}${timeCode}`; // Ej. 45289
-      
-      // Limpiamos el texto por si ya traía la palabra "Llevar" desde el cajero
-      let nombreCliente = 'Cliente';
-      if (ticketId) {
-         nombreCliente = String(ticketId).replace(/Llevar\s*#?[0-9\-\s]*/i, '').trim();
-         if (!nombreCliente) nombreCliente = 'Cliente';
+      // 🔥 SI ES MOSTRADOR: Generamos un folio especial "MOSTRADOR CAF-XXXXXX"
+      if (ticketId === 'VITRINA-EXPRESS' || ticketId === 'MOSTRADOR') {
+        const randomNum = Math.floor(100 + Math.random() * 900);
+        const timeCode = Date.now().toString().slice(-6);
+        finalTicketId = `MOSTRADOR CAF-${timeCode}${randomNum}`;
+      } else {
+        // 🔥 SI ES PARA LLEVAR REGULAR
+        const randomNum = Math.floor(1000 + Math.random() * 9000); 
+        const timeCode = Date.now().toString().slice(-2);
+        const folioSeguro = `${randomNum}${timeCode}`;
+        let nombreCliente = 'Cliente';
+        if (ticketId) {
+           nombreCliente = String(ticketId).replace(/Llevar\s*#?[0-9\-\s]*/i, '').trim();
+           if (!nombreCliente) nombreCliente = 'Cliente';
+        }
+        finalTicketId = `Llevar #${folioSeguro} - ${nombreCliente}`;
       }
-      
-      finalTicketId = `Llevar #${folioSeguro} - ${nombreCliente}`;
     }
 
     const newOrder = await Order.create({ 
@@ -85,7 +89,7 @@ export const addItemsToOrder = async (req, res) => {
     await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
 
     const allItems = await OrderItem.findAll({
-      where: { orderId },
+      where: { orderId, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
 
@@ -108,6 +112,8 @@ export const getActiveOrderByTable = async (req, res) => {
         { 
           model: OrderItem, 
           as: 'items', 
+          where: { status: 'ACTIVE' },
+          required: false, 
           include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }] 
         }
       ]
@@ -139,13 +145,18 @@ export const payOrder = async (req, res) => {
     const folioUnico = `CAF-${Date.now().toString().slice(-6)}${randomNum}`;
     let desc = '';
 
+    // 🔥 IDENTIFICADOR PERFECTO PARA LA CAJA
     let identificador = '';
     if (order.orderType === 'LLEVAR') {
-      const rawId = String(order.ticketId || '');
-      const partes = rawId.split(' - ');
-      let idLimpio = partes[0] || 'Pedido';
-      idLimpio = idLimpio.replace(/Llevar\s*#?/i, '').trim();
-      identificador = `Para Llevar #${idLimpio}`;
+      if (order.ticketId && (order.ticketId.startsWith('MOSTRADOR') || order.ticketId.startsWith('VITRINA') || order.ticketId.startsWith('MOS-'))) {
+        identificador = 'MOSTRADOR'; // Forzamos a que en la caja diga (MOSTRADOR)
+      } else {
+        const rawId = String(order.ticketId || '');
+        const partes = rawId.split(' - ');
+        let idLimpio = partes[0] || 'Pedido';
+        idLimpio = idLimpio.replace(/Llevar\s*#?/i, '').trim();
+        identificador = `Para Llevar #${idLimpio}`;
+      }
     } else {
       const numMesa = order.table ? order.table.number : (order.tableId || '?');
       identificador = `Mesa #${numMesa}`;
@@ -155,12 +166,14 @@ export const payOrder = async (req, res) => {
     if (paymentMethod === 'transferencia' || paymentMethod === 'TRANSFER') dbMethod = 'TRANSFER';
     else if (paymentMethod === 'tarjeta' || paymentMethod === 'CARD') dbMethod = 'CARD';
 
+    const activeItems = order.items.filter(i => i.status === 'ACTIVE');
+
     if (isFullPayment) {
-      const unpaidItems = order.items.filter(i => !paidAccounts.includes(i.cuenta));
+      const unpaidItems = activeItems.filter(i => !paidAccounts.includes(i.cuenta));
       amountToRegister = unpaidItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
       desc = `Pago de Consumo (${identificador})  ${folioUnico}`; 
     } else if (cuentaName) {
-      amountToRegister = order.items.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+      amountToRegister = activeItems.filter(i => i.cuenta === cuentaName).reduce((sum, i) => sum + Number(i.subtotal), 0);
       desc = `Pago de Consumo (${identificador}) Cuenta: ${cuentaName}  ${folioUnico}`;
       if (!paidAccounts.includes(cuentaName)) paidAccounts.push(cuentaName);
     }
@@ -221,7 +234,13 @@ export const getActiveOrders = async (req, res) => {
       where: { status: ['OPEN', 'PAID'] },
       include: [ 
         { model: Table, as: 'table', attributes: ['id', 'number', 'zone'] },
-        { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }] } 
+        { 
+          model: OrderItem, 
+          as: 'items', 
+          where: { status: 'ACTIVE' },
+          required: false,
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }] 
+        } 
       ]
     });
     res.json(activeOrders);
@@ -307,7 +326,8 @@ export const moveItemAccount = async (req, res) => {
             productId: item.productId,
             cuenta: targetCuenta,
             kitchenStatus: item.kitchenStatus,
-            isTakeaway: item.isTakeaway 
+            isTakeaway: item.isTakeaway,
+            status: 'ACTIVE'
         }
     });
 
@@ -356,7 +376,8 @@ export const moveItemAccount = async (req, res) => {
              cuenta: targetCuenta,
              notes: JSON.stringify(notesToMove),
              kitchenStatus: item.kitchenStatus,
-             isTakeaway: item.isTakeaway
+             isTakeaway: item.isTakeaway,
+             status: 'ACTIVE'
            });
         } else {
            await item.update({ cuenta: targetCuenta });
@@ -364,7 +385,7 @@ export const moveItemAccount = async (req, res) => {
     }
 
     const allItems = await OrderItem.findAll({
-      where: { orderId: item.orderId },
+      where: { orderId: item.orderId, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
     
@@ -389,6 +410,8 @@ export const printOrderTicket = async (req, res) => {
         { 
           model: OrderItem, 
           as: 'items', 
+          where: { status: 'ACTIVE' },
+          required: false,
           include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice'] }] 
         }
       ]
@@ -432,10 +455,21 @@ export const printOrderTicket = async (req, res) => {
     printer.println(`Fecha de emision: ${new Date().toLocaleString()}`);
     printer.println(`Atendido por:     ${cashierName}`);
     
+    // 🔥 TITULO DEL TICKET AJUSTADO AL FORMATO "MOSTRADOR CAF-XXXX"
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
-    let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
-    let identificadorMesa = isLlevar ? `Pedido #${idLimpio || 'Llevar'}` : `Mesa #${order.table?.number || 'Salon'}`;
+    let identificadorMesa = '';
+
+    if (isLlevar) {
+      if (rawId.startsWith('MOSTRADOR') || rawId.startsWith('VITRINA') || rawId.startsWith('MOS-')) {
+        identificadorMesa = rawId; // Literalmente imprime: MOSTRADOR CAF-123456
+      } else {
+        let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
+        identificadorMesa = `Pedido #${idLimpio || 'Llevar'}`;
+      }
+    } else {
+      identificadorMesa = `Mesa #${order.table?.number || 'Salon'}`;
+    }
     
     printer.println(`Servicio:         ${identificadorMesa}`);
     if (cuentaName && cuentaName !== 'General') {
@@ -602,6 +636,8 @@ export const shareOrderTicket = async (req, res) => {
         { 
           model: OrderItem, 
           as: 'items', 
+          where: { status: 'ACTIVE' },
+          required: false,
           include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice'] }] 
         }
       ]
@@ -636,10 +672,21 @@ export const shareOrderTicket = async (req, res) => {
 
     const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
+    // 🔥 TITULO DEL TICKET DIGITAL IGUAL QUE EN FÍSICO
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
-    let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
-    let identificadorMesa = isLlevar ? `Pedido #${idLimpio || 'Llevar'}` : `Mesa #${order.table?.number || 'Salón'}`;
+    let identificadorMesa = '';
+
+    if (isLlevar) {
+      if (rawId.startsWith('MOSTRADOR') || rawId.startsWith('VITRINA') || rawId.startsWith('MOS-')) {
+        identificadorMesa = rawId;
+      } else {
+        let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
+        identificadorMesa = `Pedido #${idLimpio || 'Llevar'}`;
+      }
+    } else {
+      identificadorMesa = `Mesa #${order.table?.number || 'Salón'}`;
+    }
 
     const htmlResponse = `
     <!DOCTYPE html>
@@ -867,7 +914,7 @@ export const shareOrderTicket = async (req, res) => {
   }
 };
 
-// 📌 1. Marcar toda la orden como entregada (Botón "Todo Entregado")
+// 📌 1. Marcar toda la orden como entregada
 export const deliverAllItems = async (req, res) => {
   try {
     const { id } = req.params;
@@ -875,7 +922,6 @@ export const deliverAllItems = async (req, res) => {
     const order = await Order.findByPk(id);
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
 
-    // Actualizamos todos los items activos que no estén entregados
     await OrderItem.update(
       { kitchenStatus: 'DELIVERED' },
       { 
@@ -887,7 +933,6 @@ export const deliverAllItems = async (req, res) => {
       }
     );
 
-    // Emitimos evento por WebSockets para limpiar el KDS y actualizar POS
     getIO().emit('orderDeliveredAll', { orderId: id });
     getIO().emit('pos:update');
 
@@ -898,11 +943,11 @@ export const deliverAllItems = async (req, res) => {
   }
 };
 
-// 📌 2. Cancelar un producto individual (con soporte para cantidades parciales)
+// 📌 2. Cancelar un producto individual
 export const cancelOrderItem = async (req, res) => {
   try {
     const { id, itemId } = req.params;
-    const { cancelReason, cancelQty } = req.body; // 🔥 Ahora recibimos la cantidad a cancelar
+    const { cancelReason, cancelQty } = req.body; 
     const userId = req.user?.id; 
 
     const item = await OrderItem.findOne({ where: { id: itemId, orderId: id } });
@@ -910,18 +955,14 @@ export const cancelOrderItem = async (req, res) => {
 
     const order = await Order.findByPk(id);
 
-    // Calculamos cuánto vamos a cancelar realmente
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // Calcular el precio unitario y el monto del reembolso
     const unitPrice = Number(item.subtotal) / item.quantity;
     const refundAmount = unitPrice * qtyToCancel;
 
-    // Verificamos si el producto o la cuenta ya estaban pagados
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
-    // Si estaba pagado, creamos el reembolso proporcional en Caja
     if (wasPaid && refundAmount > 0) {
       await Transaction.create({
         type: 'EXPENSE',
@@ -940,7 +981,6 @@ export const cancelOrderItem = async (req, res) => {
     if (!Array.isArray(notesArray)) notesArray = [notesArray];
 
     if (isPartial) {
-        // 🔥 SI ES PARCIAL: Dividimos las notas y creamos un registro nuevo cancelado
         const cancelledNotes = notesArray.slice(0, qtyToCancel);
         const remainingNotes = notesArray.slice(qtyToCancel);
 
@@ -959,14 +999,12 @@ export const cancelOrderItem = async (req, res) => {
             cancelledBy: userId
         });
 
-        // Actualizamos el ítem original restándole la cantidad cancelada
         await item.update({
             quantity: item.quantity - qtyToCancel,
             subtotal: Number(item.subtotal) - refundAmount,
             notes: JSON.stringify(remainingNotes)
         });
     } else {
-        // 🔥 SI ES TOTAL: Solo cambiamos el estado
         await item.update({
           status: 'CANCELLED',
           cancelledAt: new Date(),
@@ -975,21 +1013,18 @@ export const cancelOrderItem = async (req, res) => {
         });
     }
 
-    // Avisamos al KDS SÓLO si el producto NO había sido entregado
     if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
       getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
     }
 
-    // Revisar si todos los items quedaron cancelados para cancelar la orden entera
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
     if (activeItems === 0 && order.status !== 'CLOSED') {
       await order.update({ status: 'CANCELLED', cancelledAt: new Date(), cancelReason: 'Todos los productos fueron cancelados automáticamente', cancelledBy: userId });
       if (order.tableId) await Table.update({ status: 'active' }, { where: { id: order.tableId } });
     }
 
-    // Retornar los ítems actualizados para que React no tenga que recargar toda la ventana
     const allItems = await OrderItem.findAll({
-      where: { orderId: id },
+      where: { orderId: id, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
     });
 
@@ -1001,7 +1036,7 @@ export const cancelOrderItem = async (req, res) => {
   }
 };
 
-// 📌 3. Cancelar cuenta completa (Efecto Cascada)
+// 📌 3. Cancelar cuenta completa
 export const cancelOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1017,12 +1052,10 @@ export const cancelOrder = async (req, res) => {
 
     let totalRefund = 0;
 
-    // Cancelar todos los items activos en cascada
     for (const item of order.OrderItems) {
       if (item.status === 'ACTIVE') {
         const previousKitchenStatus = item.kitchenStatus;
         
-        // Calcular reembolsos individuales
         let wasPaid = order.status === 'PAID' || 
                       (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) totalRefund += Number(item.subtotal);
@@ -1034,14 +1067,12 @@ export const cancelOrder = async (req, res) => {
           cancelledBy: userId
         });
 
-        // Limpiar del KDS si no estaba entregado
         if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
           getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
         }
       }
     }
 
-    // Generar 1 solo reembolso global en Caja si hubo dinero involucrado
     if (totalRefund > 0) {
       await Transaction.create({
         type: 'EXPENSE',
@@ -1054,7 +1085,6 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
-    // Cancelar la orden padre
     await order.update({
       status: 'CANCELLED',
       cancelledAt: new Date(),
@@ -1062,12 +1092,11 @@ export const cancelOrder = async (req, res) => {
       cancelledBy: userId
     });
 
-    // Liberar la mesa (Ajustado a tu modelo Table)
     if (order.tableId) {
       await Table.update({ status: 'active' }, { where: { id: order.tableId } });
     }
 
-    getIO().emit('pos:update'); // Refrescar el POS
+    getIO().emit('pos:update'); 
     res.json({ message: 'Cuenta cancelada completamente', refundedAmount: totalRefund });
   } catch (error) {
     console.error('Error en cancelOrder:', error);
@@ -1081,7 +1110,6 @@ export const getDailySummary = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Inicio del día local
 
-    // 1. Obtener todas las órdenes de hoy
     const orders = await Order.findAll({
       where: { createdAt: { [Op.gte]: today } },
       include: [
@@ -1091,16 +1119,15 @@ export const getDailySummary = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // 2. Obtener productos cancelados individualmente hoy
     const cancelledItemsOnly = await OrderItem.findAll({
       where: { status: 'CANCELLED', updatedAt: { [Op.gte]: today } },
       include: [{ model: Product, as: 'product', attributes: ['name'] }],
       order: [['updatedAt', 'DESC']]
     });
 
-    // 3. Obtener el dinero en caja (Ingresos - Reembolsos)
     const transactions = await Transaction.findAll({
-      where: { createdAt: { [Op.gte]: today }, source: 'CAFETERIA', status: 'ACTIVE' }
+      where: { createdAt: { [Op.gte]: today }, source: 'CAFETERIA', status: 'ACTIVE' },
+      order: [['createdAt', 'DESC']] // 🔥 Aseguramos que las más recientes salgan primero
     });
 
     const totalCaja = transactions.reduce((acc, t) => {
@@ -1109,11 +1136,9 @@ export const getDailySummary = async (req, res) => {
       return acc;
     }, 0);
 
-    // 4. Clasificar la información
     const vendidosOrders = orders.filter(o => o.status === 'PAID' || o.status === 'CLOSED');
     const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
     
-    // Evitar contar doble los ítems de una orden que fue cancelada completa
     const activeOrderIds = orders.filter(o => o.status !== 'CANCELLED').map(o => o.id);
     const orphanCancelledItems = cancelledItemsOnly.filter(i => activeOrderIds.includes(i.orderId));
 
@@ -1123,11 +1148,118 @@ export const getDailySummary = async (req, res) => {
       papeleraCount: cancelledOrders.length + orphanCancelledItems.reduce((acc, i) => acc + i.quantity, 0),
       vendidosOrders,
       cancelledOrders,
-      cancelledItems: orphanCancelledItems
+      cancelledItems: orphanCancelledItems,
+      transactions // 🔥 ENVIAMOS LAS TRANSACCIONES PARA LA VISTA DETALLADA
     });
 
   } catch (error) {
     console.error('Error al obtener resumen del día:', error);
     res.status(500).json({ message: 'Error al obtener resumen del día' });
+  }
+};
+
+// ==========================================
+// ♻️ RESTAURAR PRODUCTO CANCELADO
+// ==========================================
+export const restoreOrderItem = async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const userId = req.user?.id;
+
+    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id } });
+    if (!item) return res.status(404).json({ message: 'Producto no encontrado en la papelera' });
+
+    const order = await Order.findByPk(id);
+    
+    let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+    
+    if (wasPaid) {
+      const unitPrice = Number(item.subtotal) / item.quantity;
+      const amountToRestore = unitPrice * item.quantity;
+      
+      await Transaction.create({
+        type: 'INCOME',
+        source: 'CAFETERIA',
+        expenseCategory: 'RECOVERY', 
+        amount: amountToRestore,
+        description: `Recuperación por producto restaurado en Ticket ${order.ticketId || id}`,
+        referenceId: order.id,
+        createdBy: userId
+      });
+    }
+
+    await item.update({
+      status: 'ACTIVE',
+      cancelledAt: null,
+      cancelReason: null,
+      cancelledBy: null
+    });
+
+    getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
+    getIO().emit('pos:update');
+
+    res.json({ message: 'Producto restaurado exitosamente', wasRefundReversed: wasPaid });
+  } catch (error) {
+    console.error('Error en restoreOrderItem:', error);
+    res.status(500).json({ message: 'Error al restaurar producto' });
+  }
+};
+
+// ==========================================
+// ♻️ RESTAURAR ORDEN COMPLETA (CUENTA)
+// ==========================================
+export const restoreOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const order = await Order.findByPk(id, { include: [OrderItem] });
+    if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
+
+    if (order.tableId) {
+      const table = await Table.findByPk(order.tableId);
+      if (table && table.status === 'active') {
+        await table.update({ status: 'ocupada' });
+      } else if (table && table.status === 'ocupada') {
+        return res.status(400).json({ message: `La mesa #${table.number} ya está ocupada por otro cliente. Libere la mesa primero.` });
+      }
+    }
+
+    let totalRestoredAmount = 0;
+
+    for (const item of order.OrderItems) {
+      if (item.status === 'CANCELLED' && item.cancelReason === 'Cancelación de cuenta completa') {
+        let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+        if (wasPaid) totalRestoredAmount += Number(item.subtotal);
+
+        await item.update({ status: 'ACTIVE', cancelledAt: null, cancelReason: null, cancelledBy: null });
+        getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
+      }
+    }
+
+    if (totalRestoredAmount > 0) {
+      await Transaction.create({
+        type: 'INCOME',
+        source: 'CAFETERIA',
+        expenseCategory: 'RECOVERY',
+        amount: totalRestoredAmount,
+        description: `Recuperación global por orden restaurada: ${order.ticketId || id}`,
+        referenceId: order.id,
+        createdBy: userId
+      });
+    }
+
+    await order.update({
+      status: 'OPEN',
+      cancelledAt: null,
+      cancelReason: null,
+      cancelledBy: null
+    });
+
+    getIO().emit('pos:update');
+    res.json({ message: 'Orden restaurada correctamente' });
+  } catch (error) {
+    console.error('Error en restoreOrder:', error);
+    res.status(500).json({ message: 'Error al restaurar la cuenta' });
   }
 };

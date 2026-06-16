@@ -1,5 +1,6 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle, Phone, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -68,9 +69,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered,
-    toggleItemTakeaway, cuentasTelefonos,
-    // 🔥 CORRECCIÓN: Aquí es donde extraemos cancelAccountItems
-    deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
+    toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
   useEffect(() => {
@@ -80,6 +79,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
       return () => clearTimeout(timer);
     }
   }, [isOpen, categoriaActiva]); 
+
+  const isLlevar = mesa?.zona === 'llevar';
+  const isVitrina = mesa?.zona === 'vitrina';
 
   const handleConfirmOption = (productWithOptions) => { addToCart(productWithOptions); setSelectedProduct(null); };
 
@@ -91,7 +93,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   const handleOpenCheckout = () => {
-    if (!validateAllDelivered()) { 
+    if (!isVitrina && !validateAllDelivered()) { 
       setAlertMessage("Todos los productos de la mesa deben estar marcados como ENTREGADOS en cocina antes de poder cobrar la cuenta completa."); 
       return; 
     }
@@ -101,7 +103,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   const handleOpenPayCuenta = (cuentaName) => {
-    if (!validateAllDelivered(cuentaName)) { 
+    if (!isVitrina && !validateAllDelivered(cuentaName)) { 
       setAlertMessage(`Todos los productos de la cuenta "${cuentaName}" deben estar ENTREGADOS antes de poder cobrarla individualmente.`); 
       return; 
     }
@@ -109,24 +111,26 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     if (subtotal > 0) { setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal }); setShowCheckout(true); }
   };
 
-  const handleFinalizePayment = (paymentDetails) => {
+  // 🔥 AQUÍ ESTÁ EL CAMBIO PRINCIPAL (AHORA ES ASYNC Y ESPERA)
+  const handleFinalizePayment = async (paymentDetails) => {
     const { amountPaid, targetType, cuentaName } = paymentDetails;
-    setShowCheckout(false);
-
+    
     if (targetType === 'partial' && cuentaName) { 
-      payCuenta(cuentaName, paymentDetails, () => { 
+      await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
         setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${cuentaName}" ha sido pagada exitosamente.` });
         setTimeout(() => setPaymentSuccessData(null), 1800);
+        setShowCheckout(false); // Cierra solo cuando sea exitoso
       }); 
       return; 
     }
     
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
     
-    handleCheckout(paymentDetails, () => {
+    await handleCheckout(paymentDetails, () => {
        setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `El total ha sido pagado exitosamente.` });
        setTimeout(() => setPaymentSuccessData(null), 1800);
+       setShowCheckout(false); // Cierra solo cuando sea exitoso
     });
   };
 
@@ -147,9 +151,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   };
 
   if (!isOpen || !mesa) return null;
-
-  const isLlevar = mesa.zona === 'llevar';
-  const isVitrina = mesa.zona === 'vitrina';
 
   const partesNumero = (mesa.numero || '').toString().split(' - ');
   let numeroReal = partesNumero[0] || 'Pedido'; 
@@ -224,7 +225,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     setTimeout(() => setPaymentSuccessData(null), 1800);
   };
 
-  // 🔥 INYECTAMOS LAS FUNCIONES AL SIDEBAR
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -241,7 +241,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onDeliverAll: deliverAllActiveItems,         
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
-    onCancelAccount: cancelAccountItems   // 🔥 ¡Asegúrate de que esta línea esté aquí!
+    onCancelAccount: cancelAccountItems   
   };
 
   const posContent = (
@@ -299,44 +299,50 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
       {inline ? (
         <div className="w-full h-full animate-fade-in">{posContent}</div>
       ) : (
-        <AnimatePresence>
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full h-[100dvh] md:h-[90vh] md:max-w-7xl">
-              {posContent}
-            </motion.div>
-          </div>
-        </AnimatePresence>
+        typeof document !== 'undefined' ? createPortal(
+          <>
+            <div className="fixed inset-0 z-[9980] flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden">
+              <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" />
+              <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative z-10 w-full h-[100dvh] md:h-[90vh] md:max-w-7xl shadow-2xl md:rounded-3xl flex flex-col overflow-hidden">
+                {posContent}
+              </motion.div>
+            </div>
+
+            <div className="relative z-[9999]">
+                <TicketPreviewModal 
+                  isOpen={!!previewTicketData} 
+                  onClose={() => setPreviewTicketData(null)} 
+                  cart={cart} 
+                  mesa={mesa} 
+                  cuentaName={previewTicketData?.cuentaName} 
+                  telefonoPredeterminado={previewTicketData?.telefono}
+                  onConfirmPrint={executeRealPrint} 
+                  onSendWhatsApp={handleSendWhatsAppTicket} 
+                  userName={nombreCajero} 
+                />
+
+                <AnimatePresence>
+                  {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
+                  
+                  {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
+                  {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
+                  {showCheckout && <CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={total} initialTarget={checkoutTarget} cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} onConfirmPayment={handleFinalizePayment} />}
+                  {showOpcionesMesa && <OpcionesMesaModal isOpen={showOpcionesMesa} onClose={() => setShowOpcionesMesa(false)} mesa={mesa} todasLasMesas={todasLasMesas} onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} />}
+                  {alertMessage && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                       <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-gray-900 rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
+                          <AlertTriangle size={32} className="text-orange-500 mb-4" />
+                          <p className="text-sm text-gray-500 mb-6">{alertMessage}</p>
+                          <button onClick={() => setAlertMessage(null)} className="w-full bg-orange-500 text-white py-3 rounded-2xl font-black uppercase">Entendido</button>
+                       </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+            </div>
+          </>,
+          document.body
+        ) : null
       )}
-
-      <TicketPreviewModal 
-        isOpen={!!previewTicketData} 
-        onClose={() => setPreviewTicketData(null)} 
-        cart={cart} 
-        mesa={mesa} 
-        cuentaName={previewTicketData?.cuentaName} 
-        telefonoPredeterminado={previewTicketData?.telefono}
-        onConfirmPrint={executeRealPrint} 
-        onSendWhatsApp={handleSendWhatsAppTicket} 
-        userName={nombreCajero} 
-      />
-
-      <AnimatePresence>
-        {isSuccess && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100]"><SuccessScreen /></motion.div>}
-        {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
-        {selectedProduct && <ProductOptionsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
-        {showCheckout && <CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={total} initialTarget={checkoutTarget} cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} onConfirmPayment={handleFinalizePayment} />}
-        {showOpcionesMesa && <OpcionesMesaModal isOpen={showOpcionesMesa} onClose={() => setShowOpcionesMesa(false)} mesa={mesa} todasLasMesas={todasLasMesas} onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} />}
-        {alertMessage && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-gray-900 rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
-                <AlertTriangle size={32} className="text-orange-500 mb-4" />
-                <p className="text-sm text-gray-500 mb-6">{alertMessage}</p>
-                <button onClick={() => setAlertMessage(null)} className="w-full bg-orange-500 text-white py-3 rounded-2xl font-black uppercase">Entendido</button>
-             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 };
