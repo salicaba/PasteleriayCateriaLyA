@@ -1,21 +1,26 @@
 // frontend/src/modules/cafeteria/views/MesaCard.jsx
 import React, { useMemo } from 'react';
-import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2 } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2, BellRing } from 'lucide-react';
 
 export const MesaCard = ({ mesa, onClick, onCancel }) => {
   const isOcupada = mesa.estado === 'ocupada';
   const isLlevar = mesa.zona === 'llevar';
 
-  const { pendientes, totalItems } = useMemo(() => {
-    if (!mesa.items || mesa.items.length === 0) return { pendientes: 0, totalItems: 0 };
+  // 🔥 Se actualizó para detectar también los "listos" (READY)
+  const { pendientes, listos, totalItems } = useMemo(() => {
+    if (!mesa.items || mesa.items.length === 0) return { pendientes: 0, listos: 0, totalItems: 0 };
     
     let pend = 0;
+    let ready = 0;
     mesa.items.forEach(item => {
-      if (item.kitchenStatus === 'PENDING') pend++;
+      if (item.kitchenStatus === 'PENDING' || item.kitchenStatus === 'PREPARING') pend++;
+      if (item.kitchenStatus === 'READY') ready++;
     });
     
-    return { pendientes: pend, totalItems: mesa.items.length };
+    return { pendientes: pend, listos: ready, totalItems: mesa.items.length };
   }, [mesa.items]);
+
+  const hasReadyItems = listos > 0;
 
   const { idPrincipal, nombreCliente, telefonoCliente } = useMemo(() => {
     const rawNumero = String(mesa.numero || '');
@@ -45,23 +50,36 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
   return (
     <div 
       onClick={() => onClick(mesa)}
-      className={`group relative rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-hidden ${
-        isOcupada 
-          ? 'bg-white dark:bg-gray-800 border-y border-r border-gray-100 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/30' 
-          : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
+      // 🔥 Se añade el borde azul y el fondo si hay productos listos
+      className={`group relative rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-visible ${
+        hasReadyItems 
+          ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 shadow-blue-500/20 lya:bg-blue-900/10 lya:border-blue-500'
+          : isOcupada 
+            ? 'bg-white dark:bg-gray-800 border-y border-r border-gray-100 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/30' 
+            : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
       }`}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors ${
-        isOcupada 
-          ? 'bg-blue-500 dark:bg-blue-400 lya:bg-lya-primary' 
-          : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/60'
+      {/* 🔥 ETIQUETA FLOTANTE DE NOTIFICACIÓN PARA EL MESERO */}
+      {hasReadyItems && (
+        <div className="absolute -top-3 -right-2 bg-blue-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 animate-bounce z-50">
+          <BellRing size={12} className="animate-pulse" />
+          ¡LISTO PARA ENTREGAR!
+        </div>
+      )}
+
+      <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors rounded-l-xl ${
+        hasReadyItems 
+          ? 'bg-blue-500' 
+          : isOcupada 
+            ? 'bg-blue-500 dark:bg-blue-400 lya:bg-lya-primary' 
+            : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/60'
       }`} />
 
-      <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full">
+      <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full relative z-10">
         <div className="flex justify-between items-start">
           <div className="z-10">
             <span className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 block ${
-              isOcupada ? 'text-blue-500 dark:text-blue-400 lya:text-lya-primary' : 'text-gray-400 lya:text-lya-text/50'
+              hasReadyItems ? 'text-blue-600 dark:text-blue-400' : isOcupada ? 'text-blue-500 dark:text-blue-400 lya:text-lya-primary' : 'text-gray-400 lya:text-lya-text/50'
             }`}>
               {isLlevar ? 'Para Llevar' : (isOcupada ? 'Mesa Ocupada' : 'Mesa Libre')}
             </span>
@@ -77,7 +95,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
               <button
                 onClick={(e) => {
                   e.stopPropagation(); 
-                  // Ya no usamos window.confirm, directamente llamamos a onCancel
                   onCancel();
                 }}
                 className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/20 lya:hover:bg-red-900/20 transition-colors"
@@ -88,9 +105,11 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             )}
 
             <div className={`p-2 rounded-xl transition-colors ${
-              isOcupada 
-                ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
-                : 'bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-border'
+              hasReadyItems
+                ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
+                : isOcupada 
+                  ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
+                  : 'bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-border'
             }`}>
               {isLlevar ? <ShoppingBag size={20} strokeWidth={2} /> : <UtensilsCrossed size={20} strokeWidth={2} />}
             </div>
@@ -134,16 +153,26 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             </div>
 
             {totalItems > 0 && (
-              <div className="text-[11px] font-bold">
-                {pendientes > 0 ? (
+              <div className="flex gap-1.5 text-[11px] font-bold">
+                {/* Indicador de cosas pendientes por cocinar */}
+                {pendientes > 0 && (
                   <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#FDE8E8] px-2 py-0.5 rounded-md">
                     <ChefHat size={13} className="animate-pulse" />
                     {pendientes} cocina
                   </span>
-                ) : (
+                )}
+                {/* Indicador de cosas Listas para entregar (solo si las hay) */}
+                {listos > 0 && (
+                  <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/20 px-2 py-0.5 rounded-md">
+                    <BellRing size={13} className="animate-pulse" />
+                    {listos} listos
+                  </span>
+                )}
+                {/* Si no hay pendientes ni listos (TODO ENTREGADO) */}
+                {pendientes === 0 && listos === 0 && (
                   <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 lya:text-[#03543F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#DEF7EC] px-2 py-0.5 rounded-md">
                     <Check size={13} strokeWidth={3} />
-                    Listos
+                    Entregados
                   </span>
                 )}
               </div>

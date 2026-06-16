@@ -111,7 +111,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     if (subtotal > 0) { setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal }); setShowCheckout(true); }
   };
 
-  // 🔥 AQUÍ ESTÁ EL CAMBIO PRINCIPAL (AHORA ES ASYNC Y ESPERA)
   const handleFinalizePayment = async (paymentDetails) => {
     const { amountPaid, targetType, cuentaName } = paymentDetails;
     
@@ -120,7 +119,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
         setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${cuentaName}" ha sido pagada exitosamente.` });
         setTimeout(() => setPaymentSuccessData(null), 1800);
-        setShowCheckout(false); // Cierra solo cuando sea exitoso
+        setShowCheckout(false); 
       }); 
       return; 
     }
@@ -130,7 +129,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     await handleCheckout(paymentDetails, () => {
        setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `El total ha sido pagado exitosamente.` });
        setTimeout(() => setPaymentSuccessData(null), 1800);
-       setShowCheckout(false); // Cierra solo cuando sea exitoso
+       setShowCheckout(false); 
     });
   };
 
@@ -325,7 +324,10 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                   {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
                   
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
-                  {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
+                  
+                  {/* 🔥 AQUI PASAMOS isLlevar AL MODAL DE OPCIONES DE PRODUCTO */}
+                  {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
+                  
                   {showCheckout && <CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={total} initialTarget={checkoutTarget} cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} onConfirmPayment={handleFinalizePayment} />}
                   {showOpcionesMesa && <OpcionesMesaModal isOpen={showOpcionesMesa} onClose={() => setShowOpcionesMesa(false)} mesa={mesa} todasLasMesas={todasLasMesas} onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} />}
                   {alertMessage && (

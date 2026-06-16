@@ -4,10 +4,10 @@ import { motion } from 'framer-motion';
 import { X, Check, AlertCircle, ShoppingBag } from 'lucide-react';
 import clsx from 'clsx';
 
-export const ProductOptionsModal = ({ product, isVitrina, onClose, onConfirm }) => {
+export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
-  // 🔥 Si es Mostrador (isVitrina), se marca automáticamente para llevar
-  const [isTakeaway, setIsTakeaway] = useState(isVitrina || false);
+  // 🔥 Si es Mostrador (isVitrina) o Para Llevar (isLlevar), se marca automáticamente para llevar
+  const [isTakeaway, setIsTakeaway] = useState(isVitrina || isLlevar || false);
 
   if (!product) return null;
 
@@ -208,8 +208,8 @@ export const ProductOptionsModal = ({ product, isVitrina, onClose, onConfirm }) 
             ))
           )}
 
-          {/* 🔥 OCULTAMOS EL BOTÓN DE "EMPACAR" SI ES MOSTRADOR */}
-          {!isVitrina && (
+          {/* 🔥 OCULTAMOS EL BOTÓN DE "EMPACAR" SI ES MOSTRADOR O PARA LLEVAR */}
+          {!isVitrina && !isLlevar && (
             <div className="mt-8 mb-2">
               <label className="flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-500/30 bg-orange-50/50 dark:bg-orange-500/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform">
                 <input 

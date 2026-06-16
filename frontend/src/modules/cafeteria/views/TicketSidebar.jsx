@@ -25,12 +25,9 @@ export const TicketSidebar = ({
   const scrollContainerRef = useRef(null);
   const [cuentasOcultas, setCuentasOcultas] = useState([]);
   
-  // 🔥 ESTADOS PARA LA PAPELERA Y EL MODAL
   const [showCancelled, setShowCancelled] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInputValue, setModalInputValue] = useState('');
-  
-  // 🔥 NUEVO ESTADO PARA SABER QUÉ CUENTA ESTAMOS CANCELANDO EN EL MODAL
   const [modalCancelTarget, setModalCancelTarget] = useState('ALL');
 
   const activeAcc = cuentaActiva || 'General';
@@ -161,8 +158,6 @@ export const TicketSidebar = ({
   };
 
   const cuentasCancelables = Array.from(new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General')));
-
-  // 🔥 NUEVA LÓGICA: Identificar si hay items listos y si hay items cocinándose
   const hasReadyItems = activeCart.some(i => i.enviadoCocina && i.kitchenStatus === 'READY');
   const hasCookingItems = activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
   const showDeliverAllBtn = activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
@@ -323,7 +318,7 @@ export const TicketSidebar = ({
                           </button>
                         )}
                         
-                        {(isCuentaPagada || isCompletamentePagada) && items.length > 0 && (
+                        {!isVitrina && !isLlevar && (isCuentaPagada || isCompletamentePagada) && items.length > 0 && (
                           <button 
                               onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
                               className="text-[10px] font-black bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1.5 rounded-lg uppercase flex gap-1.5 items-center active:scale-95 transition-colors"
@@ -332,7 +327,7 @@ export const TicketSidebar = ({
                           </button>
                         )}
 
-                        {isCuentaPagada && (
+                        {!isVitrina && !isLlevar && isCuentaPagada && (
                           <button 
                               onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
                               className="text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 px-2.5 py-1.5 rounded-lg uppercase flex gap-1.5 items-center active:scale-95 transition-colors"
@@ -365,6 +360,7 @@ export const TicketSidebar = ({
                             item.enviadoCocina ? "bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-700" : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm"
                         )}
                       >
+                        {/* 🔥 FILA 1: IMAGEN Y DETALLES DEL PRODUCTO */}
                         <div className="flex gap-3">
                           <div className="w-14 h-14 rounded-xl overflow-hidden bg-white dark:bg-gray-900 flex-shrink-0 border border-gray-100 dark:border-gray-800 flex items-center justify-center relative group-hover:shadow-inner shadow-sm">
                             {item.imagen || item.image ? <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" /> : <span className="text-xl">🧁</span>}
@@ -395,7 +391,7 @@ export const TicketSidebar = ({
                                 )}
                             </div>
 
-                            <div className="space-y-1 pointer-events-none mb-2">
+                            <div className="space-y-1 pointer-events-none">
                               {item.preparaciones?.map((prep, pIdx) => {
                                 if (!prep || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
                                 return (
@@ -406,60 +402,78 @@ export const TicketSidebar = ({
                                 );
                               })}
                             </div>
+                          </div>
+                        </div>
 
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                {!isVitrina && (
-                                  item.enviadoCocina ? (
-                                    <button 
-                                      onClick={() => toggleDeliveredStatus(item)} 
-                                      disabled={isCompletamentePagada || isCuentaPagada || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
-                                      className={clsx(
-                                          "flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full border uppercase transition-all duration-300", 
-                                          item.kitchenStatus === 'DELIVERED' ? "text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 cursor-pointer" 
-                                          : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 shadow-sm active:scale-95 cursor-pointer" 
-                                          : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
-                                      )}
-                                    >
-                                      {item.kitchenStatus === 'DELIVERED' ? <><CheckCircle size={12} /> Entregado</> : item.kitchenStatus === 'READY' ? <><CheckCircle size={12} className="animate-pulse" /> Listo Entregar</> : <><ChefHat size={12} /> En Preparación</>}
-                                    </button>
-                                  ) : (
-                                    <>
-                                      <span className="flex items-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full uppercase border border-gray-200 dark:border-gray-700">Por enviar</span>
-                                      {!isLlevar && toggleItemTakeaway && (
-                                        <button 
-                                            onClick={() => toggleItemTakeaway(item)} 
-                                            className={clsx(
-                                                "flex items-center gap-1 text-[9px] font-black px-2 py-1 rounded-full border uppercase tracking-tighter transition-all active:scale-95 cursor-pointer", 
-                                                item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:text-orange-500 hover:border-orange-300"
-                                            )} 
-                                        >
-                                          <ShoppingBag size={10} className={item.isTakeaway ? "text-orange-600" : "text-gray-400"} /> {item.isTakeaway ? 'Empacar' : 'Mesa'}
-                                        </button>
-                                      )}
-                                    </>
-                                  )
+                        {/* 🔥 FILA 2: CONTROLES FUERA DE LA COLUMNA DE LA IMAGEN (OCUPAN 100% DEL ANCHO) 🔥 */}
+                        {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && !isCuentaPagada && onCancelItem)) && (
+                          <div className="flex items-center justify-between gap-2 mt-2 pt-3 border-t border-gray-100 dark:border-gray-800/60">
+                            
+                            {/* Contenedor Izquierdo de Botones de Estado (Oculto en mostrador) */}
+                            {!isVitrina && (
+                              <div className="flex-1 flex items-center gap-2">
+                                {item.enviadoCocina ? (
+                                  <button 
+                                    onClick={() => toggleDeliveredStatus(item)} 
+                                    disabled={isCompletamentePagada || isCuentaPagada || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
+                                    className={clsx(
+                                        "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-xl border uppercase transition-all duration-300 w-full text-center shadow-sm", 
+                                        item.kitchenStatus === 'DELIVERED' ? "text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 cursor-pointer" 
+                                        : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 shadow-md active:scale-95 cursor-pointer animate-pulse" 
+                                        : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
+                                    )}
+                                  >
+                                    {item.kitchenStatus === 'DELIVERED' ? <><CheckCircle size={12} /> Entregado</> : item.kitchenStatus === 'READY' ? <><CheckCircle size={12} /> Listo Entregar</> : <><ChefHat size={12} /> En Preparación</>}
+                                  </button>
+                                ) : (
+                                  <>
+                                    <span className={clsx(
+                                      "flex items-center justify-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-xl uppercase border border-gray-200 dark:border-gray-700 text-center",
+                                      (isLlevar || !toggleItemTakeaway) ? "w-full" : "flex-1"
+                                    )}>
+                                      Por enviar
+                                    </span>
+                                    {!isLlevar && toggleItemTakeaway && (
+                                      <button 
+                                          onClick={() => toggleItemTakeaway(item)} 
+                                          className={clsx(
+                                              "flex items-center justify-center gap-1 text-[9px] font-black px-2 py-1.5 rounded-xl border uppercase tracking-tighter transition-all active:scale-95 cursor-pointer flex-1 text-center shadow-sm", 
+                                              item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:text-orange-500 hover:border-orange-300"
+                                          )} 
+                                      >
+                                        <ShoppingBag size={10} className={item.isTakeaway ? "text-orange-600" : "text-gray-400"} /> {item.isTakeaway ? 'Empacar' : 'Mesa'}
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
-                              
-                              <div className="flex items-center gap-1 bg-white dark:bg-gray-900 rounded-lg p-0.5 shadow-sm border border-gray-100 dark:border-gray-800">
+                            )}
+                            
+                            {/* Controles +, -, Trash alineados a la derecha (o expandidos al 100% en Mostrador) */}
+                            {((!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && !isCuentaPagada && onCancelItem)) && (
+                              <div className={clsx(
+                                "flex items-center gap-1 bg-white dark:bg-gray-900 rounded-xl p-0.5 shadow-sm border border-gray-100 dark:border-gray-800",
+                                isVitrina ? "w-full justify-between" : "shrink-0"
+                              )}>
                                 {!item.enviadoCocina && !isCuentaPagada && (
                                   <>
-                                    <button onClick={() => onRemove(item)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-red-500 transition-colors"><Minus size={14} /></button>
-                                    <button onClick={() => onAdd(item, cuentaName)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-orange-500 transition-colors"><Plus size={14} /></button>
-                                    <div className="w-px h-3 bg-gray-200 dark:bg-gray-700 mx-0.5" />
-                                    <button onClick={() => onDelete(item)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                                    <button onClick={() => onRemove(item)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Minus size={isVitrina ? 18 : 14} /></button>
+                                    <button onClick={() => onAdd(item, cuentaName)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-orange-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Plus size={isVitrina ? 18 : 14} /></button>
+                                    <div className={clsx("bg-gray-200 dark:bg-gray-700 mx-0.5", isVitrina ? "w-px h-6" : "w-px h-3")} />
+                                    <button onClick={() => onDelete(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Trash2 size={isVitrina ? 18 : 14} /></button>
                                   </>
                                 )}
                                 {item.enviadoCocina && !isCuentaPagada && onCancelItem && (
-                                    <button onClick={() => handleCancelItem(item)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md text-red-400 hover:text-red-600 transition-colors" title="Cancelar / Eliminar Producto">
-                                      <XCircle size={16} />
+                                    <button onClick={() => handleCancelItem(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-400 hover:text-red-600 transition-colors", isVitrina ? "w-full py-2 flex justify-center items-center gap-2" : "p-1")} title="Cancelar / Eliminar Producto">
+                                      <XCircle size={isVitrina ? 18 : 16} />
+                                      {isVitrina && <span className="text-[10px] font-black uppercase tracking-wider">Cancelar Producto</span>}
                                     </button>
                                 )}
                               </div>
-                            </div>
+                            )}
                           </div>
-                        </div>
+                        )}
+
                       </motion.div>
                       );
                     })}
@@ -506,7 +520,6 @@ export const TicketSidebar = ({
            </div>
         ) : (
            <>
-             {/* 🔥 LÓGICA DE 'ENTREGAR TODA LA MESA' RESTRINGIDA */}
              {!isVitrina && onDeliverAll && showDeliverAllBtn && (
                <button
                   disabled={!hasReadyItems}

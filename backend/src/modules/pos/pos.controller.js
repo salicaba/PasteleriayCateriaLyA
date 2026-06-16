@@ -662,8 +662,10 @@ export const shareOrderTicket = async (req, res) => {
     }
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    
+    // 🔥 AQUÍ SE AÑADIÓ "weekday: 'long'" PARA IGUALAR A PASTELERÍA
     const dateStr = new Date(order.createdAt).toLocaleDateString('es-MX', {
-      year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
     const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
@@ -733,7 +735,7 @@ export const shareOrderTicket = async (req, res) => {
           <div class="space-y-2 text-sm font-medium text-slate-600 mb-6">
             <div class="flex justify-between items-center">
               <span>Fecha de emisión:</span>
-              <span class="text-slate-900 font-bold">${dateStr}</span>
+              <span class="text-slate-900 font-bold capitalize">${dateStr}</span>
             </div>
             <div class="flex justify-between items-center">
               <span>Atendido por:</span>
