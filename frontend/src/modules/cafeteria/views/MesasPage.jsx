@@ -40,7 +40,7 @@ export const MesasPage = () => {
   
   // 🔥 Estados para el Modal de Confirmación y su tiempo de carga
   const [orderToCancel, setOrderToCancel] = useState(null);
-  const [isCanceling, setIsCanceling] = useState(false); // <--- NUEVO: Controla si está procesando
+  const [isCanceling, setIsCanceling] = useState(false);
 
   const [dailySummary, setDailySummary] = useState({
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
@@ -258,7 +258,7 @@ export const MesasPage = () => {
             />
           )}
 
-          {/* 🔥 MODAL DE CONFIRMACIÓN CON ESTADO DE CARGA ANIMADO */}
+          {/* 🔥 MODAL DE CONFIRMACIÓN */}
           <AnimatePresence>
             {orderToCancel && (
               <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -266,7 +266,6 @@ export const MesasPage = () => {
                   initial={{ opacity: 0 }} 
                   animate={{ opacity: 1 }} 
                   exit={{ opacity: 0 }} 
-                  // Bloquea cerrar haciendo clic afuera si se está cancelando
                   onClick={() => !isCanceling && setOrderToCancel(null)} 
                   className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" 
                 />
@@ -303,10 +302,10 @@ export const MesasPage = () => {
                     <button 
                       disabled={isCanceling}
                       onClick={async () => {
-                        setIsCanceling(true); // Se bloquea UI
+                        setIsCanceling(true); 
                         await handleCancelOrder(orderToCancel.orderId, 'Pedido para llevar descartado');
-                        setIsCanceling(false); // Se libera UI
-                        setOrderToCancel(null); // Cierra modal
+                        setIsCanceling(false); 
+                        setOrderToCancel(null); 
                       }}
                       className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg shadow-red-500/30 transition-all ${isCanceling ? 'bg-red-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'}`}
                     >
@@ -360,7 +359,13 @@ export const MesasPage = () => {
                                 </div>
                               </div>
                               <p className="text-[11px] text-gray-500 leading-snug">Motivo: {order.cancelReason || 'Sin especificar'}</p>
-                              <p className="text-[10px] text-gray-400 mt-2">{new Date(order.cancelledAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                              
+                              <div className="flex items-center gap-2 mt-3">
+                                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                                  🕒 {new Date(order.cancelledAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                </span>
+                              </div>
+
                             </div>
                           )})}
                         </div>
@@ -397,7 +402,15 @@ export const MesasPage = () => {
                                   <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Cta: {item.cuenta}</span>
                                 </div>
                                 
-                                <p className="text-[10px] text-gray-400 italic leading-snug">"{item.cancelReason || 'Sin motivo'}"</p>
+                                {/* 🔥 ETIQUETA "Motivo:" AÑADIDA AQUÍ 🔥 */}
+                                <p className="text-[11px] text-gray-500 leading-snug mt-1">Motivo: {item.cancelReason || 'Sin especificar'}</p>
+
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                                    🕒 {new Date(item.cancelledAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                  </span>
+                                </div>
+
                               </div>
                               <div className="flex flex-col items-end gap-2 shrink-0">
                                 <span className="text-sm font-black text-gray-400 line-through">${Number(item.subtotal).toFixed(2)}</span>

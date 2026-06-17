@@ -1,26 +1,41 @@
 // backend/src/modules/pos/pos.routes.js
 import { Router } from 'express';
-import { 
-  getDailySummary,
-  getActiveOrders, 
-  createOrder, 
-  addItemsToOrder,
-  getActiveOrderByTable,
-  payOrder,
-  closeOrder,
-  getTables,
-  createTable,
-  deleteTable,
-  moveItemAccount,
-  printOrderTicket,
-  shareOrderTicket,
-  deliverAllItems, 
-  cancelOrderItem, 
-  cancelOrder,
-  restoreOrder,         // <-- NUEVO: Función para restaurar cuenta completa
-  restoreOrderItem      // <-- NUEVO: Función para restaurar producto individual
-} from './pos.controller.js';
 import { verifyToken } from '../../middlewares/auth.middleware.js';
+
+// --- NUEVAS IMPORTACIONES MODULARES ---
+import { 
+  createOrder, 
+  addItemsToOrder, 
+  getActiveOrderByTable, 
+  closeOrder, 
+  getActiveOrders, 
+  moveItemAccount, 
+  deliverAllItems 
+} from './pos.orders.controller.js';
+
+import { 
+  getTables, 
+  createTable, 
+  deleteTable 
+} from './pos.tables.controller.js';
+
+import { 
+  payOrder 
+} from './pos.payments.controller.js';
+
+import { 
+  printOrderTicket, 
+  shareOrderTicket 
+} from './pos.tickets.controller.js';
+
+import { 
+  cancelOrderItem, 
+  cancelOrder, 
+  getDailySummary, 
+  restoreOrderItem, 
+  restoreOrder 
+} from './pos.cancellations.controller.js';
+// ---------------------------------------
 
 const router = Router();
 

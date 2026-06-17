@@ -360,7 +360,6 @@ export const TicketSidebar = ({
                             item.enviadoCocina ? "bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-700" : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm"
                         )}
                       >
-                        {/* 🔥 FILA 1: IMAGEN Y DETALLES DEL PRODUCTO */}
                         <div className="flex gap-3">
                           <div className="w-14 h-14 rounded-xl overflow-hidden bg-white dark:bg-gray-900 flex-shrink-0 border border-gray-100 dark:border-gray-800 flex items-center justify-center relative group-hover:shadow-inner shadow-sm">
                             {item.imagen || item.image ? <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" /> : <span className="text-xl">🧁</span>}
@@ -405,11 +404,9 @@ export const TicketSidebar = ({
                           </div>
                         </div>
 
-                        {/* 🔥 FILA 2: CONTROLES FUERA DE LA COLUMNA DE LA IMAGEN (OCUPAN 100% DEL ANCHO) 🔥 */}
                         {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && !isCuentaPagada && onCancelItem)) && (
                           <div className="flex items-center justify-between gap-2 mt-2 pt-3 border-t border-gray-100 dark:border-gray-800/60">
                             
-                            {/* Contenedor Izquierdo de Botones de Estado (Oculto en mostrador) */}
                             {!isVitrina && (
                               <div className="flex-1 flex items-center gap-2">
                                 {item.enviadoCocina ? (
@@ -449,7 +446,6 @@ export const TicketSidebar = ({
                               </div>
                             )}
                             
-                            {/* Controles +, -, Trash alineados a la derecha (o expandidos al 100% en Mostrador) */}
                             {((!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && !isCuentaPagada && onCancelItem)) && (
                               <div className={clsx(
                                 "flex items-center gap-1 bg-white dark:bg-gray-900 rounded-xl p-0.5 shadow-sm border border-gray-100 dark:border-gray-800",
@@ -558,16 +554,17 @@ export const TicketSidebar = ({
                  <CreditCard size={18} /><span>{isVitrina ? 'Cobrar Express' : (isLlevar ? 'Cobrar Pedido' : 'Cobrar Mesa')}</span>
                </button>
              </div>
-
-             {!isVitrina && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
-                 <button 
-                    onClick={handleCancelClick} 
-                    className="w-full mt-3 py-2 text-[10px] font-black text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5"
-                 >
-                    <AlertTriangle size={14}/> Opciones de Cancelación
-                 </button>
-             )}
            </>
+        )}
+
+        {/* 🔥 MOVIDO AQUÍ ABAJO PARA QUE SIEMPRE SEA VISIBLE 🔥 */}
+        {!isVitrina && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
+            <button 
+               onClick={handleCancelClick} 
+               className="w-full mt-3 py-2 text-[10px] font-black text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5"
+            >
+               <AlertTriangle size={14}/> Opciones de Cancelación
+            </button>
         )}
       </div>
 
