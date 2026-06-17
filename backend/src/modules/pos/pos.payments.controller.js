@@ -28,7 +28,7 @@ export const payOrder = async (req, res) => {
     let identificador = '';
     if (order.orderType === 'LLEVAR') {
       if (order.ticketId && (order.ticketId.startsWith('MOSTRADOR') || order.ticketId.startsWith('VITRINA') || order.ticketId.startsWith('MOS-'))) {
-        identificador = 'MOSTRADOR'; 
+        identificador = 'Mostrador'; 
       } else {
         const rawId = String(order.ticketId || '');
         const partes = rawId.split(' - ');

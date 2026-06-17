@@ -38,7 +38,6 @@ export const MesasPage = () => {
   const [showLlevarModal, setShowLlevarModal] = useState(false);
   const [activeTab, setActiveTab] = useState('salon'); 
   
-  // 🔥 Estados para el Modal de Confirmación y su tiempo de carga
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [isCanceling, setIsCanceling] = useState(false);
 
@@ -258,7 +257,6 @@ export const MesasPage = () => {
             />
           )}
 
-          {/* 🔥 MODAL DE CONFIRMACIÓN */}
           <AnimatePresence>
             {orderToCancel && (
               <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -380,16 +378,26 @@ export const MesasPage = () => {
                             const canRestore = activeOrderIds.includes(item.orderId);
 
                             let nombreOrigen = 'Origen Desconocido';
+                            // 🔥 Variables para determinar el contexto real de la orden/mesa
+                            let orderTypeContext = 'SALON'; 
+
                             const mesaActiva = [...mesasSalon, ...mesasLlevar].find(m => (m.orderId || m.id) === item.orderId);
                             
                             if (mesaActiva) {
+                                orderTypeContext = mesaActiva.zona === 'salon' ? 'SALON' : mesaActiva.zona === 'vitrina' ? 'MOSTRADOR' : 'LLEVAR';
                                 nombreOrigen = mesaActiva.zona === 'salon' ? `Mesa ${mesaActiva.numero}` : (mesaActiva.ticketId || `Llevar ${mesaActiva.numero}`);
                             } else {
                                 const ordenCerrada = [...dailySummary.vendidosOrders, ...dailySummary.cancelledOrders].find(o => o.id === item.orderId);
                                 if (ordenCerrada) {
+                                    orderTypeContext = ordenCerrada.orderType;
                                     nombreOrigen = ordenCerrada.orderType === 'LLEVAR' ? ordenCerrada.ticketId : `Mesa ${ordenCerrada.table?.number || '?'}`;
                                 }
                             }
+
+                            // 🔥 Lógica dinámica para el texto de "Mesa/Pedido Cerrado"
+                            let textoCerrado = 'Mesa Cerrada';
+                            if (orderTypeContext === 'LLEVAR') textoCerrado = 'Pedido Cerrado';
+                            if (orderTypeContext === 'MOSTRADOR') textoCerrado = 'Ticket Cerrado';
 
                             return (
                             <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between opacity-90 transition-opacity">
@@ -402,7 +410,6 @@ export const MesasPage = () => {
                                   <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Cta: {item.cuenta}</span>
                                 </div>
                                 
-                                {/* 🔥 ETIQUETA "Motivo:" AÑADIDA AQUÍ 🔥 */}
                                 <p className="text-[11px] text-gray-500 leading-snug mt-1">Motivo: {item.cancelReason || 'Sin especificar'}</p>
 
                                 <div className="flex items-center gap-2 mt-2">
@@ -427,7 +434,8 @@ export const MesasPage = () => {
                                         className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md" 
                                         title="No se puede restaurar porque la cuenta/mesa ya fue cerrada o finalizada."
                                     >
-                                        Mesa Cerrada
+                                        {/* 🔥 APLICACIÓN DEL TEXTO DINÁMICO 🔥 */}
+                                        {textoCerrado}
                                     </span>
                                 )}
                               </div>

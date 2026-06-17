@@ -10,7 +10,15 @@ const modalVariants = {
   exit: { scale: 0.9, opacity: 0, y: 20 }
 };
 
-export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasResumen = [], onConfirmPayment }) => {
+export const CheckoutModal = ({ 
+  isOpen, 
+  onClose, 
+  total, 
+  initialTarget, 
+  cuentasResumen = [], 
+  onConfirmPayment,
+  orderType = 'salon' // Puede ser: 'salon', 'mostrador', 'llevar'
+}) => {
   const [method, setMethod] = useState('efectivo');
   const [amountReceived, setAmountReceived] = useState('');
   const [change, setChange] = useState(0);
@@ -20,7 +28,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
   const [splitCount, setSplitCount] = useState(1);
   const [selectedCuenta, setSelectedCuenta] = useState('');
   
-  // 🔥 NUEVO ESTADO PARA EL BOTÓN DE CARGA
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -30,9 +37,10 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
       setChange(0);
       setSplitCount(1);
       setTransferInfo(null);
-      setIsProcessing(false); // Reset al abrir
+      setIsProcessing(false); 
 
-      if (initialTarget?.type === 'partial') {
+      // Solo permite iniciar en 'nominal' (Por Persona) si es un pedido de Salón
+      if (initialTarget?.type === 'partial' && orderType === 'salon') {
         setCobroMode('nominal');
         setSelectedCuenta(initialTarget.cuentaName);
       } else {
@@ -41,7 +49,7 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, orderType]);
 
   useEffect(() => {
     if (isOpen && method === 'transferencia') {
@@ -65,12 +73,11 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
     }
   }, [amountReceived, amountToPay, method]);
 
-  // 🔥 AHORA ES UNA FUNCIÓN ASÍNCRONA PARA BLOQUEAR EL BOTÓN MIENTRAS CARGA
   const handlePayment = async () => {
     if (amountToPay <= 0) return alert("No hay monto a cobrar en la selección actual.");
     if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return alert("El monto recibido es insuficiente.");
     
-    setIsProcessing(true); // Se bloquea el botón
+    setIsProcessing(true); 
     
     try {
       await onConfirmPayment({ 
@@ -84,8 +91,21 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
     } catch(e) {
       console.error(e);
     } finally {
-      setIsProcessing(false); // Se desbloquea si falla (si tiene éxito se cerrará de todas formas)
+      setIsProcessing(false); 
     }
+  };
+
+  // Textos Dinámicos
+  const getFullModeTextBtn = () => {
+    if (orderType === 'mostrador') return 'Todo el Pedido';
+    if (orderType === 'llevar') return 'Toda la Cuenta';
+    return 'Toda la Mesa';
+  };
+
+  const getFullModeTextTotal = () => {
+    if (orderType === 'mostrador') return 'Total del Pedido';
+    if (orderType === 'llevar') return 'Total de la Cuenta';
+    return 'Total Mesa';
   };
 
   if (!isOpen) return null;
@@ -106,9 +126,20 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
 
         <div className="p-5 overflow-y-auto custom-scrollbar space-y-5">
           <div className="flex gap-2 p-1.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl">
-            <button onClick={() => setCobroMode('full')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'full' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}><LayoutList size={18}/> Toda la Mesa</button>
-            <button onClick={() => setCobroMode('nominal')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'nominal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}><User size={18}/> Por Persona</button>
-            <button onClick={() => setCobroMode('equal')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'equal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}><PieChart size={18}/> Dividir</button>
+            <button onClick={() => setCobroMode('full')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'full' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}>
+              <LayoutList size={18}/> {getFullModeTextBtn()}
+            </button>
+            
+            {/* Lógica condicional: Ocultar si no es Salón */}
+            {orderType === 'salon' && (
+              <button onClick={() => setCobroMode('nominal')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'nominal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}>
+                <User size={18}/> Por Persona
+              </button>
+            )}
+            
+            <button onClick={() => setCobroMode('equal')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex flex-col items-center gap-1.5 transition-all ${cobroMode === 'equal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-orange-500 lya:text-lya-primary' : 'text-gray-500 lya:text-lya-text/60'}`}>
+              <PieChart size={18}/> Dividir
+            </button>
           </div>
 
           <div className="min-h-[70px] flex items-center justify-center">
@@ -117,7 +148,7 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
                 <p className="text-sm font-medium text-orange-800 dark:text-orange-300 lya:text-lya-primary">Cobro en una sola exhibición</p>
               </div>
             )}
-            {cobroMode === 'nominal' && (
+            {cobroMode === 'nominal' && orderType === 'salon' && (
               <div className="w-full flex flex-wrap gap-2 justify-center">
                 {cuentasResumen.length === 0 ? (<span className="text-sm text-gray-400 italic">No hay cuentas pendientes.</span>) : (
                    cuentasResumen.map(cuenta => (
@@ -144,7 +175,7 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
 
           <div className="text-center py-2">
             <span className="text-xs text-orange-500 lya:text-lya-primary uppercase tracking-widest font-black">
-              {cobroMode === 'full' ? 'Total Mesa' : cobroMode === 'equal' ? `Parte a cobrar (1 de ${splitCount})` : `Cobrando a ${selectedCuenta || '...'}`}
+              {cobroMode === 'full' ? getFullModeTextTotal() : cobroMode === 'equal' ? `Parte a cobrar (1 de ${splitCount})` : `Cobrando a ${selectedCuenta || '...'}`}
             </span>
             <div className="text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text mt-1">${amountToPay.toFixed(2)}</div>
           </div>
@@ -189,7 +220,6 @@ export const CheckoutModal = ({ isOpen, onClose, total, initialTarget, cuentasRe
             {method === 'transferencia' && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
               <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
                 
-                {/* 🚀 BANNER NEO-BENTO PARA RECORDATORIO DE WHATSAPP 🚀 */}
                 {transferInfo?.whatsapp_number && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
                     <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">

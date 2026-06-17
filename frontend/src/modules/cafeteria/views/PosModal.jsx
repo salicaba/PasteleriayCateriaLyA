@@ -158,13 +158,14 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     numeroReal = numeroReal.replace(/#/g, '').trim();
   }
 
+  const nombreCliente = partesNumero[1];
+  const telCliente = partesNumero[2];
+
   const HeaderTitle = () => {
     if (isVitrina) return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mostrador ⚡</h3>;
     
     if (isLlevar) {
       const folio = partesNumero[0]; 
-      const nombreCliente = partesNumero[1]; 
-      const telCliente = partesNumero[2]; 
 
       return (
         <div className="flex flex-col gap-2">
@@ -237,10 +238,12 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     isVitrina, 
     toggleItemTakeaway,
     cuentasTelefonos,
-    onDeliverAll: deliverAllActiveItems,         
+    onDeliverAll: deliverAllActiveItems,        
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
-    onCancelAccount: cancelAccountItems   
+    onCancelAccount: cancelAccountItems,
+    // 🔥 PASAMOS EL NOMBRE DEL CLIENTE AL SIDEBAR
+    nombreCliente: isLlevar ? nombreCliente : null 
   };
 
   const posContent = (
@@ -325,11 +328,22 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                   
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
                   
-                  {/* 🔥 AQUI PASAMOS isLlevar AL MODAL DE OPCIONES DE PRODUCTO */}
                   {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
                   
-                  {showCheckout && <CheckoutModal isOpen={showCheckout} onClose={() => setShowCheckout(false)} total={total} initialTarget={checkoutTarget} cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} onConfirmPayment={handleFinalizePayment} />}
+                  {showCheckout && (
+                    <CheckoutModal 
+                      isOpen={showCheckout} 
+                      onClose={() => setShowCheckout(false)} 
+                      total={total} 
+                      initialTarget={checkoutTarget} 
+                      cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} 
+                      onConfirmPayment={handleFinalizePayment} 
+                      orderType={isVitrina ? 'mostrador' : isLlevar ? 'llevar' : 'salon'}
+                    />
+                  )}
+
                   {showOpcionesMesa && <OpcionesMesaModal isOpen={showOpcionesMesa} onClose={() => setShowOpcionesMesa(false)} mesa={mesa} todasLasMesas={todasLasMesas} onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} />}
+                  
                   {alertMessage && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                        <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-gray-900 rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">

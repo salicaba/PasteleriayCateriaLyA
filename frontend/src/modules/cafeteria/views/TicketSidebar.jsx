@@ -4,7 +4,7 @@ import {
   Trash2, Minus, Plus, ShoppingBag, ChefHat, 
   CreditCard, Lock, User, UserPlus, GripVertical, 
   ArrowRightLeft, Info, X, CheckCircle, Printer, XCircle, Phone,
-  CheckCheck, AlertTriangle, ChevronDown
+  CheckCheck, AlertTriangle, ChevronDown, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -15,7 +15,8 @@ export const TicketSidebar = ({
   cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, onPayCuenta, onMoveItem,
   orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus,
   isLlevar, isVitrina, toggleItemTakeaway, cuentasTelefonos,
-  onDeliverAll, onDeliverAccount, onCancelItem, onCancelFullOrder, onCancelAccount 
+  onDeliverAll, onDeliverAccount, onCancelItem, onCancelFullOrder, onCancelAccount,
+  nombreCliente
 }) => {
   const [newCuentaName, setNewCuentaName] = useState('');
   const [newCuentaPhone, setNewCuentaPhone] = useState('');
@@ -29,6 +30,9 @@ export const TicketSidebar = ({
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInputValue, setModalInputValue] = useState('');
   const [modalCancelTarget, setModalCancelTarget] = useState('ALL');
+
+  const [isDeliveringAll, setIsDeliveringAll] = useState(false);
+  const [processingItems, setProcessingItems] = useState({});
 
   const activeAcc = cuentaActiva || 'General';
   const availableAccs = (isLlevar || isVitrina) ? ['General'] : (cuentasDisponibles || ['General']);
@@ -92,6 +96,25 @@ export const TicketSidebar = ({
   const openConfirmModal = (config) => {
     setModalConfig(config);
     if (config.requireInput) setModalInputValue(config.inputDefault || '');
+  };
+
+  const handleToggleStatus = async (item) => {
+    const itemId = item.backendItemId || item.id;
+    setProcessingItems(prev => ({ ...prev, [itemId]: true }));
+    try {
+      if (toggleDeliveredStatus) await toggleDeliveredStatus(item);
+    } finally {
+      setProcessingItems(prev => ({ ...prev, [itemId]: false }));
+    }
+  };
+
+  const handleDeliverAll = async () => {
+    setIsDeliveringAll(true);
+    try {
+      if (onDeliverAll) await onDeliverAll();
+    } finally {
+      setIsDeliveringAll(false);
+    }
   };
 
   const handleCancelItem = (item) => {
@@ -158,9 +181,14 @@ export const TicketSidebar = ({
   };
 
   const cuentasCancelables = Array.from(new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General')));
-  const hasReadyItems = activeCart.some(i => i.enviadoCocina && i.kitchenStatus === 'READY');
-  const hasCookingItems = activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
-  const showDeliverAllBtn = activeCart.some(i => i.enviadoCocina && ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
+  
+  const sentItems = activeCart.filter(i => i.enviadoCocina);
+  const hasSentItems = sentItems.length > 0;
+  const allSentItemsDelivered = hasSentItems && sentItems.every(i => i.kitchenStatus === 'DELIVERED');
+  
+  const hasReadyItems = sentItems.some(i => i.kitchenStatus === 'READY');
+  const hasCookingItems = sentItems.some(i => ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
+  const showDeliverAllBtn = hasSentItems && !allSentItemsDelivered;
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative">
@@ -280,7 +308,7 @@ export const TicketSidebar = ({
                           <h4 className={clsx("font-black text-sm uppercase tracking-tight truncate max-w-[120px] sm:max-w-none", 
                               isCuentaPagada ? "text-gray-800 dark:text-gray-200" : isDragTarget ? "text-blue-600 dark:text-blue-400" : isActive ? "text-[#f48b31]" : "text-gray-600 dark:text-gray-400"
                           )}>
-                            {isVitrina ? 'Cuenta Express' : cuentaName}
+                            {isVitrina ? 'Cuenta Express' : (isLlevar && nombreCliente ? nombreCliente : cuentaName)}
                           </h4>
                           {cuentasTelefonos?.[cuentaName] && (
                             <span className="flex items-center gap-1 text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded-md font-bold tracking-wider shadow-sm shrink-0">
@@ -342,6 +370,8 @@ export const TicketSidebar = ({
                   <div className="px-3 pb-3 space-y-2">
                     {items.map((item, idx) => {
                       const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}`;
+                      
+                      const isProcessing = processingItems[item.backendItemId || item.id];
 
                       return (
                       <motion.div 
@@ -411,16 +441,25 @@ export const TicketSidebar = ({
                               <div className="flex-1 flex items-center gap-2">
                                 {item.enviadoCocina ? (
                                   <button 
-                                    onClick={() => toggleDeliveredStatus(item)} 
-                                    disabled={isCompletamentePagada || isCuentaPagada || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
+                                    onClick={() => handleToggleStatus(item)} 
+                                    disabled={isCompletamentePagada || isCuentaPagada || isProcessing || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                                     className={clsx(
                                         "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-xl border uppercase transition-all duration-300 w-full text-center shadow-sm", 
+                                        isProcessing ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
                                         item.kitchenStatus === 'DELIVERED' ? "text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 cursor-pointer" 
                                         : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 shadow-md active:scale-95 cursor-pointer animate-pulse" 
                                         : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
                                     )}
                                   >
-                                    {item.kitchenStatus === 'DELIVERED' ? <><CheckCircle size={12} /> Entregado</> : item.kitchenStatus === 'READY' ? <><CheckCircle size={12} /> Listo Entregar</> : <><ChefHat size={12} /> En Preparación</>}
+                                    {isProcessing ? (
+                                       <><Loader2 size={12} className="animate-spin" /> Cargando...</>
+                                    ) : item.kitchenStatus === 'DELIVERED' ? (
+                                       <><CheckCircle size={12} /> Entregado</>
+                                    ) : item.kitchenStatus === 'READY' ? (
+                                       <><CheckCircle size={12} /> Listo Entregar</>
+                                    ) : (
+                                       <><ChefHat size={12} /> En Preparación</>
+                                    )}
                                   </button>
                                 ) : (
                                   <>
@@ -495,7 +534,7 @@ export const TicketSidebar = ({
                                       <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded">{cItem.qty}x</span>
                                       <div className="flex flex-col min-w-0">
                                         <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">{cItem.nombre}</span>
-                                        <span className="text-[9px] text-gray-500 uppercase">{cItem.cuenta}</span>
+                                        <span className="text-[9px] text-gray-500 uppercase">{isLlevar && nombreCliente ? nombreCliente : cItem.cuenta}</span>
                                       </div>
                                   </div>
                                   <span className="text-[10px] font-black text-gray-400 line-through shrink-0">${(cItem.precio * cItem.qty).toFixed(2)}</span>
@@ -516,25 +555,27 @@ export const TicketSidebar = ({
            </div>
         ) : (
            <>
-             {!isVitrina && onDeliverAll && showDeliverAllBtn && (
+             {onDeliverAll && showDeliverAllBtn && (
                <button
-                  disabled={!hasReadyItems}
+                  disabled={!hasReadyItems || isDeliveringAll}
                   onClick={() => openConfirmModal({
-                      title: 'Entregar Toda la Mesa',
+                      title: (isVitrina || isLlevar) ? 'Entregar Todo el Pedido' : 'Entregar Toda la Mesa',
                       message: hasCookingItems 
-                        ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?'
-                        : '¿Confirmas que ya entregaste los productos listos a la mesa?',
+                        ? ((isVitrina || isLlevar) ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos del pedido como entregados?' : 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?')
+                        : ((isVitrina || isLlevar) ? '¿Confirmas que ya entregaste los productos listos del pedido?' : '¿Confirmas que ya entregaste los productos listos a la mesa?'),
                       icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
-                      onConfirm: () => onDeliverAll()
+                      onConfirm: () => handleDeliverAll()
                   })}
                   className={clsx(
                     "w-full mb-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-2 transition-all shadow-sm",
+                    isDeliveringAll ? "bg-green-100 dark:bg-green-800/40 text-green-700 border border-green-300 dark:border-green-700 cursor-wait opacity-80" :
                     hasReadyItems
                       ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-800/40 active:scale-95 cursor-pointer"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed opacity-70"
                   )}
                >
-                  <CheckCheck size={16} /> {hasReadyItems ? 'Entregar Toda La Mesa' : 'Esperando a Cocina...'}
+                  {isDeliveringAll ? <Loader2 size={16} className="animate-spin" /> : <CheckCheck size={16} />}
+                  {isDeliveringAll ? 'Entregando...' : (hasReadyItems ? ((isVitrina || isLlevar) ? 'Entregar Todo El Pedido' : 'Entregar Toda La Mesa') : 'Esperando a Cocina...')}
                </button>
              )}
              
@@ -557,8 +598,8 @@ export const TicketSidebar = ({
            </>
         )}
 
-        {/* 🔥 MOVIDO AQUÍ ABAJO PARA QUE SIEMPRE SEA VISIBLE 🔥 */}
-        {!isVitrina && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
+        {/* 🔥 SE MUESTRA SOLO EN MESAS 🔥 */}
+        {(!isVitrina && !isLlevar) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
             <button 
                onClick={handleCancelClick} 
                className="w-full mt-3 py-2 text-[10px] font-black text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5"
