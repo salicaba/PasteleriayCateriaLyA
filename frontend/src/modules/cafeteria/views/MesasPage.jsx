@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/MesasPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Grid, ShoppingBag, CheckCircle, Trash2, X, Plus, Store, Loader2, RotateCcw, Zap, Banknote, CreditCard, ArrowRightLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,6 +47,8 @@ export const MesasPage = () => {
   const [showPapelera, setShowPapelera] = useState(false);
   const [showVendidos, setShowVendidos] = useState(false);
 
+  const wasActiveRef = useRef(false);
+
   const fetchSummary = async () => {
     try {
       const res = await client.get('/pos/orders/daily-summary');
@@ -61,6 +63,23 @@ export const MesasPage = () => {
     socket.on('pos:update', fetchSummary);
     return () => { socket.off('pos:update', fetchSummary); };
   }, []);
+
+  const activeOrderIds = [...mesasSalon, ...mesasLlevar].map(m => m.orderId || m.id).filter(Boolean);
+
+  useEffect(() => {
+    if (selectedMesa && !isLoading) {
+      const currentId = selectedMesa.orderId || selectedMesa.id;
+      const isActive = activeOrderIds.includes(currentId);
+      
+      if (isActive) {
+        wasActiveRef.current = true;
+      } else if (wasActiveRef.current && !isActive) {
+        setSelectedMesa(null);
+      }
+    } else {
+      wasActiveRef.current = false;
+    }
+  }, [activeOrderIds, selectedMesa, isLoading]);
 
   if (isLoading) {
     return (
@@ -83,7 +102,6 @@ export const MesasPage = () => {
   }
 
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
-  const activeOrderIds = [...mesasSalon, ...mesasLlevar].map(m => m.orderId || m.id).filter(Boolean);
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8">
@@ -341,10 +359,52 @@ export const MesasPage = () => {
                         <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Cuentas Canceladas</h3>
                         <div className="space-y-3">
                           {dailySummary.cancelledOrders.map(order => {
+                            const nombreCuenta = order.cuenta || order.customerName || order.name || 'Cuenta General';
+                            const numMesa = order.table?.numero || order.table?.number || '?';
+                            
+                            const esMesaCompleta = order.cancelReason?.includes('Mesa Completa');
+
+                            let tituloPrincipal = order.ticketId ? order.ticketId : `Mesa #${numMesa}`;
+                            let textoInsignia = esMesaCompleta ? 'MESA COMPLETA' : `CUENTA: ${nombreCuenta}`;
+
+                            if (tituloPrincipal.toUpperCase().includes('MOSTRADOR')) {
+                              const partesTicket = tituloPrincipal.split(' ');
+                              tituloPrincipal = `Mostrador`;
+                              textoInsignia = `Folio: ${partesTicket[1] || 'Express'}`;
+                            } else if (order.ticketId && order.ticketId.includes(' - ')) {
+                              const partesTicket = order.ticketId.split(' - ');
+                              tituloPrincipal = partesTicket[0]; 
+                              
+                              if (partesTicket.length > 1) {
+                                const nombreCliente = partesTicket[1];
+                                const telefonoCliente = partesTicket[2];
+                                textoInsignia = `CUENTA: ${nombreCliente}${telefonoCliente ? ` | CEL: ${telefonoCliente}` : ''}`;
+                              }
+                            }
+
+                            let cuentasInvolucradas = '';
+                            if (esMesaCompleta && order.cancelReason) {
+                              const match = order.cancelReason.match(/\(Cuentas:\s*(.*?)\)/);
+                              if (match && match[1]) {
+                                cuentasInvolucradas = match[1];
+                              }
+                            }
+
+                            let motivoLimpio = order.cancelReason || 'Sin especificar';
+                            if (motivoLimpio.includes(' - Motivo: ')) {
+                              motivoLimpio = motivoLimpio.split(' - Motivo: ')[1] || 'Cancelación desde POS';
+                            } else if (motivoLimpio.includes(' - Se vaciaron los productos')) {
+                              motivoLimpio = 'Se vaciaron los productos automáticamente';
+                            } else if (motivoLimpio === 'Pedido para llevar descartado') {
+                              motivoLimpio = 'Cancelado desde POS';
+                            }
+
                             return (
                             <div key={order.id} className="p-4 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 rounded-2xl transition-all">
                               <div className="flex justify-between items-start mb-2">
-                                <span className="font-bold text-gray-900 dark:text-white">{order.ticketId || `Mesa ${order.table?.number}`}</span>
+                                <span className="font-black text-gray-900 dark:text-white text-base">
+                                  {tituloPrincipal}
+                                </span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
                                   <button 
@@ -356,7 +416,22 @@ export const MesasPage = () => {
                                   </button>
                                 </div>
                               </div>
-                              <p className="text-[11px] text-gray-500 leading-snug">Motivo: {order.cancelReason || 'Sin especificar'}</p>
+
+                              <div className="mb-2">
+                                <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
+                                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                    {textoInsignia}
+                                  </span>
+                                  
+                                  {esMesaCompleta && cuentasInvolucradas && (
+                                    <span className="text-[9px] font-bold mt-1.5 pt-1 border-t border-red-100 dark:border-red-900/50 opacity-90 leading-none">
+                                      Cuentas: {cuentasInvolucradas}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <p className="text-[11px] text-gray-500 leading-snug">Motivo: {motivoLimpio}</p>
                               
                               <div className="flex items-center gap-2 mt-3">
                                 <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
@@ -375,29 +450,62 @@ export const MesasPage = () => {
                         <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Productos Cancelados</h3>
                         <div className="space-y-3">
                           {dailySummary.cancelledItems.map(item => {
-                            const canRestore = activeOrderIds.includes(item.orderId);
+                            
+                            // 🔥 AHORA LEEMOS LA ORDEN PADRE QUE NOS MANDÓ LA BASE DE DATOS 🔥
+                            const ordenRef = item.parentOrder || [...mesasSalon, ...mesasLlevar, selectedMesa, ...dailySummary.vendidosOrders, ...dailySummary.cancelledOrders]
+                                .filter(Boolean)
+                                .find(o => (o.orderId || o.id) === item.orderId);
+
+                            // El botón de restaurar producto aparece SÓLO si el ticket sigue vivo
+                            const canRestore = ordenRef && ordenRef.status !== 'CANCELLED' && ordenRef.status !== 'CLOSED';
 
                             let nombreOrigen = 'Origen Desconocido';
-                            // 🔥 Variables para determinar el contexto real de la orden/mesa
                             let orderTypeContext = 'SALON'; 
+                            let cuentaMostrar = item.cuenta || 'General';
 
-                            const mesaActiva = [...mesasSalon, ...mesasLlevar].find(m => (m.orderId || m.id) === item.orderId);
-                            
-                            if (mesaActiva) {
-                                orderTypeContext = mesaActiva.zona === 'salon' ? 'SALON' : mesaActiva.zona === 'vitrina' ? 'MOSTRADOR' : 'LLEVAR';
-                                nombreOrigen = mesaActiva.zona === 'salon' ? `Mesa ${mesaActiva.numero}` : (mesaActiva.ticketId || `Llevar ${mesaActiva.numero}`);
-                            } else {
-                                const ordenCerrada = [...dailySummary.vendidosOrders, ...dailySummary.cancelledOrders].find(o => o.id === item.orderId);
-                                if (ordenCerrada) {
-                                    orderTypeContext = ordenCerrada.orderType;
-                                    nombreOrigen = ordenCerrada.orderType === 'LLEVAR' ? ordenCerrada.ticketId : `Mesa ${ordenCerrada.table?.number || '?'}`;
+                            if (ordenRef) {
+                                const ticketId = ordenRef.ticketId || '';
+                                
+                                if (ticketId.toUpperCase().includes('MOSTRADOR')) {
+                                    orderTypeContext = 'MOSTRADOR';
+                                    const partes = ticketId.split(' ');
+                                    nombreOrigen = `Mostrador`;
+                                    cuentaMostrar = `Folio: ${partes[1] || 'Express'}`;
+                                } else if (ticketId.includes(' - ')) {
+                                    orderTypeContext = 'LLEVAR';
+                                    const partes = ticketId.split(' - ');
+                                    nombreOrigen = partes[0]; 
+                                    
+                                    if (partes.length > 1 && cuentaMostrar === 'General') {
+                                        cuentaMostrar = partes[1]; 
+                                    }
+                                } else if (ticketId.toUpperCase().includes('LLEVAR')) {
+                                    orderTypeContext = 'LLEVAR';
+                                    nombreOrigen = ticketId;
+                                    if (cuentaMostrar === 'General') {
+                                        cuentaMostrar = ordenRef.nombreCliente || ordenRef.customerName || ordenRef.name || 'General';
+                                    }
+                                } else {
+                                    orderTypeContext = 'SALON';
+                                    nombreOrigen = `Mesa #${ordenRef.table?.numero || ordenRef.table?.number || ordenRef.numero || '?'}`;
+                                    if (cuentaMostrar === 'General') {
+                                       cuentaMostrar = 'Cuenta General';
+                                    }
                                 }
                             }
 
-                            // 🔥 Lógica dinámica para el texto de "Mesa/Pedido Cerrado"
                             let textoCerrado = 'Mesa Cerrada';
                             if (orderTypeContext === 'LLEVAR') textoCerrado = 'Pedido Cerrado';
                             if (orderTypeContext === 'MOSTRADOR') textoCerrado = 'Ticket Cerrado';
+
+                            let motivoLimpioItem = item.cancelReason || 'Sin especificar';
+                            if (motivoLimpioItem.includes(' - Motivo: ')) {
+                              motivoLimpioItem = motivoLimpioItem.split(' - Motivo: ')[1] || 'Cancelación desde POS';
+                            } else if (motivoLimpioItem.includes(' - Se vaciaron los productos')) {
+                              motivoLimpioItem = 'Se vaciaron los productos automáticamente';
+                            } else if (motivoLimpioItem === 'Pedido para llevar descartado') {
+                              motivoLimpioItem = 'Cancelado desde POS';
+                            }
 
                             return (
                             <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between opacity-90 transition-opacity">
@@ -407,10 +515,12 @@ export const MesasPage = () => {
                                 <div className="mt-1.5 mb-1 inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-700">
                                   <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{nombreOrigen}</span>
                                   <span className="mx-1.5 text-gray-300 dark:text-gray-600">•</span>
-                                  <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Cta: {item.cuenta}</span>
+                                  <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                                    {orderTypeContext === 'MOSTRADOR' ? cuentaMostrar : `Cta: ${cuentaMostrar}`}
+                                  </span>
                                 </div>
                                 
-                                <p className="text-[11px] text-gray-500 leading-snug mt-1">Motivo: {item.cancelReason || 'Sin especificar'}</p>
+                                <p className="text-[11px] text-gray-500 leading-snug mt-1">Motivo: {motivoLimpioItem}</p>
 
                                 <div className="flex items-center gap-2 mt-2">
                                   <span className="bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
@@ -434,7 +544,6 @@ export const MesasPage = () => {
                                         className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md" 
                                         title="No se puede restaurar porque la cuenta/mesa ya fue cerrada o finalizada."
                                     >
-                                        {/* 🔥 APLICACIÓN DEL TEXTO DINÁMICO 🔥 */}
                                         {textoCerrado}
                                     </span>
                                 )}

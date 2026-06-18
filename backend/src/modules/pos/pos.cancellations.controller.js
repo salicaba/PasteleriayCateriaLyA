@@ -19,7 +19,9 @@ export const cancelOrderItem = async (req, res) => {
     const item = await OrderItem.findOne({ where: { id: itemId, orderId: id } });
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
 
-    const order = await Order.findByPk(id);
+    const order = await Order.findByPk(id, {
+      include: [{ model: Table, as: 'table' }]
+    });
 
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
@@ -86,9 +88,31 @@ export const cancelOrderItem = async (req, res) => {
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
     
+    // Si se vacía la orden borrando producto por producto
     if (activeItems === 0 && order.status !== 'CLOSED') {
-      await order.update({ status: 'CANCELLED', totalAmount: 0, cancelledAt: new Date(), cancelReason: 'Todos los productos fueron cancelados automáticamente', cancelledBy: userId });
-      if (order.tableId) await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+      const numeroMesa = order.table ? order.table.numero || order.table.number : 'Sin Mesa/Llevar';
+      const nombreCuenta = item.cuenta || 'Cuenta General'; 
+      
+      let motivoMecanismoSeguridad = `Cancelación de cuenta: ${nombreCuenta} (Mesa #${numeroMesa}) - Se vaciaron los productos automáticamente`;
+
+      if (order.ticketId && order.ticketId.toUpperCase().includes('MOSTRADOR')) {
+        motivoMecanismoSeguridad = `Se vaciaron los productos automáticamente`;
+      }
+
+      await order.update({ 
+        status: 'CANCELLED', 
+        totalAmount: 0, 
+        cancelledAt: new Date(), 
+        cancelReason: motivoMecanismoSeguridad, 
+        cancelledBy: userId 
+      });
+      
+      if (order.tableId) {
+        const remainingOrders = await Order.count({ where: { tableId: order.tableId, status: ['OPEN', 'PAID'] } });
+        if (remainingOrders === 0) {
+          await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+        }
+      }
     } else {
       await order.update({ totalAmount: newTotal });
     }
@@ -107,7 +131,7 @@ export const cancelOrderItem = async (req, res) => {
 };
 
 // ==========================================
-// 📌 3. CANCELAR CUENTA COMPLETA
+// 📌 3. CANCELAR TODA LA ORDEN (MESA COMPLETA)
 // ==========================================
 export const cancelOrder = async (req, res) => {
   try {
@@ -116,14 +140,30 @@ export const cancelOrder = async (req, res) => {
     const userId = req.user?.id;
 
     const order = await Order.findByPk(id, { 
-      include: [{ model: OrderItem, as: 'items' }] 
+      include: [
+        { model: OrderItem, as: 'items' },
+        { model: Table, as: 'table' } 
+      ] 
     });
     
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
+    if (order.status === 'CLOSED') return res.status(400).json({ message: 'No se puede cancelar una orden cerrada definitivamente' });
 
-    if (order.status === 'CLOSED') {
-      return res.status(400).json({ message: 'No se puede cancelar una orden cerrada definitivamente' });
+    const cuentasActivas = order.items.filter(i => i.status === 'ACTIVE').map(i => i.cuenta || 'Cuenta General');
+    const uniqueCuentas = [...new Set(cuentasActivas)];
+    const nombresCuentas = uniqueCuentas.length > 0 ? uniqueCuentas.join(', ') : 'Cuenta General';
+    
+    const numeroMesa = order.table ? order.table.numero || order.table.number : 'Sin Mesa/Llevar';
+    
+    let textoPapelera = order.table 
+        ? `Mesa Completa #${numeroMesa} (Cuentas: ${nombresCuentas})`
+        : `Pedido para Llevar (Cuentas: ${nombresCuentas})`;
+        
+    if (order.ticketId && order.ticketId.toUpperCase().includes('MOSTRADOR')) {
+      textoPapelera = `Mostrador Express`;
     }
+    
+    const motivoFinal = cancelReason ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` : `Cancelación de ${textoPapelera}`;
 
     let totalRefund = 0;
 
@@ -131,14 +171,13 @@ export const cancelOrder = async (req, res) => {
       if (item.status === 'ACTIVE') {
         const previousKitchenStatus = item.kitchenStatus;
         
-        let wasPaid = order.status === 'PAID' || 
-                      (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+        let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) totalRefund += Number(item.subtotal);
 
         await item.update({
           status: 'CANCELLED',
           cancelledAt: new Date(),
-          cancelReason: cancelReason || 'Cancelación de cuenta completa',
+          cancelReason: motivoFinal, 
           cancelledBy: userId
         });
 
@@ -154,7 +193,7 @@ export const cancelOrder = async (req, res) => {
         source: 'CAFETERIA',
         expenseCategory: 'REFUND',
         amount: totalRefund,
-        description: `Reembolso total por cancelación de Orden ${order.ticketId || id}`,
+        description: `Reembolso total por ${textoPapelera}`,
         referenceId: order.id,
         createdBy: userId
       });
@@ -164,16 +203,21 @@ export const cancelOrder = async (req, res) => {
       status: 'CANCELLED',
       totalAmount: 0,
       cancelledAt: new Date(),
-      cancelReason: cancelReason || 'Cancelada desde POS',
+      cancelReason: motivoFinal, 
       cancelledBy: userId
     });
 
     if (order.tableId) {
-      await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+      const cuentasRestantes = await Order.count({
+        where: { tableId: order.tableId, status: ['OPEN', 'PAID'] }
+      });
+      if (cuentasRestantes === 0) {
+        await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+      }
     }
 
     getIO().emit('pos:update'); 
-    res.json({ message: 'Cuenta cancelada completamente', refundedAmount: totalRefund });
+    res.json({ message: `La cuenta fue cancelada correctamente`, refundedAmount: totalRefund });
   } catch (error) {
     console.error('Error en cancelOrder:', error);
     res.status(500).json({ message: 'Error al cancelar la cuenta' });
@@ -205,10 +249,23 @@ export const getDailySummary = async (req, res) => {
       order: [['cancelledAt', 'DESC']]
     });
 
-    const cancelledItems = await OrderItem.findAll({
+    const rawCancelledItems = await OrderItem.findAll({
       where: { status: 'CANCELLED', cancelledAt: dateFilter },
       include: [{ model: Product, as: 'product' }],
       order: [['cancelledAt', 'DESC']]
+    });
+
+    // 🔥 MAGIA: Buscamos manualmente las órdenes padre para el frontend 🔥
+    const orderIds = [...new Set(rawCancelledItems.map(i => i.orderId))];
+    const parentOrders = await Order.findAll({
+      where: { id: orderIds },
+      include: [{ model: Table, as: 'table', required: false }]
+    });
+
+    const cancelledItems = rawCancelledItems.map(item => {
+      const itemJSON = item.toJSON ? item.toJSON() : item;
+      itemJSON.parentOrder = parentOrders.find(o => o.id === item.orderId);
+      return itemJSON;
     });
 
     const transactions = await Transaction.findAll({
@@ -242,17 +299,24 @@ export const restoreOrderItem = async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Producto no encontrado en la papelera' });
 
     const order = await Order.findByPk(id);
-    
-    let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+
+    // 🔥 SEGURIDAD: Bloquea si intentan restaurar producto de un ticket cerrado/cancelado
+    if (order.status === 'CANCELLED' || order.status === 'CLOSED') {
+      return res.status(400).json({ message: `No se puede restaurar un producto individual si el ticket entero ya fue finalizado o cancelado. Restaura el ticket completo primero.` });
+    }
+
+    // 🔥 DETECTAR SI ESTABA PAGADO PARA NO VOLVER A COBRAR 🔥
+    const refundTx = await Transaction.findOne({ where: { referenceId: order.id, expenseCategory: 'REFUND' } });
+    let wasPaid = !!refundTx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
     if (wasPaid) {
       const unitPrice = Number(item.subtotal) / item.quantity;
       const amountToRestore = unitPrice * item.quantity;
       
+      // ✅ SE ELIMINÓ expenseCategory: 'RECOVERY' PORQUE ES UN INGRESO
       await Transaction.create({
         type: 'INCOME',
         source: 'CAFETERIA',
-        expenseCategory: 'RECOVERY', 
         amount: amountToRestore,
         description: `Recuperación por producto restaurado en Ticket ${order.ticketId || id}`,
         referenceId: order.id,
@@ -268,7 +332,12 @@ export const restoreOrderItem = async (req, res) => {
     });
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
-    await order.update({ totalAmount: newTotal });
+    
+    // Si estaba pagado, lo mantenemos como pagado
+    await order.update({ 
+      status: wasPaid ? 'PAID' : 'OPEN',
+      totalAmount: newTotal,
+    });
 
     getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
     getIO().emit('pos:update');
@@ -281,7 +350,7 @@ export const restoreOrderItem = async (req, res) => {
 };
 
 // ==========================================
-// ♻️ RESTAURAR ORDEN COMPLETA (CUENTA)
+// ♻️ RESTAURAR ORDEN COMPLETA (CUENTA O MESA)
 // ==========================================
 export const restoreOrder = async (req, res) => {
   try {
@@ -289,25 +358,52 @@ export const restoreOrder = async (req, res) => {
     const userId = req.user?.id;
 
     const order = await Order.findByPk(id, { 
-      include: [{ model: OrderItem, as: 'items' }] 
+      include: [
+        { model: OrderItem, as: 'items' },
+        { model: Table, as: 'table' } 
+      ] 
     });
     
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
 
+    // 🔥 LÓGICA DE SEGURIDAD PARA IGNORAR TICKETS FANTASMA EN MOSTRADOR 🔥
     if (order.tableId) {
-      const table = await Table.findByPk(order.tableId);
-      if (table && table.status === 'active') {
-        await table.update({ status: 'ocupada' });
-      } else if (table && table.status === 'ocupada') {
-        return res.status(400).json({ message: `La mesa #${table.number} ya está ocupada por otro cliente. Libere la mesa primero.` });
+      if (order.status === 'CANCELLED' || order.status === 'CLOSED') {
+        const table = order.table;
+        const activeOrdersOnTable = await Order.count({
+          where: { tableId: order.tableId, status: ['OPEN', 'PAID'] }
+        });
+        
+        if (activeOrdersOnTable > 0) {
+          return res.status(400).json({ message: `No se puede restaurar. La Mesa #${table?.numero || table?.number || ''} ya está siendo ocupada por un nuevo cliente.` });
+        }
+      }
+    } else if (order.ticketId && order.ticketId.toUpperCase().includes('MOSTRADOR')) {
+      if (order.status === 'CANCELLED' || order.status === 'CLOSED') {
+        const activeVitrina = await Order.findAll({
+          where: {
+            tableId: null,
+            status: ['OPEN', 'PAID'],
+            ticketId: { [Op.iLike]: '%MOSTRADOR%' }
+          },
+          include: [{ model: OrderItem, as: 'items', where: { status: 'ACTIVE' }, required: true }] 
+        });
+
+        if (activeVitrina.length > 0) {
+          return res.status(400).json({ message: `No se puede restaurar. Actualmente hay una venta en curso en el Mostrador con productos adentro. Pásela a "Siguiente Venta" o cancélela primero.` });
+        }
       }
     }
+
+    // 🔥 DETECTAR SI ESTABA PAGADO PARA NO VOLVER A COBRAR 🔥
+    const refundTx = await Transaction.findOne({ where: { referenceId: order.id, expenseCategory: 'REFUND' } });
+    const wasGloballyPaid = !!refundTx;
 
     let totalRestoredAmount = 0;
 
     for (const item of order.items) {
-      if (item.status === 'CANCELLED' && item.cancelReason === 'Cancelación de cuenta completa') {
-        let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+      if (item.status === 'CANCELLED' && item.cancelReason?.includes('Cancelación')) {
+        let wasPaid = wasGloballyPaid || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) totalRestoredAmount += Number(item.subtotal);
 
         await item.update({ status: 'ACTIVE', cancelledAt: null, cancelReason: null, cancelledBy: null });
@@ -316,10 +412,10 @@ export const restoreOrder = async (req, res) => {
     }
 
     if (totalRestoredAmount > 0) {
+      // ✅ SE ELIMINÓ expenseCategory: 'RECOVERY' PORQUE ES UN INGRESO
       await Transaction.create({
         type: 'INCOME',
         source: 'CAFETERIA',
-        expenseCategory: 'RECOVERY',
         amount: totalRestoredAmount,
         description: `Recuperación global por orden restaurada: ${order.ticketId || id}`,
         referenceId: order.id,
@@ -328,9 +424,12 @@ export const restoreOrder = async (req, res) => {
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
+    
+    // Si recuperamos el monto y había reembolsos, se marca como pagado
+    const finalStatus = (wasGloballyPaid || totalRestoredAmount >= newTotal) && newTotal > 0 ? 'PAID' : 'OPEN';
 
     await order.update({
-      status: 'OPEN',
+      status: finalStatus,
       totalAmount: newTotal,
       cancelledAt: null,
       cancelReason: null,

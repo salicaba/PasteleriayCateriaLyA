@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import OpcionesCancelacionModal from './OpcionesCancelacionModal'; 
 
 export const TicketSidebar = ({ 
   cart, total, hasUnsentItems, unsentTotal, mesaTotal, 
@@ -29,7 +30,8 @@ export const TicketSidebar = ({
   const [showCancelled, setShowCancelled] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInputValue, setModalInputValue] = useState('');
-  const [modalCancelTarget, setModalCancelTarget] = useState('ALL');
+  
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const [isDeliveringAll, setIsDeliveringAll] = useState(false);
   const [processingItems, setProcessingItems] = useState({});
@@ -154,26 +156,6 @@ export const TicketSidebar = ({
     }
   };
 
-  const handleCancelClick = () => {
-    setModalCancelTarget('ALL');
-    openConfirmModal({
-        type: 'cancelOrder',
-        title: 'Opciones de Cancelación',
-        message: 'Selecciona si deseas cancelar toda la mesa o solo una cuenta específica.',
-        icon: AlertTriangle, 
-        color: 'red', 
-        confirmText: 'Confirmar Cancelación',
-        inputDefault: 'Cancelación desde POS',
-        onConfirm: (target, reason) => { 
-            if (target === 'ALL') {
-                if (onCancelFullOrder) onCancelFullOrder(reason);
-            } else {
-                if (onCancelAccount) onCancelAccount(target, reason);
-            }
-        }
-    });
-  };
-
   const modalColors = {
       blue: { icon: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30", btn: "bg-blue-500 hover:bg-blue-600 text-white" },
       green: { icon: "text-green-500", bg: "bg-green-100 dark:bg-green-900/30", btn: "bg-[#24d366] hover:bg-[#20bd5c] text-white" },
@@ -188,7 +170,9 @@ export const TicketSidebar = ({
   
   const hasReadyItems = sentItems.some(i => i.kitchenStatus === 'READY');
   const hasCookingItems = sentItems.some(i => ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
-  const showDeliverAllBtn = hasSentItems && !allSentItemsDelivered;
+  
+  // 🔥 AQUÍ APAGAMOS EL BOTÓN PARA MOSTRADOR 🔥
+  const showDeliverAllBtn = !isVitrina && hasSentItems && !allSentItemsDelivered;
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative">
@@ -549,9 +533,38 @@ export const TicketSidebar = ({
 
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-20 shrink-0 transition-colors">
         {isCompletamentePagada ? (
-           <div className="flex gap-3 animate-fade-in">
-              <button onClick={() => onPrintTicket()} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 active:scale-95 transition-transform hover:bg-gray-200 dark:hover:bg-gray-700"><Printer size={18} /><span>Ticket Completo</span></button>
-              <button onClick={onCloseTable} className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform"><XCircle size={18} /><span>{isVitrina ? 'Siguiente Venta' : (isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa')}</span></button>
+           <div className="flex gap-2 animate-fade-in">
+              <button onClick={() => onPrintTicket()} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 active:scale-95 transition-transform hover:bg-gray-200 dark:hover:bg-gray-700">
+                <Printer size={16} /><span>Imprimir</span>
+              </button>
+              
+              {isVitrina && onCancelFullOrder && (
+                  <button 
+                    onClick={() => {
+                        openConfirmModal({
+                            title: 'Cancelar Venta Express',
+                            message: '¿Estás seguro de cancelar esta venta de mostrador?',
+                            icon: AlertTriangle,
+                            color: 'red',
+                            confirmText: 'Sí, Cancelar',
+                            requireInput: true,
+                            inputType: 'text',
+                            inputPlaceholder: 'Motivo de cancelación (opcional)',
+                            inputDefault: 'Cancelado desde POS',
+                            onConfirm: (reason) => {
+                                if (onCancelFullOrder) onCancelFullOrder(reason);
+                            }
+                        });
+                    }} 
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 active:scale-95 transition-transform hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50"
+                  >
+                    <Trash2 size={16} /><span>Cancelar</span>
+                  </button>
+              )}
+
+              <button onClick={onCloseTable} className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform">
+                <XCircle size={16} /><span>{isVitrina ? 'Siguiente Venta' : (isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa')}</span>
+              </button>
            </div>
         ) : (
            <>
@@ -598,10 +611,9 @@ export const TicketSidebar = ({
            </>
         )}
 
-        {/* 🔥 SE MUESTRA SOLO EN MESAS 🔥 */}
         {(!isVitrina && !isLlevar) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
             <button 
-               onClick={handleCancelClick} 
+               onClick={() => setShowCancelModal(true)} 
                className="w-full mt-3 py-2 text-[10px] font-black text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5"
             >
                <AlertTriangle size={14}/> Opciones de Cancelación
@@ -628,36 +640,7 @@ export const TicketSidebar = ({
                 {modalConfig.message}
               </p>
 
-              {modalConfig.type === 'cancelOrder' ? (
-                <div className="w-full mb-6 space-y-3">
-                    <div className="text-left">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">¿Qué deseas cancelar?</label>
-                        <div className="relative mt-1">
-                            <select
-                                value={modalCancelTarget}
-                                onChange={(e) => setModalCancelTarget(e.target.value)}
-                                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm rounded-xl py-3 pl-4 pr-10 outline-none focus:ring-2 focus:ring-red-500/50 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 appearance-none font-bold shadow-sm cursor-pointer"
-                            >
-                                <option value="ALL">Toda la Orden (Mesa Completa)</option>
-                                {cuentasCancelables.map(acc => (
-                                    <option key={acc} value={acc}>Solo la cuenta: {acc}</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={16} className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" />
-                        </div>
-                    </div>
-                    <div className="text-left">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Motivo (Opcional)</label>
-                        <input 
-                            type="text" 
-                            value={modalInputValue}
-                            onChange={(e) => setModalInputValue(e.target.value)}
-                            placeholder="Ej. Cliente se retiró"
-                            className="w-full mt-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-red-500/50 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 font-medium shadow-inner"
-                        />
-                    </div>
-                </div>
-              ) : modalConfig.requireInput ? (
+              {modalConfig.requireInput && (
                 <div className="w-full mb-6">
                   <input 
                     type={modalConfig.inputType || 'text'} 
@@ -669,7 +652,7 @@ export const TicketSidebar = ({
                     className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-orange-500/50 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-center font-medium shadow-inner"
                   />
                 </div>
-              ) : null}
+              )}
 
               <div className="flex gap-3 w-full">
                 <button 
@@ -680,11 +663,7 @@ export const TicketSidebar = ({
                 </button>
                 <button 
                   onClick={() => { 
-                    if (modalConfig.type === 'cancelOrder') {
-                        modalConfig.onConfirm(modalCancelTarget, modalInputValue);
-                    } else {
-                        modalConfig.onConfirm(modalConfig.requireInput ? modalInputValue : undefined); 
-                    }
+                    modalConfig.onConfirm(modalConfig.requireInput ? modalInputValue : undefined); 
                     setModalConfig(null); 
                   }} 
                   className={clsx("flex-[1.5] py-3 rounded-2xl font-black uppercase text-[11px] tracking-wider transition-transform active:scale-95 shadow-md", modalColors[modalConfig.color].btn)}
@@ -696,6 +675,20 @@ export const TicketSidebar = ({
           </div>
         )}
       </AnimatePresence>
+
+      <OpcionesCancelacionModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        cuentas={cuentasCancelables}
+        onConfirmar={(tipo, cuenta, motivo) => {
+          setShowCancelModal(false);
+          if (tipo === 'mesa') {
+              if (onCancelFullOrder) onCancelFullOrder(motivo);
+          } else {
+              if (onCancelAccount) onCancelAccount(cuenta, motivo);
+          }
+        }}
+      />
     </div>
   );
 };
