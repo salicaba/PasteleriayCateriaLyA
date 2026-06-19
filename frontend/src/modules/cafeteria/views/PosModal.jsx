@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, ChevronDown, ChevronUp, MoreVertical, Info, Plus, AlertTriangle, Phone, User } from 'lucide-react';
+import { X, Search, AlertTriangle, Phone, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -14,22 +14,10 @@ import { ProductOptionsModal } from './ProductOptionsModal';
 import { CheckoutModal } from './CheckoutModal'; 
 import { OpcionesMesaModal } from './OpcionesMesaModal';
 import { TicketPreviewModal } from './TicketPreviewModal';
+import MenuLoader from '../../../components/animations/MenuLoader'; // <-- IMPORTAMOS EL LOADER
 
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } }, exit: { y: "100%", opacity: 0 } };
-
-const ProductSkeleton = () => (
-  <div className="bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl p-4 flex flex-col justify-between h-48 border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shadow-sm">
-    <div className="flex justify-between items-start mb-2">
-      <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
-      <div className="w-16 h-6 rounded-full bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
-    </div>
-    <div className="space-y-2 w-full mt-auto">
-      <div className="w-full h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-      <div className="w-2/3 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-    </div>
-  </div>
-);
 
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial, inline = false }) => {
   
@@ -75,7 +63,9 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   useEffect(() => {
     if (isOpen) {
       setIsRendering(true);
-      const timer = setTimeout(() => setIsRendering(false), 250); 
+      // Incrementé ligeramente el timeout a 400ms para asegurar que la animación del loader se luzca
+      // y la carga sea fluida sin parpadeos.
+      const timer = setTimeout(() => setIsRendering(false), 400); 
       return () => clearTimeout(timer);
     }
   }, [isOpen, categoriaActiva]); 
@@ -242,7 +232,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
-    // 🔥 PASAMOS EL NOMBRE DEL CLIENTE AL SIDEBAR
     nombreCliente: isLlevar ? nombreCliente : null 
   };
 
@@ -262,25 +251,36 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
           <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar pb-32 md:pb-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar pb-32 md:pb-4 relative">
+          
+          {/* AQUI ESTÁ LA MAGIA DE ANIMATE PRESENCE */}
+          <AnimatePresence mode="wait">
             {isRendering ? (
-              [...Array(12)].map((_, i) => <ProductSkeleton key={i} />)
+              <MenuLoader key="menu-loader" />
             ) : (
-              filteredProducts.map(product => (
-                <ProductCard key={product.id} product={product} onClick={setSelectedProduct} onQuickAdd={(p) => {
-                    let ops = p.opciones;
-                    if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
-                    let precioAdicional = 0, detalles = { tamano: 'Estándar' };
-                    if (ops && typeof ops === 'object') {
-                       if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
-                       if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
-                    }
-                    addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
-                }} />
-              ))
+              <motion.div
+                key="product-grid"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
+              >
+                {filteredProducts.map(product => (
+                  <ProductCard key={product.id} product={product} onClick={setSelectedProduct} onQuickAdd={(p) => {
+                      let ops = p.opciones;
+                      if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+                      let precioAdicional = 0, detalles = { tamano: 'Estándar' };
+                      if (ops && typeof ops === 'object') {
+                         if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
+                         if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
+                      }
+                      addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
+                  }} />
+                ))}
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
+
         </div>
       </div>
 

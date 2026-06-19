@@ -1,4 +1,3 @@
-// backend/src/modules/pos/pos.cancellations.controller.js
 import { Op } from 'sequelize';
 import { getIO } from '../../config/socket.js'; 
 import Order from './Order.model.js';
@@ -6,6 +5,59 @@ import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
+
+// =====================================================================
+// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN ORIGINAL (ANULACIONES) 🔥
+// =====================================================================
+const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null) => {
+  const tx = await Transaction.findOne({
+    where: { referenceId: orderId, type: 'INCOME' },
+    order: [['createdAt', 'DESC']]
+  });
+
+  if (tx && monto > 0) {
+    let nuevoMonto = Number(tx.amount);
+    let nuevaDescripcion = tx.description || '';
+
+    if (tipoOperacion === 'restar') {
+      nuevoMonto -= monto;
+      nuevaDescripcion += ` | 📉 -$${monto.toFixed(2)} (Anulado: ${detalle})`;
+    } else if (tipoOperacion === 'sumar') {
+      nuevoMonto += monto;
+      nuevaDescripcion += ` | 📈 +$${monto.toFixed(2)} (Restaurado: ${detalle})`;
+    }
+
+    // Evitamos decimales residuales
+    if (nuevoMonto <= 0.01) nuevoMonto = 0;
+
+    let newStatus = tx.status;
+    let cancelledAt = tx.cancelledAt;
+    let cancelledBy = tx.cancelledBy;
+
+    // 🔥 LA MAGIA: Si llega a 0, la pasamos a ANULADO automáticamente.
+    if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
+      newStatus = 'CANCELLED';
+      cancelledAt = new Date();
+      cancelledBy = userId;
+    } 
+    // 🔥 Si estaba anulada y le regresamos dinero (Restaurar), la revivimos.
+    else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
+      newStatus = 'ACTIVE';
+      cancelledAt = null;
+      cancelledBy = null;
+    }
+
+    await tx.update({
+      amount: nuevoMonto,
+      description: nuevaDescripcion,
+      status: newStatus,
+      cancelledAt,
+      cancelledBy
+    });
+    return true;
+  }
+  return false;
+};
 
 // ==========================================
 // 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL
@@ -16,7 +68,7 @@ export const cancelOrderItem = async (req, res) => {
     const { cancelReason, cancelQty } = req.body; 
     const userId = req.user?.id; 
 
-    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id } });
+    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id }, include: [{ model: Product, as: 'product' }] });
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
 
     const order = await Order.findByPk(id, {
@@ -32,15 +84,8 @@ export const cancelOrderItem = async (req, res) => {
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
     if (wasPaid && refundAmount > 0) {
-      await Transaction.create({
-        type: 'EXPENSE',
-        source: 'CAFETERIA',
-        expenseCategory: 'REFUND',
-        amount: refundAmount,
-        description: `Reembolso por cancelación de producto en Ticket ${order.ticketId || id}`,
-        referenceId: order.id,
-        createdBy: userId
-      });
+      const nombreProducto = item.product?.name || item.nombre || 'Producto';
+      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId);
     }
 
     const previousKitchenStatus = item.kitchenStatus;
@@ -76,7 +121,7 @@ export const cancelOrderItem = async (req, res) => {
         await item.update({
           status: 'CANCELLED',
           cancelledAt: new Date(),
-          cancelReason: cancelReason || 'Cancelación desde POS',
+          cancelReason: cancelReason || 'Cancelado desde POS',
           cancelledBy: userId
         });
     }
@@ -88,7 +133,6 @@ export const cancelOrderItem = async (req, res) => {
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
     
-    // Si se vacía la orden borrando producto por producto
     if (activeItems === 0 && order.status !== 'CLOSED') {
       const numeroMesa = order.table ? order.table.numero || order.table.number : 'Sin Mesa/Llevar';
       const nombreCuenta = item.cuenta || 'Cuenta General'; 
@@ -188,15 +232,7 @@ export const cancelOrder = async (req, res) => {
     }
 
     if (totalRefund > 0) {
-      await Transaction.create({
-        type: 'EXPENSE',
-        source: 'CAFETERIA',
-        expenseCategory: 'REFUND',
-        amount: totalRefund,
-        description: `Reembolso total por ${textoPapelera}`,
-        referenceId: order.id,
-        createdBy: userId
-      });
+      await modificarTransaccionOriginal(order.id, totalRefund, 'restar', 'Todos los productos/Cuentas', userId);
     }
 
     await order.update({
@@ -255,7 +291,6 @@ export const getDailySummary = async (req, res) => {
       order: [['cancelledAt', 'DESC']]
     });
 
-    // 🔥 MAGIA: Buscamos manualmente las órdenes padre para el frontend 🔥
     const orderIds = [...new Set(rawCancelledItems.map(i => i.orderId))];
     const parentOrders = await Order.findAll({
       where: { id: orderIds },
@@ -295,33 +330,24 @@ export const restoreOrderItem = async (req, res) => {
     const { id, itemId } = req.params;
     const userId = req.user?.id;
 
-    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id } });
+    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id }, include: [{ model: Product, as: 'product' }] });
     if (!item) return res.status(404).json({ message: 'Producto no encontrado en la papelera' });
 
     const order = await Order.findByPk(id);
 
-    // 🔥 SEGURIDAD: Bloquea si intentan restaurar producto de un ticket cerrado/cancelado
     if (order.status === 'CANCELLED' || order.status === 'CLOSED') {
       return res.status(400).json({ message: `No se puede restaurar un producto individual si el ticket entero ya fue finalizado o cancelado. Restaura el ticket completo primero.` });
     }
 
-    // 🔥 DETECTAR SI ESTABA PAGADO PARA NO VOLVER A COBRAR 🔥
-    const refundTx = await Transaction.findOne({ where: { referenceId: order.id, expenseCategory: 'REFUND' } });
-    let wasPaid = !!refundTx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
+    const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
+    let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
     if (wasPaid) {
       const unitPrice = Number(item.subtotal) / item.quantity;
       const amountToRestore = unitPrice * item.quantity;
+      const nombreProducto = item.product?.name || item.nombre || 'Producto';
       
-      // ✅ SE ELIMINÓ expenseCategory: 'RECOVERY' PORQUE ES UN INGRESO
-      await Transaction.create({
-        type: 'INCOME',
-        source: 'CAFETERIA',
-        amount: amountToRestore,
-        description: `Recuperación por producto restaurado en Ticket ${order.ticketId || id}`,
-        referenceId: order.id,
-        createdBy: userId
-      });
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId);
     }
 
     await item.update({
@@ -333,7 +359,6 @@ export const restoreOrderItem = async (req, res) => {
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     
-    // Si estaba pagado, lo mantenemos como pagado
     await order.update({ 
       status: wasPaid ? 'PAID' : 'OPEN',
       totalAmount: newTotal,
@@ -366,7 +391,6 @@ export const restoreOrder = async (req, res) => {
     
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
 
-    // 🔥 LÓGICA DE SEGURIDAD PARA IGNORAR TICKETS FANTASMA EN MOSTRADOR 🔥
     if (order.tableId) {
       if (order.status === 'CANCELLED' || order.status === 'CLOSED') {
         const table = order.table;
@@ -395,14 +419,13 @@ export const restoreOrder = async (req, res) => {
       }
     }
 
-    // 🔥 DETECTAR SI ESTABA PAGADO PARA NO VOLVER A COBRAR 🔥
-    const refundTx = await Transaction.findOne({ where: { referenceId: order.id, expenseCategory: 'REFUND' } });
-    const wasGloballyPaid = !!refundTx;
+    const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
+    const wasGloballyPaid = !!tx;
 
     let totalRestoredAmount = 0;
 
     for (const item of order.items) {
-      if (item.status === 'CANCELLED' && item.cancelReason?.includes('Cancelación')) {
+      if (item.status === 'CANCELLED') {
         let wasPaid = wasGloballyPaid || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) totalRestoredAmount += Number(item.subtotal);
 
@@ -412,20 +435,11 @@ export const restoreOrder = async (req, res) => {
     }
 
     if (totalRestoredAmount > 0) {
-      // ✅ SE ELIMINÓ expenseCategory: 'RECOVERY' PORQUE ES UN INGRESO
-      await Transaction.create({
-        type: 'INCOME',
-        source: 'CAFETERIA',
-        amount: totalRestoredAmount,
-        description: `Recuperación global por orden restaurada: ${order.ticketId || id}`,
-        referenceId: order.id,
-        createdBy: userId
-      });
+      await modificarTransaccionOriginal(order.id, totalRestoredAmount, 'sumar', 'Todos los productos/Cuentas', userId);
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     
-    // Si recuperamos el monto y había reembolsos, se marca como pagado
     const finalStatus = (wasGloballyPaid || totalRestoredAmount >= newTotal) && newTotal > 0 ? 'PAID' : 'OPEN';
 
     await order.update({

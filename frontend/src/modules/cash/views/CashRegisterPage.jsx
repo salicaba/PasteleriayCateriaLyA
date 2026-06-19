@@ -1,7 +1,7 @@
 // src/modules/cash/views/CashRegisterPage.jsx
 import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
-import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark } from 'lucide-react';
+import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CashRegisterSkeleton = () => (
@@ -9,7 +9,6 @@ const CashRegisterSkeleton = () => (
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
   >
-    {/* Header Skeleton */}
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
       <div className="flex items-center space-x-4">
         <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
@@ -24,17 +23,14 @@ const CashRegisterSkeleton = () => (
       </div>
     </div>
 
-    {/* KPIs Skeleton */}
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
       {[...Array(6)].map((_, i) => (
         <div key={i} className={`h-32 rounded-3xl p-5 animate-pulse ${i===0 ? 'col-span-2 md:col-span-1 bg-gray-300 dark:bg-gray-800 lya:bg-lya-border/40' : 'bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`} />
       ))}
     </div>
 
-    {/* Filter Row Skeleton */}
     <div className="mb-4 h-16 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse" />
 
-    {/* Table Skeleton */}
     <div className="flex-1 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col">
       <div className="h-12 bg-gray-100/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30" />
       <div className="p-4 space-y-4">
@@ -54,6 +50,7 @@ export const CashRegisterPage = ({ user }) => {
   } = useCashController(user);
 
   const [filterSource, setFilterSource] = useState('ALL');
+  const [showModDetails, setShowModDetails] = useState(false);
 
   const setToday = () => {
     const today = new Date();
@@ -79,7 +76,6 @@ export const CashRegisterPage = ({ user }) => {
     return { label: 'Efectivo', icon: Banknote, color: 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-700', bg: 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-emerald-100' };
   };
 
-  // 🔥 SOLUCIÓN PROTEGIDA: Declaramos useMemo ANTES de cualquier return.
   const activeTransactions = transactions.filter(tx => tx.status === 'ACTIVE');
   const paymentStats = useMemo(() => {
     return activeTransactions.reduce((acc, tx) => {
@@ -93,7 +89,6 @@ export const CashRegisterPage = ({ user }) => {
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
 
-  // Si está cargando, mostramos el skeleton
   if (loading) return <CashRegisterSkeleton />;
 
   const filteredTransactions = transactions.filter(tx => {
@@ -103,10 +98,7 @@ export const CashRegisterPage = ({ user }) => {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.05 }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
 
   const cardVariants = {
@@ -207,29 +199,43 @@ export const CashRegisterPage = ({ user }) => {
         </motion.div>
       </motion.div>
 
-      <div className="mb-4 bg-white dark:bg-gray-900 lya:bg-lya-surface p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h3 className="text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold flex items-center gap-2 pl-2">
+      <div className="mb-4 bg-white dark:bg-gray-900 lya:bg-lya-surface p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col md:flex-row justify-between items-center gap-4">
+        <h3 className="text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold flex items-center gap-2 pl-2 whitespace-nowrap">
           <Filter size={18} className="text-gray-400 lya:text-lya-text/50" /> Movimientos
         </h3>
         
-        <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto overflow-x-auto">
-          <button
-            onClick={() => setFilterSource('ALL')}
-            className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all ${filterSource === 'ALL' ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 lya:text-lya-text/50 lya:hover:text-lya-text/80'}`}
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto">
+          <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto flex-shrink-0">
+            <button
+              onClick={() => setFilterSource('ALL')}
+              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all ${filterSource === 'ALL' ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 lya:text-lya-text/50 lya:hover:text-lya-text/80'}`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFilterSource('CAFETERIA')}
+              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 shadow-sm lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'text-gray-500 hover:text-orange-500 lya:text-lya-text/50 lya:hover:text-[#9B1C1C]'}`}
+            >
+              <Coffee size={14} /> Cafetería
+            </button>
+            <button
+              onClick={() => setFilterSource('PASTELERIA')}
+              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 shadow-sm lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'text-gray-500 hover:text-pink-500 lya:text-lya-text/50 lya:hover:text-[#9D174D]'}`}
+            >
+              <Cake size={14} /> Pastelería
+            </button>
+          </div>
+
+          <button 
+            onClick={() => setShowModDetails(!showModDetails)}
+            className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-black rounded-xl transition-all w-full sm:w-auto flex-shrink-0 ${
+              showModDetails 
+                ? 'bg-orange-100 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/50 lya:bg-lya-primary/10 lya:text-lya-primary lya:border-lya-primary/20' 
+                : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/40 hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/50'
+            } border shadow-sm`}
           >
-            Todos
-          </button>
-          <button
-            onClick={() => setFilterSource('CAFETERIA')}
-            className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 shadow-sm lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'text-gray-500 hover:text-orange-500 lya:text-lya-text/50 lya:hover:text-[#9B1C1C]'}`}
-          >
-            <Coffee size={14} /> Cafetería
-          </button>
-          <button
-            onClick={() => setFilterSource('PASTELERIA')}
-            className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 shadow-sm lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'text-gray-500 hover:text-pink-500 lya:text-lya-text/50 lya:hover:text-[#9D174D]'}`}
-          >
-            <Cake size={14} /> Pastelería
+            {showModDetails ? <EyeOff size={14}/> : <Eye size={14}/>}
+            {showModDetails ? 'Ocultar Detalles' : 'Ver Detalles'}
           </button>
         </div>
       </div>
@@ -268,7 +274,7 @@ export const CashRegisterPage = ({ user }) => {
 
                   return (
                     <motion.tr 
-                      key={tx.id} // 🔥 AQUÍ ESTÁ LA MAGIA, CADA ABONO TIENE SU ID ÚNICO
+                      key={tx.id} 
                       layout
                       initial={{ opacity: 0, y: 15 }} 
                       animate={{ opacity: 1, y: 0 }} 
@@ -280,13 +286,51 @@ export const CashRegisterPage = ({ user }) => {
                         {new Date(tx.createdAt).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
                       </td>
                       <td className="p-5">
-                        <span className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit ${tx.source === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]'}`}>
-                          {tx.source === 'CAFETERIA' ? <Coffee size={12} /> : <Cake size={12} />}
+                        <span className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit ${tx.source === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : tx.source === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
+                          {tx.source === 'CAFETERIA' ? <Coffee size={12} /> : tx.source === 'PASTELERIA' ? <Cake size={12} /> : <Calculator size={12} />}
                           {tx.source}
                         </span>
                       </td>
                       <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">
-                        <p className={isCancelled ? 'line-through opacity-50' : ''}>{tx.description}</p>
+                        
+                        {(() => {
+                          const partes = (tx.description || '').split(' | ');
+                          const descOriginal = partes[0];
+                          const modificaciones = partes.slice(1);
+                          
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <p className={isCancelled ? 'line-through opacity-50' : ''}>
+                                {descOriginal}
+                              </p>
+                              
+                              {modificaciones.length > 0 && showModDetails && (
+                                <div className="flex flex-col gap-1 mt-0.5">
+                                  {modificaciones.map((mod, i) => {
+                                    const isRestaurado = mod.includes('📈');
+                                    return (
+                                      <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${
+                                        isRestaurado 
+                                          ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500' 
+                                          : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500'
+                                      }`}>
+                                        {mod}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {modificaciones.length > 0 && !showModDetails && (
+                                 <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold italic flex items-center gap-1">
+                                   <RotateCcw size={10}/> {modificaciones.length} modificación(es) oculta(s)
+                                 </span>
+                              )}
+
+                            </div>
+                          );
+                        })()}
+
                         <div className={`text-[11px] font-semibold mt-1.5 flex flex-wrap items-center gap-2 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
                           <span className="flex items-center gap-1"><UserCheck size={12} /> Por: {creatorName}</span>
                           {!isCancelled && (
@@ -300,7 +344,7 @@ export const CashRegisterPage = ({ user }) => {
                         </div>
                       </td>
                       <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text">
-                        <span className={isCancelled ? 'line-through opacity-50' : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'}>
+                        <span className={isCancelled ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'}>
                           {isCancelled ? '' : '+'} ${parseFloat(tx.amount).toFixed(2)}
                         </span>
                       </td>
@@ -318,29 +362,43 @@ export const CashRegisterPage = ({ user }) => {
                           <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 px-3 py-1.5 rounded-lg lya:bg-emerald-500/10 lya:border-emerald-500/20 lya:text-[#03543F]">Activo</span>
                         )}
                       </td>
+
+                      {/* 🔥 CANDADO DE SEGURIDAD APLICADO A LA COLUMNA DE ACCIONES 🔥 */}
                       <td className="p-5 text-center">
-                        {!isCancelled && user?.role === 'Administrador' && (
-                          <button 
-                            onClick={() => handleCancelTransaction(tx.id)}
-                            className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl outline-none active:scale-95 lya:bg-red-500/10 lya:text-red-500 lya:hover:bg-red-500/20"
-                            title="Anular Movimiento"
+                        {tx.source !== 'MANUAL' ? (
+                          <span 
+                            className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-lg select-none"
+                            title={`Los movimientos de ${tx.source === 'CAFETERIA' ? 'Cafetería' : 'Pastelería'} solo se pueden anular o restaurar desde su módulo correspondiente.`}
                           >
-                            <XCircle size={20} />
-                          </button>
-                        )}
-                        {isCancelled && user?.role === 'Administrador' && (
-                          <button 
-                            onClick={() => handleRestoreTransaction(tx.id)}
-                            className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl outline-none active:scale-95 lya:bg-lya-primary/10 lya:text-lya-primary lya:hover:bg-lya-primary/20"
-                            title="Restaurar Movimiento"
-                          >
-                            <RotateCcw size={20} />
-                          </button>
-                        )}
-                        {user?.role !== 'Administrador' && (
-                           <span className="text-xs font-bold text-gray-400 lya:text-lya-text/30 select-none">No auto.</span>
+                            Automático
+                          </span>
+                        ) : (
+                          <>
+                            {!isCancelled && user?.role === 'Administrador' && (
+                              <button 
+                                onClick={() => handleCancelTransaction(tx.id)}
+                                className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl outline-none active:scale-95 lya:bg-red-500/10 lya:text-red-500 lya:hover:bg-red-500/20"
+                                title="Anular Movimiento Manual"
+                              >
+                                <XCircle size={20} />
+                              </button>
+                            )}
+                            {isCancelled && user?.role === 'Administrador' && (
+                              <button 
+                                onClick={() => handleRestoreTransaction(tx.id)}
+                                className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl outline-none active:scale-95 lya:bg-lya-primary/10 lya:text-lya-primary lya:hover:bg-lya-primary/20"
+                                title="Restaurar Movimiento Manual"
+                              >
+                                <RotateCcw size={20} />
+                              </button>
+                            )}
+                            {user?.role !== 'Administrador' && (
+                               <span className="text-xs font-bold text-gray-400 lya:text-lya-text/30 select-none">No auto.</span>
+                            )}
+                          </>
                         )}
                       </td>
+
                     </motion.tr>
                   );
                 })}

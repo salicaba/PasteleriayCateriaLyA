@@ -22,7 +22,6 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: false,
   },
   expenseCategory: {
-    // 🔥 Añadido 'REFUND' a las categorías
     type: DataTypes.ENUM('NONE', 'PAYROLL', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'MARKETING', 'OTHER', 'REFUND'),
     defaultValue: 'NONE',
     allowNull: false
@@ -37,11 +36,12 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: false,
   },
   description: {
-    type: DataTypes.STRING,
+    // 🔥 EL CAMBIO ESTÁ AQUÍ: Cambiamos STRING por TEXT para quitar el límite de 255 caracteres
+    type: DataTypes.TEXT,
     allowNull: false,
   },
   referenceId: {
-    type: DataTypes.STRING, // Aquí guardaremos el ID de la Orden al hacer un reembolso
+    type: DataTypes.STRING, 
     allowNull: true, 
   },
   status: {

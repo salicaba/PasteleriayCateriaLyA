@@ -42,8 +42,25 @@ export const TicketSidebar = ({
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
 
-  const allItemsPaid = activeCart.length > 0 && activeCart.every(item => item.enviadoCocina && paidAccounts?.includes(item.cuenta || 'General'));
-  const isCompletamentePagada = orderStatus === 'PAID' || allItemsPaid;
+  let isCompletamentePagada = false;
+  if (isVitrina) {
+      isCompletamentePagada = orderStatus === 'PAID';
+  } else if (activeCart.length === 0) {
+      isCompletamentePagada = orderStatus === 'PAID';
+  } else {
+      const unpaidActiveItems = activeCart.filter(item => !(paidAccounts?.includes(item.cuenta || 'General')));
+      const allItemsPaid = unpaidActiveItems.length === 0;
+      
+      if (orderStatus === 'PAID') {
+          if (paidAccounts && paidAccounts.length > 0) {
+              isCompletamentePagada = allItemsPaid;
+          } else {
+              isCompletamentePagada = true;
+          }
+      } else {
+          isCompletamentePagada = allItemsPaid && activeCart.every(i => i.enviadoCocina);
+      }
+  }
 
   const handleAddCuenta = (e) => {
     e.preventDefault();
@@ -82,6 +99,15 @@ export const TicketSidebar = ({
         }
     });
     return { cuentaName, items: displayItems };
+  });
+
+  const visibleGroups = groupedCart.filter(g => {
+      if (cuentasOcultas.includes(g.cuentaName)) return false;
+      if (g.items.length === 0) {
+          const otherGroupsWithItems = groupedCart.some(other => other.cuentaName !== g.cuentaName && other.items.length > 0);
+          if (otherGroupsWithItems) return false;
+      }
+      return true;
   });
 
   const handleContainerDragOver = (e) => {
@@ -171,7 +197,6 @@ export const TicketSidebar = ({
   const hasReadyItems = sentItems.some(i => i.kitchenStatus === 'READY');
   const hasCookingItems = sentItems.some(i => ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
   
-  // 🔥 AQUÍ APAGAMOS EL BOTÓN PARA MOSTRADOR 🔥
   const showDeliverAllBtn = !isVitrina && hasSentItems && !allSentItemsDelivered;
 
   return (
@@ -224,7 +249,7 @@ export const TicketSidebar = ({
           </div>
         ) : (
           <AnimatePresence mode="popLayout"> 
-            {groupedCart.filter(g => !cuentasOcultas.includes(g.cuentaName)).map(({ cuentaName, items }) => {
+            {visibleGroups.map(({ cuentaName, items }) => {
               const isActive = activeAcc === cuentaName;
               const isDragTarget = dragOverCuenta === cuentaName;
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
@@ -418,7 +443,7 @@ export const TicketSidebar = ({
                           </div>
                         </div>
 
-                        {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && !isCuentaPagada && onCancelItem)) && (
+                        {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
                           <div className="flex items-center justify-between gap-2 mt-2 pt-3 border-t border-gray-100 dark:border-gray-800/60">
                             
                             {!isVitrina && (
@@ -426,7 +451,8 @@ export const TicketSidebar = ({
                                 {item.enviadoCocina ? (
                                   <button 
                                     onClick={() => handleToggleStatus(item)} 
-                                    disabled={isCompletamentePagada || isCuentaPagada || isProcessing || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
+                                    // 🔥 AQUÍ ESTÁ EL ARREGLO: Quitamos el isCompletamentePagada de las restricciones 🔥
+                                    disabled={isProcessing || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                                     className={clsx(
                                         "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-xl border uppercase transition-all duration-300 w-full text-center shadow-sm", 
                                         isProcessing ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
@@ -469,7 +495,7 @@ export const TicketSidebar = ({
                               </div>
                             )}
                             
-                            {((!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && !isCuentaPagada && onCancelItem)) && (
+                            {((!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
                               <div className={clsx(
                                 "flex items-center gap-1 bg-white dark:bg-gray-900 rounded-xl p-0.5 shadow-sm border border-gray-100 dark:border-gray-800",
                                 isVitrina ? "w-full justify-between" : "shrink-0"
@@ -482,7 +508,7 @@ export const TicketSidebar = ({
                                     <button onClick={() => onDelete(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Trash2 size={isVitrina ? 18 : 14} /></button>
                                   </>
                                 )}
-                                {item.enviadoCocina && !isCuentaPagada && onCancelItem && (
+                                {item.enviadoCocina && onCancelItem && (
                                     <button onClick={() => handleCancelItem(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-400 hover:text-red-600 transition-colors", isVitrina ? "w-full py-2 flex justify-center items-center gap-2" : "p-1")} title="Cancelar / Eliminar Producto">
                                       <XCircle size={isVitrina ? 18 : 16} />
                                       {isVitrina && <span className="text-[10px] font-black uppercase tracking-wider">Cancelar Producto</span>}
@@ -532,6 +558,32 @@ export const TicketSidebar = ({
       </div>
 
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-20 shrink-0 transition-colors">
+        
+        {/* 🔥 AQUÍ SE MOVIÓ EL BOTÓN "ENTREGAR TODO" PARA QUE SALGA AUNQUE ESTÉ PAGADO 🔥 */}
+        {onDeliverAll && showDeliverAllBtn && (
+          <button
+             disabled={!hasReadyItems || isDeliveringAll}
+             onClick={() => openConfirmModal({
+                 title: (isVitrina || isLlevar) ? 'Entregar Todo el Pedido' : 'Entregar Toda la Mesa',
+                 message: hasCookingItems 
+                   ? ((isVitrina || isLlevar) ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos del pedido como entregados?' : 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?')
+                   : ((isVitrina || isLlevar) ? '¿Confirmas que ya entregaste los productos listos del pedido?' : '¿Confirmas que ya entregaste los productos listos a la mesa?'),
+                 icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
+                 onConfirm: () => handleDeliverAll()
+             })}
+             className={clsx(
+               "w-full mb-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-2 transition-all shadow-sm",
+               isDeliveringAll ? "bg-green-100 dark:bg-green-800/40 text-green-700 border border-green-300 dark:border-green-700 cursor-wait opacity-80" :
+               hasReadyItems
+                 ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-800/40 active:scale-95 cursor-pointer"
+                 : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed opacity-70"
+             )}
+          >
+             {isDeliveringAll ? <Loader2 size={16} className="animate-spin" /> : <CheckCheck size={16} />}
+             {isDeliveringAll ? 'Entregando...' : (hasReadyItems ? ((isVitrina || isLlevar) ? 'Entregar Todo El Pedido' : 'Entregar Toda La Mesa') : 'Esperando a Cocina...')}
+          </button>
+        )}
+
         {isCompletamentePagada ? (
            <div className="flex gap-2 animate-fade-in">
               <button onClick={() => onPrintTicket()} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 active:scale-95 transition-transform hover:bg-gray-200 dark:hover:bg-gray-700">
@@ -562,36 +614,21 @@ export const TicketSidebar = ({
                   </button>
               )}
 
+              {!isVitrina && (onCancelFullOrder || onCancelAccount) && (
+                  <button 
+                    onClick={() => setShowCancelModal(true)} 
+                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 active:scale-95 transition-transform hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50"
+                  >
+                    <AlertTriangle size={16} /><span>Cancelar</span>
+                  </button>
+              )}
+
               <button onClick={onCloseTable} className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform">
                 <XCircle size={16} /><span>{isVitrina ? 'Siguiente Venta' : (isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa')}</span>
               </button>
            </div>
         ) : (
            <>
-             {onDeliverAll && showDeliverAllBtn && (
-               <button
-                  disabled={!hasReadyItems || isDeliveringAll}
-                  onClick={() => openConfirmModal({
-                      title: (isVitrina || isLlevar) ? 'Entregar Todo el Pedido' : 'Entregar Toda la Mesa',
-                      message: hasCookingItems 
-                        ? ((isVitrina || isLlevar) ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos del pedido como entregados?' : 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?')
-                        : ((isVitrina || isLlevar) ? '¿Confirmas que ya entregaste los productos listos del pedido?' : '¿Confirmas que ya entregaste los productos listos a la mesa?'),
-                      icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
-                      onConfirm: () => handleDeliverAll()
-                  })}
-                  className={clsx(
-                    "w-full mb-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-2 transition-all shadow-sm",
-                    isDeliveringAll ? "bg-green-100 dark:bg-green-800/40 text-green-700 border border-green-300 dark:border-green-700 cursor-wait opacity-80" :
-                    hasReadyItems
-                      ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-800/40 active:scale-95 cursor-pointer"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed opacity-70"
-                  )}
-               >
-                  {isDeliveringAll ? <Loader2 size={16} className="animate-spin" /> : <CheckCheck size={16} />}
-                  {isDeliveringAll ? 'Entregando...' : (hasReadyItems ? ((isVitrina || isLlevar) ? 'Entregar Todo El Pedido' : 'Entregar Toda La Mesa') : 'Esperando a Cocina...')}
-               </button>
-             )}
-             
              <div className="space-y-2 mb-4">
                <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider"><span>{isVitrina ? 'Total de Productos' : (isLlevar ? 'Subtotal Pedido' : 'Subtotal Mesa')}</span><span>${isVitrina ? (mesaTotal + unsentTotal).toFixed(2) : mesaTotal.toFixed(2)}</span></div>
                {!isVitrina && hasUnsentItems && (<div className="flex justify-between items-center text-orange-500 text-xs font-black uppercase tracking-wider"><span>Por enviar</span><span>+${unsentTotal.toFixed(2)}</span></div>)}
@@ -611,7 +648,7 @@ export const TicketSidebar = ({
            </>
         )}
 
-        {(!isVitrina && !isLlevar) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
+        {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
             <button 
                onClick={() => setShowCancelModal(true)} 
                className="w-full mt-3 py-2 text-[10px] font-black text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5"
