@@ -1,13 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, PackageMinus, Wallet, PieChart as PieChartIcon, Filter, Download, FileText, FileSpreadsheet, Coffee } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
+import { 
+  Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, 
+  PackageMinus, Wallet, PieChart as PieChartIcon, Filter, 
+  FileText, FileSpreadsheet, ChevronDown, Search 
+} from 'lucide-react';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
+  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend 
+} from 'recharts';
 import { useReportsController } from '../controllers/useReportsController';
 import { useTheme } from '../../../hooks/useTheme';
 
 const COLORS = {
-  primary: ['#f97316', '#fb923c', '#fdba74'], 
-  lya: ['#4A2B29', '#E6CCB2', '#DDB892'], 
+  // 🔥 CORRECCIÓN: Colores altamente contrastantes para diferenciar Orígenes (Cafetería vs Pastelería)
+  primary: ['#f97316', '#8b5cf6', '#10b981', '#0ea5e9'], 
+  lya: ['#4A2B29', '#8A3A3A', '#DDB892', '#556B2F'],     
   opex: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'], 
   opexLya: ['#4A2B29', '#DDB892', '#8A3A3A', '#4682B4', '#556B2F', '#9E6A55', '#6b7280'], 
   success: '#10b981',
@@ -21,7 +29,73 @@ const OPEX_TRANSLATIONS = {
   'SUPPLIES': 'Artículos de Limpieza',
   'MARKETING': 'Publicidad',
   'OTHER': 'Otros Gastos',
+  'REFUND': 'Reembolsos / Devoluciones', // 🔥 ESTA ES LA LÍNEA NUEVA
   'NONE': 'Sin Categoría'
+};
+
+/* ==========================================
+   NUEVO: COMPONENTE SELECTOR 100% TEMATIZADO
+   ========================================== */
+const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassName, buttonClassName }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className={`relative ${containerClassName}`} ref={dropdownRef}>
+      <button 
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full transition-colors ${buttonClassName}`}
+      >
+        <div className="flex items-center truncate">
+          {Icon && <Icon size={16} className="text-gray-400 dark:text-gray-500 lya:text-lya-primary mr-2 shrink-0" />}
+          <span className="truncate">{selected?.label}</span>
+        </div>
+        <ChevronDown size={14} className={`text-gray-400 dark:text-gray-500 ml-2 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute z-50 top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden py-1"
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-colors ${
+                  value === opt.value 
+                    ? 'bg-orange-50 dark:bg-gray-700 lya:bg-lya-primary/10 text-orange-600 dark:text-white lya:text-lya-primary' 
+                    : 'text-gray-600 dark:text-gray-300 lya:text-lya-text hover:bg-gray-50 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg/50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 };
 
 const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
@@ -82,7 +156,6 @@ const ReportsSkeleton = () => (
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
   >
-    {/* Header Skeleton */}
     <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
       <div className="flex items-center space-x-4">
         <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
@@ -91,29 +164,14 @@ const ReportsSkeleton = () => (
           <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
         </div>
       </div>
-      <div className="flex gap-4 w-full xl:w-auto">
-        <div className="w-full sm:w-32 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        <div className="w-full sm:w-64 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-      </div>
     </div>
-
     <div className="flex-1 overflow-y-auto hide-scrollbar pb-24 space-y-6 pr-1">
-      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="h-28 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
         ))}
       </div>
-      
-      {/* Big Chart Skeleton */}
       <div className="h-[300px] bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
-      
-      {/* 3 Small Charts Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-[300px] bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
-        ))}
-      </div>
     </div>
   </motion.div>
 );
@@ -122,25 +180,80 @@ export const ReportsPage = () => {
   const { theme } = useTheme();
   const { loading, dateRange, setDateRange, chartData, exportToExcel, exportToPDF } = useReportsController();
   
+  // Estados para Filtros
   const [productFilter, setProductFilter] = useState('5');
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Estado: Controla el selector elegante de fechas
+  const [timeRange, setTimeRange] = useState('this_month');
 
   const gridColor = theme === 'dark' ? '#374151' : theme === 'lya' ? '#E6CCB2' : '#e5e7eb';
   const textColor = theme === 'dark' ? '#9ca3af' : theme === 'lya' ? '#4A2B29' : '#6b7280';
   const getPieColors = () => theme === 'lya' ? COLORS.lya : COLORS.primary;
   const getOpexColors = () => theme === 'lya' ? COLORS.opexLya : COLORS.opex;
 
+  // Lógica: Calcula las fechas basado en el periodo predefinido
+  const handleRangeChange = (val) => {
+    setTimeRange(val);
+
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    switch(val) {
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'yesterday':
+        start.setDate(now.getDate() - 1);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(now.getDate() - 1);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'this_week':
+        const firstDay = now.getDate() - now.getDay();
+        start.setDate(firstDay);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(firstDay + 6);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'this_month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'last_month':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        break;
+      case 'custom':
+        return; // Si es personalizado, mantenemos las fechas que ya estén puestas
+      default:
+        break;
+    }
+
+    setDateRange({ start, end });
+  };
+
   const handleDateChange = (e, type) => {
+    // Si cambian la fecha manualmente, cambiamos el selector a 'Personalizado'
+    setTimeRange('custom');
     setDateRange(prev => ({
       ...prev,
       [type]: new Date(e.target.value)
     }));
   };
 
-  // 🔥 SOLUCIÓN: Los useMemo ahora están declarados ANTES del return temprano.
   const processedProducts = useMemo(() => {
     if (!chartData?.productSales) return [];
     
     let list = [...chartData.productSales];
+
+    if (searchTerm) {
+      list = list.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+
     list.sort((a, b) => b.cantidad - a.cantidad);
 
     if (productFilter === 'SOLD') {
@@ -150,13 +263,12 @@ export const ReportsPage = () => {
     }
     
     return list;
-  }, [chartData?.productSales, productFilter]);
+  }, [chartData?.productSales, productFilter, searchTerm]);
 
   const chartDisplayedProducts = useMemo(() => {
     return [...processedProducts].reverse();
   }, [processedProducts]);
 
-  // 🔥 AHORA SÍ: Validamos el estado de carga
   if (loading || !chartData?.kpis) return <ReportsSkeleton />;
 
   const dynamicChartHeight = Math.max(300, chartDisplayedProducts.length * 35);
@@ -181,7 +293,7 @@ export const ReportsPage = () => {
     >
       
       {/* HEADER */}
-      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors duration-300">
+      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-20 relative transition-colors duration-300">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 dark:shadow-orange-900/30 lya:shadow-lya-primary/20">
             <PieChartIcon size={28} />
@@ -196,52 +308,82 @@ export const ReportsPage = () => {
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
-          
+        <div className="flex flex-col xl:flex-row items-center gap-4 w-full xl:w-auto">
           <div className="flex gap-2 w-full sm:w-auto">
              <button 
                 onClick={exportToPDF}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/40 px-4 py-2.5 rounded-xl transition-colors text-sm font-bold shadow-sm"
              >
-                <FileText size={18} /> <span className="hidden sm:inline">Exportar PDF</span>
+                <FileText size={18} /> <span className="hidden xl:inline">Exportar PDF</span>
              </button>
              <button 
                 onClick={exportToExcel}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800/40 px-4 py-2.5 rounded-xl transition-colors text-sm font-bold shadow-sm"
              >
-                <FileSpreadsheet size={18} /> <span className="hidden sm:inline">Exportar Excel</span>
+                <FileSpreadsheet size={18} /> <span className="hidden xl:inline">Exportar Excel</span>
              </button>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2.5 shadow-inner transition-colors">
-            <CalendarIcon size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 shrink-0" />
-            <input 
-              type="date" 
-              value={dateRange.start.toISOString().split('T')[0]} 
-              onChange={(e) => handleDateChange(e, 'start')}
-              style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-              className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full"
+          {/* Selector de Fechas Premium */}
+          <div className="flex flex-col sm:flex-row items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-1 py-1 shadow-inner transition-colors w-full sm:w-auto">
+            
+            <ThemedDropdown
+              value={timeRange}
+              onChange={handleRangeChange}
+              icon={CalendarIcon}
+              options={[
+                { value: 'today', label: 'Hoy' },
+                { value: 'yesterday', label: 'Ayer' },
+                { value: 'this_week', label: 'Esta Semana' },
+                { value: 'this_month', label: 'Este Mes' },
+                { value: 'last_month', label: 'Mes Anterior' },
+                { value: 'custom', label: 'Personalizado...' }
+              ]}
+              containerClassName="px-2 py-1.5 min-w-[170px]"
+              buttonClassName="justify-between"
             />
-            <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border font-bold">-</span>
-            <input 
-              type="date" 
-              value={dateRange.end.toISOString().split('T')[0]} 
-              onChange={(e) => handleDateChange(e, 'end')}
-              style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-              className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full"
-            />
+
+            {/* Inputs manuales (Solo se ven si elige "Personalizado") */}
+            <AnimatePresence>
+              {timeRange === 'custom' && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="flex items-center overflow-hidden whitespace-nowrap mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0"
+                >
+                  <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
+                  <input 
+                    type="date" 
+                    value={dateRange.start.toISOString().split('T')[0]} 
+                    onChange={(e) => handleDateChange(e, 'start')}
+                    style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
+                  />
+                  <span className="text-gray-300 dark:text-gray-600 mx-1">-</span>
+                  <input 
+                    type="date" 
+                    value={dateRange.end.toISOString().split('T')[0]} 
+                    onChange={(e) => handleDateChange(e, 'end')}
+                    style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
           </div>
         </div>
       </header>
 
       {/* CONTENIDO SCROLLABLE */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar pb-24 space-y-6 pr-1">
+      <div className="flex-1 overflow-y-auto hide-scrollbar pb-24 space-y-6 pr-1 z-10">
         
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <KPICard title="Ingresos Totales" amount={kpis.totalIncome} trend={trends.income} icon={DollarSign} type="income" delay={0.05} />
           <KPICard title="Utilidad Neta (Aprox)" amount={kpis.netProfit} trend={trends.profit} icon={kpis.netProfit >= 0 ? TrendingUp : TrendingDown} type="profit" delay={0.1} />
-          <KPICard title="Gastos (OPEX)" amount={kpis.totalOpex} trend={trends.opex} icon={Wallet} type="expense" delay={0.15} />
+          <KPICard title="Gastos Operativos" amount={kpis.totalOpex} trend={trends.opex} icon={Wallet} type="expense" delay={0.15} />
           <KPICard title="Mermas (Kardex)" amount={kpis.totalMermas} trend={trends.mermas} icon={PackageMinus} type="expense" delay={0.2} />
         </div>
 
@@ -345,34 +487,93 @@ export const ReportsPage = () => {
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }} 
           transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.45 }}
-          className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden transition-colors duration-300"
+          className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden transition-colors duration-300 relative"
         >
-          <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-             <div>
-               <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text transition-colors">Rendimiento y Desglose del Menú</h3>
-               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Análisis visual y financiero de los productos vendidos.</p>
-             </div>
+          {/* Elemento Decorativo Neo-Bento */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-primary/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-colors"></div>
 
-             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 shadow-inner w-full md:w-auto">
-               <Filter size={16} className="text-gray-400" />
-               <span className="text-xs font-bold text-gray-500 mr-1">Mostrar:</span>
-               <select 
-                  value={productFilter} 
-                  onChange={(e) => setProductFilter(e.target.value)}
-                  className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer border-none focus:ring-0 appearance-none"
-               >
-                  <option value="5">Top 5 más vendidos</option>
-                  <option value="10">Top 10 más vendidos</option>
-                  <option value="20">Top 20 más vendidos</option>
-                  <option value="50">Top 50 más vendidos</option>
-                  <option value="SOLD">Solo productos vendidos</option>
-                  <option value="ALL">Todo el catálogo completo</option>
-               </select>
-             </div>
+          {/* Header Rendimiento */}
+          <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+            <div>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text flex items-center gap-3 transition-colors">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 rounded-xl transition-colors">
+                  <PackageMinus className="w-5 h-5 text-orange-600 dark:text-orange-400 lya:text-lya-primary" />
+                </div>
+                Rendimiento y Desglose del Menú
+              </h3>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">
+                Análisis visual y financiero de los productos vendidos.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500/50 lya:focus:ring-lya-primary/50 outline-none"
+            >
+              <Filter className="w-4 h-4 text-orange-500 dark:text-orange-400 lya:text-lya-primary" />
+              {showFilters ? 'Ocultar Filtros' : 'Filtros y Búsqueda'}
+              <motion.div animate={{ rotate: showFilters ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              </motion.div>
+            </button>
           </div>
+
+          {/* Panel Desplegable de Filtros */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="overflow-hidden border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 bg-gray-50/50 dark:bg-gray-950/30 lya:bg-lya-bg/30 relative z-20"
+              >
+                <div className="p-6 flex flex-wrap gap-4 relative z-10">
+                  {/* Buscador de Texto */}
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-2 uppercase tracking-wider">
+                      Buscar producto
+                    </label>
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Ej. Pastel de Chocolate..."
+                        className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-2.5 text-sm text-gray-800 dark:text-white lya:text-lya-text focus:outline-none focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:ring-1 focus:ring-orange-500 lya:focus:ring-lya-primary transition-all shadow-sm font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filtro Select (Top N) con Componente Tematizado */}
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-2 uppercase tracking-wider">
+                      Clasificación / Rango
+                    </label>
+                    <ThemedDropdown
+                      value={productFilter}
+                      onChange={setProductFilter}
+                      icon={Filter}
+                      options={[
+                        { value: '5', label: 'Top 5 más vendidos' },
+                        { value: '10', label: 'Top 10 más vendidos' },
+                        { value: '20', label: 'Top 20 más vendidos' },
+                        { value: '50', label: 'Top 50 más vendidos' },
+                        { value: 'SOLD', label: 'Solo productos vendidos' },
+                        { value: 'ALL', label: 'Todo el catálogo completo' }
+                      ]}
+                      containerClassName="w-full relative z-30"
+                      buttonClassName="w-full justify-between bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2.5 focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:ring-1 focus:ring-orange-500 lya:focus:ring-lya-primary shadow-sm"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
-          <div className="p-6 flex flex-col gap-6">
-            
+          <div className="p-6 flex flex-col gap-6 relative z-10">
+            {/* Gráfica de Barras Horizontal */}
             <div className="w-full border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl overflow-y-auto hide-scrollbar max-h-[400px]">
               {chartDisplayedProducts?.length > 0 ? (
                 <div style={{ height: dynamicChartHeight, width: '100%' }}>
@@ -391,13 +592,13 @@ export const ReportsPage = () => {
                         tickFormatter={(val) => val.length > 18 ? val.substring(0, 17) + '...' : val}
                       />
                       <RechartsTooltip 
-                        cursor={{fill: theme === 'dark' ? '#374151' : '#f3f4f6', opacity: 0.4}} 
+                        cursor={{fill: theme === 'dark' ? '#374151' : theme === 'lya' ? '#E6CCB2' : '#f3f4f6', opacity: 0.4}} 
                         contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }}
                       />
                       <Bar 
                         dataKey="cantidad" 
                         name="Unidades Vendidas" 
-                        fill={theme === 'lya' ? '#DDB892' : '#8b5cf6'} 
+                        fill={theme === 'lya' ? '#DDB892' : '#f97316'} 
                         radius={[0, 6, 6, 0]} 
                         barSize={18} 
                       />
@@ -406,14 +607,15 @@ export const ReportsPage = () => {
                 </div>
               ) : (
                 <div className="h-[300px]">
-                  <EmptyChartState message="No hay productos registrados en esta vista." />
+                  <EmptyChartState message="No hay productos que coincidan con la búsqueda." />
                 </div>
               )}
             </div>
 
+            {/* Tabla Detallada */}
             <div className="overflow-x-auto hide-scrollbar border border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 rounded-2xl max-h-[400px]">
               <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 sticky top-0 z-10">
+                <thead className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 sticky top-0 z-10 backdrop-blur-md">
                   <tr className="border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs uppercase tracking-wider font-bold transition-colors">
                     <th className="p-4">Producto</th>
                     <th className="p-4 text-center">Clasificación</th>
@@ -429,13 +631,19 @@ export const ReportsPage = () => {
                         layout 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.01, 0.1) }}
                         className="hover:bg-gray-50 dark:hover:bg-gray-800/40 lya:hover:bg-lya-bg/40 transition-colors"
                       >
                         <td className="p-4">
-                          <div className="font-bold text-sm text-gray-800 dark:text-gray-100 lya:text-lya-text flex items-center gap-2 transition-colors">
-                            {prod.cantidad === 0 && <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" title="Sin rotación"></span>}
-                            {index + 1}. {prod.name}
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 flex items-center justify-center text-orange-600 dark:text-orange-400 lya:text-lya-primary font-black text-xs shrink-0 transition-colors">
+                              {prod.name.charAt(0)}
+                            </div>
+                            <div className="font-bold text-sm text-gray-800 dark:text-gray-100 lya:text-lya-text flex items-center gap-2 transition-colors">
+                              {prod.cantidad === 0 && <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" title="Sin rotación"></span>}
+                              {index + 1}. {prod.name}
+                            </div>
                           </div>
                         </td>
                         <td className="p-4 text-center">

@@ -2,13 +2,16 @@
 import { Router } from 'express';
 import { 
   getPedidos, 
-  getPedidoById, // 🔥 NUEVO IMPORT
+  getPedidoById,
   createPedido, 
   addAbono, 
   updateEstado, 
   updatePedido,
   printPedidoTicket,   
-  sharePedidoTicket    
+  sharePedidoTicket,
+  entregarPedido,    // 🔥 NUEVO: Para marcar entregas
+  cancelarPedido,    // 🔥 NUEVO: Cancela pedido y anula dinero en Caja
+  restaurarPedido    // 🔥 NUEVO: Restaura pedido y revive dinero en Caja
 } from './pasteleria.controller.js';
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
@@ -29,11 +32,18 @@ router.use(verifyToken);
 // 🔒 RUTAS PRIVADAS (Solo Empleados / Admins)
 // ==========================================
 router.get('/pedidos', getPedidos);
-router.get('/pedidos/:id', getPedidoById); // 🔥 AQUÍ ESTÁ LA RUTA CORREGIDA
+router.get('/pedidos/:id', getPedidoById);
 router.post('/pedidos', createPedido);
 router.post('/pedidos/:id/abonos', addAbono);
-router.put('/pedidos/:id/estado', updateEstado);
 router.put('/pedidos/:id', updatePedido); 
 router.post('/pedidos/:id/print', printPedidoTicket);
+
+// Ruta global de estados (Mantenida por retrocompatibilidad)
+router.put('/pedidos/:id/estado', updateEstado);
+
+// 🔥 NUEVAS RUTAS DE ESTADOS ESPECÍFICOS (Con sincronización de caja y transacciones)
+router.put('/pedidos/:id/entregar', entregarPedido);
+router.put('/pedidos/:id/cancelar', cancelarPedido);
+router.put('/pedidos/:id/restaurar', restaurarPedido);
 
 export default router;

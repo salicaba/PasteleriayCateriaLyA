@@ -24,6 +24,8 @@ export const getDashboardData = async (req, res) => {
     const prevDateFilter = { createdAt: { [Op.between]: [prevStart, prevEnd] } };
 
     // 1. Tendencia de Ventas Diarias e Ingresos por Origen (Actual)
+    // 🔥 La lógica de mutar transacciones que implementaste funciona perfecto aquí, 
+    // ya que solo suma transacciones 'ACTIVE' con su monto real ajustado.
     const incomeTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [
@@ -46,19 +48,24 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 3. Ventas de TODOS los productos
+    // 3. Ventas de TODOS los productos (🔥 CORREGIDO)
     const allProducts = await Product.findAll({
       attributes: ['id', 'name', 'departamento'],
       raw: true
     });
 
     const soldItems = await OrderItem.findAll({
-      where: { createdAt: { [Op.between]: [start, end] } },
+      where: { 
+        createdAt: { [Op.between]: [start, end] },
+        status: 'ACTIVE' // 🔥 FIX CRÍTICO: Excluir productos cancelados parcialmente
+      },
       include: [{
         model: Order,
         as: 'order',
         attributes: [],
-        where: { status: { [Op.in]: ['PAID', 'CLOSED'] } }
+        where: { 
+          status: { [Op.in]: ['PAID', 'CLOSED'] } // Excluye órdenes abiertas o canceladas totalmente
+        }
       }],
       attributes: [
         'productId',
@@ -89,7 +96,6 @@ export const getDashboardData = async (req, res) => {
         where: { status: 'COMPLETED' } 
       }],
       attributes: [
-        // 🔥 CORRECCIÓN AQUÍ: Comillas dobles agregadas a "difference" y "totalDifferenceCost"
         [fn('SUM', literal('CASE WHEN "difference" < 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalMermas'],
         [fn('SUM', literal('CASE WHEN "difference" > 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalSobrantes']
       ],
@@ -113,7 +119,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // --- CONSULTAS DEL PERIODO ANTERIOR ---
+    // --- CONSULTAS DEL PERIODO ANTERIOR (Tendencias) ---
     const prevIncomeTransactions = await Transaction.findAll({
       where: { ...prevDateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [[fn('SUM', col('amount')), 'total']],
@@ -134,7 +140,6 @@ export const getDashboardData = async (req, res) => {
         model: InventoryReconciliation, as: 'reconciliation', attributes: [], 
         where: { status: 'COMPLETED' } 
       }],
-      // 🔥 CORRECCIÓN AQUÍ: También aplicamos las comillas en el cálculo anterior
       attributes: [[fn('SUM', literal('CASE WHEN "difference" < 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalMermas']],
       raw: true
     });

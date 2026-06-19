@@ -1,32 +1,147 @@
-// src/modules/finance/views/NetProfitDashboard.jsx
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useFinanceController } from '../controllers/useFinanceController';
-import { TrendingUp, TrendingDown, DollarSign, Wallet, AlertCircle, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Wallet, AlertCircle, Calendar, ChevronDown } from 'lucide-react';
+
+/* ==========================================
+   COMPONENTE SELECTOR 100% TEMATIZADO (Finanzas)
+   ========================================== */
+const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassName, buttonClassName }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className={`relative ${containerClassName}`} ref={dropdownRef}>
+      <button 
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full transition-colors ${buttonClassName}`}
+      >
+        <div className="flex items-center truncate">
+          {Icon && <Icon size={16} className="text-gray-400 dark:text-gray-500 lya:text-lya-primary mr-2 shrink-0" />}
+          <span className="truncate">{selected?.label}</span>
+        </div>
+        <ChevronDown size={14} className={`text-gray-400 dark:text-gray-500 ml-2 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute z-50 top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden py-1"
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-colors ${
+                  value === opt.value 
+                    ? 'bg-emerald-50 dark:bg-gray-700 lya:bg-lya-primary/10 text-emerald-600 dark:text-white lya:text-lya-primary' 
+                    : 'text-gray-600 dark:text-gray-300 lya:text-lya-text hover:bg-gray-50 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg/50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export const NetProfitDashboard = () => {
   const { summary, isSummaryLoading, fetchFinancialSummary } = useFinanceController();
   
+  // Función auxiliar para evitar problemas de zona horaria al formatear fechas
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+    return formatLocalDate(new Date(d.getFullYear(), d.getMonth(), 1));
   });
   
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+    return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
   });
+
+  // Estado del selector premium
+  const [timeRange, setTimeRange] = useState('this_month');
 
   useEffect(() => {
     fetchFinancialSummary(startDate, endDate);
   }, [startDate, endDate, fetchFinancialSummary]);
 
-  const setThisMonth = () => {
-    const d = new Date();
-    const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
-    setStartDate(start);
-    setEndDate(end);
+  // Lógica de cambio de rango
+  const handleRangeChange = (val) => {
+    setTimeRange(val);
+
+    const now = new Date();
+    let start, end;
+
+    switch(val) {
+      case 'today':
+        start = new Date(now);
+        end = new Date(now);
+        break;
+      case 'yesterday':
+        start = new Date(now);
+        start.setDate(start.getDate() - 1);
+        end = new Date(start);
+        break;
+      case 'this_week':
+        start = new Date(now);
+        const firstDay = start.getDate() - start.getDay();
+        start.setDate(firstDay);
+        end = new Date(start);
+        end.setDate(firstDay + 6);
+        break;
+      case 'this_month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        break;
+      case 'last_month':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'custom':
+        return; // Mantiene las fechas actuales si se elige personalizado
+      default:
+        return;
+    }
+
+    setStartDate(formatLocalDate(start));
+    setEndDate(formatLocalDate(end));
+  };
+
+  const handleCustomDateChange = (val, type) => {
+    setTimeRange('custom');
+    if (type === 'start') setStartDate(val);
+    if (type === 'end') setEndDate(val);
   };
 
   const formatMoney = (amount) => {
@@ -45,6 +160,9 @@ export const NetProfitDashboard = () => {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
+
+  // Solo inyectar el modo de color si es necesario (el input type=date usa colorScheme)
+  const isDarkMode = document.documentElement.classList.contains('dark');
 
   return (
     <motion.div 
@@ -65,31 +183,55 @@ export const NetProfitDashboard = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
-          <button 
-            onClick={setThisMonth}
-            className="px-5 py-3 rounded-xl text-sm font-bold transition-all bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 w-full sm:w-auto flex items-center justify-center gap-2 active:scale-95"
-          >
-            <Calendar size={18} /> Este Mes
-          </button>
+          
+          {/* Selector de Fechas Premium (Neo-Bento) */}
+          <div className="flex flex-col sm:flex-row items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-1 py-1 shadow-inner transition-colors w-full sm:w-auto">
+            
+            <ThemedDropdown
+              value={timeRange}
+              onChange={handleRangeChange}
+              icon={Calendar}
+              options={[
+                { value: 'today', label: 'Hoy' },
+                { value: 'yesterday', label: 'Ayer' },
+                { value: 'this_week', label: 'Esta Semana' },
+                { value: 'this_month', label: 'Este Mes' },
+                { value: 'last_month', label: 'Mes Anterior' },
+                { value: 'custom', label: 'Personalizado...' }
+              ]}
+              containerClassName="px-2 py-1.5 min-w-[170px] w-full sm:w-auto"
+              buttonClassName="justify-between"
+            />
 
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg p-2 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm w-full sm:w-auto justify-center transition-colors">
-            <div className="flex items-center gap-2 px-3">
-              <input 
-                type="date" 
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="bg-transparent font-bold text-sm text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer transition-colors"
-              />
-            </div>
-            <span className="text-gray-400 dark:text-gray-500 lya:text-lya-text/50 font-bold transition-colors">-</span>
-            <div className="flex items-center gap-2 px-3">
-              <input 
-                type="date" 
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="bg-transparent font-bold text-sm text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer transition-colors"
-              />
-            </div>
+            {/* Inputs manuales (Solo se ven si elige "Personalizado") */}
+            <AnimatePresence>
+              {timeRange === 'custom' && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="flex items-center overflow-hidden whitespace-nowrap mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0"
+                >
+                  <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={(e) => handleCustomDateChange(e.target.value, 'start')}
+                    style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
+                  />
+                  <span className="text-gray-300 dark:text-gray-600 mx-1">-</span>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={(e) => handleCustomDateChange(e.target.value, 'end')}
+                    style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
           </div>
         </div>
       </header>

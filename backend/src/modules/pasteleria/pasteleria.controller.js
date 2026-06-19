@@ -1,9 +1,13 @@
-// backend/src/modules/pasteleria/pasteleria.controller.js
+import { Op } from 'sequelize';
+import sequelize from '../../config/database.js'; // Necesario para transacciones seguras
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
 import Transaction from '../cash/Transaction.model.js'; 
 
-// Obtener todos los pedidos
+// ==========================================
+// 🎂 OBTENCIÓN DE PEDIDOS
+// ==========================================
+
 export const getPedidos = async (req, res) => {
   try {
     const pedidos = await PasteleriaOrder.findAll({
@@ -17,7 +21,6 @@ export const getPedidos = async (req, res) => {
   }
 };
 
-// Obtener un solo pedido (CON IMÁGENES)
 export const getPedidoById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -33,7 +36,10 @@ export const getPedidoById = async (req, res) => {
   }
 };
 
-// Crear un nuevo pedido
+// ==========================================
+// 📝 CREACIÓN Y MODIFICACIÓN
+// ==========================================
+
 export const createPedido = async (req, res) => {
   try {
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
@@ -85,7 +91,27 @@ export const createPedido = async (req, res) => {
   }
 };
 
-// Registrar un abono a un pedido existente
+export const updatePedido = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pedido = await PasteleriaOrder.findByPk(id);
+    
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    await pedido.update(req.body);
+    res.json({ data: pedido });
+  } catch (error) {
+    console.error("Error al editar pedido:", error);
+    res.status(500).json({ message: "Error al actualizar el pedido" });
+  }
+};
+
+// ==========================================
+// 💰 FINANZAS Y ABONOS
+// ==========================================
+
 export const addAbono = async (req, res) => {
   try {
     const { id } = req.params;
@@ -134,7 +160,11 @@ export const addAbono = async (req, res) => {
   }
 };
 
-// Actualizar el estado de un pedido
+// ==========================================
+// 🔄 CONTROL DE ESTADOS (Manejo de Caja Sincronizado)
+// ==========================================
+
+// Controlador global de estado (Para mantener retrocompatibilidad)
 export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
@@ -149,38 +179,15 @@ export const updateEstado = async (req, res) => {
     pedido.estado = estado;
     await pedido.save();
 
-    // 🔥 MAGIA: Sincronizar Caja Automáticamente
     if (estado === 'cancelado') {
-      // Si se cancela el pedido, anulamos todas sus transacciones activas en la Caja
       await Transaction.update(
-        { 
-          status: 'CANCELLED', 
-          cancelledBy: userId, 
-          cancelledAt: new Date() 
-        },
-        { 
-          where: { 
-            referenceId: pedido.id, 
-            source: 'PASTELERIA',
-            status: 'ACTIVE' 
-          } 
-        }
+        { status: 'CANCELLED', cancelledBy: userId, cancelledAt: new Date() },
+        { where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'ACTIVE' } }
       );
     } else if (estado === 'pendiente') {
-      // Si se restaura el pedido, restauramos sus transacciones en la Caja
       await Transaction.update(
-        { 
-          status: 'ACTIVE', 
-          cancelledBy: null, 
-          cancelledAt: null 
-        },
-        { 
-          where: { 
-            referenceId: pedido.id, 
-            source: 'PASTELERIA',
-            status: 'CANCELLED' 
-          } 
-        }
+        { status: 'ACTIVE', cancelledBy: null, cancelledAt: null },
+        { where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'CANCELLED' } }
       );
     }
 
@@ -191,23 +198,91 @@ export const updateEstado = async (req, res) => {
   }
 };
 
-// Actualizar un pedido completo
-export const updatePedido = async (req, res) => {
+// Acciones Específicas de Estado
+export const entregarPedido = async (req, res) => {
   try {
     const { id } = req.params;
     const pedido = await PasteleriaOrder.findByPk(id);
-    
-    if (!pedido) {
-      return res.status(404).json({ message: "Pedido no encontrado" });
-    }
 
-    await pedido.update(req.body);
-    res.json({ data: pedido });
+    if (!pedido) return res.status(404).json({ message: 'Pedido no encontrado' });
+
+    pedido.estado = 'entregado';
+    await pedido.save();
+
+    res.json({ message: 'Pedido entregado correctamente', data: pedido });
   } catch (error) {
-    console.error("Error al editar pedido:", error);
-    res.status(500).json({ message: "Error al actualizar el pedido" });
+    console.error('Error al entregar pedido:', error);
+    res.status(500).json({ message: 'Error al entregar el pedido' });
   }
 };
+
+export const cancelarPedido = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id || req.userId || req.usuario?.id || null;
+    const pedido = await PasteleriaOrder.findByPk(id, { transaction: t });
+
+    if (!pedido) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
+
+    // Cambiar estado del pedido
+    pedido.estado = 'cancelado';
+    await pedido.save({ transaction: t });
+
+    // Anular transacciones financieras en Caja sin alterar su createdAt
+    await Transaction.update(
+      { status: 'CANCELLED', cancelledBy: userId, cancelledAt: new Date() },
+      { 
+        where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'ACTIVE' },
+        transaction: t 
+      }
+    );
+
+    await t.commit();
+    res.json({ message: 'Pedido cancelado y dinero descontado de caja correctamente', data: pedido });
+  } catch (error) {
+    await t.rollback();
+    console.error('Error al cancelar pedido de pastelería:', error);
+    res.status(500).json({ message: 'Error interno al cancelar el pedido' });
+  }
+};
+
+export const restaurarPedido = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const pedido = await PasteleriaOrder.findByPk(id, { transaction: t });
+
+    if (!pedido) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
+
+    // Regresar el pedido a pendiente
+    pedido.estado = 'pendiente';
+    await pedido.save({ transaction: t });
+
+    // Revivir las transacciones para que el dinero vuelva a la Caja en sus fechas originales
+    await Transaction.update(
+      { status: 'ACTIVE', cancelledBy: null, cancelledAt: null },
+      { 
+        where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'CANCELLED' },
+        transaction: t 
+      }
+    );
+
+    await t.commit();
+    res.json({ message: 'Pedido restaurado. El dinero ha vuelto a la caja.', data: pedido });
+  } catch (error) {
+    await t.rollback();
+    console.error('Error al restaurar pedido de pastelería:', error);
+    res.status(500).json({ message: 'Error interno al restaurar el pedido' });
+  }
+};
+
 
 // ==========================================
 // 🖨️ IMPRIMIR TICKET (MOCK NATIVO EN CONSOLA)
@@ -234,8 +309,8 @@ export const printPedidoTicket = async (req, res) => {
 
     console.log(`\n==========================================`);
     console.log(`                  𝓛𝔂𝓪`);
-    console.log(`         Pastelería & Cafetería`);
-    console.log(`          Pijijiapan, Chiapas`);
+    console.log(`        Pastelería & Cafetería`);
+    console.log(`         Pijijiapan, Chiapas`);
     console.log(`------------------------------------------`);
     console.log(`          COMPROBANTE DE PEDIDO`);
     console.log(`                ${pedido.id}`);
