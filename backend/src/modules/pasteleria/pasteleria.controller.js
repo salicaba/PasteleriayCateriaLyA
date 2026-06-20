@@ -91,18 +91,63 @@ export const createPedido = async (req, res) => {
   }
 };
 
+// 🔥 Actualizar un pedido completo (Con Inteligencia de Reembolsos)
 export const updatePedido = async (req, res) => {
+  const t = await sequelize.transaction(); // Usamos transacción para seguridad financiera
   try {
     const { id } = req.params;
-    const pedido = await PasteleriaOrder.findByPk(id);
+    const userId = req.user?.id || req.userId || req.usuario?.id || null;
+    const pedido = await PasteleriaOrder.findByPk(id, { transaction: t });
     
     if (!pedido) {
+      await t.rollback();
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    await pedido.update(req.body);
+    // 🔥 LÓGICA DE REEMBOLSO AUTOMÁTICO 🔥
+    const nuevoCosto = parseFloat(req.body.costoTotal);
+    
+    // Verificamos si el usuario le bajó el precio al pedido
+    if (!isNaN(nuevoCosto) && nuevoCosto < pedido.costoTotal) {
+      const abonosActuales = pedido.abonos || [];
+      const totalPagado = abonosActuales.reduce((sum, ab) => sum + parseFloat(ab.monto), 0);
+      
+      // Si el cliente ya había pagado MÁS del nuevo costo, hay saldo a favor
+      if (totalPagado > nuevoCosto) {
+        const devolucion = totalPagado - nuevoCosto;
+        
+        // 1. Crear transacción de salida (REFUND) en la Caja HOY
+        const tx = await Transaction.create({
+          source: 'PASTELERIA',
+          type: 'EXPENSE',
+          expenseCategory: 'REFUND', // Aparecerá en tu gráfica como Reembolsos
+          paymentMethod: 'CASH',     // Se asume que le devuelves el billete en mano
+          amount: devolucion,
+          description: `Devolución por ajuste de precio. Pedido: ${pedido.cliente} ${pedido.id}`,
+          referenceId: pedido.id,
+          createdBy: userId
+        }, { transaction: t });
+
+        // 2. Registrar el reembolso en el historial de abonos del pedido como número negativo
+        const abonoReembolso = {
+          id: tx.id,
+          fecha: new Date().toISOString(),
+          monto: -devolucion, // Monto negativo para equilibrar el total pagado
+          metodo: 'efectivo',
+          nota: 'Devolución automática'
+        };
+        
+        req.body.abonos = [...abonosActuales, abonoReembolso];
+      }
+    }
+    // 🔥 FIN DE LÓGICA DE REEMBOLSO 🔥
+
+    await pedido.update(req.body, { transaction: t });
+    
+    await t.commit();
     res.json({ data: pedido });
   } catch (error) {
+    await t.rollback();
     console.error("Error al editar pedido:", error);
     res.status(500).json({ message: "Error al actualizar el pedido" });
   }

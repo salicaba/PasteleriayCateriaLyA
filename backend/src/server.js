@@ -16,7 +16,8 @@ const server = http.createServer(app);
 
 initSocket(server);
 
-async function main() {
+// 🔥 CORRECCIÓN: Convertimos esto en la función principal de arranque
+async function startServer() {
   try {
     // 1. Probar la conexión a Supabase
     await sequelize.authenticate();
@@ -24,19 +25,23 @@ async function main() {
     
     // 2. Ejecutar las relaciones ANTES de sincronizar
     setupAssociations(); 
+    console.log('🔗 Asociaciones de Sequelize configuradas correctamente.');
     
-    // 3. Sincronizar esquemas (Postgres maneja los 'alter' perfectamente)
+    // 3. Sincronizar esquemas (Bloquea hasta que termine)
     console.log('⏳ Sincronizando esquemas con la nube...');
     await sequelize.sync({ alter: true });
     
     console.log('✅ Base de datos lista y actualizada en Supabase.');
 
+    // 4. 🔥 AHORA SÍ: Abrimos las puertas para que el Frontend se conecte
+    server.listen(PORT, () => {
+      console.log(`🚀 Servidor HTTP y WebSockets corriendo en puerto ${PORT}`);
+    });
+
   } catch (error) {
-    console.error('❌ No se pudo conectar a Supabase:', error);
+    console.error('❌ Error crítico al arrancar el servidor:', error);
   }
 }
 
-server.listen(PORT, () => {
-  console.log(`🚀 Servidor HTTP y WebSockets corriendo en puerto ${PORT}`);
-  main(); 
-});
+// Iniciar el ciclo de arranque
+startServer();

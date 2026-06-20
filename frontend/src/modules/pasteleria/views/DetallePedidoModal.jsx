@@ -1,12 +1,13 @@
 // src/modules/pasteleria/views/DetallePedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark, MessageCircle, Image as ImageIcon } from 'lucide-react';
+import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark, MessageCircle, Image as ImageIcon, Loader2 } from 'lucide-react'; 
 import client from '../../../api/client'; 
 
 export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, calcularFinanzas }) {
   const [transferInfo, setTransferInfo] = useState(null);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0); 
+  const [isLoadingEdit, setIsLoadingEdit] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -14,8 +15,29 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
         .then(res => { if (res.data) setTransferInfo(res.data); })
         .catch(err => console.error("Error al cargar datos bancarios:", err));
       setActivePhotoIdx(0); 
+      setIsLoadingEdit(false); 
     }
   }, [isOpen, pedido?.id]);
+
+  // 🔥 LÓGICA CORREGIDA: Espera real y desbloqueo del hilo principal
+  const handleEditClick = async () => {
+    setIsLoadingEdit(true);
+    
+    // 1. Forzamos a React a pausar 150ms para que SÍ alcance a dibujar el "Cargando..." en pantalla
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    try {
+      // 2. Esperamos a que el componente padre haga TODO su trabajo pesado (procesar imágenes, abrir modal)
+      await Promise.resolve(onEdit(pedido));
+      
+      // 3. SOLO cuando termina de cargar la otra pantalla, cerramos esta
+      onClose();
+    } catch (error) {
+      console.error("Error al preparar la edición:", error);
+      // Si algo falla, quitamos el cargando para que no se quede trabado
+      setIsLoadingEdit(false); 
+    }
+  };
 
   if (!pedido) return null;
 
@@ -49,8 +71,13 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
               </div>
               <div className="flex gap-2">
                 {(pedido.estado !== 'entregado' && pedido.estado !== 'cancelado') && (
-                  <button onClick={() => { onEdit(pedido); onClose(); }} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20">
-                    <Edit3 size={18} /> Editar
+                  <button 
+                    onClick={handleEditClick} 
+                    disabled={isLoadingEdit}
+                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingEdit ? <Loader2 size={18} className="animate-spin" /> : <Edit3 size={18} />}
+                    {isLoadingEdit ? 'Preparando...' : 'Editar'}
                   </button>
                 )}
                 <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors"><X size={24} /></button>
@@ -71,7 +98,6 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   </div>
                 ) : tieneImagenes ? (
                   <div className="space-y-3">
-                    {/* 🔥 AQUÍ ESTÁ EL CAMBIO: object-contain en lugar de object-cover y un fondo de marco elegante */}
                     <div className="w-full h-96 rounded-[2rem] overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl bg-gray-100 dark:bg-black/50 p-2 flex items-center justify-center">
                       <AnimatePresence mode="wait">
                         <motion.img 
