@@ -4,12 +4,40 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
   DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle, Loader2
-} from 'lucide-react'; // 🔥 Importamos 'Check' para el nuevo modal
+} from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
 import client from '../../../api/client';
+
+// --- COMPONENTE INTERNO: CLON EXACTO DE StatCard (MesasPage.jsx) ---
+const KpiCard = ({ title, value, icon: Icon, themeColor, isActive, onClick }) => {
+  const colors = {
+    blue: { border: "border-blue-500 lya:border-blue-400", bg: "bg-blue-500", text: "text-blue-500" },
+    orange: { border: "border-orange-500 lya:border-orange-400", bg: "bg-orange-500", text: "text-orange-500" },
+    emerald: { border: "border-[#24d366] lya:border-emerald-400", bg: "bg-[#24d366]", text: "text-[#24d366]" },
+    red: { border: "border-red-500 lya:border-red-400", bg: "bg-red-500", text: "text-red-500" }
+  };
+
+  const style = colors[themeColor];
+
+  return (
+    <div 
+      onClick={onClick}
+      className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all active:scale-95 hover:shadow-md ${style.border} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-70 hover:opacity-100'}`}
+    >
+      <div>
+        <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
+        <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text">{value}</h3>
+      </div>
+      <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${style.bg}`}>
+        <Icon size={24} className={style.text} />
+      </div>
+    </div>
+  );
+};
+// -----------------------------------------------------------------
 
 const PasteleriaSkeleton = () => (
   <motion.div 
@@ -30,16 +58,23 @@ const PasteleriaSkeleton = () => (
       </div>
     </div>
 
-    <div className="flex gap-2 mb-6 overflow-hidden">
+    {/* SKELETON PARA EL KPI GRID CLONADO DE MESAS */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 shrink-0 w-full">
       {[1, 2, 3, 4].map(i => (
-        <div key={i} className="w-36 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse shrink-0" />
+        <div key={i} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 border-l-4 border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center animate-pulse">
+          <div>
+            <div className="w-20 h-2.5 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 rounded mb-2"></div>
+            <div className="w-10 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 rounded"></div>
+          </div>
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 rounded-xl"></div>
+        </div>
       ))}
     </div>
 
     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-64 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col justify-between">
+          <div key={i} className="h-64 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-start mb-4">
                 <div className="space-y-2 w-1/2">
@@ -159,26 +194,26 @@ export default function PasteleriaDashboard() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center justify-start gap-4 mb-6 shrink-0">
-        <div className="flex gap-2 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 p-1 rounded-2xl overflow-x-auto">
-          <button onClick={() => setActiveTab('activos')} className={`flex items-center px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'activos' && !searchQuery ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-emerald-500 lya:text-lya-secondary shadow-sm' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'}`} >
-            <ShoppingBasket size={18} className="mr-2" /> Activos
-            <span className={`ml-2 px-2 py-0.5 rounded-md text-[11px] font-black ${activeTab === 'activos' && !searchQuery ? 'bg-emerald-100 text-emerald-600 lya:bg-lya-secondary/20 lya:text-lya-secondary' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 lya:bg-lya-border/50 lya:text-lya-text/70'}`}>{conteos.activos}</span>
-          </button>
-          <button onClick={() => setActiveTab('atrasados')} className={`flex items-center px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'atrasados' && !searchQuery ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-rose-500 lya:text-rose-500 shadow-sm' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'}`} >
-            <ClockAlert size={18} className="mr-2" /> Atrasados
-            <span className={`ml-2 px-2 py-0.5 rounded-md text-[11px] font-black ${activeTab === 'atrasados' && !searchQuery ? 'bg-rose-100 text-rose-600 lya:bg-rose-500/20 lya:text-rose-500' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 lya:bg-lya-border/50 lya:text-lya-text/70'}`}>{conteos.atrasados}</span>
-          </button>
-          <button onClick={() => setActiveTab('entregadosHoy')} className={`flex items-center px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'entregadosHoy' && !searchQuery ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-blue-500 lya:text-blue-500 shadow-sm' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'}`} >
-            <PackageCheck size={18} className="mr-2" /> Entregados Hoy
-            <span className={`ml-2 px-2 py-0.5 rounded-md text-[11px] font-black ${activeTab === 'entregadosHoy' && !searchQuery ? 'bg-blue-100 text-blue-600 lya:bg-blue-500/20 lya:text-blue-500' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 lya:bg-lya-border/50 lya:text-lya-text/70'}`}>{conteos.entregadosHoy}</span>
-          </button>
-          <button onClick={() => setActiveTab('canceladosHoy')} className={`flex items-center px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'canceladosHoy' && !searchQuery ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-red-500 lya:text-red-500 shadow-sm' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-300 lya:hover:text-lya-text'}`} >
-            <Ban size={18} className="mr-2" /> Cancelados Hoy
-            <span className={`ml-2 px-2 py-0.5 rounded-md text-[11px] font-black ${activeTab === 'canceladosHoy' && !searchQuery ? 'bg-red-100 text-red-600 lya:bg-red-500/20 lya:text-red-500' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 lya:bg-lya-border/50 lya:text-lya-text/70'}`}>{conteos.canceladosHoy}</span>
-          </button>
-        </div>
+      {/* --- GRID DE TARJETAS KPI (ESTILO IDÉNTICO A CAFETERÍA) --- */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 shrink-0 w-full">
+        <KpiCard 
+          title="Activos" value={conteos.activos} icon={ShoppingBasket} themeColor="blue" 
+          isActive={activeTab === 'activos' && !searchQuery} onClick={() => setActiveTab('activos')} 
+        />
+        <KpiCard 
+          title="Atrasados" value={conteos.atrasados} icon={ClockAlert} themeColor="orange" 
+          isActive={activeTab === 'atrasados' && !searchQuery} onClick={() => setActiveTab('atrasados')} 
+        />
+        <KpiCard 
+          title="Entregados Hoy" value={conteos.entregadosHoy} icon={CheckCircle2} themeColor="emerald" 
+          isActive={activeTab === 'entregadosHoy' && !searchQuery} onClick={() => setActiveTab('entregadosHoy')} 
+        />
+        <KpiCard 
+          title="Cancelados Hoy" value={conteos.canceladosHoy} icon={Ban} themeColor="red" 
+          isActive={activeTab === 'canceladosHoy' && !searchQuery} onClick={() => setActiveTab('canceladosHoy')} 
+        />
       </div>
+      {/* --------------------------------------------------------- */}
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
         {pedidosFiltrados.length === 0 ? (
@@ -314,7 +349,6 @@ export default function PasteleriaDashboard() {
         )}
       </div>
 
-      {/* 🔥 NUEVA PANTALLA DE ÉXITO ESTILO MODAL OSCURO (Como la imagen) */}
       <AnimatePresence>
         {successScreen.isOpen && (
           <motion.div 
@@ -500,7 +534,7 @@ export default function PasteleriaDashboard() {
                             <AnimatePresence>
                               {mostrarCambio && (
                                 <motion.div initial={{ opacity: 0, scale: 0.9, height: 0 }} animate={{ opacity: 1, scale: 1, height: 'auto' }} exit={{ opacity: 0, scale: 0.9, height: 0 }} className="overflow-hidden">
-                                  <div className="bg-emerald-500 lya:bg-lya-secondary text-white lya:text-lya-surface p-4 rounded-2xl flex justify-between items-center shadow-lg shadow-emerald-500/20 lya:shadow-lya-secondary/20">
+                                  <div className="bg-emerald-500 lya:bg-lya-secondary text-white lya:text-lya-surface p-4 rounded-[1.5rem] flex justify-between items-center shadow-lg shadow-emerald-500/20 lya:shadow-lya-secondary/20">
                                     <span className="font-bold uppercase text-sm">Cambio a devolver:</span>
                                     <span className="text-3xl font-black">${cambio.toFixed(2)}</span>
                                   </div>
@@ -527,7 +561,7 @@ export default function PasteleriaDashboard() {
 
                             <div className="flex gap-3 overflow-x-auto custom-scrollbar pt-2 pb-2 px-1">
                               {transferInfo.bank_accounts.map(acc => (
-                                <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-3xl shrink-0 shadow-sm flex flex-col justify-between">
+                                <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-[1.5rem] shrink-0 shadow-sm flex flex-col justify-between">
                                   <div className="flex items-center gap-2 mb-3">
                                     <Smartphone className="text-purple-600 dark:text-purple-400" size={18} />
                                     <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>

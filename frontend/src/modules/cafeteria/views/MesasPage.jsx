@@ -11,16 +11,16 @@ import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal';
 import { NuevoPedidoLlevarModal } from './NuevoPedidoLlevarModal';
 
-const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick }) => (
+const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
     onClick={onClick}
-    className={`bg-white dark:bg-gray-900 rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all active:scale-95 hover:shadow-md ${borderClass}`}
+    className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all active:scale-95 hover:shadow-md ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-70 hover:opacity-100'}`}
   >
     <div>
-      <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">{title}</p>
-      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{value}</h3>
+      <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
+      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text">{value}</h3>
     </div>
-    <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 ${iconColors.bg}`}>
+    <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${iconColors.bg}`}>
       <Icon size={24} className={iconColors.text} />
     </div>
   </div>
@@ -164,36 +164,37 @@ export const MesasPage = () => {
             title="Mesas Ocupadas" 
             value={`${mesasOcupadas} / ${mesasSalon.length}`} 
             icon={Grid} 
-            borderClass="border-orange-500" 
+            borderClass="border-orange-500 lya:border-orange-400" 
             iconColors={{ bg: "bg-orange-500", text: "text-orange-500" }} 
-            onClick={() => setActiveTab('salon')}
+            onClick={() => { setActiveTab('salon'); setShowVendidos(false); setShowPapelera(false); }}
+            isActive={activeTab === 'salon' && !showVendidos && !showPapelera}
           />
           <StatCard 
             title="Para Llevar" 
             value={mesasLlevar.length} 
             icon={ShoppingBag} 
-            borderClass="border-blue-500" 
+            borderClass="border-blue-500 lya:border-blue-400" 
             iconColors={{ bg: "bg-blue-500", text: "text-blue-500" }} 
-            onClick={() => setActiveTab('llevar')}
+            onClick={() => { setActiveTab('llevar'); setShowVendidos(false); setShowPapelera(false); }}
+            isActive={activeTab === 'llevar' && !showVendidos && !showPapelera}
           />
-          
-          {/* 🔥 AQUÍ ESTÁ EL CAMBIO: Ahora cuenta las transacciones de ingreso (ingresosTotales.length) 🔥 */}
           <StatCard 
             title="Vendidos Hoy" 
             value={ingresosTotales.length} 
             icon={CheckCircle} 
-            borderClass="border-[#24d366]" 
+            borderClass="border-[#24d366] lya:border-emerald-400" 
             iconColors={{ bg: "bg-[#24d366]", text: "text-[#24d366]" }} 
-            onClick={() => setShowVendidos(true)}
+            onClick={() => { setShowVendidos(true); setShowPapelera(false); }}
+            isActive={showVendidos}
           />
-          
           <StatCard 
-            title="Papelera" 
+            title="Cancelados Hoy" 
             value={dailySummary.papeleraCount} 
             icon={Trash2} 
-            borderClass="border-red-500" 
+            borderClass="border-red-500 lya:border-red-400" 
             iconColors={{ bg: "bg-red-500", text: "text-red-500" }} 
-            onClick={() => setShowPapelera(true)}
+            onClick={() => { setShowPapelera(true); setShowVendidos(false); }}
+            isActive={showPapelera}
           />
         </div>
       </div>
