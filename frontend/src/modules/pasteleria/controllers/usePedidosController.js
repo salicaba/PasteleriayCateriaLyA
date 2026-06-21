@@ -31,7 +31,7 @@ export const usePedidosController = () => {
   const [detalleModal, setDetalleModal] = useState({ isOpen: false, pedido: null });
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
 
-  // 🔥 NUEVO ESTADO PARA LA PANTALLA DE ÉXITO TIPO CAFETERÍA
+  // ESTADO PARA LA PANTALLA DE ÉXITO TIPO CAFETERÍA
   const [successScreen, setSuccessScreen] = useState({ isOpen: false, title: '', subtitle: '' });
 
   useEffect(() => {
@@ -123,7 +123,20 @@ export const usePedidosController = () => {
   const pedirConfirmacion = (pedido, tipo) => setConfirmModal({ isOpen: true, tipo, pedido });
   const cerrarConfirmacion = () => setConfirmModal({ isOpen: false, tipo: '', pedido: null });
 
-  const ejecutarAccionConfirmada = async () => {
+  // 🔥 NUEVA FUNCIÓN: Restauración Directa (Sin Modales)
+  const restaurarPedido = async (pedidoId) => {
+    try {
+      const pedidoActualizado = await actualizarEstadoPedidoReal(pedidoId, 'pendiente');
+      setPedidos(pedidos.map(p => p.id === pedidoId ? pedidoActualizado : p));
+      toast.success('Pedido restaurado exitosamente');
+    } catch (error) {
+      console.error("Error al restaurar el pedido:", error);
+      toast.error('Hubo un error al restaurar el pedido');
+      throw error; // Lanzamos el error para que el frontend quite el spinner si falla
+    }
+  };
+
+  const ejecutarAccionConfirmada = async (motivoPersonalizado) => {
     const { tipo, pedido } = confirmModal;
     if (!pedido) return;
 
@@ -134,8 +147,19 @@ export const usePedidosController = () => {
 
     setIsSubmitting(true);
     try {
-      // 🔥 Eliminado el toast.loading
-      const pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, nuevoEstado);
+      // Si la acción es cancelar y hay motivo, usamos editarPedidoReal para inyectar el motivo, sino solo actualizamos estado
+      let pedidoActualizado;
+      
+      if (tipo === 'cancelar' && motivoPersonalizado) {
+        pedidoActualizado = await editarPedidoReal(pedido.id, {
+          ...pedido,
+          estado: 'cancelado',
+          motivoCancelacion: motivoPersonalizado
+        });
+        pedidoActualizado = pedidoActualizado.data || pedidoActualizado;
+      } else {
+        pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, nuevoEstado);
+      }
       
       setPedidos(pedidos.map(p => p.id === pedido.id ? pedidoActualizado : p));
       cerrarConfirmacion();
@@ -182,7 +206,6 @@ export const usePedidosController = () => {
   const guardarPedido = async (datosPedido) => {
     setIsSubmitting(true);
     try {
-      // 🔥 Eliminado el toast.loading
       const anticipoNum = parseFloat(datosPedido.anticipo) || 0;
       
       let pedidoAEnviar = { ...datosPedido };
@@ -246,7 +269,6 @@ export const usePedidosController = () => {
 
     setIsSubmitting(true);
     try {
-      // 🔥 Eliminado el toast.loading
       await registrarAbonoReal(pedidoId, monto); 
 
       const pedidoActual = pedidos.find(p => p.id === pedidoId);
@@ -265,7 +287,6 @@ export const usePedidosController = () => {
 
       const finanzasActualizadas = calcularFinanzas(pedidoActualizado);
       
-      // 🔥 ACTIVAMOS LA PANTALLA DE ÉXITO ESTILO CAFETERÍA
       if (finanzasActualizadas.estaLiquidado) {
          setSuccessScreen({ 
             isOpen: true, 
@@ -309,7 +330,8 @@ export const usePedidosController = () => {
     calcularFinanzas, 
     guardarPedido,  
     registrarAbono,
-    successScreen, // 🔥 EXPORTAMOS LA NUEVA VARIABLE
+    restaurarPedido, // 🔥 AHORA SÍ ESTÁ EXPORTADA
+    successScreen, 
     isSubmitting 
   };
 };

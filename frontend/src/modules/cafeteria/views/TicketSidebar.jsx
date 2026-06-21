@@ -451,7 +451,6 @@ export const TicketSidebar = ({
                                 {item.enviadoCocina ? (
                                   <button 
                                     onClick={() => handleToggleStatus(item)} 
-                                    // 🔥 AQUÍ ESTÁ EL ARREGLO: Quitamos el isCompletamentePagada de las restricciones 🔥
                                     disabled={isProcessing || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                                     className={clsx(
                                         "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-xl border uppercase transition-all duration-300 w-full text-center shadow-sm", 
@@ -559,7 +558,6 @@ export const TicketSidebar = ({
 
       <div className="p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-20 shrink-0 transition-colors">
         
-        {/* 🔥 AQUÍ SE MOVIÓ EL BOTÓN "ENTREGAR TODO" PARA QUE SALGA AUNQUE ESTÉ PAGADO 🔥 */}
         {onDeliverAll && showDeliverAllBtn && (
           <button
              disabled={!hasReadyItems || isDeliveringAll}
@@ -614,6 +612,7 @@ export const TicketSidebar = ({
                   </button>
               )}
 
+              {/* Botón CANCELAR al lado de imprimir (solo sale cuando TODO está cobrado) */}
               {!isVitrina && (onCancelFullOrder || onCancelAccount) && (
                   <button 
                     onClick={() => setShowCancelModal(true)} 
@@ -648,7 +647,8 @@ export const TicketSidebar = ({
            </>
         )}
 
-        {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
+        {/* 🐛 AQUI ESTÁ EL ARREGLO: Agregamos `!isCompletamentePagada` para que este botón desaparezca al cobrar y no se amontone con el otro */}
+        {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && !isCompletamentePagada && (
             <button 
                onClick={() => setShowCancelModal(true)} 
                className="w-full mt-3 py-2 text-[10px] font-black text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors uppercase tracking-widest flex items-center justify-center gap-1.5"

@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
-  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle, Loader2
+  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle, Loader2,
+  Trash2, RotateCcw
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
@@ -11,7 +12,7 @@ import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
 import client from '../../../api/client';
 
-// --- COMPONENTE INTERNO: CLON EXACTO DE StatCard (MesasPage.jsx) ---
+// --- COMPONENTE INTERNO: CLON EXACTO DE StatCard (CAFETERÍA) ---
 const KpiCard = ({ title, value, icon: Icon, themeColor, isActive, onClick }) => {
   const colors = {
     blue: { border: "border-blue-500 lya:border-blue-400", bg: "bg-blue-500", text: "text-blue-500" },
@@ -58,7 +59,6 @@ const PasteleriaSkeleton = () => (
       </div>
     </div>
 
-    {/* SKELETON PARA EL KPI GRID CLONADO DE MESAS */}
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 shrink-0 w-full">
       {[1, 2, 3, 4].map(i => (
         <div key={i} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 border-l-4 border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center animate-pulse">
@@ -112,12 +112,22 @@ export default function PasteleriaDashboard() {
     confirmModal, pedirConfirmacion, cerrarConfirmacion, ejecutarAccionConfirmada,
     detalleModal, abrirDetalles, cerrarDetalles, 
     pedidoAEditar, iniciarEdicion,               
-    calcularFinanzas, guardarPedido, registrarAbono,
+    calcularFinanzas, guardarPedido, registrarAbono, restaurarPedido, 
     successScreen, 
     isSubmitting 
   } = usePedidosController();
 
   const [transferInfo, setTransferInfo] = useState(null);
+
+  // Estados para los paneles laterales
+  const [showCancelados, setShowCancelados] = useState(false);
+  const [showEntregados, setShowEntregados] = useState(false);
+  
+  // Estado para el campo de motivo de cancelación
+  const [modalInputValue, setModalInputValue] = useState('');
+
+  // Estado para manejar qué pedido se está restaurando (para mostrar el spinner de carga local)
+  const [restoringId, setRestoringId] = useState(null);
 
   useEffect(() => {
     if (abonoModal.isOpen && abonoForm.metodo === 'transferencia') {
@@ -128,6 +138,25 @@ export default function PasteleriaDashboard() {
   }, [abonoModal.isOpen, abonoForm.metodo]);
 
   if (loading) return <PasteleriaSkeleton />; 
+
+  // --- FUNCIÓN DE RESTAURACIÓN DIRECTA ---
+  const handleRestaurarDirecto = async (pedido) => {
+    setRestoringId(pedido.id);
+    try {
+      if (restaurarPedido) {
+        await restaurarPedido(pedido.id);
+      } else {
+        pedirConfirmacion(pedido, 'restaurar');
+        setTimeout(() => {
+          ejecutarAccionConfirmada();
+        }, 50);
+      }
+    } catch (error) {
+      console.error("Error al restaurar:", error);
+    } finally {
+      setTimeout(() => setRestoringId(null), 1500);
+    }
+  };
 
   const getConfirmacionDetalles = () => {
     if (!confirmModal.pedido) return {};
@@ -148,15 +177,10 @@ export default function PasteleriaDashboard() {
           title: 'Cancelar Pedido',
           description: 'El pedido se marcará como cancelado y desaparecerá mañana. Esta acción se puede deshacer hoy.',
           color: 'bg-red-500 hover:bg-red-600',
-          bgIcon: 'bg-red-50 dark:bg-red-500/10'
-        };
-      case 'restaurar':
-        return {
-          icon: <Undo2 size={28} className="text-orange-500 lya:text-lya-secondary" />,
-          title: 'Restaurar Pedido',
-          description: 'El pedido volverá a la lista de activos o atrasados según su fecha.',
-          color: 'bg-orange-500 hover:bg-orange-600 lya:bg-lya-secondary',
-          bgIcon: 'bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10'
+          bgIcon: 'bg-red-50 dark:bg-red-500/10',
+          requireInput: true,
+          inputType: 'text',
+          inputPlaceholder: 'Motivo de cancelación (opcional)'
         };
       default: return {};
     }
@@ -194,160 +218,298 @@ export default function PasteleriaDashboard() {
         </div>
       </header>
 
-      {/* --- GRID DE TARJETAS KPI (ESTILO IDÉNTICO A CAFETERÍA) --- */}
+      {/* --- GRID DE TARJETAS KPI --- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 shrink-0 w-full">
         <KpiCard 
-          title="Activos" value={conteos.activos} icon={ShoppingBasket} themeColor="blue" 
-          isActive={activeTab === 'activos' && !searchQuery} onClick={() => setActiveTab('activos')} 
+          title="Activos" value={conteos?.activos || 0} icon={ShoppingBasket} themeColor="blue" 
+          isActive={activeTab === 'activos' && !showCancelados && !showEntregados && !searchQuery} 
+          onClick={() => { 
+            setActiveTab('activos'); 
+            setSearchQuery(''); 
+            setShowCancelados(false);
+            setShowEntregados(false);
+          }} 
         />
         <KpiCard 
-          title="Atrasados" value={conteos.atrasados} icon={ClockAlert} themeColor="orange" 
-          isActive={activeTab === 'atrasados' && !searchQuery} onClick={() => setActiveTab('atrasados')} 
+          title="Atrasados" value={conteos?.atrasados || 0} icon={ClockAlert} themeColor="orange" 
+          isActive={activeTab === 'atrasados' && !showCancelados && !showEntregados && !searchQuery} 
+          onClick={() => { 
+            setActiveTab('atrasados'); 
+            setSearchQuery(''); 
+            setShowCancelados(false);
+            setShowEntregados(false);
+          }} 
         />
         <KpiCard 
-          title="Entregados Hoy" value={conteos.entregadosHoy} icon={CheckCircle2} themeColor="emerald" 
-          isActive={activeTab === 'entregadosHoy' && !searchQuery} onClick={() => setActiveTab('entregadosHoy')} 
+          title="Entregados Hoy" value={conteos?.entregadosHoy || 0} icon={PackageCheck} themeColor="emerald" 
+          isActive={showEntregados} 
+          onClick={() => { 
+            setActiveTab('entregadosHoy'); 
+            setSearchQuery(''); 
+            setShowEntregados(true);
+            setShowCancelados(false);
+          }} 
         />
         <KpiCard 
-          title="Cancelados Hoy" value={conteos.canceladosHoy} icon={Ban} themeColor="red" 
-          isActive={activeTab === 'canceladosHoy' && !searchQuery} onClick={() => setActiveTab('canceladosHoy')} 
+          title="Cancelados Hoy" value={conteos?.canceladosHoy || 0} icon={Ban} themeColor="red" 
+          isActive={showCancelados} 
+          onClick={() => { 
+            setActiveTab('canceladosHoy'); 
+            setSearchQuery(''); 
+            setShowCancelados(true);
+            setShowEntregados(false);
+          }} 
         />
       </div>
       {/* --------------------------------------------------------- */}
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
-        {pedidosFiltrados.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} 
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50"
-          >
-            <ShoppingBasket size={64} className="mb-4 opacity-20" />
-            <p className="text-xl font-bold">{searchQuery ? `No se encontró el pedido "${searchQuery}"` : 'No hay pedidos en esta sección'}</p>
-          </motion.div>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
-            <AnimatePresence mode="popLayout">
-              {pedidosFiltrados.map((pedido) => {
-                const finanzas = calcularFinanzas(pedido);
-                const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
-                const isAtrasado = new Date(pedido.fechaEntrega) < new Date() && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
-                const isCancelado = pedido.estado === 'cancelado';
+      {/* GRID PRINCIPAL (Solo se muestra si los paneles están cerrados) */}
+      {(!showCancelados && !showEntregados) && (
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
+          {pedidosFiltrados.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }} 
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50"
+            >
+              <ShoppingBasket size={64} className="mb-4 opacity-20" />
+              <p className="text-xl font-bold">{searchQuery ? `No se encontró el pedido "${searchQuery}"` : 'No hay pedidos en esta sección'}</p>
+            </motion.div>
+          ) : (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
+              <AnimatePresence mode="popLayout">
+                {pedidosFiltrados.map((pedido) => {
+                  const finanzas = calcularFinanzas(pedido);
+                  const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+                  const isAtrasado = new Date(pedido.fechaEntrega) < new Date() && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
 
-                return (
-                  <motion.div
-                    key={pedido.id} 
-                    layout 
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }} 
-                    animate={{ opacity: 1, scale: 1, y: 0 }} 
-                    exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                    onClick={() => abrirDetalles(pedido)} 
-                    className={`cursor-pointer relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full
-                      ${isCancelado ? 'bg-gray-100 dark:bg-gray-900/50 lya:bg-lya-bg/50 border-gray-200 dark:border-gray-800 lya:border-lya-border/20 opacity-75 grayscale-[0.5]' : 'bg-white dark:bg-gray-900 lya:bg-lya-surface'}
-                      ${!isCancelado && finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : ''}
-                      ${!isCancelado && !finanzas.requiereLiquidacionUrgente ? 'border-gray-100 dark:border-gray-800 hover:border-emerald-400/50 lya:border-lya-border/30 lya:hover:border-lya-secondary/50' : ''}
-                      ${isAtrasado ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}
-                  >
-                    {isAtrasado && <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10">ATRASADO</div>}
-                    {isCancelado && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10">CANCELADO</div>}
+                  return (
+                    <motion.div
+                      key={pedido.id} 
+                      layout 
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+                      animate={{ opacity: 1, scale: 1, y: 0 }} 
+                      exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                      onClick={() => abrirDetalles(pedido)} 
+                      className={`cursor-pointer relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface
+                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 hover:border-emerald-400/50 lya:border-lya-border/30 lya:hover:border-lya-secondary/50'}
+                        ${isAtrasado ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}
+                    >
+                      {isAtrasado && <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10">ATRASADO</div>}
 
-                    <div>
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1 min-w-0 pr-4">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-wider mb-2 inline-block lya:border lya:border-lya-border/30">{pedido.id}</span>
-                          <h3 className={`text-lg font-bold truncate ${isCancelado ? 'text-gray-500 dark:text-gray-500 lya:text-lya-text/60 line-through' : 'text-gray-800 dark:text-white lya:text-lya-text'}`}>{pedido.cliente}</h3>
-                        </div>
-                        <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${isCancelado ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 lya:bg-lya-bg lya:text-lya-text/50 lya:border-lya-border/20' : isAtrasado ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary border-emerald-500/10 lya:border-lya-secondary/20'}`}>
-                          <CalendarClock size={14} /> {fecha}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 lya:border-indigo-800/50 px-2 py-1 rounded-md shadow-sm">
-                          {pedido.categoria || 'Pastel'}
-                        </span>
-                        {pedido.porciones?.map((p, idx) => <span key={idx} className="text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text px-2 py-1 rounded-md border border-amber-100 dark:border-amber-900/30 lya:border-lya-border/40">{p}</span>)}
-                        {pedido.saborPan?.map((s, idx) => <span key={idx} className="text-[10px] font-bold bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text px-2 py-1 rounded-md border border-purple-100 dark:border-purple-900/30 lya:border-lya-border/40">{s}</span>)}
-                      </div>
-                      
-                      <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 mb-6 line-clamp-2 min-h-[40px] italic">"{pedido.descripcion}"</p>
-                    </div>
-
-                    <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30">
-                      <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-gray-400 lya:text-lya-text/50">
-                        <span>Total</span>
-                        <span className={`${isCancelado ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-white lya:text-lya-text'}`}>${parseFloat(pedido.costoTotal).toFixed(2)}</span>
-                      </div>
-                      
-                      <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 rounded-full overflow-hidden mb-4">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((finanzas.totalPagado / pedido.costoTotal) * 100, 100)}%` }} className={`h-full ${isCancelado ? 'bg-gray-400' : finanzas.estaLiquidado ? 'bg-emerald-500 lya:bg-lya-secondary' : 'bg-amber-400 lya:bg-lya-primary'}`} />
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        {finanzas.estaLiquidado ? (
-                          <div className={`text-xs font-bold flex items-center gap-1 ${isCancelado ? 'text-gray-400' : 'text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary'}`}>
-                            <CheckCircle2 size={14} /> Liquidado
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1 min-w-0 pr-4">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-wider mb-2 inline-block lya:border lya:border-lya-border/30">{pedido.id}</span>
+                            <h3 className="text-lg font-bold truncate text-gray-800 dark:text-white lya:text-lya-text">{pedido.cliente}</h3>
                           </div>
-                        ) : (
-                          <div className={`text-xs font-bold ${isCancelado ? 'text-gray-400' : finanzas.requiereLiquidacionUrgente ? 'text-red-500 animate-pulse' : 'text-amber-600 lya:text-lya-text'}`}>
-                            Resta: ${finanzas.deuda.toFixed(2)}
+                          <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${isAtrasado ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary border-emerald-500/10 lya:border-lya-secondary/20'}`}>
+                            <CalendarClock size={14} /> {fecha}
                           </div>
-                        )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 lya:border-indigo-800/50 px-2 py-1 rounded-md shadow-sm">
+                            {pedido.categoria || 'Pastel'}
+                          </span>
+                          {pedido.porciones?.map((p, idx) => <span key={idx} className="text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text px-2 py-1 rounded-md border border-amber-100 dark:border-amber-900/30 lya:border-lya-border/40">{p}</span>)}
+                          {pedido.saborPan?.map((s, idx) => <span key={idx} className="text-[10px] font-bold bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text px-2 py-1 rounded-md border border-purple-100 dark:border-purple-900/30 lya:border-lya-border/40">{s}</span>)}
+                        </div>
                         
-                        <div className="flex gap-2">
-                          {isCancelado ? (
-                            <button onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'restaurar'); }} title="Restaurar Pedido" className="p-2 text-orange-500 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors border border-orange-200 dark:border-orange-800 lya:border-lya-secondary/30 bg-white dark:bg-gray-800 lya:bg-lya-surface">
-                              <Undo2 size={18} />
-                            </button>
-                          ) : pedido.estado === 'entregado' ? (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); abrirTicket(pedido); }} title="Ver Ticket" className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors">
-                                <FileText size={18} />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'restaurar'); }} title="Deshacer Entrega" className="p-2 text-orange-500 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors border border-orange-200 dark:border-orange-800 lya:border-lya-secondary/30 bg-white dark:bg-gray-800 lya:bg-lya-surface">
-                                <Undo2 size={18} />
-                              </button>
-                            </>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 mb-6 line-clamp-2 min-h-[40px] italic">"{pedido.descripcion}"</p>
+                      </div>
+
+                      <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30">
+                        <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-gray-400 lya:text-lya-text/50">
+                          <span>Total</span>
+                          <span className="text-gray-800 dark:text-white lya:text-lya-text">${parseFloat(pedido.costoTotal).toFixed(2)}</span>
+                        </div>
+                        
+                        <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 rounded-full overflow-hidden mb-4">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((finanzas.totalPagado / pedido.costoTotal) * 100, 100)}%` }} className={`h-full ${finanzas.estaLiquidado ? 'bg-emerald-500 lya:bg-lya-secondary' : 'bg-amber-400 lya:bg-lya-primary'}`} />
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          {finanzas.estaLiquidado ? (
+                            <div className="text-xs font-bold flex items-center gap-1 text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary">
+                              <CheckCircle2 size={14} /> Liquidado
+                            </div>
                           ) : (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); abrirTicket(pedido); }} title="Ver Ticket" className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors">
-                                <FileText size={18} />
-                              </button>
-                              
-                              <button onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'cancelar'); }} title="Cancelar Pedido" className="p-2 text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 lya:text-red-500 lya:hover:bg-red-500/10 rounded-lg transition-colors">
-                                <Ban size={18} />
-                              </button>
-
-                              {pedido.estado !== 'entregado' && (
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'entregar'); }} 
-                                  disabled={!finanzas.estaLiquidado}
-                                  title={finanzas.estaLiquidado ? "Marcar como Entregado" : "Debes registrar el pago total antes de entregar"}
-                                  className={`p-2 rounded-lg transition-colors ${finanzas.estaLiquidado ? 'text-emerald-500 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 lya:text-lya-primary lya:hover:bg-lya-primary/10' : 'text-gray-300 dark:text-gray-600 lya:text-lya-text/30 cursor-not-allowed'}`}
-                                >
-                                  <PackageCheck size={18} />
-                                </button>
-                              )}
-
-                              {!finanzas.estaLiquidado && pedido.estado !== 'entregado' && (
-                                <button onClick={(e) => { e.stopPropagation(); abrirModalAbono(pedido); }} className="bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
-                                  <DollarSign size={14} className="inline mr-1" /> Abonar
-                                </button>
-                              )}
-                            </>
+                            <div className={`text-xs font-bold ${finanzas.requiereLiquidacionUrgente ? 'text-red-500 animate-pulse' : 'text-amber-600 lya:text-lya-text'}`}>
+                              Resta: ${finanzas.deuda.toFixed(2)}
+                            </div>
                           )}
+                          
+                          <div className="flex gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); abrirTicket(pedido); }} title="Ver Ticket" className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors">
+                              <FileText size={18} />
+                            </button>
+                            
+                            <button onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'cancelar'); }} title="Cancelar Pedido" className="p-2 text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 lya:text-red-500 lya:hover:bg-red-500/10 rounded-lg transition-colors">
+                              <Ban size={18} />
+                            </button>
+
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'entregar'); }} 
+                              disabled={!finanzas.estaLiquidado}
+                              title={finanzas.estaLiquidado ? "Marcar como Entregado" : "Debes registrar el pago total antes de entregar"}
+                              className={`p-2 rounded-lg transition-colors ${finanzas.estaLiquidado ? 'text-emerald-500 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 lya:text-lya-primary lya:hover:bg-lya-primary/10' : 'text-gray-300 dark:text-gray-600 lya:text-lya-text/30 cursor-not-allowed'}`}
+                            >
+                              <PackageCheck size={18} />
+                            </button>
+
+                            {!finanzas.estaLiquidado && (
+                              <button onClick={(e) => { e.stopPropagation(); abrirModalAbono(pedido); }} className="bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
+                                <DollarSign size={14} className="inline mr-1" /> Abonar
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </motion.div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </div>
+      )}
+
+      {/* --- PANEL LATERAL DESLIZANTE PARA CANCELADOS Y ENTREGADOS --- */}
+      <AnimatePresence>
+        {(showCancelados || showEntregados) && (
+          <div className="fixed inset-0 z-40 flex justify-end overflow-hidden">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+              onClick={() => { setShowCancelados(false); setShowEntregados(false); setActiveTab('activos'); }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" 
+            />
+            <motion.div 
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} 
+              className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
+                <div className={`flex items-center gap-3 ${showCancelados ? 'text-red-500' : 'text-emerald-500 lya:text-lya-primary'}`}>
+                  <div className={`p-2 rounded-xl ${showCancelados ? 'bg-red-100 dark:bg-red-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30 lya:bg-lya-primary/20'}`}>
+                    {showCancelados ? <Trash2 size={24} /> : <CheckCircle2 size={24} />}
+                  </div>
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text">
+                    {showCancelados ? 'Papelera Hoy' : 'Entregados Hoy'}
+                  </h2>
+                </div>
+                <button 
+                  onClick={() => { setShowCancelados(false); setShowEntregados(false); setActiveTab('activos'); }} 
+                  className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pb-10">
+                {pedidosFiltrados.length === 0 ? (
+                  <div className="text-center text-gray-400 mt-10">
+                    {showCancelados ? <Trash2 size={40} className="mx-auto mb-3 opacity-30" /> : <PackageCheck size={40} className="mx-auto mb-3 opacity-30" />}
+                    <p className="font-bold">{showCancelados ? 'Papelera vacía' : 'Aún no hay entregas'}</p>
+                    <p className="text-xs">{showCancelados ? 'No hay pedidos cancelados hoy.' : 'Los pedidos entregados aparecerán aquí.'}</p>
+                  </div>
+                ) : (
+                  pedidosFiltrados.map(pedido => {
+                    const fechaActualizacion = new Date(pedido.updatedAt || pedido.fechaEntrega).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    
+                    if (showCancelados) {
+                      const motivoMostrar = pedido.motivoCancelacion || pedido.cancelReason || pedido.motivo || 'Cancelado desde POS';
+
+                      return (
+                        <div key={pedido.id} className="p-4 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 rounded-2xl transition-all shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
+                              {pedido.id}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleRestaurarDirecto(pedido); }} 
+                                disabled={restoringId === pedido.id}
+                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Restaurar Pedido"
+                              >
+                                {restoringId === pedido.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
+                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
+                                  {restoringId === pedido.id ? 'Restaurando...' : 'Restaurar'}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mb-2">
+                            <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
+                              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                Nombre: {pedido.cliente}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-gray-500 leading-snug">Motivo: {motivoMostrar}</p>
+                          <div className="flex items-center gap-2 mt-3">
+                            <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                              🕒 {fechaActualizacion}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div key={pedido.id} className="p-4 border border-green-100 dark:border-green-900/30 bg-green-50/50 dark:bg-green-950/20 rounded-2xl transition-all shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
+                              {pedido.id}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded uppercase">Entregado</span>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleRestaurarDirecto(pedido); }} 
+                                disabled={restoringId === pedido.id}
+                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Deshacer Entrega"
+                              >
+                                {restoringId === pedido.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
+                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
+                                  {restoringId === pedido.id ? 'Restaurando...' : 'Deshacer'}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mb-2">
+                            <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-green-200 dark:border-green-900/50 text-emerald-600 dark:text-emerald-400 px-2.5 py-1.5 rounded-lg shadow-sm">
+                              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                Nombre: {pedido.cliente}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between mt-3">
+                            <div className="flex items-center gap-2">
+                              <span className="bg-green-100 dark:bg-green-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                                🕒 {fechaActualizacion}
+                              </span>
+                              <button onClick={() => abrirTicket(pedido)} className="text-[10px] font-black px-2 py-1.5 rounded-lg uppercase tracking-widest bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 dark:text-gray-300 transition-colors flex items-center gap-1.5 shadow-sm">
+                                <FileText size={14} /> Ticket
+                              </button>
+                            </div>
+                            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">
+                              ${parseFloat(pedido.costoTotal).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                  })
+                )}
+              </div>
+            </motion.div>
+          </div>
         )}
-      </div>
+      </AnimatePresence>
 
       <AnimatePresence>
         {successScreen.isOpen && (
@@ -393,6 +555,19 @@ export default function PasteleriaDashboard() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2">{detallesModal.title}</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{detallesModal.description}</p>
+                
+                {detallesModal.requireInput && (
+                  <div className="w-full mt-4 mb-2">
+                    <input 
+                      type={detallesModal.inputType || 'text'} 
+                      value={modalInputValue} 
+                      onChange={(e) => setModalInputValue(e.target.value)} 
+                      placeholder={detallesModal.inputPlaceholder}
+                      className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-red-500/50 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-center font-medium shadow-inner"
+                    />
+                  </div>
+                )}
+
                 {new Date() < new Date(confirmModal.pedido?.fechaEntrega) && confirmModal.tipo === 'entregar' && (
                   <div className="mt-4 flex items-start gap-2 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-500 p-3 rounded-xl text-left border border-amber-200 dark:border-amber-500/30">
                     <AlertTriangle size={16} className="shrink-0 mt-0.5" />
@@ -401,8 +576,28 @@ export default function PasteleriaDashboard() {
                 )}
               </div>
               <div className="flex gap-3">
-                <button onClick={cerrarConfirmacion} disabled={isSubmitting} className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-bold py-3 rounded-xl transition-colors">Volver</button>
-                <button onClick={ejecutarAccionConfirmada} disabled={isSubmitting} className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'} ${detallesModal.color}`}>
+                <button 
+                  onClick={() => {
+                    setModalInputValue('');
+                    cerrarConfirmacion();
+                  }} 
+                  disabled={isSubmitting} 
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-bold py-3 rounded-xl transition-colors"
+                >
+                  Volver
+                </button>
+                <button 
+                  onClick={() => {
+                    let reason = undefined;
+                    if (detallesModal.requireInput) {
+                      reason = modalInputValue.trim() !== '' ? modalInputValue.trim() : 'Cancelado desde POS';
+                    }
+                    ejecutarAccionConfirmada(reason);
+                    setModalInputValue('');
+                  }} 
+                  disabled={isSubmitting} 
+                  className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'transform hover:-translate-y-0.5'} ${detallesModal.color}`}
+                >
                   {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={24} /> : 'Confirmar'}
                 </button>
               </div>
@@ -428,7 +623,10 @@ export default function PasteleriaDashboard() {
         isSubmitting={isSubmitting}
       />
       
-      <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
+      {/* 🔥 TICKET MODAL SOBRE EL PANEL LATERAL */}
+      <div className="relative z-[9999]">
+        <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
+      </div>
 
       <AnimatePresence>
         {abonoModal.isOpen && abonoModal.pedido && (() => {
