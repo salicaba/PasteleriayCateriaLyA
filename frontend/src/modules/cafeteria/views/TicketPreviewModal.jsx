@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/TicketPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Printer, X, MessageCircle, XCircle } from 'lucide-react';
+import { Printer, X, MessageCircle, Coffee } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -11,7 +11,7 @@ export const TicketPreviewModal = ({
   cart, 
   mesa, 
   cuentaName, 
-  telefonoPredeterminado = '', // 🔥 NUEVA PROPIEDAD
+  telefonoPredeterminado = '', 
   onConfirmPrint, 
   onSendWhatsApp,
   userName = 'Cajero en turno'
@@ -26,13 +26,11 @@ export const TicketPreviewModal = ({
     if (isOpen) {
       setViewMode(cuentaName || 'Todas');
       
-      // 🔥 Si viene un teléfono desde la cuenta que creamos, lo pegamos directo
       if (telefonoPredeterminado) {
         setPhoneNumber(telefonoPredeterminado);
         return;
       }
       
-      // Si no hay teléfono predeterminado, buscamos si era pedido "Para llevar"
       if (mesa) {
         const partes = (mesa.numero || '').toString().split(' - ');
         if (mesa.zona === 'llevar' && partes.length > 2) {
@@ -45,7 +43,7 @@ export const TicketPreviewModal = ({
       }
       setPhoneNumber('');
     }
-  }, [isOpen, mesa, cuentaName, telefonoPredeterminado]); // 🔥 Lo agregamos como dependencia
+  }, [isOpen, mesa, cuentaName, telefonoPredeterminado]);
 
   if (!isOpen) return null;
 
@@ -96,6 +94,13 @@ export const TicketPreviewModal = ({
       onSendWhatsApp(phoneNumber, itemsToPrint, totalToPrint, viewMode === 'Todas' ? null : viewMode);
     }
   };
+
+  const now = new Date();
+  const diaSemana = now.toLocaleDateString('es-MX', { weekday: 'long' });
+  const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+  const fechaFormateada = now.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const horaFormateada = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const currentDateTimeStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm print:hidden">
@@ -154,37 +159,32 @@ export const TicketPreviewModal = ({
           </div>
         )}
 
-        {/* TICKET VISUAL ESTILO PASTELERÍA */}
+        {/* TICKET VISUAL ESTILO PASTELERÍA (AHORA SIN MAX-WIDTH PARA IGUALAR ZOOM) */}
         <div className="overflow-y-auto p-6 custom-scrollbar flex-1 bg-gray-100 dark:bg-gray-900">
-          <div id="printable-ticket-content" className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-gray-800 font-mono text-sm relative w-full mx-auto" style={{ maxWidth: '340px' }}>
+          <div id="printable-ticket-content" className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-gray-800 font-mono text-sm relative w-full mx-auto">
             
             <div className="absolute top-0 left-0 w-full h-2 bg-[radial-gradient(circle,transparent_4px,#fff_5px)] bg-[length:10px_10px] -mt-1"></div>
 
-            {/* Header del Ticket */}
+            {/* Header del Ticket con Icono y Folio Grande */}
             <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
+              <Coffee size={32} className="mx-auto mb-2 text-gray-800" />
               <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
               <p className="text-xs font-bold text-gray-600 uppercase mt-1">Pastelería & Cafetería</p>
               <p className="text-xs text-gray-500 mt-1">Comprobante de Venta</p>
-              <p className="text-sm font-bold mt-2 text-black">
-                {new Date().toLocaleDateString('es-MX')} {new Date().toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'})}
+              <p className="text-lg font-black mt-2 text-black tracking-wider">
+                {ticketFolio}
               </p>
             </div>
 
-            {/* Info de Mesa y Cliente */}
+            {/* Info de Mesa, Cliente y Expedición */}
             <div className="space-y-2 mb-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Folio:</span> 
-                <span className="font-bold text-right text-black uppercase tracking-wider">{ticketFolio}</span>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500">Expedición:</span> 
+                <span className="font-bold text-right text-black">{currentDateTimeStr}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Atendido por:</span> 
                 <span className="font-bold text-right text-black capitalize">{userName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">{isVitrina ? 'Tipo:' : 'Servicio:'}</span> 
-                <span className="font-bold text-right text-black uppercase">
-                  {isVitrina ? 'Mostrador Express' : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`)}
-                </span>
               </div>
               {!isVitrina && isLlevar && nombreCliente !== 'MOSTRADOR' && (
                 <div className="flex justify-between">
@@ -198,6 +198,13 @@ export const TicketPreviewModal = ({
                   <span className="font-bold text-right text-black uppercase bg-gray-100 px-1 rounded">{viewMode}</span>
                 </div>
               )}
+              {/* SERVICIO SIEMPRE AL FINAL SIN LA LÍNEA SEPARADORA */}
+              <div className="flex justify-between">
+                <span className="text-gray-500">{isVitrina ? 'Tipo:' : 'Servicio:'}</span> 
+                <span className="font-bold text-right text-black uppercase tracking-wide">
+                  {isVitrina ? 'Mostrador Express' : (isLlevar ? `Llevar #${numeroReal}` : `Mesa #${numeroReal}`)}
+                </span>
+              </div>
             </div>
 
             {/* Tabla de Productos */}
@@ -311,7 +318,7 @@ export const TicketPreviewModal = ({
         </div>
 
         {/* CONTROLES INFERIORES */}
-        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10 shrink-0 p-4 flex flex-col gap-3">
+        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10 shrink-0 p-4">
           
           <div className="flex items-center gap-3 w-full">
             <div className="flex-1 relative flex items-center">
@@ -340,13 +347,6 @@ export const TicketPreviewModal = ({
               <Printer size={20} />
             </button>
           </div>
-          
-          <button 
-            onClick={onClose}
-            className="w-full py-3 rounded-2xl font-black text-sm uppercase bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 transition-all flex justify-center items-center gap-2 border border-gray-200 dark:border-gray-600"
-          >
-            <XCircle size={18} /> Cerrar Previsualización
-          </button>
           
         </div>
 

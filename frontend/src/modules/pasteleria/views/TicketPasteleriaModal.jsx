@@ -53,9 +53,14 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   if (!pedido) return null;
 
   const finanzas = calcularFinanzas(pedido);
-  const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { 
-    weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute:'2-digit' 
-  });
+
+  // 🔥 Formateo exacto de la fecha para Pastelería
+  const d = new Date(pedido.fechaEntrega);
+  const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
+  const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+  const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const fecha = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
 
   const costoTotalNum = parseFloat(pedido.costoTotal) || 0;
 
@@ -78,6 +83,10 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       transferInfo.bank_accounts.forEach(acc => {
         cuentasTexto += `\n🏦 *${acc.bank_name}*\nTitular: ${acc.account_holder}\nCuenta: ${acc.account_number}\n${acc.clabe ? `CLABE: ${acc.clabe}\n` : ''}`;
       });
+      // AQUI AGREGAMOS EL WHATSAPP GLOBAL
+      if (transferInfo.whatsapp_number) {
+        cuentasTexto += `\n📲 *Mandar comprobante al:* ${transferInfo.whatsapp_number}\n`;
+      }
       cuentasTexto += `\n💡 _Importante: En el *concepto* de tu pago, por favor escribe tu folio: *${pedido.id}*_`;
     }
 
@@ -159,7 +168,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                         <div className="flex justify-between"><span className="text-gray-500">Atendido por:</span> <span className="font-bold text-right text-black capitalize">{nombreCajero}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Cliente:</span> <span className="font-bold text-right text-black uppercase">{pedido.cliente || 'Público'}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span> <span className="text-right">{pedido.telefono || 'N/A'}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Entrega:</span> <span className="font-bold text-right capitalize text-black">{fecha}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Entrega:</span> <span className="font-bold text-right text-black">{fecha}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Tipo:</span> <span className="font-bold text-right uppercase text-black">{pedido.tipoEntrega}</span></div>
                       </div>
 
@@ -186,15 +195,33 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                                 <p className="font-black uppercase mb-1 text-black">{acc.bank_name}</p>
                                 <p className="flex justify-between text-gray-600"><span>Titular:</span> <span className="font-bold text-black">{acc.account_holder}</span></p>
                                 <p className="flex justify-between text-gray-600"><span>Cuenta:</span> <span className="font-bold text-black">{acc.account_number}</span></p>
+                                {acc.clabe && (
+                                  <p className="flex justify-between text-gray-600"><span>CLABE:</span> <span className="font-bold text-black">{acc.clabe}</span></p>
+                                )}
                               </div>
                             ))}
                           </div>
+                          
+                          {/* AQUI MOSTRAMOS EL WHATSAPP GLOBAL (Si existe) */}
+                          {transferInfo?.whatsapp_number && (
+                            <div className="mt-3 bg-gray-50 p-2 rounded-lg border border-gray-200 text-center">
+                              <span className="text-[10px] font-bold text-gray-500 block mb-0.5">Mandar comprobante (WhatsApp) al:</span>
+                              <span className="text-[12px] font-black text-black">{transferInfo.whatsapp_number}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      <div className="text-center mt-6 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                      {/* PIE DE PÁGINA HOMOLOGADO */}
+                      <div className="text-center mt-6 text-xs text-gray-800 font-bold">
                         <p>¡Gracias por celebrar con nosotros!</p>
+                        {finanzas.deuda > 0 ? (
+                          <p className="mt-1 text-[10px] font-normal text-gray-400">El pedido debe estar liquidado al momento de su entrega.</p>
+                        ) : (
+                          <p className="mt-1 text-[10px] font-normal text-gray-400">¡Pedido totalmente liquidado!</p>
+                        )}
                       </div>
+
                     </div>
                   </div>
 

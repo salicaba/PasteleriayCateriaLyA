@@ -62,11 +62,7 @@ export const printOrderTicket = async (req, res) => {
     printer.println("Pijijiapan, Chiapas");
     
     printer.drawLine();
-    
-    printer.alignLeft();
-    printer.println(`Fecha de emision: ${new Date().toLocaleString()}`);
-    printer.println(`Atendido por:     ${cashierName}`);
-    
+
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
     let identificadorMesa = '';
@@ -81,7 +77,29 @@ export const printOrderTicket = async (req, res) => {
     } else {
       identificadorMesa = `Mesa #${order.table?.number || 'Salon'}`;
     }
+
+    const ticketFolio = rawId || (isLlevar ? 'LLEVAR-' : 'CAFE-') + order.id.split('-')[0].toUpperCase();
+
+    printer.alignCenter();
+    printer.println("COMPROBANTE DE VENTA");
+    printer.setTextDoubleHeight();
+    printer.setTextDoubleWidth();
+    printer.println(ticketFolio); // Folio en Grande
+    printer.setTextNormal();
+    printer.drawLine();
     
+    // 🔥 Formateo y saneo de fecha para impresora térmica
+    const d = new Date();
+    const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
+    const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+    const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const currentDateTimeStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
+    const fechaImpresion = currentDateTimeStr.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    printer.alignLeft();
+    printer.println(`Expedicion:       ${fechaImpresion}`);
+    printer.println(`Atendido por:     ${cashierName}`);
     printer.println(`Servicio:         ${identificadorMesa}`);
     if (cuentaName && cuentaName !== 'General') {
       printer.println(`Cuenta de:        ${cuentaName}`);
@@ -278,9 +296,12 @@ export const shareOrderTicket = async (req, res) => {
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
-    const dateStr = new Date(order.createdAt).toLocaleDateString('es-MX', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
+    const d = new Date(order.createdAt);
+    const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
+    const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+    const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const dateStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
 
     const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
@@ -298,6 +319,8 @@ export const shareOrderTicket = async (req, res) => {
     } else {
       identificadorMesa = `Mesa #${order.table?.number || 'Salón'}`;
     }
+
+    const ticketFolio = rawId || (isLlevar ? 'LLEVAR-' : 'CAFE-') + order.id.split('-')[0].toUpperCase();
 
     const htmlResponse = `
     <!DOCTYPE html>
@@ -346,10 +369,15 @@ export const shareOrderTicket = async (req, res) => {
 
           <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
 
+          <div class="text-center mb-6">
+            <p class="text-xs font-black uppercase text-slate-400 tracking-wider">Comprobante de Venta</p>
+            <p class="text-2xl font-black text-slate-900 tracking-wider">${ticketFolio}</p>
+          </div>
+
           <div class="space-y-2 text-sm font-medium text-slate-600 mb-6">
-            <div class="flex justify-between items-center">
-              <span>Fecha de emisión:</span>
-              <span class="text-slate-900 font-bold capitalize">${dateStr}</span>
+            <div class="flex justify-between items-start">
+              <span>Expedición:</span>
+              <span class="text-slate-900 font-bold text-right">${dateStr}</span>
             </div>
             <div class="flex justify-between items-center">
               <span>Atendido por:</span>
