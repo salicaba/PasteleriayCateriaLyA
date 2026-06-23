@@ -40,66 +40,23 @@ const KpiCard = ({ title, value, icon: Icon, themeColor, isActive, onClick }) =>
 };
 // -----------------------------------------------------------------
 
-const PasteleriaSkeleton = () => (
-  <motion.div 
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
-  >
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-40 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-      <div className="flex gap-4 w-full md:w-auto">
-        <div className="w-full sm:w-64 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        <div className="w-full sm:w-40 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-      </div>
-    </div>
-
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 shrink-0 w-full">
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 border-l-4 border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center animate-pulse">
-          <div>
-            <div className="w-20 h-2.5 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 rounded mb-2"></div>
-            <div className="w-10 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 rounded"></div>
-          </div>
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/40 rounded-xl"></div>
-        </div>
-      ))}
-    </div>
-
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-64 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div className="space-y-2 w-1/2">
-                  <div className="w-16 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded animate-pulse" />
-                  <div className="w-full h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-                </div>
-                <div className="w-24 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-full animate-pulse" />
-              </div>
-              <div className="flex gap-2 mb-4">
-                <div className="w-16 h-5 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-                <div className="w-20 h-5 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-              </div>
-              <div className="space-y-2">
-                <div className="w-full h-3 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded animate-pulse" />
-                <div className="w-4/5 h-3 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded animate-pulse" />
-              </div>
-            </div>
-            <div className="mt-4 p-4 bg-gray-50/50 dark:bg-gray-800/30 lya:bg-lya-bg/50 rounded-xl border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
-              <div className="w-full h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </motion.div>
+// --- NUEVO COMPONENTE DE CARGA ---
+const PasteleriaLoader = () => (
+  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+    <motion.div
+      animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+      transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+    >
+      <ShoppingBasket size={40} className="text-emerald-500 lya:text-lya-primary" />
+    </motion.div>
+    <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+      Cargando Pedidos
+    </h2>
+    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+      <Loader2 size={16} className="animate-spin text-emerald-500 lya:text-lya-primary" /> Sincronizando datos...
+    </p>
+  </div>
 );
 
 export default function PasteleriaDashboard() {
@@ -137,7 +94,8 @@ export default function PasteleriaDashboard() {
     }
   }, [abonoModal.isOpen, abonoForm.metodo]);
 
-  if (loading) return <PasteleriaSkeleton />; 
+  // Aquí renderizamos el nuevo loader si los datos están cargando
+  if (loading) return <PasteleriaLoader />; 
 
   // --- FUNCIÓN DE RESTAURACIÓN DIRECTA ---
   const handleRestaurarDirecto = async (pedido) => {

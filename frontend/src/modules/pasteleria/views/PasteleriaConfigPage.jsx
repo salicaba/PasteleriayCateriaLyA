@@ -1,7 +1,7 @@
 // src/modules/pasteleria/views/PasteleriaConfigPage.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tags, Layers, Hash, Plus, Trash2, CheckCircle2, GripVertical } from 'lucide-react';
+import { Tags, Layers, Hash, Plus, Trash2, CheckCircle2, GripVertical, BookOpen, Loader2 } from 'lucide-react';
 import { usePasteleriaConfig } from '../controllers/usePasteleriaConfig';
 
 // Importaciones de dnd-kit para Drag & Drop
@@ -24,7 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 // --- COMPONENTES ARRASTRABLES ---
 
-const SortableCategoria = ({ cat, setAsDefault, deleteCategoria }) => {
+const SortableCategoria = ({ cat, setAsDefault, deleteCategoria, processingAction }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
   
   const style = {
@@ -32,6 +32,10 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria }) => {
     transition,
     zIndex: isDragging ? 999 : 'auto', 
   };
+
+  const isDeleting = processingAction === `del-cat-${cat.id}`;
+  const isSettingDefault = processingAction === `def-cat-${cat.id}`;
+  const isDisabled = isDeleting || isSettingDefault;
 
   return (
     <div 
@@ -41,7 +45,7 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria }) => {
         cat.isDefault 
           ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30 lya:bg-lya-primary/10 lya:border-lya-primary/40' 
           : 'bg-white border-gray-100 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40'
-      } ${isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'}`}
+      } ${isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'} ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-2 overflow-hidden">
         <div {...attributes} {...listeners} className="text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 lya:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
@@ -49,7 +53,8 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria }) => {
         </div>
 
         <button 
-          onClick={()=>setAsDefault(cat.id)} 
+          onClick={() => setAsDefault(cat.id)} 
+          disabled={isDisabled}
           title={cat.isDefault ? "Categoría predeterminada" : "Fijar como predeterminado"} 
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
             cat.isDefault 
@@ -57,7 +62,11 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria }) => {
               : 'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-border/50'
           }`}
         >
-          <CheckCircle2 size={16} className={cat.isDefault ? 'opacity-100' : 'opacity-40'} /> 
+          {isSettingDefault ? (
+            <Loader2 size={16} className="animate-spin text-emerald-500" />
+          ) : (
+            <CheckCircle2 size={16} className={cat.isDefault ? 'opacity-100' : 'opacity-40'} /> 
+          )}
           <span className="hidden xl:inline">{cat.isDefault ? 'Por defecto' : 'Fijar'}</span>
         </button>
         
@@ -67,15 +76,19 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria }) => {
       </div>
 
       <div className="flex items-center shrink-0">
-        <button onClick={()=>deleteCategoria(cat.id)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-50 rounded-lg transition-colors">
-          <Trash2 size={16}/>
+        <button 
+          onClick={() => deleteCategoria(cat.id)} 
+          disabled={isDisabled}
+          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16}/>}
         </button>
       </div>
     </div>
   );
 };
 
-const SortableString = ({ item, field, deleteString }) => {
+const SortableString = ({ item, field, deleteString, processingAction }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item });
   
   const style = {
@@ -84,13 +97,15 @@ const SortableString = ({ item, field, deleteString }) => {
     zIndex: isDragging ? 999 : 'auto',
   };
 
+  const isDeleting = processingAction === `del-${field}-${item}`;
+
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
       className={`relative flex items-center justify-between p-3 mb-2 rounded-xl border bg-white border-gray-100 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40 transition-colors ${
         isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'
-      }`}
+      } ${isDeleting ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-2 overflow-hidden">
         <div {...attributes} {...listeners} className="text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 lya:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
@@ -101,123 +116,154 @@ const SortableString = ({ item, field, deleteString }) => {
         </span>
       </div>
       <div className="flex items-center shrink-0">
-        <button onClick={()=>deleteString(field, item)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-50 rounded-lg transition-colors">
-          <Trash2 size={16}/>
+        <button 
+          onClick={() => deleteString(field, item)} 
+          disabled={isDeleting}
+          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16}/>}
         </button>
       </div>
     </div>
   );
 };
 
-// --- SKELETON DE CARGA PARA EL CATÁLOGO ---
-const PasteleriaConfigSkeleton = () => (
-  <motion.div 
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 overflow-hidden relative"
-  >
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-32 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-    </div>
-
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4 min-h-0">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[1, 2, 3].map((col) => (
-          <div key={col} className="bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-6 shadow-sm flex flex-col">
-            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
-              <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
-              <div className="w-24 h-6 rounded-lg bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
-            </div>
-            <div className="flex gap-2 mb-6">
-              <div className="flex-1 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
-              <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 animate-pulse" />
-            </div>
-            <div className="space-y-3">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-12 w-full rounded-xl bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 animate-pulse" />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </motion.div>
+// --- COMPONENTE DE CARGA INICIAL ---
+const PasteleriaLoader = () => (
+  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10">
+    <motion.div
+      animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+      transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+    >
+      <BookOpen size={40} className="text-emerald-500 lya:text-lya-primary" />
+    </motion.div>
+    <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+      Cargando Catálogo
+    </h2>
+    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+      <Loader2 size={16} className="animate-spin text-emerald-500 lya:text-lya-primary" /> Sincronizando configuración...
+    </p>
+  </div>
 );
 
 // --- PANTALLA PRINCIPAL ---
 
 export default function PasteleriaConfigPage() {
-  // Obtenemos los estados, y prevemos variables de carga comunes
   const { config, updateConfig, loading, isLoading } = usePasteleriaConfig();
   
-  // 🔥 Regla de Hooks: TODOS los useState y useSensors van ANTES del 'if' de carga
   const [newCategoria, setNewCategoria] = useState('');
   const [newTamano, setNewTamano] = useState('');
   const [newSabor, setNewSabor] = useState('');
+  
+  // Estados para UX (Spinners individuales y Mensajes de éxito)
+  const [processingAction, setProcessingAction] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Determinamos si aún estamos esperando datos
   const isPageLoading = loading || isLoading || !config;
 
-  // 🔥 AHORA SÍ: Cortamos y mostramos el Skeleton elegante si aún carga
-  if (isPageLoading) return <PasteleriaConfigSkeleton />;
+  if (isPageLoading) return <PasteleriaLoader />;
 
-  const handleDragEndCategorias = (event) => {
+  // Función para mostrar la notificación de éxito
+  const showSuccess = (msg) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
+
+  const handleDragEndCategorias = async (event) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const oldIndex = config.categorias.findIndex((c) => c.id === active.id);
       const newIndex = config.categorias.findIndex((c) => c.id === over.id);
-      updateConfig({ ...config, categorias: arrayMove(config.categorias, oldIndex, newIndex) });
+      await updateConfig({ ...config, categorias: arrayMove(config.categorias, oldIndex, newIndex) });
+      showSuccess("Orden de categorías guardado");
     }
   };
 
-  const handleDragEndString = (field) => (event) => {
+  const handleDragEndString = (field) => async (event) => {
     const { active, over } = event;
     if (active && over && active.id !== over.id) {
       const oldIndex = config[field].indexOf(active.id);
       const newIndex = config[field].indexOf(over.id);
-      updateConfig({ ...config, [field]: arrayMove(config[field], oldIndex, newIndex) });
+      await updateConfig({ ...config, [field]: arrayMove(config[field], oldIndex, newIndex) });
+      showSuccess("Orden actualizado");
     }
   };
 
-  const handleAddCategoria = (e) => {
+  const handleAddCategoria = async (e) => {
     e.preventDefault();
     if (!newCategoria.trim()) return;
-    const isFirst = config.categorias.length === 0;
-    const newItem = { id: Date.now().toString(), nombre: newCategoria.trim(), isDefault: isFirst };
-    updateConfig({ ...config, categorias: [...config.categorias, newItem] });
-    setNewCategoria('');
+    setProcessingAction('add-cat');
+    try {
+      const isFirst = config.categorias.length === 0;
+      const newItem = { id: Date.now().toString(), nombre: newCategoria.trim(), isDefault: isFirst };
+      await updateConfig({ ...config, categorias: [...config.categorias, newItem] });
+      setNewCategoria('');
+      showSuccess("Categoría agregada con éxito");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
-  const setAsDefault = (id) => {
-    const updated = config.categorias.map(cat => ({ ...cat, isDefault: cat.id === id }));
-    updateConfig({ ...config, categorias: updated });
+  const setAsDefault = async (id) => {
+    setProcessingAction(`def-cat-${id}`);
+    try {
+      const updated = config.categorias.map(cat => ({ ...cat, isDefault: cat.id === id }));
+      await updateConfig({ ...config, categorias: updated });
+      showSuccess("Categoría predeterminada actualizada");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
-  const deleteCategoria = (id) => {
-    const updated = config.categorias.filter(cat => cat.id !== id);
-    if (updated.length > 0 && !updated.some(c => c.isDefault)) updated[0].isDefault = true;
-    updateConfig({ ...config, categorias: updated });
+  const deleteCategoria = async (id) => {
+    setProcessingAction(`del-cat-${id}`);
+    try {
+      const updated = config.categorias.filter(cat => cat.id !== id);
+      if (updated.length > 0 && !updated.some(c => c.isDefault)) updated[0].isDefault = true;
+      await updateConfig({ ...config, categorias: updated });
+      showSuccess("Categoría eliminada");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
-  const handleAddString = (e, field, value, setValue) => {
+  const handleAddString = async (e, field, value, setValue) => {
     e.preventDefault();
     if (!value.trim() || config[field].includes(value.trim())) return;
-    updateConfig({ ...config, [field]: [...config[field], value.trim()] });
-    setValue('');
+    setProcessingAction(`add-${field}`);
+    try {
+      await updateConfig({ ...config, [field]: [...config[field], value.trim()] });
+      setValue('');
+      showSuccess(`${field === 'tamanos' ? 'Tamaño agregado' : 'Sabor agregado'} con éxito`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
-  const deleteString = (field, valueToRemove) => {
-    updateConfig({ ...config, [field]: config[field].filter(v => v !== valueToRemove) });
+  const deleteString = async (field, valueToRemove) => {
+    setProcessingAction(`del-${field}-${valueToRemove}`);
+    try {
+      await updateConfig({ ...config, [field]: config[field].filter(v => v !== valueToRemove) });
+      showSuccess(`${field === 'tamanos' ? 'Tamaño eliminado' : 'Sabor eliminado'}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
   return (
@@ -225,7 +271,6 @@ export default function PasteleriaConfigPage() {
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      // CRUCIAL: Aquí quitamos el scroll de la página global (overflow-hidden en lugar de overflow-y-auto)
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
@@ -240,7 +285,6 @@ export default function PasteleriaConfigPage() {
         </div>
       </header>
 
-      {/* Este es el único div que hace scroll y dibuja la barra de navegación lateral */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4 min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
@@ -251,8 +295,21 @@ export default function PasteleriaConfigPage() {
                <h2 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Categorías</h2>
             </div>
             <form onSubmit={handleAddCategoria} className="flex gap-2 mb-4">
-               <input type="text" placeholder="Nueva Categoría" value={newCategoria} onChange={(e)=>setNewCategoria(e.target.value)} className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text" />
-               <button type="submit" className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity"><Plus size={20}/></button>
+               <input 
+                 type="text" 
+                 placeholder="Nueva Categoría" 
+                 value={newCategoria} 
+                 disabled={processingAction === 'add-cat'}
+                 onChange={(e)=>setNewCategoria(e.target.value)} 
+                 className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text disabled:opacity-50" 
+               />
+               <button 
+                 type="submit" 
+                 disabled={processingAction === 'add-cat' || !newCategoria.trim()}
+                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 {processingAction === 'add-cat' ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20}/>}
+               </button>
             </form>
             
             <div className="flex flex-col mt-2">
@@ -261,7 +318,7 @@ export default function PasteleriaConfigPage() {
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndCategorias}>
                  <SortableContext items={config.categorias.map(c => c.id)} strategy={verticalListSortingStrategy}>
                      {config.categorias.map(cat => (
-                       <SortableCategoria key={cat.id} cat={cat} setAsDefault={setAsDefault} deleteCategoria={deleteCategoria} />
+                       <SortableCategoria key={cat.id} cat={cat} setAsDefault={setAsDefault} deleteCategoria={deleteCategoria} processingAction={processingAction} />
                      ))}
                  </SortableContext>
                </DndContext>
@@ -275,8 +332,21 @@ export default function PasteleriaConfigPage() {
                <h2 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Tamaños</h2>
             </div>
             <form onSubmit={(e) => handleAddString(e, 'tamanos', newTamano, setNewTamano)} className="flex gap-2 mb-4">
-               <input type="text" placeholder="Ej. 20 Personas" value={newTamano} onChange={(e)=>setNewTamano(e.target.value)} className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text" />
-               <button type="submit" className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity"><Plus size={20}/></button>
+               <input 
+                 type="text" 
+                 placeholder="Ej. 20 Personas" 
+                 value={newTamano} 
+                 disabled={processingAction === 'add-tamanos'}
+                 onChange={(e)=>setNewTamano(e.target.value)} 
+                 className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text disabled:opacity-50" 
+               />
+               <button 
+                 type="submit" 
+                 disabled={processingAction === 'add-tamanos' || !newTamano.trim()}
+                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 {processingAction === 'add-tamanos' ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20}/>}
+               </button>
             </form>
 
             <div className="flex flex-col mt-2">
@@ -285,7 +355,7 @@ export default function PasteleriaConfigPage() {
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndString('tamanos')}>
                  <SortableContext items={config.tamanos} strategy={verticalListSortingStrategy}>
                      {config.tamanos.map(tam => (
-                       <SortableString key={tam} item={tam} field="tamanos" deleteString={deleteString} />
+                       <SortableString key={tam} item={tam} field="tamanos" deleteString={deleteString} processingAction={processingAction} />
                      ))}
                  </SortableContext>
                </DndContext>
@@ -299,8 +369,21 @@ export default function PasteleriaConfigPage() {
                <h2 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Sabores</h2>
             </div>
             <form onSubmit={(e) => handleAddString(e, 'sabores', newSabor, setNewSabor)} className="flex gap-2 mb-4">
-               <input type="text" placeholder="Ej. Chocolate" value={newSabor} onChange={(e)=>setNewSabor(e.target.value)} className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text" />
-               <button type="submit" className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity"><Plus size={20}/></button>
+               <input 
+                 type="text" 
+                 placeholder="Ej. Chocolate" 
+                 value={newSabor} 
+                 disabled={processingAction === 'add-sabores'}
+                 onChange={(e)=>setNewSabor(e.target.value)} 
+                 className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text disabled:opacity-50" 
+               />
+               <button 
+                 type="submit" 
+                 disabled={processingAction === 'add-sabores' || !newSabor.trim()}
+                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 {processingAction === 'add-sabores' ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20}/>}
+               </button>
             </form>
 
             <div className="flex flex-col mt-2">
@@ -309,7 +392,7 @@ export default function PasteleriaConfigPage() {
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndString('sabores')}>
                  <SortableContext items={config.sabores} strategy={verticalListSortingStrategy}>
                      {config.sabores.map(sabor => (
-                       <SortableString key={sabor} item={sabor} field="sabores" deleteString={deleteString} />
+                       <SortableString key={sabor} item={sabor} field="sabores" deleteString={deleteString} processingAction={processingAction} />
                      ))}
                  </SortableContext>
                </DndContext>
@@ -318,6 +401,26 @@ export default function PasteleriaConfigPage() {
 
         </div>
       </div>
+
+      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO (TOAST CENTRADO ARRIBA) */}
+      <AnimatePresence>
+        {successMessage && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
+            >
+              <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full">
+                <CheckCircle2 size={20} className="text-emerald-500 lya:text-lya-primary" />
+              </div>
+              {successMessage}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

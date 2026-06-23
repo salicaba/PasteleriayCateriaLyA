@@ -1,44 +1,29 @@
+// src/modules/pasteleria/views/PasteleriaCalendar.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, Plus, CalendarDays, Search, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Cake, Clock, CheckCircle2, AlertCircle, FileText, Plus, CalendarDays, Search, Eye, CalendarClock, Loader2 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
 
-// 🔥 Skeleton exclusivo para el Calendario Neo-Bento
-const PasteleriaCalendarSkeleton = () => (
-  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8">
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-32 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-48 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-      <div className="w-full md:w-64 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-    </div>
-
-    <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
-      <div className="w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 flex flex-col shadow-sm">
-        <div className="flex justify-between items-center mb-6">
-          <div className="w-48 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        </div>
-        <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr">
-          {[...Array(35)].map((_, i) => <div key={i} className="bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-border/20 rounded-2xl animate-pulse" />)}
-        </div>
-      </div>
-
-      <div className="w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 flex flex-col shadow-sm">
-         <div className="w-40 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse mb-6" />
-         <div className="flex-1 space-y-4">
-           {[...Array(4)].map((_, i) => <div key={i} className="h-32 bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-border/20 rounded-2xl animate-pulse" />)}
-         </div>
-      </div>
-    </div>
-  </motion.div>
+// --- NUEVO COMPONENTE DE CARGA ---
+const PasteleriaLoader = () => (
+  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+    <motion.div
+      animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+      transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+    >
+      <CalendarClock size={40} className="text-emerald-500 lya:text-lya-primary" />
+    </motion.div>
+    <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+      Cargando Agenda
+    </h2>
+    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 flex items-center gap-2">
+      <Loader2 size={16} className="animate-spin text-emerald-500 lya:text-lya-primary" /> Sincronizando fechas...
+    </p>
+  </div>
 );
 
 export default function PasteleriaCalendar() {
@@ -47,17 +32,18 @@ export default function PasteleriaCalendar() {
     isModalOpen, abrirModalNuevoPedido, cerrarModalNuevoPedido, fechaPredefinida,
     ticketModal, abrirTicket, cerrarTicket,
     detalleModal, abrirDetalles, cerrarDetalles,
-    pedidoAEditar, iniciarEdicion, calcularFinanzas, guardarPedido 
+    pedidoAEditar, iniciarEdicion, calcularFinanzas, guardarPedido,
+    successScreen, // Importamos el successScreen del controlador
+    isSubmitting
   } = usePedidosController();
 
-  // 🔥 TODOS los useState definidos antes del loading
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showMobileList, setShowMobileList] = useState(false);
   const [fechaBusqueda, setFechaBusqueda] = useState('');
 
-  // AHORA SÍ: Cortamos si está cargando
-  if (loading) return <PasteleriaCalendarSkeleton />;
+  // Aquí renderizamos el nuevo loader si los datos están cargando
+  if (loading) return <PasteleriaLoader />;
 
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
@@ -115,7 +101,7 @@ export default function PasteleriaCalendar() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
@@ -132,13 +118,20 @@ export default function PasteleriaCalendar() {
           <div className="bg-white dark:bg-gray-700 lya:bg-lya-surface p-2 rounded-xl text-emerald-500 lya:text-lya-primary shadow-sm">
              <Search size={16} />
           </div>
-          <div className="flex flex-col pr-2 flex-1">
+          <div className="relative flex flex-col pr-2 flex-1">
              <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-wider">Ir a fecha</label>
+             {/* Truco UX: opacity-0 y absolute en el pseudo-elemento ocultan el ícono nativo pero mantienen el área clickeable */}
              <input
                type="date"
                value={fechaBusqueda} 
                onChange={handleDateSearch}
-               className="bg-transparent border-none outline-none text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text cursor-pointer leading-none w-full"
+               className="bg-transparent border-none outline-none text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text cursor-pointer leading-none w-full 
+                 [&::-webkit-calendar-picker-indicator]:opacity-0 
+                 [&::-webkit-calendar-picker-indicator]:absolute 
+                 [&::-webkit-calendar-picker-indicator]:inset-0 
+                 [&::-webkit-calendar-picker-indicator]:w-full 
+                 [&::-webkit-calendar-picker-indicator]:h-full 
+                 [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
              />
           </div>
         </div>
@@ -146,6 +139,7 @@ export default function PasteleriaCalendar() {
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
         
+        {/* --- PANEL DE CALENDARIO --- */}
         <div className={`w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 shadow-xl overflow-y-auto custom-scrollbar 
           ${showMobileList ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
           <div className="flex justify-between items-center mb-6">
@@ -182,7 +176,7 @@ export default function PasteleriaCalendar() {
               let indicatorColor = '';
               if (numPedidos > 0 && numPedidos <= 2) indicatorColor = 'bg-emerald-400 shadow-emerald-400/50 lya:bg-lya-secondary lya:shadow-lya-secondary/50';
               if (numPedidos > 2 && numPedidos <= 4) indicatorColor = 'bg-amber-400 shadow-amber-400/50 lya:bg-lya-primary lya:shadow-lya-primary/50';
-              if (numPedidos > 4) indicatorColor = 'bg-rose-500 shadow-rose-500/50';
+              if (numPedidos > 4) indicatorColor = 'bg-rose-500 shadow-rose-500/50 lya:bg-rose-500 lya:shadow-rose-500/50';
 
               return (
                 <motion.button
@@ -196,7 +190,7 @@ export default function PasteleriaCalendar() {
                   }}
                   className={`relative flex flex-col items-center p-2 rounded-2xl border transition-colors duration-300 min-h-[4rem]
                     ${isSelected ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30 lya:bg-lya-secondary lya:border-lya-secondary lya:shadow-lya-secondary/30' : 
-                      isToday ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 lya:bg-lya-secondary/10 lya:border-slate-300/50' : 
+                      isToday ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 lya:bg-lya-secondary/10 lya:border-lya-secondary/50' : 
                       'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 lya:bg-lya-surface lya:border-lya-border/30 lya:hover:border-lya-secondary/50'}
                   `}
                 >
@@ -214,13 +208,14 @@ export default function PasteleriaCalendar() {
           </div>
         </div>
 
+        {/* --- LISTA DE PEDIDOS DEL DÍA --- */}
         <div className={`w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-3xl p-6 shadow-xl overflow-hidden h-full
           ${showMobileList ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'}`}>
           
           <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 shrink-0 flex items-start gap-3">
             <button 
               onClick={() => setShowMobileList(false)} 
-              className="lg:hidden mt-0.5 p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30"
+              className="lg:hidden mt-0.5 p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-xl transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30"
             >
               <ChevronLeft size={20} />
             </button>
@@ -243,7 +238,7 @@ export default function PasteleriaCalendar() {
                   className="h-full flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40"
                 >
                   <Cake size={48} className="mb-3 opacity-20" />
-                  <p className="mb-4 text-center">No hay entregas agendadas<br/>para este día.</p>
+                  <p className="mb-4 text-center font-medium">No hay entregas agendadas<br/>para este día.</p>
                 </motion.div>
               ) : (
                 pedidosSeleccionados.map(pedido => {
@@ -259,13 +254,13 @@ export default function PasteleriaCalendar() {
                       transition={{ type: "spring", stiffness: 200, damping: 20 }}
                       key={pedido.id}
                       className={`p-4 rounded-2xl bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-colors hover:shadow-md
-                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40'}
+                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40'}
                       `}
                     >
                       <div className="flex justify-between items-start">
                         <div className="cursor-pointer flex-1" onClick={() => abrirDetalles(pedido)}>
                           <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
-                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text hover:text-emerald-500 transition-colors">{pedido.cliente}</h4>
+                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text hover:text-emerald-500 lya:hover:text-lya-primary transition-colors">{pedido.cliente}</h4>
                         </div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
                           <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {hora}
@@ -273,30 +268,30 @@ export default function PasteleriaCalendar() {
                       </div>
 
                       <div className="flex flex-wrap gap-1.5 my-0.5">
-                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 shadow-sm">
+                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 lya:bg-lya-bg lya:text-lya-text border border-indigo-100 dark:border-indigo-900/50 lya:border-lya-border/40 shadow-sm">
                           {pedido.categoria || 'Pastel'}
                         </span>
                         
                         {Array.isArray(pedido.porciones) ? (
                           pedido.porciones.map((p, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40 shadow-sm">
+                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text border border-amber-100 dark:border-amber-900/40 lya:border-lya-border/40 shadow-sm">
                               {p}
                             </span>
                           ))
                         ) : pedido.porciones && (
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40 shadow-sm">
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text border border-amber-100 dark:border-amber-900/40 lya:border-lya-border/40 shadow-sm">
                             {pedido.porciones}
                           </span>
                         )}
 
                         {Array.isArray(pedido.saborPan) ? (
                           pedido.saborPan.map((s, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border border-purple-100 dark:border-purple-900/40 shadow-sm">
+                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text border border-purple-100 dark:border-purple-900/40 lya:border-lya-border/40 shadow-sm">
                               {s}
                             </span>
                           ))
                         ) : pedido.saborPan && (
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border border-purple-100 dark:border-purple-900/40 shadow-sm">
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text border border-purple-100 dark:border-purple-900/40 lya:border-lya-border/40 shadow-sm">
                             {pedido.saborPan}
                           </span>
                         )}
@@ -316,7 +311,7 @@ export default function PasteleriaCalendar() {
                         )}
                         
                         <div className="flex gap-2">
-                          <button onClick={() => abrirDetalles(pedido)} className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg transition-colors" title="Ver Detalles"><Eye size={16}/></button>
+                          <button onClick={() => abrirDetalles(pedido)} className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-lg transition-colors" title="Ver Detalles"><Eye size={16}/></button>
                           <button onClick={() => abrirTicket(pedido)} className="p-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-lg transition-colors" title="Ver Ticket"><FileText size={16}/></button>
                         </div>
                       </div>
@@ -340,7 +335,29 @@ export default function PasteleriaCalendar() {
         </div>
       </div>
 
-      <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} />
+      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO (TOAST CENTRADO ARRIBA) */}
+      <AnimatePresence>
+        {successScreen?.isOpen && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
+            >
+              <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
+                <CheckCircle2 size={20} className="text-emerald-500 lya:text-lya-primary" />
+              </div>
+              <div className="flex flex-col">
+                  <span className="text-sm">{successScreen.title || 'Acción exitosa'}</span>
+                  {successScreen.subtitle && <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 leading-none mt-0.5">{successScreen.subtitle}</span>}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} isSubmitting={isSubmitting} />
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
       <DetallePedidoModal isOpen={detalleModal.isOpen} onClose={cerrarDetalles} pedido={detalleModal.pedido} onEdit={iniciarEdicion} calcularFinanzas={calcularFinanzas} />
 
