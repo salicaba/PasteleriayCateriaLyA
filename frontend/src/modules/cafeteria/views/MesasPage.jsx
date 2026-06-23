@@ -41,6 +41,10 @@ export const MesasPage = () => {
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [isCanceling, setIsCanceling] = useState(false);
 
+  // 🔥 ESTADOS PARA BLOQUEAR LOS BOTONES DE RESTAURAR MIENTRAS CARGAN
+  const [restoringOrderId, setRestoringOrderId] = useState(null);
+  const [restoringItemId, setRestoringItemId] = useState(null);
+
   const [dailySummary, setDailySummary] = useState({
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
   });
@@ -82,6 +86,25 @@ export const MesasPage = () => {
   }, [activeOrderIds, selectedMesa, isLoading]);
 
   const ingresosTotales = dailySummary.transactions?.filter(t => t.type === 'INCOME') || [];
+
+  // 🔥 FUNCIONES ASÍNCRONAS PARA MANEJAR LA CARGA AL RESTAURAR
+  const onRestoreOrder = async (orderId) => {
+    setRestoringOrderId(orderId);
+    try {
+      await handleRestoreOrder(orderId);
+    } finally {
+      setRestoringOrderId(null);
+    }
+  };
+
+  const onRestoreItem = async (orderId, itemId) => {
+    setRestoringItemId(itemId);
+    try {
+      await handleRestoreItem(orderId, itemId);
+    } finally {
+      setRestoringItemId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -414,11 +437,19 @@ export const MesasPage = () => {
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
                                   <button 
-                                    onClick={() => handleRestoreOrder(order.id)} 
-                                    className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all flex items-center gap-1.5" 
+                                    onClick={() => onRestoreOrder(order.id)} 
+                                    disabled={restoringOrderId === order.id}
+                                    className={`px-2 py-1.5 rounded-lg shadow-sm border transition-all flex items-center gap-1.5 ${
+                                      restoringOrderId === order.id 
+                                        ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
+                                        : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
+                                    }`} 
                                     title="Restaurar Cuenta Completa"
                                   >
-                                    <RotateCcw size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Restaurar</span>
+                                    {restoringOrderId === order.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
+                                    <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
+                                      {restoringOrderId === order.id ? 'Restaurando...' : 'Restaurar'}
+                                    </span>
                                   </button>
                                 </div>
                               </div>
@@ -536,11 +567,19 @@ export const MesasPage = () => {
                                 <span className="text-sm font-black text-gray-400 line-through">${Number(item.subtotal).toFixed(2)}</span>
                                 {canRestore ? (
                                     <button 
-                                        onClick={() => handleRestoreItem(item.orderId, item.id)} 
-                                        className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl border border-orange-200 dark:border-orange-800/50 shadow-sm hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all flex items-center gap-1.5" 
+                                        onClick={() => onRestoreItem(item.orderId, item.id)} 
+                                        disabled={restoringItemId === item.id}
+                                        className={`px-2 py-1.5 rounded-xl border shadow-sm transition-all flex items-center gap-1.5 ${
+                                          restoringItemId === item.id 
+                                            ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
+                                            : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
+                                        }`} 
                                         title="Restaurar Producto a la Orden Original"
                                     >
-                                        <RotateCcw size={16} /> <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Restaurar</span>
+                                        {restoringItemId === item.id ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />} 
+                                        <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
+                                          {restoringItemId === item.id ? 'Restaurando...' : 'Restaurar'}
+                                        </span>
                                     </button>
                                 ) : (
                                     <span 

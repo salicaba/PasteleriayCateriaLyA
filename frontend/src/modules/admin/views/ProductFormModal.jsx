@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { motion } from 'framer-motion';
-import { X, Upload, RotateCw, Package, Folder, Settings2, CheckCircle2, Star, Store, ChefHat } from 'lucide-react';
+import { X, Upload, RotateCw, Package, Folder, Settings2, CheckCircle2, Star, Store, ChefHat, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
 const createImage = (url) => new Promise((resolve, reject) => {
@@ -83,6 +83,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  
+  // 🔥 ESTADO DE CARGA PARA EL BOTÓN DE GUARDAR
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleOption = (tipo, globalOpt) => {
     const current = formData.opciones[tipo];
@@ -127,7 +130,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     }
   };
 
-  const handleSaveSubmit = () => {
+  const handleSaveSubmit = async () => {
+    setIsSubmitting(true);
     const cleanOpts = (arr) => arr.map(opt => ({
       ...opt, 
       precioAdicional: opt.precioAdicional === '' ? 0 : parseFloat(opt.precioAdicional)
@@ -144,7 +148,10 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
         defaults: formData.opciones.defaults
       }
     };
-    onSave(finalData);
+    
+    // Ejecutamos la carga a BD (que hace todo en el controller)
+    await onSave(finalData);
+    setIsSubmitting(false); // Por si acaso falla y no se cierra
   };
 
   return (
@@ -168,7 +175,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
           <div className="flex flex-col h-full max-h-[90vh]">
             <header className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-white dark:bg-gray-900 lya:bg-lya-surface sticky top-0 z-10 transition-colors">
               <h2 className="text-2xl font-black dark:text-white lya:text-lya-text">{initialData ? 'Editar Producto' : 'Nuevo Producto'}</h2>
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 lya:hover:bg-lya-bg rounded-full transition-colors">
+              <button onClick={onClose} disabled={isSubmitting} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 lya:hover:bg-lya-bg rounded-full transition-colors disabled:opacity-50">
                 <X size={24} className="text-gray-400 lya:text-lya-text/40" />
               </button>
             </header>
@@ -184,9 +191,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                         <Upload size={48} className="text-gray-400 lya:text-lya-text/30" />
                       </div>
                     )}
-                    <label className="bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl cursor-pointer font-bold text-sm shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 w-full text-center transition-colors">
+                    <label className={`bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 lya:shadow-lya-primary/20 w-full text-center transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       Subir Foto
-                      <input type="file" className="hidden" onChange={onFileChange} accept="image/*" />
+                      <input type="file" className="hidden" disabled={isSubmitting} onChange={onFileChange} accept="image/*" />
                     </label>
                   </div>
                 </div>
@@ -196,8 +203,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                     <label className="text-xs font-bold text-gray-400 lya:text-lya-text/50 uppercase ml-1">Nombre del Producto</label>
                     <input 
                       type="text" value={formData.name}
+                      disabled={isSubmitting}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text transition-all font-medium"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text transition-all font-medium disabled:opacity-60"
                       placeholder="Ej: Frappé de Moka"
                     />
                   </div>
@@ -209,8 +217,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                         <Folder className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
                         <select
                           value={formData.categoryId}
+                          disabled={isSubmitting}
                           onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
-                          className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none cursor-pointer transition-all font-medium"
+                          className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none transition-all font-medium disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <option value="" disabled>Selecciona una categoría...</option>
                           {categories.map((cat) => (
@@ -226,8 +235,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                         <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
                         <select
                           value={formData.departamento}
+                          disabled={isSubmitting}
                           onChange={(e) => setFormData({...formData, departamento: e.target.value})}
-                          className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none cursor-pointer transition-all font-medium"
+                          className="w-full p-4 pl-12 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text appearance-none transition-all font-medium disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <option value="cafeteria">Caja Cafetería</option>
                           <option value="pasteleria">Caja Pastelería</option>
@@ -243,17 +253,18 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/50 font-bold">$</span>
                         <input 
                           type="number" value={formData.basePrice}
+                          disabled={isSubmitting}
                           onChange={(e) => setFormData({...formData, basePrice: e.target.value === '' ? '' : parseFloat(e.target.value)})}
                           placeholder="Ej: 45.00"
-                          className="w-full p-4 pl-8 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text transition-all font-medium"
+                          className="w-full p-4 pl-8 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text transition-all font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
                         />
                       </div>
                     </div>
                     
                     <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 rounded-2xl p-3 flex flex-col justify-center transition-colors">
                       <div className="flex items-center justify-between px-1 mb-2">
-                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase">Controlar Inventario</label>
-                        <button type="button" onClick={() => setFormData({...formData, controlarStock: !formData.controlarStock})} className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 ${formData.controlarStock ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'}`}>
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase">Stock</label>
+                        <button type="button" disabled={isSubmitting} onClick={() => setFormData({...formData, controlarStock: !formData.controlarStock})} className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 ${formData.controlarStock ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'} ${isSubmitting ? 'opacity-50' : ''}`}>
                           <div className={`w-4 h-4 bg-white lya:bg-lya-surface rounded-full shadow-md transform transition-transform ${formData.controlarStock ? 'translate-x-5' : 'translate-x-0'}`} />
                         </button>
                       </div>
@@ -262,16 +273,16 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                           <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={16} />
                           <input 
                             type="number" value={formData.stockQuantity}
+                            disabled={isSubmitting}
                             onChange={(e) => setFormData({...formData, stockQuantity: e.target.value === '' ? '' : parseInt(e.target.value)})}
                             placeholder="Ej: 15"
-                            className="w-full p-2 pl-9 bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:border-orange-500 lya:focus:border-lya-secondary rounded-xl outline-none dark:text-white lya:text-lya-text text-sm transition-all font-medium"
+                            className="w-full p-2 pl-9 bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:border-orange-500 lya:focus:border-lya-secondary rounded-xl outline-none dark:text-white lya:text-lya-text text-sm transition-all font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
                           />
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* 🔥 BLOQUE CORREGIDO: SWITCH DE COCINA CON DISEÑO UNIFICADO */}
                   <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-transparent lya:border-lya-border/30 rounded-2xl p-3 flex flex-col justify-center transition-colors mt-2">
                     <div className="flex items-center justify-between px-1">
                       <div>
@@ -287,8 +298,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       </div>
                       <button 
                         type="button" 
+                        disabled={isSubmitting}
                         onClick={() => setFormData({...formData, requiereCocina: !formData.requiereCocina})} 
-                        className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 shrink-0 ${formData.requiereCocina ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'}`}
+                        className={`w-11 h-6 rounded-full flex items-center transition-colors px-1 shrink-0 ${formData.requiereCocina ? 'bg-orange-500 lya:bg-lya-secondary' : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/50'} ${isSubmitting ? 'opacity-50' : ''}`}
                       >
                         <div className={`w-4 h-4 bg-white lya:bg-lya-surface rounded-full shadow-md transform transition-transform ${formData.requiereCocina ? 'translate-x-5' : 'translate-x-0'}`} />
                       </button>
@@ -349,8 +361,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                  >
                                    <button
                                      type="button"
+                                     disabled={isSubmitting}
                                      onClick={() => toggleOption(tipo, opt)}
-                                     className="flex items-start gap-2 text-sm font-bold w-full text-left outline-none"
+                                     className="flex items-start gap-2 text-sm font-bold w-full text-left outline-none disabled:opacity-70"
                                    >
                                      <div className="mt-0.5 shrink-0">
                                        {isSelected ? (
@@ -374,9 +387,10 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                            min="0"
                                            step="1"
                                            placeholder="0.00"
+                                           disabled={isSubmitting}
                                            value={selectedOpt.precioAdicional}
                                            onChange={handlePriceChange}
-                                           className="w-20 p-1.5 text-sm bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 rounded-lg outline-none text-right font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text focus:border-orange-400 lya:focus:border-lya-primary transition-colors shadow-inner"
+                                           className="w-20 p-1.5 text-sm bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 rounded-lg outline-none text-right font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text focus:border-orange-400 lya:focus:border-lya-primary transition-colors shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
                                            onClick={(e) => e.stopPropagation()} 
                                          />
                                        </div>
@@ -401,6 +415,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                             </label>
                             <select
                               value={formData.opciones.defaults[tipo === 'tamanos' ? 'tamano' : 'leche']}
+                              disabled={isSubmitting}
                               onChange={(e) => setFormData(prev => ({
                                 ...prev,
                                 opciones: {
@@ -411,7 +426,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                   }
                                 }
                               }))}
-                              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 outline-none text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text"
+                              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 outline-none text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text disabled:opacity-60"
                             >
                               <option value="">-- Sin predeterminado --</option>
                               {optsSeleccionadas.map(s => (
@@ -429,9 +444,19 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
             </div>
 
             <footer className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg flex gap-4 shrink-0 transition-colors">
-              <button type="button" onClick={onClose} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 lya:text-lya-text/60 lya:hover:bg-lya-surface rounded-2xl transition-colors">Cancelar</button>
-              <button type="button" onClick={handleSaveSubmit} className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl font-bold shadow-lg shadow-orange-500/30 lya:shadow-lya-primary/30 transition-all transform hover:-translate-y-0.5">
-                {formData.id ? 'Actualizar Producto' : 'Guardar Producto'}
+              <button type="button" disabled={isSubmitting} onClick={onClose} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 lya:text-lya-text/60 lya:hover:bg-lya-surface rounded-2xl transition-colors disabled:opacity-50">Cancelar</button>
+              <button 
+                type="button" 
+                disabled={isSubmitting} 
+                onClick={handleSaveSubmit} 
+                className={`flex-1 py-4 text-white lya:text-lya-surface rounded-2xl font-bold shadow-lg transition-all transform flex items-center justify-center gap-2 ${
+                  isSubmitting 
+                    ? 'bg-orange-400 lya:bg-lya-primary/70 cursor-not-allowed shadow-none' 
+                    : 'bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 shadow-orange-500/30 lya:shadow-lya-primary/30 hover:-translate-y-0.5'
+                }`}
+              >
+                {isSubmitting && <Loader2 size={20} className="animate-spin" />}
+                {isSubmitting ? 'Guardando...' : (formData.id ? 'Actualizar Producto' : 'Guardar Producto')}
               </button>
             </footer>
           </div>

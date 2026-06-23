@@ -12,11 +12,11 @@ import GlobalOption from './GlobalOption.model.js';
 export const getCategories = async (req, res) => {
   try {
     const categories = await Category.findAll({
-      order: [['order', 'ASC']], // Crucial: Devolver siempre ordenado
+      order: [['order', 'ASC']], 
       include: [{
         model: Product,
         as: 'products',
-        attributes: ['id'] // Solo para saber si tiene productos asociados
+        attributes: ['id'] 
       }]
     });
     res.json(categories);
@@ -30,7 +30,6 @@ export const createCategory = async (req, res) => {
   try {
     const { name } = req.body;
     
-    // Obtener el order más alto actual para poner la nueva al final
     const maxOrder = await Category.max('order') || 0;
     
     const newCategory = await Category.create({ 
@@ -109,8 +108,9 @@ export const deleteCategory = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
+    // 🔥 CAMBIO IMPORTANTE: Eliminamos el filtro de isActive: true
+    // Para que el gestor de menú pueda cargar TANTO los activos como los inactivos
     const products = await Product.findAll({
-      where: { isActive: true },
       include: [{ model: Variant, as: 'variants' }]
     });
     res.json(products);
@@ -121,7 +121,6 @@ export const getProducts = async (req, res) => {
 
 export const createProduct = async (req, res) => {
   try {
-    // 🔥 BLINDAJE PARA CREAR: Extraemos requiereCocina y departamento
     const { 
       name, 
       description, 
@@ -132,7 +131,8 @@ export const createProduct = async (req, res) => {
       categoryId,
       opciones,
       departamento,
-      requiereCocina 
+      requiereCocina,
+      isActive // 🔥 Se asegura de extraerlo si se manda
     } = req.body;
     
     const newProduct = await Product.create({
@@ -145,7 +145,8 @@ export const createProduct = async (req, res) => {
       categoryId,
       opciones,
       departamento, 
-      requiereCocina 
+      requiereCocina,
+      isActive: isActive !== undefined ? isActive : true
     });
 
     res.status(201).json({ message: 'Producto creado', product: newProduct });
@@ -158,7 +159,6 @@ export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // 🔥 BLINDAJE PARA EDITAR: Extraemos requiereCocina y departamento
     const { 
       name, 
       description, 
@@ -169,13 +169,18 @@ export const updateProduct = async (req, res) => {
       categoryId, 
       opciones, 
       departamento, 
-      requiereCocina 
+      requiereCocina,
+      isActive,       // 🔥 AQUÍ ESTABA EL PROBLEMA: No se estaba recibiendo
+      disponible      // Por si el frontend lo manda como 'disponible'
     } = req.body;
 
     const product = await Product.findByPk(id);
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
+
+    // Determinar cuál campo de estado usar (isActive o disponible)
+    const estadoFinal = isActive !== undefined ? isActive : (disponible !== undefined ? disponible : product.isActive);
 
     await product.update({
       name, 
@@ -187,7 +192,8 @@ export const updateProduct = async (req, res) => {
       categoryId, 
       opciones, 
       departamento, 
-      requiereCocina
+      requiereCocina,
+      isActive: estadoFinal // 🔥 AHORA SÍ SE GUARDA EL ESTADO
     });
     
     res.json({ message: 'Producto actualizado', product });

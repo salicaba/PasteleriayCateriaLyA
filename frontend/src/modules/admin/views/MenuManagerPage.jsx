@@ -3,42 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
-
-const MenuManagerSkeleton = () => (
-  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8">
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-48 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-      <div className="flex gap-3 w-full md:w-auto">
-        <div className="w-full sm:w-32 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        <div className="w-full sm:w-32 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        <div className="w-full sm:w-40 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-      </div>
-    </div>
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20 space-y-10">
-      {[1, 2, 3].map(cat => (
-        <div key={cat} className="space-y-4">
-          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse mb-4" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(prod => (
-              <div key={prod} className="h-28 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse" />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  </motion.div>
-);
 
 export const MenuManagerPage = () => {
   const {
@@ -49,7 +18,8 @@ export const MenuManagerPage = () => {
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
     productToDelete, confirmRemoveProduct, cancelRemoveProduct,
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
-    isLoading // 🔥 Ahora sí la recibimos del controlador
+    isLoading,
+    processingProducts // 🔥 Lo recibimos del controlador
   } = useMenuManagerController();
 
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -66,9 +36,28 @@ export const MenuManagerPage = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // 🔥 VALIDACIÓN CORRECTA DE CARGA
-  const isPageLoading = isLoading;
-  if (isPageLoading) return <MenuManagerSkeleton />;
+  // ==========================================
+  // PANTALLA DE CARGA ANIMADA NEO-BENTO
+  // ==========================================
+  if (isLoading) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+        <motion.div
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+        >
+          <LayoutGrid size={40} className="text-orange-500 lya:text-lya-primary" />
+        </motion.div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+          Cargando Gestor de Menú
+        </h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando catálogo...
+        </p>
+      </div>
+    );
+  }
 
   // Drag & Drop para Categorías
   const handleDragEnd = (event) => {
@@ -152,7 +141,11 @@ export const MenuManagerPage = () => {
                 {categoryProducts.length > 0 ? (
                   <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <AnimatePresence mode="popLayout">
-                      {categoryProducts.map((product) => (
+                      {categoryProducts.map((product) => {
+                        const isActive = product.isActive !== undefined ? product.isActive : product.disponible;
+                        const isProcessing = processingProducts?.has(product.id);
+
+                        return (
                         <motion.div 
                           key={product.id} 
                           layout 
@@ -160,7 +153,7 @@ export const MenuManagerPage = () => {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
                           transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-5 shadow-sm border ${product.disponible || product.isActive ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30' : 'border-red-200 dark:border-red-900/50 opacity-75'}`}
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-5 shadow-sm border ${isActive ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30' : 'border-red-200 dark:border-red-900/50 opacity-75'}`}
                         >
                           <div className="flex items-center space-x-4 mb-4">
                             <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner flex items-center justify-center">
@@ -171,23 +164,37 @@ export const MenuManagerPage = () => {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-bold text-lg leading-tight truncate ${!(product.disponible || product.isActive) ? 'text-gray-500 dark:text-gray-400 lya:text-lya-text/50' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
+                              <h3 className={`font-bold text-lg leading-tight truncate ${!isActive ? 'text-gray-500 dark:text-gray-400 lya:text-lya-text/50' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                 <p className="text-orange-500 dark:text-orange-400 lya:text-lya-primary font-black">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto">
-                            <button onClick={() => toggleAvailability(product.id)} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${product.disponible || product.isActive ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20' : 'text-red-600 bg-red-50 dark:bg-red-500/10 hover:bg-red-100'}`}>
-                              <Power size={16} /> <span>{product.disponible || product.isActive ? 'Activo' : 'Apagado'}</span>
+                            
+                            {/* 🔥 BOTÓN DE ACTIVAR/INACTIVAR CON SPINNER */}
+                            <button 
+                              onClick={() => !isProcessing && toggleAvailability(product.id)} 
+                              disabled={isProcessing}
+                              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                                isProcessing 
+                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-70 cursor-wait'
+                                  : isActive 
+                                    ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20' 
+                                    : 'text-red-600 bg-red-50 dark:bg-red-500/10 hover:bg-red-100'
+                              }`}
+                            >
+                              {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Power size={16} />} 
+                              <span>{isProcessing ? 'Cargando...' : (isActive ? 'Activo' : 'Inactivo')}</span>
                             </button>
+                            
                             <div className="flex space-x-2">
                               <button onClick={() => openModal(product)} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors"><Edit2 size={18} /></button>
                               <button onClick={() => deleteProduct(product.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={18} /></button>
                             </div>
                           </div>
                         </motion.div>
-                      ))}
+                      )})}
                     </AnimatePresence>
                   </motion.div>
                 ) : (

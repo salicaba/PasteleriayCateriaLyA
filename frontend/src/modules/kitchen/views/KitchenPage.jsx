@@ -3,47 +3,38 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKitchenController } from '../controllers/useKitchenController';
 import { KitchenOrderCard } from './KitchenOrderCard';
-import { Flame, UtensilsCrossed, ShoppingBag } from 'lucide-react';
-
-const KitchenSkeleton = () => (
-  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-6 overflow-hidden">
-    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4 md:mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-40 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-        </div>
-      </div>
-      <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-    </div>
-    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-      {[1, 2].map(col => (
-        <div key={col} className="flex-1 flex flex-col bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden">
-          <div className="h-14 bg-gray-100/50 dark:bg-gray-800/30 lya:bg-lya-bg/50 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 p-4 animate-pulse flex justify-between">
-            <div className="w-32 h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 rounded-md" />
-            <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/50 rounded-full" />
-          </div>
-          <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-            {[1, 2, 3].map(card => (
-              <div key={card} className="h-40 bg-gray-200/50 dark:bg-gray-800/50 lya:bg-lya-border/20 rounded-xl animate-pulse" />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  </motion.div>
-);
+import { Flame, UtensilsCrossed, ShoppingBag, Loader2 } from 'lucide-react';
 
 export const KitchenPage = () => {
-  const { orders, toggleItemReady, completeOrder, markAllReady, loading, isLoading } = useKitchenController();
+  const { 
+    orders, toggleItemReady, completeOrder, markAllReady, 
+    loading, processingItems, processingOrders 
+  } = useKitchenController();
 
-  // 🔥 HOOKS A SALVO
   const [vistaMovilActiva, setVistaMovilActiva] = useState('salon');
 
-  // AHORA SÍ: Cortamos si está cargando
-  const isPageLoading = loading || isLoading || !orders;
-  if (isPageLoading) return <KitchenSkeleton />;
+  // ==========================================
+  // PANTALLA DE CARGA ANIMADA NEO-BENTO
+  // ==========================================
+  if (loading) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+        <motion.div
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+        >
+          <Flame size={40} className="text-orange-500 lya:text-lya-primary" />
+        </motion.div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+          Cargando KDS Cocina
+        </h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando comandas...
+        </p>
+      </div>
+    );
+  }
 
   const ordersMesa = orders.filter(o => o.tipo !== 'llevar');
   const ordersLlevar = orders.filter(o => o.tipo === 'llevar');
@@ -154,7 +145,9 @@ export const KitchenPage = () => {
                             order={order} 
                             onToggleItem={toggleItemReady} 
                             onComplete={completeOrder} 
-                            onMarkAllReady={markAllReady} 
+                            onMarkAllReady={markAllReady}
+                            processingItems={processingItems}
+                            processingOrders={processingOrders}
                           />
                         </motion.div>
                       ))}
@@ -193,7 +186,9 @@ export const KitchenPage = () => {
                             order={order} 
                             onToggleItem={toggleItemReady} 
                             onComplete={completeOrder} 
-                            onMarkAllReady={markAllReady} 
+                            onMarkAllReady={markAllReady}
+                            processingItems={processingItems}
+                            processingOrders={processingOrders}
                           />
                         </motion.div>
                       ))}

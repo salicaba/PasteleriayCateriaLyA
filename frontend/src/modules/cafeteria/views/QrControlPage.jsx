@@ -3,45 +3,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, RefreshCw, Trash2, Smartphone, 
-  Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X 
+  Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
-
-const QrControlSkeleton = () => (
-  <motion.div 
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
-  >
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-32 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-48 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-    </div>
-    <div className="flex gap-2 mb-6">
-      <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-      <div className="w-32 h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-    </div>
-    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-      <div className="flex flex-wrap gap-6">
-        {[1, 2, 3, 4, 5, 6].map(mesa => (
-          <div key={mesa} className="w-full max-w-[300px] h-72 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse flex flex-col p-6">
-            <div className="flex justify-between w-full mb-4">
-               <div className="w-24 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-               <div className="w-8 h-8 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-md animate-pulse" />
-            </div>
-            <div className="flex-1 bg-gray-100/50 dark:bg-gray-800/50 lya:bg-lya-border/20 rounded-2xl mb-4 animate-pulse" />
-            <div className="h-10 w-full bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-          </div>
-        ))}
-      </div>
-    </div>
-  </motion.div>
-);
 
 export const QrControlPage = () => {
   const { 
@@ -53,7 +18,29 @@ export const QrControlPage = () => {
   const [previewMesa, setPreviewMesa] = useState(null);
 
   const isPageLoading = loading || isLoading || !zonas;
-  if (isPageLoading) return <QrControlSkeleton />;
+  
+  // ==========================================
+  // PANTALLA DE CARGA ANIMADA NEO-BENTO
+  // ==========================================
+  if (isPageLoading) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+        <motion.div
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+        >
+          <ScanLine size={40} className="text-orange-500 lya:text-lya-primary" />
+        </motion.div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+          Cargando Control QR
+        </h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando accesos y zonas...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
@@ -88,7 +75,8 @@ export const QrControlPage = () => {
       <header className="no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
-            <QrCode size={28} />
+            {/* Ícono actualizado a ScanLine para ir a juego con la pantalla de carga */}
+            <ScanLine size={28} />
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight">
@@ -138,7 +126,6 @@ export const QrControlPage = () => {
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 
               exit={{ opacity: 0, y: -10 }}
-              /* Modificado para que las tarjetas no crezcan demasiado: auto-fill con minmax controlando el ancho */
               className={`grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 items-start auto-rows-max ${previewMesa ? 'no-print' : ''}`}
             >
               <AnimatePresence mode='popLayout'>
@@ -150,7 +137,6 @@ export const QrControlPage = () => {
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
                     transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                    /* max-w-[300px] evita que la tarjeta se vuelva gigante en monitores grandes */
                     className="w-full max-w-[300px] mx-auto md:mx-0 bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-3xl shadow-sm relative group overflow-hidden flex flex-col"
                   >
                     <div className="flex justify-between items-start mb-4">
@@ -220,14 +206,13 @@ export const QrControlPage = () => {
               exit={{ opacity: 0, x: -20 }}
               className={`flex justify-center print:fixed print:inset-0 print:items-start print:bg-white ${previewMesa ? 'no-print' : ''}`}
             >
-              {/* Tarjeta del mostrador reducida a max-w-[340px] para que no sea muy ancha */}
               <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-8 max-w-[340px] w-full shadow-xl flex flex-col items-center text-center print-card print:bg-white">
                 
                 <div className="no-print bg-orange-500/10 lya:bg-lya-secondary/10 p-4 rounded-full mb-4">
                   <Smartphone className="w-10 h-10 text-orange-500 lya:text-lya-secondary" />
                 </div>
                 
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2 print:text-black text-3xl print:mb-4">Mostrador 𝓛𝔂𝓐</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white lya:text-lya-text mb-2 print:text-black text-3xl print:mb-4">Mostrador 𝓛𝔂𝓪</h2>
                 
                 <p className="no-print text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-6">QR único para que los clientes en fila puedan escanear el menú.</p>
                 
@@ -277,7 +262,6 @@ export const QrControlPage = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              /* El modal central también ajustado para no exceder los 340px */
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/20 print-card print:bg-white"
             >
               <button 
@@ -292,7 +276,7 @@ export const QrControlPage = () => {
               </div>
               
               <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white lya:text-lya-text mb-6 print:text-black print:text-4xl print:mb-4">
-                {previewMesa.isLlevar ? 'Mostrador 𝓛𝔂𝓐' : `Mesa ${previewMesa.number}`}
+                {previewMesa.isLlevar ? 'Mostrador 𝓛𝔂𝓪' : `Mesa ${previewMesa.number}`}
               </h2>
               
               <div className="hidden print:block mb-6 px-2">
@@ -336,3 +320,5 @@ export const QrControlPage = () => {
     </motion.div>
   );
 };
+
+export default QrControlPage;

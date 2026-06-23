@@ -1,9 +1,10 @@
+// src/modules/reports/views/ReportsPage.jsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar as CalendarIcon, TrendingUp, TrendingDown, DollarSign, 
   PackageMinus, Wallet, PieChart as PieChartIcon, Filter, 
-  FileText, FileSpreadsheet, ChevronDown, Search 
+  FileText, FileSpreadsheet, ChevronDown, Search, Loader2 
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -151,31 +152,6 @@ const EmptyChartState = ({ message }) => (
   </div>
 );
 
-const ReportsSkeleton = () => (
-  <motion.div 
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
-  >
-    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-48 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-    </div>
-    <div className="flex-1 overflow-y-auto hide-scrollbar pb-24 space-y-6 pr-1">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-28 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
-        ))}
-      </div>
-      <div className="h-[300px] bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl animate-pulse border border-gray-100 dark:border-gray-800 lya:border-lya-border/30" />
-    </div>
-  </motion.div>
-);
-
 export const ReportsPage = () => {
   const { theme } = useTheme();
   const { loading, dateRange, setDateRange, chartData, exportToExcel, exportToPDF } = useReportsController();
@@ -269,7 +245,25 @@ export const ReportsPage = () => {
     return [...processedProducts].reverse();
   }, [processedProducts]);
 
-  if (loading || !chartData?.kpis) return <ReportsSkeleton />;
+  if (loading || !chartData?.kpis) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+        <motion.div
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+        >
+          <PieChartIcon size={40} className="text-orange-500" />
+        </motion.div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+          Cargando Inteligencia de Negocios
+        </h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin text-orange-500" /> Analizando datos financieros...
+        </p>
+      </div>
+    );
+  }
 
   const dynamicChartHeight = Math.max(300, chartDisplayedProducts.length * 35);
 

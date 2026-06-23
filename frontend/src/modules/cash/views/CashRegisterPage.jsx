@@ -1,46 +1,8 @@
 // src/modules/cash/views/CashRegisterPage.jsx
 import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
-import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark, Eye, EyeOff } from 'lucide-react';
+import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, CreditCard, Landmark, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const CashRegisterSkeleton = () => (
-  <motion.div 
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-    className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8"
-  >
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-      <div className="flex items-center space-x-4">
-        <div className="w-14 h-14 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-2xl animate-pulse" />
-        <div className="space-y-2">
-          <div className="w-24 h-6 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-          <div className="w-64 h-4 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-lg animate-pulse" />
-        </div>
-      </div>
-      <div className="flex gap-3 w-full md:w-auto">
-        <div className="w-full sm:w-20 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-        <div className="w-full sm:w-40 h-12 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl animate-pulse" />
-      </div>
-    </div>
-
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
-      {[...Array(6)].map((_, i) => (
-        <div key={i} className={`h-32 rounded-3xl p-5 animate-pulse ${i===0 ? 'col-span-2 md:col-span-1 bg-gray-300 dark:bg-gray-800 lya:bg-lya-border/40' : 'bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`} />
-      ))}
-    </div>
-
-    <div className="mb-4 h-16 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 animate-pulse" />
-
-    <div className="flex-1 bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-md rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col">
-      <div className="h-12 bg-gray-100/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30" />
-      <div className="p-4 space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-10 bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 rounded-xl animate-pulse" />
-        ))}
-      </div>
-    </div>
-  </motion.div>
-);
 
 export const CashRegisterPage = ({ user }) => {
   const { 
@@ -89,7 +51,25 @@ export const CashRegisterPage = ({ user }) => {
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
 
-  if (loading) return <CashRegisterSkeleton />;
+  if (loading) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+        <motion.div
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+        >
+          <Calculator size={40} className="text-orange-500" />
+        </motion.div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+          Cargando Caja
+        </h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin text-orange-500" /> Sincronizando movimientos...
+        </p>
+      </div>
+    );
+  }
 
   const filteredTransactions = transactions.filter(tx => {
     if (filterSource === 'ALL') return true;

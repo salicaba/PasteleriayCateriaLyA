@@ -31,6 +31,9 @@ export const TicketSidebar = ({
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInputValue, setModalInputValue] = useState('');
   
+  // ESTADO DE CARGA PARA EL MODAL DE CONFIRMACIÓN INTERNO
+  const [isModalProcessing, setIsModalProcessing] = useState(false);
+  
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   const [isDeliveringAll, setIsDeliveringAll] = useState(false);
@@ -157,10 +160,10 @@ export const TicketSidebar = ({
             inputType: 'number', 
             inputMax: item.qty, 
             inputDefault: item.qty.toString(),
-            onConfirm: (val) => {
+            onConfirm: async (val) => {
                 const qtyToCancel = parseInt(val, 10);
                 if (qtyToCancel > 0 && qtyToCancel <= item.qty) {
-                    onCancelItem(item._groupedItems ? item._groupedItems[0] : item, 'Cancelación parcial desde POS', qtyToCancel);
+                    if (onCancelItem) await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, 'Cancelación parcial desde POS', qtyToCancel);
                 }
             }
         });
@@ -175,8 +178,8 @@ export const TicketSidebar = ({
             inputType: 'text', 
             inputPlaceholder: 'Motivo (opcional)', 
             inputDefault: 'Cancelado desde POS',
-            onConfirm: (reason) => {
-                if (onCancelItem) onCancelItem(item._groupedItems ? item._groupedItems[0] : item, reason, 1);
+            onConfirm: async (reason) => {
+                if (onCancelItem) await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, reason, 1);
             }
         });
     }
@@ -567,7 +570,7 @@ export const TicketSidebar = ({
                    ? ((isVitrina || isLlevar) ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos del pedido como entregados?' : 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?')
                    : ((isVitrina || isLlevar) ? '¿Confirmas que ya entregaste los productos listos del pedido?' : '¿Confirmas que ya entregaste los productos listos a la mesa?'),
                  icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
-                 onConfirm: () => handleDeliverAll()
+                 onConfirm: async () => await handleDeliverAll()
              })}
              className={clsx(
                "w-full mb-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex items-center justify-center gap-2 transition-all shadow-sm",
@@ -601,8 +604,8 @@ export const TicketSidebar = ({
                             inputType: 'text',
                             inputPlaceholder: 'Motivo de cancelación (opcional)',
                             inputDefault: 'Cancelado desde POS',
-                            onConfirm: (reason) => {
-                                if (onCancelFullOrder) onCancelFullOrder(reason);
+                            onConfirm: async (reason) => {
+                                if (onCancelFullOrder) await onCancelFullOrder(reason);
                             }
                         });
                     }} 
@@ -647,7 +650,6 @@ export const TicketSidebar = ({
            </>
         )}
 
-        {/* 🐛 AQUI ESTÁ EL ARREGLO: Agregamos `!isCompletamentePagada` para que este botón desaparezca al cobrar y no se amontone con el otro */}
         {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && !isCompletamentePagada && (
             <button 
                onClick={() => setShowCancelModal(true)} 
@@ -686,7 +688,8 @@ export const TicketSidebar = ({
                     value={modalInputValue} 
                     onChange={(e) => setModalInputValue(e.target.value)} 
                     placeholder={modalConfig.inputPlaceholder}
-                    className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-orange-500/50 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-center font-medium shadow-inner"
+                    disabled={isModalProcessing}
+                    className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-orange-500/50 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-center font-medium shadow-inner disabled:opacity-50"
                   />
                 </div>
               )}
@@ -694,18 +697,28 @@ export const TicketSidebar = ({
               <div className="flex gap-3 w-full">
                 <button 
                   onClick={() => setModalConfig(null)} 
-                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 rounded-2xl font-bold uppercase text-[11px] tracking-wider transition-colors active:scale-95"
+                  disabled={isModalProcessing}
+                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 rounded-2xl font-bold uppercase text-[11px] tracking-wider transition-colors active:scale-95 disabled:opacity-50"
                 >
                   Volver
                 </button>
                 <button 
-                  onClick={() => { 
-                    modalConfig.onConfirm(modalConfig.requireInput ? modalInputValue : undefined); 
-                    setModalConfig(null); 
+                  onClick={async () => { 
+                    setIsModalProcessing(true);
+                    try {
+                      await modalConfig.onConfirm(modalConfig.requireInput ? modalInputValue : undefined); 
+                    } finally {
+                      setIsModalProcessing(false);
+                      setModalConfig(null); 
+                    }
                   }} 
-                  className={clsx("flex-[1.5] py-3 rounded-2xl font-black uppercase text-[11px] tracking-wider transition-transform active:scale-95 shadow-md", modalColors[modalConfig.color].btn)}
+                  disabled={isModalProcessing}
+                  className={clsx("flex-[1.5] py-3 rounded-2xl font-black uppercase text-[11px] tracking-wider transition-transform shadow-md flex items-center justify-center gap-2", 
+                    isModalProcessing ? "opacity-80 cursor-wait" : "active:scale-95", 
+                    modalColors[modalConfig.color].btn)}
                 >
-                  {modalConfig.confirmText}
+                  {isModalProcessing && <Loader2 size={14} className="animate-spin" />}
+                  {isModalProcessing ? 'Procesando...' : modalConfig.confirmText}
                 </button>
               </div>
             </motion.div>
@@ -717,12 +730,15 @@ export const TicketSidebar = ({
         isOpen={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         cuentas={cuentasCancelables}
-        onConfirmar={(tipo, cuenta, motivo) => {
-          setShowCancelModal(false);
-          if (tipo === 'mesa') {
-              if (onCancelFullOrder) onCancelFullOrder(motivo);
-          } else {
-              if (onCancelAccount) onCancelAccount(cuenta, motivo);
+        onConfirmar={async (tipo, cuenta, motivo) => {
+          try {
+            if (tipo === 'mesa') {
+                if (onCancelFullOrder) await onCancelFullOrder(motivo);
+            } else {
+                if (onCancelAccount) await onCancelAccount(cuenta, motivo);
+            }
+          } finally {
+            setShowCancelModal(false);
           }
         }}
       />
