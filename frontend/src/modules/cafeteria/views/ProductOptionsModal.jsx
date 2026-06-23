@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/ProductOptionsModal.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Check, AlertCircle, ShoppingBag } from 'lucide-react';
 import clsx from 'clsx';
@@ -56,6 +56,17 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     return [];
   }, [product]);
 
+  // 🔥 Efecto para pre-seleccionar visualmente las opciones por defecto
+  useEffect(() => {
+    const initial = {};
+    availableModifiers.forEach(mod => {
+      if (mod.type === 'single' && mod.options.length > 0) {
+        initial[mod.id] = mod.options[0].id;
+      }
+    });
+    setSelections(initial);
+  }, [availableModifiers]);
+
   const handleToggle = (modId, optId, type) => {
     setSelections(prev => {
       const current = prev[modId];
@@ -99,7 +110,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
 
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
-        if (opt && opt.id !== 's' && opt.id !== 'entera') {
+        if (opt) {
            const idLower = String(mod.id).toLowerCase();
            const titleLower = String(mod.title).toLowerCase();
            if (idLower.includes('leche') || titleLower.includes('leche')) {
@@ -208,7 +219,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
             ))
           )}
 
-          {/* 🔥 OCULTAMOS EL BOTÓN DE "EMPACAR" SI ES MOSTRADOR O PARA LLEVAR */}
           {!isVitrina && !isLlevar && (
             <div className="mt-8 mb-2">
               <label className="flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-500/30 bg-orange-50/50 dark:bg-orange-500/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform">

@@ -3,6 +3,71 @@ import { useState, useMemo, useEffect } from 'react';
 import client from '../../../api/client.js';
 import toast from 'react-hot-toast';
 
+// ----------------------------------------------------------------------
+// HELPER FUNCTIONS: INYECCIÓN DE OPCIONES PREDETERMINADAS
+// ----------------------------------------------------------------------
+const getProductModifiers = (product) => {
+  if (!product) return [];
+  let ops = product.opciones;
+  if (typeof ops === 'string') { try { ops = JSON.parse(ops); } catch (e) { } }
+  if (typeof ops === 'string') { try { ops = JSON.parse(ops); } catch (e) { } }
+  
+  if (ops && typeof ops === 'object') {
+      const mods = [];
+      const mapOption = (opt) => {
+          if (typeof opt === 'string') return { id: opt, label: opt, price: 0 };
+          return { id: opt.nombre || 'Opción', label: opt.nombre || 'Opción', price: Number(opt.precioAdicional || 0) };
+      };
+
+      const tamanos = Array.isArray(ops.tamanos) ? ops.tamanos : [];
+      const leches = Array.isArray(ops.leches) ? ops.leches : [];
+      const extras = Array.isArray(ops.extras) ? ops.extras : [];
+
+      if (tamanos.length > 0) mods.push({ id: 'tamano', title: 'Tamaño', type: 'single', options: tamanos.map(mapOption) });
+      if (leches.length > 0) mods.push({ id: 'leche', title: 'Tipo de Leche', type: 'single', options: leches.map(mapOption) });
+      if (extras.length > 0) mods.push({ id: 'extras', title: 'Extras Adicionales', type: 'multiple', options: extras.map(mapOption) });
+
+      return mods;
+  }
+  return [];
+};
+
+const getDefaultCustomizations = (product) => {
+  const modifiers = getProductModifiers(product);
+  if (modifiers.length === 0) return null;
+
+  let total = Number(product.precioBase || product.precio || 0);
+  let tamanoStr = 'Estándar';
+  let lecheStr = null;
+  let extrasArr = [];
+
+  modifiers.forEach(mod => {
+      if (mod.type === 'single' && mod.options.length > 0) {
+          const opt = mod.options[0];
+          total += opt.price;
+          
+          const idLower = String(mod.id).toLowerCase();
+          const titleLower = String(mod.title).toLowerCase();
+          
+          if (idLower.includes('leche') || titleLower.includes('leche')) {
+              lecheStr = opt.label;
+          } else if (idLower.includes('taman') || idLower.includes('tamañ') || titleLower.includes('tamañ')) {
+              tamanoStr = opt.label;
+          } else {
+              extrasArr.push(opt.label);
+          }
+      }
+  });
+
+  return {
+      precioFinal: total,
+      detalles: { tamano: tamanoStr, ...(lecheStr && { leche: lecheStr }), ...(extrasArr.length > 0 && { extras: extrasArr }) },
+  };
+};
+
+// ----------------------------------------------------------------------
+// HOOK PRINCIPAL
+// ----------------------------------------------------------------------
 export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [dbProducts, setDbProducts] = useState([]); 
   const [dbCategories, setDbCategories] = useState([]);
@@ -146,31 +211,48 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     if (orderStatus === 'PAID') return;
     const targetCuenta = forceCuenta || cuentaActiva;
     
+    let finalDetails = productWithDetails.detalles || {};
+    let finalPrice = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
+    
+    // 🔥 AUTO-INYECCIÓN: Si se agrega rápido ("Quick Add") y no trae detalles formales, buscamos sus opciones predeterminadas
+    if (!productWithDetails.detalles) {
+        const defaultCustoms = getDefaultCustomizations(productWithDetails);
+        if (defaultCustoms) {
+            finalDetails = defaultCustoms.detalles;
+            finalPrice = defaultCustoms.precioFinal;
+        }
+    }
+
     setCart(prev => {
-      const precio = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
-      const index = prev.findIndex(p => 
-        p.id === productWithDetails.id && 
-        p.precio === precio && 
-        !p.enviadoCocina && 
-        p.cuenta === targetCuenta && 
-        !!p.isTakeaway === !!productWithDetails.isTakeaway
-      );
+      const detailStr = JSON.stringify(finalDetails);
+      
+      const index = prev.findIndex(p => {
+         if (p.id !== productWithDetails.id || 
+             p.precio !== finalPrice || 
+             p.enviadoCocina || 
+             p.cuenta !== targetCuenta || 
+             !!p.isTakeaway !== !!productWithDetails.isTakeaway) {
+             return false;
+         }
+         // 🔥 VALIDACIÓN ESTRICTA: Previene mezclar productos si tienen mismo precio pero distintas leches/tamaños
+         return p.preparaciones.every(prep => JSON.stringify(prep) === detailStr);
+      });
 
       if (index !== -1) {
           const newCart = [...prev];
           newCart[index] = { 
             ...newCart[index], 
             qty: newCart[index].qty + 1, 
-            preparaciones: [...newCart[index].preparaciones, productWithDetails.detalles || {}] 
+            preparaciones: [...newCart[index].preparaciones, finalDetails] 
           };
           return newCart;
         }
         
       return [...prev, { 
         ...productWithDetails, 
-        precio, 
+        precio: finalPrice, 
         qty: 1, 
-        preparaciones: [productWithDetails.detalles || {}], 
+        preparaciones: [finalDetails], 
         enviadoCocina: false, 
         status: 'ACTIVE', 
         cuenta: targetCuenta, 
@@ -262,12 +344,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const removeFromCart = (itemToRemove) => { 
     if(!itemToRemove.enviadoCocina) setCart(prev => {
         const newCart = [...prev];
+        const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
         const idx = newCart.findIndex(p => 
           p.id === itemToRemove.id && 
           p.precio === itemToRemove.precio && 
           p.cuenta === itemToRemove.cuenta && 
           !!p.isTakeaway === !!itemToRemove.isTakeaway && 
-          !p.enviadoCocina
+          !p.enviadoCocina &&
+          JSON.stringify(p.preparaciones[0] || {}) === prepStr
         );
         
         if (idx !== -1) {
@@ -283,13 +367,17 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   };
 
   const deleteLine = (itemToRemove) => { 
-    if(!itemToRemove.enviadoCocina) setCart(prev => prev.filter(p => !(
-      p.id === itemToRemove.id && 
-      p.precio === itemToRemove.precio && 
-      p.cuenta === itemToRemove.cuenta && 
-      !!p.isTakeaway === !!itemToRemove.isTakeaway && 
-      !p.enviadoCocina
-    )));
+    if(!itemToRemove.enviadoCocina) {
+        const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
+        setCart(prev => prev.filter(p => !(
+          p.id === itemToRemove.id && 
+          p.precio === itemToRemove.precio && 
+          p.cuenta === itemToRemove.cuenta && 
+          !!p.isTakeaway === !!itemToRemove.isTakeaway && 
+          !p.enviadoCocina &&
+          JSON.stringify(p.preparaciones[0] || {}) === prepStr
+        )));
+    }
   };
 
   const toggleItemTakeaway = (itemToToggle) => {
@@ -297,12 +385,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     
     setCart(prev => {
       const newCart = [...prev];
+      const prepStr = JSON.stringify(itemToToggle.preparaciones[0] || {});
       const idx = newCart.findIndex(p => 
         p.id === itemToToggle.id && 
         p.precio === itemToToggle.precio && 
         p.cuenta === itemToToggle.cuenta && 
         !!p.isTakeaway === !!itemToToggle.isTakeaway && 
-        !p.enviadoCocina
+        !p.enviadoCocina &&
+        JSON.stringify(p.preparaciones[0] || {}) === prepStr
       );
 
       if (idx !== -1) {
@@ -324,7 +414,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             p.precio === currentItem.precio && 
             p.cuenta === currentItem.cuenta && 
             !!p.isTakeaway === targetTakeawayState && 
-            !p.enviadoCocina
+            !p.enviadoCocina &&
+            JSON.stringify(p.preparaciones[0] || {}) === prepStr
           );
           
           if (existingTargetIdx !== -1) { 
@@ -369,6 +460,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             } else {
                 setCart(prev => {
                    const newCart = [...prev];
+                   const prepStr = JSON.stringify(subItem.preparaciones[0] || {});
                    let idx = newCart.indexOf(subItem);
                    
                    if (idx === -1) { 
@@ -377,7 +469,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                        p.precio === subItem.precio && 
                        p.cuenta === (subItem.cuenta || 'General') && 
                        !!p.isTakeaway === !!subItem.isTakeaway && 
-                       !p.enviadoCocina
+                       !p.enviadoCocina &&
+                       JSON.stringify(p.preparaciones[0] || {}) === prepStr
                      ); 
                    }
                    
@@ -387,7 +480,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                          p.precio === subItem.precio && 
                          p.cuenta === target && 
                          !!p.isTakeaway === !!subItem.isTakeaway && 
-                         !p.enviadoCocina
+                         !p.enviadoCocina &&
+                         JSON.stringify(p.preparaciones[0] || {}) === prepStr
                        );
                        
                        if (existingIdx !== -1) {
