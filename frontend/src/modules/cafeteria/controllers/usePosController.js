@@ -1,6 +1,5 @@
 // src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
-import { fetchProducts, fetchCategories } from '../models/productsModel';
 import client from '../../../api/client.js';
 import toast from 'react-hot-toast';
 
@@ -28,9 +27,34 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   useEffect(() => {
     const loadData = async () => {
-      const [prods, cats] = await Promise.all([fetchProducts(), fetchCategories()]);
-      setDbProducts(prods); 
-      setDbCategories(cats);
+      try {
+        const [prodsRes, catsRes] = await Promise.all([
+          client.get('/menu/products'),
+          client.get('/menu/categories')
+        ]);
+        
+        const prods = prodsRes.data;
+        const cats = catsRes.data;
+
+        // 🔥 FILTRAMOS Y TRADUCIMOS AL ESPAÑOL PARA LA VISTA
+        const activeProducts = prods.filter(p => {
+          const estado = p.isActive !== undefined ? p.isActive : p.disponible;
+          if (estado === false || estado === 0 || estado === '0') return false;
+          return true;
+        }).map(p => ({
+          ...p,
+          nombre: p.name || p.nombre || 'Sin Nombre',
+          precio: parseFloat(p.basePrice || p.precio || 0),
+          imagen: p.imageUrl || p.imagen || p.image || null,
+          categoria: p.categoryId || p.categoria,
+          stock: p.stockQuantity || p.stock || 0
+        }));
+        
+        setDbProducts(activeProducts); 
+        setDbCategories(cats);
+      } catch (error) {
+        console.error("Error al cargar menú en POS", error);
+      }
     };
     loadData();
   }, []);
@@ -79,7 +103,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
             return {
                 id: item.productId,
-                nombre: item.product?.name || 'Producto',
+                nombre: item.product?.name || item.product?.nombre || 'Producto',
                 imagen: item.product?.imageUrl || null,
                 precio: parseFloat(item.subtotal) / item.quantity,
                 qty: item.quantity,
@@ -203,7 +227,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           
           return { 
             id: item.productId, 
-            nombre: item.product?.name || 'Producto', 
+            nombre: item.product?.name || item.product?.nombre || 'Producto', 
             imagen: item.product?.imageUrl || null, 
             precio: parseFloat(item.subtotal) / item.quantity, 
             qty: item.quantity, 
@@ -420,7 +444,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 
                 return { 
                   id: dbItem.productId, 
-                  nombre: dbItem.product?.name || 'Producto', 
+                  nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
                   imagen: dbItem.product?.imageUrl || null, 
                   precio: parseFloat(dbItem.subtotal) / dbItem.quantity, 
                   qty: dbItem.quantity, 
@@ -540,7 +564,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
                 if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
                 return { 
                   id: dbItem.productId, 
-                  nombre: dbItem.product?.name || 'Producto', 
+                  nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
                   imagen: dbItem.product?.imageUrl || null, 
                   precio: parseFloat(dbItem.subtotal) / dbItem.quantity, 
                   qty: dbItem.quantity, 
@@ -706,8 +730,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
   const filteredProducts = useMemo(() => {
     return dbProducts.filter(p => {
-       const matchText = p.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
-       const matchCat = categoriaActiva === 'todas' || p.categoria === categoriaActiva;
+       const productName = p.nombre || p.name || '';
+       const matchText = productName.toLowerCase().includes((filtroTexto || '').toLowerCase());
+       
+       const matchCat = categoriaActiva === 'todas' || p.categoria === categoriaActiva || p.categoryId === categoriaActiva;
+       
        if (isVitrina) return matchText && matchCat && p.requiereCocina === false;
        return matchText && matchCat;
     });

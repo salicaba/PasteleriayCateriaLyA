@@ -1,8 +1,8 @@
+// src/modules/client/views/ClientMenu.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, ChevronLeft, AlertTriangle, Utensils, Plus, Minus, CheckCircle, Image as ImageIcon, X, Check, Settings, Palette, Type, ReceiptText } from 'lucide-react';
-import { fetchProducts, fetchCategories } from '../../cafeteria/models/productsModel';
-import client from '../../../api/client';
+import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
 import clsx from 'clsx';
 
@@ -29,7 +29,6 @@ const getInitialSize = () => {
   return 0; 
 };
 
-// 🔥 NUEVAS FUNCIONES GLOBALES PARA MANEJO DE OPCIONES PREDETERMINADAS
 const getProductModifiers = (product) => {
   if (!product) return [];
   let ops = product.opciones;
@@ -66,7 +65,6 @@ const getDefaultCustomizations = (product) => {
   let extrasArr = [];
 
   modifiers.forEach(mod => {
-      // Auto-selecciona la PRIMERA opción de cualquier modificador de selección única
       if (mod.type === 'single' && mod.options.length > 0) {
           const opt = mod.options[0];
           total += opt.price;
@@ -91,7 +89,6 @@ const getDefaultCustomizations = (product) => {
   };
 };
 
-// --- SUB-COMPONENTE: Modal de Personalización ---
 const ClientProductModal = ({ product, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(false);
@@ -99,12 +96,11 @@ const ClientProductModal = ({ product, onClose, onConfirm }) => {
   const isAgotado = product.controlarStock === true && product.stock <= 0;
   const availableModifiers = useMemo(() => getProductModifiers(product), [product]);
 
-  // 🔥 Auto-seleccionar visualmente los predeterminados al abrir el modal
   useEffect(() => {
     const initial = {};
     availableModifiers.forEach(mod => {
       if (mod.type === 'single' && mod.options.length > 0) {
-        initial[mod.id] = mod.options[0].id; // Toma el ID de la primera opción
+        initial[mod.id] = mod.options[0].id;
       }
     });
     setSelections(initial);
@@ -151,7 +147,6 @@ const ClientProductModal = ({ product, onClose, onConfirm }) => {
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
         if (opt) {
-           // 🔥 Aquí quitamos el filtro que ocultaba 'entera' o 's', ahora SIEMPRE lo mostrará
            const idLower = String(mod.id).toLowerCase();
            const titleLower = String(mod.title).toLowerCase();
            if (idLower.includes('leche') || titleLower.includes('leche')) {
@@ -264,9 +259,31 @@ export default function ClientMenu({ clientData, type, tableId }) {
     const loadMenuData = async () => {
       try {
         setIsLoading(true);
-        const [catsData, prodsData] = await Promise.all([ fetchCategories(), fetchProducts() ]);
+        const [catsRes, prodsRes] = await Promise.all([ 
+          client.get('/menu/categories'), 
+          client.get('/menu/products') 
+        ]);
+        
+        const catsData = catsRes.data;
+        const prodsData = prodsRes.data;
+
         setCategories(catsData);
-        setProducts(prodsData);
+        
+        // 🔥 FILTRAMOS Y TRADUCIMOS AL ESPAÑOL PARA LA VISTA DEL CLIENTE
+        const activeProducts = prodsData.filter(p => {
+          const estado = p.isActive !== undefined ? p.isActive : p.disponible;
+          if (estado === false || estado === 0 || estado === '0') return false;
+          return true;
+        }).map(p => ({
+          ...p,
+          nombre: p.name || p.nombre || 'Sin Nombre',
+          precio: parseFloat(p.basePrice || p.precio || 0),
+          imagen: p.imageUrl || p.image || p.imagen || null,
+          categoria: p.categoryId || p.categoria,
+          stock: p.stockQuantity || p.stock || 0
+        }));
+        
+        setProducts(activeProducts);
 
         const todasCat = catsData.find(c => c.name.trim().toLowerCase() === 'todas');
         if (todasCat) {
@@ -514,7 +531,6 @@ export default function ClientMenu({ clientData, type, tableId }) {
                   <div className="flex items-end justify-between mt-auto">
                     <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block">${product.precio}</span>
                     
-                    {/* 🔥 BOTÓN '+': Auto-genera y manda los defaults si es personalizable */}
                     <button 
                       onClick={(e) => { 
                         e.stopPropagation(); 
