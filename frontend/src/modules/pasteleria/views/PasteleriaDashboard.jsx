@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
   DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle, Loader2,
-  Trash2, RotateCcw
+  Trash2, RotateCcw, Calculator
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
@@ -646,6 +646,11 @@ export default function PasteleriaDashboard() {
             registrarAbono(p.id, abonoForm.monto, abonoForm.metodo);
           };
 
+          // VALIDACIONES ESTRICTAS DE ABONO
+          const isMontoAbonoInvalido = montoIngresadoNum <= 0 || montoIngresadoNum > fin.deuda;
+          const isRecibidoInvalido = abonoForm.metodo === 'efectivo' && recibidoNum < montoIngresadoNum;
+          const isAbonoSubmitDisabled = isSubmitting || isMontoAbonoInvalido || isRecibidoInvalido;
+
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 lya:bg-black/50 backdrop-blur-md">
               <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] w-full max-w-lg shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col max-h-[90vh]">
@@ -686,7 +691,7 @@ export default function PasteleriaDashboard() {
                         </div>
                         <div className="relative">
                           <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                          <input type="number" required min="1" max={fin.deuda} step="0.01" placeholder="0.00" value={abonoForm.monto} onChange={(e) => setAbonoForm({...abonoForm, monto: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all" />
+                          <input type="number" required min="1" max={fin.deuda} step="0.01" placeholder="0.00" value={abonoForm.monto} onChange={(e) => setAbonoForm({...abonoForm, monto: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                         </div>
                       </div>
                     </div>
@@ -714,7 +719,7 @@ export default function PasteleriaDashboard() {
                               <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase mb-2 block">Efectivo Recibido (Para calcular cambio)</label>
                               <div className="relative">
                                 <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                <input type="number" min={abonoForm.monto || 0} step="0.01" placeholder="Ej: 500" value={abonoForm.recibido} onChange={(e) => setAbonoForm({...abonoForm, recibido: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-lg font-bold text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all" />
+                                <input type="number" min={abonoForm.monto || 0} step="0.01" placeholder="Ej: 500" value={abonoForm.recibido} onChange={(e) => setAbonoForm({...abonoForm, recibido: e.target.value})} className="w-full bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl pl-12 pr-4 py-3 text-lg font-bold text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/30 lya:focus:ring-lya-secondary/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                               </div>
                               
                               <div className="flex gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
@@ -797,9 +802,13 @@ export default function PasteleriaDashboard() {
                 </div>
 
                 <div className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0">
-                  <button type="submit" form="abonoForm" disabled={isSubmitting} className={`w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}>
+                  <button type="submit" form="abonoForm" disabled={isAbonoSubmitDisabled} className={`w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2 ${isAbonoSubmitDisabled ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}>
                     {isSubmitting ? (
                       <><Loader2 className="animate-spin" size={20} /> Procesando pago...</>
+                    ) : isMontoAbonoInvalido ? (
+                      'Monto a abonar inválido'
+                    ) : isRecibidoInvalido ? (
+                      'Efectivo recibido insuficiente'
                     ) : (
                       <><CheckCircle2 size={20} /> Confirmar Pago</>
                     )}

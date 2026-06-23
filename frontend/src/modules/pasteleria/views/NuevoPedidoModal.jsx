@@ -1,7 +1,7 @@
 // src/modules/pasteleria/views/NuevoPedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Hash, Clock, Smartphone, Banknote, Tag, Loader2 } from 'lucide-react'; 
+import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Hash, Clock, Smartphone, Banknote, Tag, Loader2, Calculator, MessageCircle } from 'lucide-react'; 
 import client from '../../../api/client';
 import { usePasteleriaConfig } from '../controllers/usePasteleriaConfig';
 import imageCompression from 'browser-image-compression';
@@ -23,6 +23,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
   const [metodoPagoAnticipo, setMetodoPagoAnticipo] = useState('efectivo');
   const [transferInfo, setTransferInfo] = useState(null);
   
+  // Estados para Lógica de Caja (Efectivo)
+  const [amountReceived, setAmountReceived] = useState('');
+  const [change, setChange] = useState(0);
+
   const [isCompressing, setIsCompressing] = useState(false);
 
   useEffect(() => {
@@ -73,6 +77,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
       setCustomPorcion('');
       setCustomSabor('');
       setMetodoPagoAnticipo('efectivo');
+      setAmountReceived('');
+      setChange(0);
       setIsCompressing(false);
     }
   }, [isOpen, pedidoAEditar]);
@@ -82,6 +88,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
       client.get('/settings').then(res => { if (res.data) setTransferInfo(res.data); }).catch(err => console.error("Error banco:", err));
     }
   }, [isOpen, metodoPagoAnticipo, pedidoAEditar]);
+
+  // Cálculo automático del cambio
+  useEffect(() => {
+    if (metodoPagoAnticipo === 'efectivo') {
+      const received = parseFloat(amountReceived) || 0;
+      const anticipoAmount = parseFloat(formData.anticipo) || 0;
+      setChange(received - anticipoAmount);
+    } else {
+      setChange(0);
+    }
+  }, [amountReceived, formData.anticipo, metodoPagoAnticipo]);
 
   const toggleTag = (stateArray, setState, nombre, isAddOnly = false) => {
     if (stateArray.includes(nombre)) {
@@ -137,15 +154,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     const loadingToast = toast.loading('Procesando a velocidad extrema...');
 
     try {
-      // 🔥 AJUSTES EXTREMOS PARA VELOCIDAD (Menos iteraciones, más rapidez)
       const options = {
-        maxSizeMB: 0.5, // 500 KB es 10x más ligero que 5MB, pero instantáneo de comprimir
-        maxWidthOrHeight: 800, // 800px es el tamaño perfecto para web sin forzar el celular
-        useWebWorker: true, // Usa hilos secundarios
-        initialQuality: 0.7 // Evita que la librería pierda tiempo intentando múltiples calidades
+        maxSizeMB: 0.5, 
+        maxWidthOrHeight: 800, 
+        useWebWorker: true, 
+        initialQuality: 0.7 
       };
 
-      // 🔥 MAGIA: Procesar TODAS las fotos al mismo tiempo en paralelo
       const nuevasImagenes = await Promise.all(
         archivosAProcesar.map(async (file) => {
           const compressedFile = await imageCompression(file, options);
@@ -213,7 +228,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     </div>
   );
 
-  const isButtonDisabled = isSubmitting || isCompressing;
+  // VALIDACIONES ESTRICTAS FINANCIERAS
+  const isAnticipoExcedido = !pedidoAEditar && anticipo > costo;
+  const isMontoInvalido = !pedidoAEditar && anticipo > 0 && metodoPagoAnticipo === 'efectivo' && (parseFloat(amountReceived) || 0) < anticipo;
+  const isButtonDisabled = isSubmitting || isCompressing || isMontoInvalido || isAnticipoExcedido;
 
   return (
     <AnimatePresence>
@@ -229,7 +247,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   {pedidoAEditar ? `Editar Pedido: ${pedidoAEditar.id}` : 'Agendar Nuevo Pedido'}
                 </span>
               </h2>
-              <button type="button" onClick={onClose} disabled={isButtonDisabled} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:hover:text-lya-primary bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface rounded-full transition-colors disabled:opacity-50"><X size={20} /></button>
+              <button type="button" onClick={onClose} disabled={isSubmitting || isCompressing} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:hover:text-lya-primary bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface rounded-full transition-colors disabled:opacity-50"><X size={20} /></button>
             </div>
 
             <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
@@ -239,15 +257,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   <h3 className="font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 pb-2">1. Detalles del Cliente y Diseño</h3>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <input type="text" name="cliente" required placeholder="Nombre del Cliente" value={formData.cliente} onChange={handleChange} disabled={isButtonDisabled} className="col-span-2 bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
-                    <input type="tel" name="telefono" placeholder="Teléfono" value={formData.telefono} onChange={handleChange} disabled={isButtonDisabled} className="col-span-2 bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                    <input type="text" name="cliente" required placeholder="Nombre del Cliente" value={formData.cliente} onChange={handleChange} disabled={isSubmitting || isCompressing} className="col-span-2 bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                    <input type="tel" name="telefono" placeholder="Teléfono" value={formData.telefono} onChange={handleChange} disabled={isSubmitting || isCompressing} className="col-span-2 bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 lya:text-lya-text/50 uppercase flex items-center gap-1"><Tag size={12} className="text-emerald-500 lya:text-lya-primary" /> Categoría (Solo 1)</label>
                     <div className="flex flex-wrap gap-2 p-1">
                       {config.categorias.map(cat => (
-                        <button type="button" key={cat.id} onClick={() => !isButtonDisabled && setFormData({...formData, categoria: cat.nombre})} disabled={isButtonDisabled}
+                        <button type="button" key={cat.id} onClick={() => !(isSubmitting || isCompressing) && setFormData({...formData, categoria: cat.nombre})} disabled={isSubmitting || isCompressing}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border disabled:opacity-50 ${formData.categoria === cat.nombre ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20 lya:bg-lya-primary lya:border-lya-primary' : 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text border-gray-200 dark:border-gray-700 lya:border-lya-border/40 hover:border-emerald-300'}`}
                         >
                           {cat.nombre}
@@ -266,7 +284,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                     {renderSelectorInteractivos(config.sabores, saboresTags, setSaboresTags, customSabor, setCustomSabor, Layers, "+ Otro sabor y presiona Enter")}
                   </div>
 
-                  <textarea name="descripcion" required rows="3" placeholder="Instrucciones especiales de decoración, dedicatoria..." value={formData.descripcion} onChange={handleChange} disabled={isButtonDisabled} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none disabled:opacity-50" />
+                  <textarea name="descripcion" required rows="3" placeholder="Instrucciones especiales de decoración, dedicatoria..." value={formData.descripcion} onChange={handleChange} disabled={isSubmitting || isCompressing} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none disabled:opacity-50" />
                   
                   <div className="space-y-3">
                     <div className="flex justify-between items-end">
@@ -280,17 +298,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                           <motion.div key={idx} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="relative aspect-square rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm group">
                             <img src={img} alt={`Ref ${idx + 1}`} className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button type="button" onClick={() => removeImage(idx)} disabled={isButtonDisabled} className="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors shadow-md disabled:opacity-50"><X size={14} /></button>
+                              <button type="button" onClick={() => removeImage(idx)} disabled={isSubmitting || isCompressing} className="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors shadow-md disabled:opacity-50"><X size={14} /></button>
                             </div>
                           </motion.div>
                         ))}
                       </AnimatePresence>
 
                       {formData.imagenesReferencia.length < 3 && (
-                        <label className={`aspect-square border-2 border-dashed border-gray-300 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 lya:text-lya-text/40 transition-colors group ${isButtonDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer'}`}>
+                        <label className={`aspect-square border-2 border-dashed border-gray-300 dark:border-gray-700 lya:border-lya-border/50 rounded-2xl flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 lya:text-lya-text/40 transition-colors group ${(isSubmitting || isCompressing) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer'}`}>
                           {isCompressing ? <Loader2 size={20} className="animate-spin mb-1 text-emerald-500" /> : <Camera size={20} className="group-hover:text-emerald-500 lya:group-hover:text-lya-primary transition-colors mb-1" />}
                           <span className="text-[10px] font-bold text-center px-1">{isCompressing ? 'Procesando' : 'Añadir foto'}</span>
-                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={isButtonDisabled} />
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={isSubmitting || isCompressing} />
                         </label>
                       )}
                     </div>
@@ -304,27 +322,27 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   <div className="flex gap-4">
                     <div className="relative flex-1">
                       <Calendar className="absolute left-4 top-3.5 text-emerald-500 lya:text-lya-primary" size={20} />
-                      <input type="date" required value={datePart} onChange={handleDateChange} disabled={isButtonDisabled} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                      <input type="date" required value={datePart} onChange={handleDateChange} disabled={isSubmitting || isCompressing} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
                     </div>
                     <div className="relative flex-1">
                       <Clock className="absolute left-4 top-3.5 text-emerald-500 lya:text-lya-primary" size={20} />
-                      <input type="time" required value={timePart} onChange={handleTimeChange} disabled={isButtonDisabled} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                      <input type="time" required value={timePart} onChange={handleTimeChange} disabled={isSubmitting || isCompressing} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
                     </div>
                   </div>
 
                   <div className="flex bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-1 rounded-xl">
-                    <button type="button" onClick={() => setFormData({...formData, tipoEntrega: 'sucursal'})} disabled={isButtonDisabled} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${formData.tipoEntrega === 'sucursal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-primary/20 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Store size={18}/> Recoger Aquí</button>
-                    <button type="button" onClick={() => setFormData({...formData, tipoEntrega: 'domicilio'})} disabled={isButtonDisabled} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${formData.tipoEntrega === 'domicilio' ? 'bg-white dark:bg-gray-700 lya:bg-lya-primary/20 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Truck size={18}/> Domicilio</button>
+                    <button type="button" onClick={() => setFormData({...formData, tipoEntrega: 'sucursal'})} disabled={isSubmitting || isCompressing} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${formData.tipoEntrega === 'sucursal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-primary/20 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Store size={18}/> Recoger Aquí</button>
+                    <button type="button" onClick={() => setFormData({...formData, tipoEntrega: 'domicilio'})} disabled={isSubmitting || isCompressing} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${formData.tipoEntrega === 'domicilio' ? 'bg-white dark:bg-gray-700 lya:bg-lya-primary/20 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Truck size={18}/> Domicilio</button>
                   </div>
                   {formData.tipoEntrega === 'domicilio' && (
-                    <motion.input initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} type="text" name="direccion" placeholder="Dirección de envío completa" value={formData.direccion} onChange={handleChange} disabled={isButtonDisabled} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                    <motion.input initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} type="text" name="direccion" placeholder="Dirección de envío completa" value={formData.direccion} onChange={handleChange} disabled={isSubmitting || isCompressing} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
                   )}
 
                   <div className="bg-emerald-50 dark:bg-emerald-900/10 lya:bg-lya-primary/5 border border-emerald-100 dark:border-emerald-500/20 lya:border-lya-primary/20 rounded-2xl p-5 space-y-4 mt-6">
                     <div className="flex gap-4">
                       <div className="flex-1 relative">
                         <DollarSign className="absolute left-3 top-3.5 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary" size={18} />
-                        <input type="number" name="costoTotal" required min="1" placeholder="Costo Total" value={formData.costoTotal} onChange={handleChange} disabled={isButtonDisabled} className="w-full bg-white dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text font-bold outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                        <input type="number" name="costoTotal" required min="1" placeholder="Costo Total" value={formData.costoTotal} onChange={handleChange} disabled={isSubmitting || isCompressing} className="w-full bg-white dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text font-bold outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                       </div>
                     </div>
 
@@ -334,7 +352,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                           <label className="text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-2 block ml-1">Registrar Anticipo</label>
                           <div className="relative">
                             <DollarSign className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                            <input type="number" name="anticipo" placeholder="0.00" value={formData.anticipo} onChange={handleChange} disabled={isButtonDisabled} className="w-full bg-white dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50" />
+                            <input type="number" name="anticipo" placeholder="0.00" value={formData.anticipo} onChange={handleChange} disabled={isSubmitting || isCompressing} className="w-full bg-white dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                           </div>
                         </div>
                         
@@ -344,13 +362,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                               <label className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-500 lya:text-lya-primary tracking-widest ml-1">Método del Anticipo</label>
                               
                               <div className="grid grid-cols-2 gap-3">
-                                <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setMetodoPagoAnticipo('efectivo')} disabled={isButtonDisabled}
+                                <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setMetodoPagoAnticipo('efectivo')} disabled={isSubmitting || isCompressing}
                                   className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors disabled:opacity-50 ${metodoPagoAnticipo === 'efectivo' ? 'border-emerald-500 bg-emerald-500/10 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
                                   <Banknote size={24} className={`mb-1.5 ${metodoPagoAnticipo === 'efectivo' ? 'text-emerald-500 lya:text-lya-primary' : 'text-gray-400'}`} />
                                   <span className={`text-[11px] font-bold ${metodoPagoAnticipo === 'efectivo' ? 'text-gray-900 dark:text-white lya:text-lya-text' : 'text-gray-400'}`}>Efectivo</span>
                                 </motion.button>
                                 
-                                <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setMetodoPagoAnticipo('transferencia')} disabled={isButtonDisabled}
+                                <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={() => setMetodoPagoAnticipo('transferencia')} disabled={isSubmitting || isCompressing}
                                   className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-colors disabled:opacity-50 ${metodoPagoAnticipo === 'transferencia' ? 'border-purple-500 bg-purple-500/10 lya:border-lya-secondary lya:bg-lya-secondary/10 shadow-sm' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-gray-300'}`}>
                                   <Smartphone size={24} className={`mb-1.5 ${metodoPagoAnticipo === 'transferencia' ? 'text-purple-500 lya:text-lya-secondary' : 'text-gray-400'}`} />
                                   <span className={`text-[11px] font-bold ${metodoPagoAnticipo === 'transferencia' ? 'text-gray-900 dark:text-white lya:text-lya-text' : 'text-gray-400'}`}>Transferencia</span>
@@ -358,28 +376,80 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                               </div>
 
                               <AnimatePresence mode="wait">
+                                {/* 🔥 PANEL DE TRANSFERENCIA HOMOLOGADO 🔥 */}
                                 {metodoPagoAnticipo === 'transferencia' && transferInfo?.bank_accounts && (
                                   <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
-                                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pt-2 pb-2">
+                                    {transferInfo?.whatsapp_number && (
+                                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
+                                        <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">
+                                          <MessageCircle size={24} className="text-purple-600 dark:text-purple-400" />
+                                        </div>
+                                        <div>
+                                          <h4 className="text-[11px] font-black text-purple-800 dark:text-purple-300 uppercase tracking-widest mb-1">Aviso para el Staff</h4>
+                                          <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed">Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.</p>
+                                        </div>
+                                      </motion.div>
+                                    )}
+
+                                    <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 pt-1 px-1">
                                       {transferInfo.bank_accounts.map(acc => (
-                                        <div key={acc.id} className="min-w-[85%] sm:min-w-[240px] p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0">
-                                          <div className="flex items-center justify-between mb-2">
-                                            <span className="font-black text-[10px] text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
-                                            <Smartphone className="text-purple-400" size={14} />
+                                        <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-2xl shrink-0 shadow-sm">
+                                          <div className="flex items-center gap-2 mb-3">
+                                            <Smartphone className="text-purple-600 dark:text-purple-400" size={18} />
+                                            <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
                                           </div>
-                                          <div className="space-y-1">
-                                            {acc.account_holder && <p className="text-[9px] text-purple-900 dark:text-white truncate">Titular: <span className="font-bold">{acc.account_holder}</span></p>}
-                                            {acc.account_number && <p className="text-[9px] text-purple-900 dark:text-white">Cta: <span className="font-mono font-bold tracking-wider">{acc.account_number}</span></p>}
+                                          <div className="space-y-2">
+                                            {acc.account_holder && (
+                                              <div className="flex justify-between items-center">
+                                                <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Titular:</span>
+                                                <span className="text-sm font-black text-purple-900 dark:text-white truncate" title={acc.account_holder}>{acc.account_holder}</span>
+                                              </div>
+                                            )}
+                                            {acc.account_number && (
+                                              <div className="flex justify-between items-center border-t border-purple-200/50 dark:border-purple-700/50 pt-2 mt-2">
+                                                <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Cuenta:</span>
+                                                <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.account_number}</span>
+                                              </div>
+                                            )}
+                                            {acc.clabe && (
+                                              <div className="flex justify-between items-center">
+                                                <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">CLABE:</span>
+                                                <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.clabe}</span>
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       ))}
                                     </div>
                                   </motion.div>
                                 )}
+                                
+                                {/* 🔥 PANEL DE EFECTIVO HOMOLOGADO CON CAJA 🔥 */}
                                 {metodoPagoAnticipo === 'efectivo' && (
-                                  <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4">
-                                    <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/10 lya:bg-lya-primary/10 rounded-xl border border-emerald-100 dark:border-emerald-800/50 lya:border-lya-primary/20">
-                                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">El pago se ingresará a caja en mostrador.</span>
+                                  <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-4 space-y-4">
+                                    <div className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
+                                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Monto Recibido</label>
+                                      <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                        <input 
+                                          type="number" 
+                                          value={amountReceived} 
+                                          onChange={(e) => setAmountReceived(e.target.value)} 
+                                          placeholder="0.00" 
+                                          className="w-full pl-8 pr-4 py-3 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                          disabled={isSubmitting || isCompressing}
+                                        />
+                                      </div>
+                                      <div className="flex gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
+                                        <button type="button" onClick={() => setAmountReceived(formData.anticipo || '0')} disabled={isSubmitting || isCompressing} className="px-4 py-2 bg-emerald-500/10 lya:bg-lya-primary/10 text-emerald-600 lya:text-lya-primary border border-emerald-500/20 lya:border-lya-primary/20 rounded-lg text-xs font-black whitespace-nowrap active:scale-95 transition-transform disabled:opacity-50">Exacto</button>
+                                        {[50, 100, 200, 500, 1000].filter(v => v > (parseFloat(formData.anticipo) || 0)).map(val => (
+                                           <button type="button" key={val} onClick={() => setAmountReceived(val.toString())} disabled={isSubmitting || isCompressing} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-transform disabled:opacity-50">${val}</button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="flex justify-between items-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
+                                      <div className="flex items-center gap-2"><Calculator size={20} className="text-emerald-600 dark:text-emerald-400"/><span className="font-bold text-emerald-800 dark:text-emerald-300">Cambio a Devolver:</span></div>
+                                      <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">${change >= 0 ? change.toFixed(2) : '0.00'}</span>
                                     </div>
                                   </motion.div>
                                 )}
@@ -409,6 +479,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   <><Loader2 className="animate-spin" size={20} /> Optimizando fotos...</>
                 ) : isSubmitting ? (
                   <><Loader2 className="animate-spin" size={20} /> Guardando...</>
+                ) : isAnticipoExcedido ? (
+                  'El Anticipo no puede ser mayor al Total'
+                ) : isMontoInvalido ? (
+                  'Efectivo Recibido Insuficiente'
                 ) : (
                   pedidoAEditar ? 'Guardar Cambios' : 'Confirmar y Agendar'
                 )}

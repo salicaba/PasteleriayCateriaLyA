@@ -107,7 +107,7 @@ export default function NewItemModal({ isOpen, onClose, onCreate }) {
               min="0"
               step="0.01"
               placeholder="Ej. 5.00"
-              className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary font-medium transition-all text-sm"
+              className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary font-medium transition-all text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               value={formData.minimumStock}
               onChange={(e) => setFormData({...formData, minimumStock: e.target.value})}
             />

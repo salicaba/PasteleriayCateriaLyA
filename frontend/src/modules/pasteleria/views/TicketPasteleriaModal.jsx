@@ -1,4 +1,4 @@
-// src/modules/pasteleria/views/TicketPasteleriaModal.jsx
+// frontend/src/modules/pasteleria/views/TicketPasteleriaModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Printer, Cake, Landmark, MessageCircle } from 'lucide-react';
@@ -54,13 +54,21 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
   const finanzas = calcularFinanzas(pedido);
 
-  // 🔥 Formateo exacto de la fecha para Pastelería
-  const d = new Date(pedido.fechaEntrega);
-  const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
-  const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
-  const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
-  const fecha = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
+  // 🔥 Formateo exacto de la fecha de Entrega
+  const dEnt = new Date(pedido.fechaEntrega);
+  const diaEnt = dEnt.toLocaleDateString('es-MX', { weekday: 'long' });
+  const diaEntCap = diaEnt.charAt(0).toUpperCase() + diaEnt.slice(1);
+  const fechaEntFormateada = dEnt.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const horaEntFormateada = dEnt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const fechaEntregaStr = `${diaEntCap}, ${fechaEntFormateada} ${horaEntFormateada}`;
+
+  // 🔥 Formateo exacto de la fecha de Expedición
+  const dExp = new Date(pedido.createdAt || new Date());
+  const diaExp = dExp.toLocaleDateString('es-MX', { weekday: 'long' });
+  const diaExpCap = diaExp.charAt(0).toUpperCase() + diaExp.slice(1);
+  const fechaExpFormateada = dExp.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const horaExpFormateada = dExp.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const fechaExpedicionStr = `${diaExpCap}, ${fechaExpFormateada} ${horaExpFormateada}`;
 
   const costoTotalNum = parseFloat(pedido.costoTotal) || 0;
 
@@ -165,11 +173,12 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       </div>
 
                       <div className="space-y-2 mb-4">
+                        <div className="flex justify-between"><span className="text-gray-500">Expedición:</span> <span className="font-bold text-right text-black">{fechaExpedicionStr}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Entrega:</span> <span className="font-bold text-right text-black">{fechaEntregaStr}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Atendido por:</span> <span className="font-bold text-right text-black capitalize">{nombreCajero}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Cliente:</span> <span className="font-bold text-right text-black uppercase">{pedido.cliente || 'Público'}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Servicio:</span> <span className="font-bold text-right uppercase text-black">{pedido.tipoEntrega}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Teléfono:</span> <span className="text-right">{pedido.telefono || 'N/A'}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Entrega:</span> <span className="font-bold text-right text-black">{fecha}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Tipo:</span> <span className="font-bold text-right uppercase text-black">{pedido.tipoEntrega}</span></div>
                       </div>
 
                       <div className="border-t border-b border-dashed border-gray-300 py-4 mb-4 space-y-3">
