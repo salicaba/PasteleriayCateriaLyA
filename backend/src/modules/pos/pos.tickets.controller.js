@@ -295,6 +295,8 @@ export const shareOrderTicket = async (req, res) => {
     }
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const estadoLiquidacion = order.status === 'PAID' ? 'LIQUIDADO' : 'PENDIENTE';
+    const nombreCliente = order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General');
     
     const d = new Date(order.createdAt);
     const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
@@ -328,8 +330,11 @@ export const shareOrderTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Tu Ticket de Consumo - 𝓛𝔂𝓪</title>
+      <title>Ticket de Consumo #${ticketFolio} - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
+      <script>
+        tailwind.config = { corePlugins: { preflight: true } }
+      </script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <style>
@@ -338,7 +343,7 @@ export const shareOrderTicket = async (req, res) => {
         @media print { .no-print { display: none !important; } }
       </style>
     </head>
-    <body class="text-gray-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
+    <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
         
@@ -359,22 +364,16 @@ export const shareOrderTicket = async (req, res) => {
         </div>
         ` : ''}
 
-        <div id="ticket-card" class="w-full bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 p-6 sm:p-8 relative transition-all duration-300">
+        <div id="ticket-card" class="w-full bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
-            <h1 class="text-5xl font-black text-amber-600 mb-4 pb-2 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
-            <p class="text-xs uppercase tracking-widest font-extrabold text-slate-400">Pastelería & Cafetería</p>
-            <p class="text-xs text-slate-500 mt-1 font-medium">Pijijiapan, Chiapas</p>
+            <div class="text-4xl mb-2 text-slate-800">☕</div>
+            <h1 class="text-5xl font-black text-slate-900 mb-1 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+            <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Cafetería</p>
+            <h2 class="text-3xl font-black text-slate-900 tracking-wider mt-4">${ticketFolio}</h2>
           </div>
 
-          <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
-
-          <div class="text-center mb-6">
-            <p class="text-xs font-black uppercase text-slate-400 tracking-wider">Comprobante de Venta</p>
-            <p class="text-2xl font-black text-slate-900 tracking-wider">${ticketFolio}</p>
-          </div>
-
-          <div class="space-y-2 text-sm font-medium text-slate-600 mb-6">
+          <div class="space-y-1.5 text-sm font-medium text-slate-600 mb-6 px-1">
             <div class="flex justify-between items-start">
               <span>Expedición:</span>
               <span class="text-slate-900 font-bold text-right">${dateStr}</span>
@@ -384,21 +383,18 @@ export const shareOrderTicket = async (req, res) => {
               <span class="text-slate-900 font-bold capitalize">${cashierName}</span>
             </div>
             <div class="flex justify-between items-center">
+              <span>Cliente:</span>
+              <span class="text-slate-900 font-bold capitalize truncate max-w-[60%] text-right">${nombreCliente}</span>
+            </div>
+            <div class="flex justify-between items-center">
               <span>Servicio:</span>
               <span class="text-slate-900 font-black uppercase tracking-wide">${identificadorMesa}</span>
             </div>
-            ${cuentaSeleccionada !== 'Todas' ? `
-            <div class="flex justify-between items-center">
-              <span>Cuenta de:</span>
-              <span class="text-amber-600 font-black uppercase">${cuentaSeleccionada}</span>
-            </div>` : ''}
           </div>
 
-          <div class="border-t-2 border-dashed border-slate-200 my-4"></div>
+          <div class="border-t border-slate-200 my-5"></div>
 
-          <div class="space-y-6">
-            <h3 class="text-xs uppercase font-black tracking-wider text-slate-400 mb-2">Detalle de consumo</h3>
-            
+          <div class="space-y-4">
             ${cuentasAVisualizar.map(accName => {
               const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
               if (accountItemsRaw.length === 0) return '';
@@ -433,8 +429,8 @@ export const shareOrderTicket = async (req, res) => {
               return `
                 <div class="space-y-3">
                   ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
-                    <div class="text-xs font-extrabold text-slate-400 bg-slate-50 px-3 py-1 rounded-lg uppercase tracking-wide">
-                      ● Cuenta: ${accName}
+                    <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg uppercase tracking-wider text-center">
+                      — Cuenta: ${accName} —
                     </div>
                   ` : ''}
                   
@@ -444,16 +440,16 @@ export const shareOrderTicket = async (req, res) => {
 
                     return `
                     <div class="flex items-start gap-3 text-sm px-1">
-                      <span class="font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-lg text-xs mt-0.5">${item.quantity}x</span>
+                      <span class="font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-xs mt-0.5">${item.quantity}x</span>
                       <div class="flex-1 min-w-0">
-                        <p class="font-bold text-slate-900 break-words">
-                          ${item.isTakeaway ? '<span class="text-orange-500 mr-1 text-[11px] uppercase tracking-tighter bg-orange-50 px-1 rounded">🛍️ Llevar</span>' : ''}
+                        <p class="font-bold text-slate-900 break-words leading-tight">
+                          ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded">🛍️ Llevar</span>' : ''}
                           ${item.product?.name || 'Producto'}
                         </p>
-                        ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-0.5 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
-                        ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-400 font-medium font-italic">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
+                        ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-1 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
+                        ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-500 font-medium mt-0.5">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
                       </div>
-                      <span class="font-bold text-slate-900 shrink-0">$${Number(item.subtotal).toFixed(2)}</span>
+                      <span class="font-black text-slate-900 shrink-0">$${Number(item.subtotal).toFixed(2)}</span>
                     </div>
                     `;
                   }).join('')}
@@ -462,11 +458,11 @@ export const shareOrderTicket = async (req, res) => {
             }).join('')}
           </div>
 
-          <div class="border-t-2 border-dashed border-slate-200 my-6"></div>
+          <div class="border-t border-slate-200 my-5"></div>
 
           ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
-            <div class="space-y-2 text-xs font-semibold text-slate-500 mb-4 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-              <p class="font-black text-slate-400 uppercase tracking-wider mb-2 text-[10px]">Resumen por Cuentas</p>
+            <div class="space-y-2 text-xs font-semibold text-slate-500 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <p class="font-black text-slate-400 uppercase tracking-wider mb-3 text-[10px] text-center">Resumen por Cuentas</p>
               ${cuentasAVisualizar.map(accName => {
                 const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
                 return `
@@ -477,29 +473,37 @@ export const shareOrderTicket = async (req, res) => {
                 `;
               }).join('')}
             </div>
-            <div class="border-t border-slate-100 my-4"></div>
+            <div class="border-t border-slate-200 my-5"></div>
           ` : ''}
 
-          <div class="flex justify-between items-baseline mb-4">
-            <span class="text-base font-black text-slate-900 uppercase tracking-tight">Total Consumido</span>
-            <span class="text-3xl font-black text-slate-900 tracking-tighter">$${totalAmount.toFixed(2)}</span>
+          <div class="flex flex-col gap-2 mb-2">
+            <div class="flex justify-between items-baseline">
+              <span class="text-sm font-black text-slate-600 uppercase tracking-tight">Total Consumido</span>
+              <span class="text-3xl font-black text-slate-900 tracking-tighter">$${totalAmount.toFixed(2)}</span>
+            </div>
+            <div class="flex justify-between items-center mt-2">
+              <span class="text-xs font-bold text-slate-500">Estado de Cuenta:</span>
+              <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800">
+                ${estadoLiquidacion}
+              </span>
+            </div>
           </div>
 
-          <div class="border-t border-slate-100 my-4"></div>
+          <div class="border-t border-slate-200 my-5"></div>
 
-          <div class="text-center space-y-2 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-            <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest">Visítanos en</p>
-            <p class="text-xs text-slate-600 font-medium leading-relaxed">
+          <div class="text-center space-y-2 mb-6 bg-slate-50/80 p-4 rounded-2xl">
+            <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Ubicación</p>
+            <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
               Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
             </p>
-            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all">
+            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
               📍 Ver en Google Maps
             </a>
           </div>
 
-          <div class="text-center mt-6 space-y-1">
-            <p class="font-extrabold text-slate-800 text-sm">¡Muchas gracias por tu preferencia!</p>
-            <p class="text-xs text-slate-400 font-medium">Este documento es un comprobante digital de caja.</p>
+          <div class="text-center mt-8 space-y-1">
+            <p class="font-black text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Comprobante Digital de Caja</p>
           </div>
 
         </div>
@@ -509,10 +513,10 @@ export const shareOrderTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="flex gap-3 w-full max-w-sm px-4">
-          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             📥 PDF
           </button>
-          <button onclick="descargarImagen()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+          <button onclick="descargarImagen()" class="flex-1 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-black py-3.5 rounded-2xl shadow-xl shadow-slate-200/50 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             📸 Imagen
           </button>
         </div>
@@ -521,12 +525,12 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightMm = (element.scrollHeight * 0.264583) + 2;
+          const heightMm = (element.scrollHeight * 0.264583) + 5;
           const options = {
             margin: 0,
-            filename: 'Ticket-Consumo-\${orderId}.pdf',
+            filename: 'Ticket_Lya_Cafeteria_${ticketFolio}.pdf',
             image: { type: 'jpeg', quality: 1 },
-            html2canvas: { scale: 3, useCORS: true },
+            html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff' },
             jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
             pagebreak: { mode: 'avoid-all' }
           };
@@ -537,7 +541,7 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
           html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = 'Ticket-Consumo-\${orderId}.png';
+            link.download = 'Ticket_Lya_Cafeteria_${ticketFolio}.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
           });
