@@ -1,9 +1,9 @@
 // src/modules/inventory/views/NewItemModal.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Package, Barcode, Scale, AlertTriangle } from 'lucide-react';
+import { X, Package, Barcode, Scale, AlertTriangle, Loader2 } from 'lucide-react';
 
-export default function NewItemModal({ isOpen, onClose, onCreate }) {
+export default function NewItemModal({ isOpen, onClose, onCreate, showSuccess }) {
   const [formData, setFormData] = useState({ name: '', sku: '', unit: 'pza', minimumStock: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,6 +21,7 @@ export default function NewItemModal({ isOpen, onClose, onCreate }) {
     });
 
     if (res.success) {
+      if (showSuccess) showSuccess('Insumo agregado con éxito');
       onClose();
     } else {
       setError(res.error);
@@ -117,16 +118,21 @@ export default function NewItemModal({ isOpen, onClose, onCreate }) {
             <button 
               type="button" 
               onClick={onClose} 
-              className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors"
+              disabled={loading}
+              className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
             <button 
               disabled={loading} 
               type="submit" 
-              className="flex-1 py-3.5 bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-xl font-bold shadow-lg shadow-orange-500/30 lya:shadow-lya-primary/30 transform hover:-translate-y-0.5 transition-all flex justify-center items-center gap-2"
+              className={`flex-1 py-3.5 bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-xl font-bold shadow-lg shadow-orange-500/30 lya:shadow-lya-primary/30 transition-all flex justify-center items-center gap-2 ${loading ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}
             >
-              {loading ? 'Guardando...' : 'Guardar Insumo'}
+              {loading ? (
+                <><Loader2 size={18} className="animate-spin" /> Guardando...</>
+              ) : (
+                'Guardar Insumo'
+              )}
             </button>
           </div>
         </form>

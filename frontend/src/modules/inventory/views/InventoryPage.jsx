@@ -1,18 +1,50 @@
 // src/modules/inventory/views/InventoryPage.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PackagePlus, Search, AlertCircle, Boxes } from 'lucide-react';
+import { PackagePlus, Search, AlertCircle, Boxes, Loader2, CheckCircle2 } from 'lucide-react';
 import { useInventoryController } from '../controllers/useInventoryController';
 import NewItemModal from './NewItemModal';
 import ItemDetailsModal from './ItemDetailsModal';
 
+// --- NUEVO COMPONENTE DE CARGA INICIAL ---
+const InventoryLoader = () => (
+  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
+    <motion.div
+      animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+      transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+    >
+      <Boxes size={40} className="text-orange-500 lya:text-lya-primary" />
+    </motion.div>
+    <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+      Cargando Inventario
+    </h2>
+    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+      <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando insumos...
+    </p>
+  </div>
+);
+
 export default function InventoryPage() {
   const controller = useInventoryController();
-  const { inventory, isLoading, createItem } = controller;
+  // Extraemos successScreen del controlador por si la lógica global manda alertas
+  const { inventory, isLoading, createItem, successScreen } = controller;
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  
+  // Estado local para notificaciones de éxito personalizadas
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Función para disparar la notificación y ocultarla a los 3 segundos
+  const showSuccess = (msg) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
+
+  // 🔥 Si está cargando, mostramos la pantalla de carga fluida
+  if (isLoading) return <InventoryLoader />;
 
   const filteredInventory = inventory.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,7 +90,6 @@ export default function InventoryPage() {
         </div>
       </header>
 
-      {/* 🔥 AQUÍ APLICAMOS LA NUEVA CLASE 'hide-scrollbar' */}
       <div className="flex-1 overflow-y-auto hide-scrollbar bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 mb-4 pb-20 transition-colors duration-300">
         <div className="overflow-x-auto hide-scrollbar">
           <table className="w-full text-left border-collapse">
@@ -73,9 +104,7 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
-              {isLoading ? (
-                <tr><td colSpan="6" className="text-center p-10 text-gray-400 dark:text-gray-500 lya:text-lya-text/60 font-medium transition-colors">Cargando inventario...</td></tr>
-              ) : filteredInventory.length === 0 ? (
+              {filteredInventory.length === 0 ? (
                 <tr><td colSpan="6" className="text-center p-10 text-gray-400 dark:text-gray-500 lya:text-lya-text/60 font-medium transition-colors">No se encontraron insumos.</td></tr>
               ) : (
                 <AnimatePresence mode="popLayout">
@@ -143,6 +172,7 @@ export default function InventoryPage() {
             isOpen={isModalOpen} 
             onClose={() => setIsModalOpen(false)} 
             onCreate={createItem} 
+            showSuccess={showSuccess} // <-- Pasamos el Toast a la modal
           />
         )}
       </AnimatePresence>
@@ -154,9 +184,33 @@ export default function InventoryPage() {
             isOpen={!!selectedItem}
             onClose={() => setSelectedItem(null)}
             controller={controller}
+            showSuccess={showSuccess} // <-- Pasamos el Toast a la modal
           />
         )}
       </AnimatePresence>
+
+      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO (TOAST CENTRADO ARRIBA) */}
+      <AnimatePresence>
+        {(successMessage || successScreen?.isOpen) && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
+            >
+              <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
+                <CheckCircle2 size={20} className="text-emerald-500 lya:text-lya-primary" />
+              </div>
+              <div className="flex flex-col">
+                  <span className="text-sm">{successMessage || successScreen?.title || 'Acción exitosa'}</span>
+                  {successScreen?.subtitle && <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 leading-none mt-0.5">{successScreen.subtitle}</span>}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

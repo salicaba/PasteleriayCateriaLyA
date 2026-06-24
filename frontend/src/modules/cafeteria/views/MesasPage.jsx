@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/MesasPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Grid, ShoppingBag, CheckCircle, Trash2, X, Plus, Store, Loader2, RotateCcw, Zap, Banknote, CreditCard, ArrowRightLeft } from 'lucide-react';
+import { Grid, ShoppingBag, CheckCircle, Trash2, X, Plus, Store, Loader2, RotateCcw, Zap, Banknote, CreditCard, ArrowRightLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket'; 
@@ -41,9 +41,20 @@ export const MesasPage = () => {
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [isCanceling, setIsCanceling] = useState(false);
 
-  // 🔥 ESTADOS PARA BLOQUEAR LOS BOTONES DE RESTAURAR MIENTRAS CARGAN
+  // 🔥 ESTADOS PARA BLOQUEAR LOS BOTONES MIENTRAS CARGAN
+  const [isCreatingMostrador, setIsCreatingMostrador] = useState(false);
   const [restoringOrderId, setRestoringOrderId] = useState(null);
   const [restoringItemId, setRestoringItemId] = useState(null);
+
+  // 🔥 ESTADOS PARA LA NOTIFICACIÓN TOAST UNIVERSAL
+  const [toastMessage, setToastMessage] = useState(null);
+  const [toastType, setToastType] = useState('success');
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const [dailySummary, setDailySummary] = useState({
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
@@ -87,11 +98,15 @@ export const MesasPage = () => {
 
   const ingresosTotales = dailySummary.transactions?.filter(t => t.type === 'INCOME') || [];
 
-  // 🔥 FUNCIONES ASÍNCRONAS PARA MANEJAR LA CARGA AL RESTAURAR
+  // 🔥 FUNCIONES ASÍNCRONAS REPARADAS (Refrescan el resumen automáticamente)
   const onRestoreOrder = async (orderId) => {
     setRestoringOrderId(orderId);
     try {
       await handleRestoreOrder(orderId);
+      await fetchSummary(); // <-- ¡ESTO ERA LO QUE FALTABA PARA LIMPIAR LA PAPELERA!
+      showToast('Cuenta restaurada con éxito');
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Error al restaurar la cuenta', 'error');
     } finally {
       setRestoringOrderId(null);
     }
@@ -101,26 +116,43 @@ export const MesasPage = () => {
     setRestoringItemId(itemId);
     try {
       await handleRestoreItem(orderId, itemId);
+      await fetchSummary(); // <-- ¡ESTO TAMBIÉN!
+      showToast('Producto restaurado con éxito');
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Error al restaurar producto', 'error');
     } finally {
       setRestoringItemId(null);
     }
   };
 
+  const handleCreateMostrador = async () => {
+    setIsCreatingMostrador(true);
+    try {
+      const mesaVitrina = await nuevoPedidoVitrina();
+      if(mesaVitrina) {
+        setSelectedMesa(mesaVitrina);
+        showToast('Pedido de mostrador abierto');
+      }
+    } finally {
+      setIsCreatingMostrador(false);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
         >
-          <Store size={40} className="text-orange-500" />
+          <Store size={40} className="text-orange-500 lya:text-lya-primary" />
         </motion.div>
         <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
           Cargando Punto de Venta
         </h2>
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
-          <Loader2 size={16} className="animate-spin text-orange-500" /> Sincronizando datos...
+          <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando datos...
         </p>
       </div>
     );
@@ -129,12 +161,12 @@ export const MesasPage = () => {
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8">
+    <div className="h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8 transition-colors duration-300">
       
       <div>
-        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-6 md:p-8 mb-8 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-6 md:p-8 mb-8 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6 transition-colors duration-300">
           <div className="flex items-center gap-5">
-            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 text-orange-500 rounded-2xl flex-shrink-0">
+            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-primary/20 text-orange-500 lya:text-lya-primary rounded-2xl flex-shrink-0">
               <Store size={32} strokeWidth={1.5} />
             </div>
             <div>
@@ -152,8 +184,8 @@ export const MesasPage = () => {
               onClick={() => setActiveTab('salon')} 
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95 border ${
                 activeTab === 'salon' 
-                  ? 'bg-orange-500 text-white border-orange-500 shadow-md' 
-                  : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-900/40 border-orange-100 dark:border-orange-900/30'
+                  ? 'bg-orange-500 text-white border-orange-500 shadow-md lya:bg-lya-primary lya:border-lya-primary lya:shadow-lya-primary/30' 
+                  : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-900/40 border-orange-100 dark:border-orange-900/30 lya:bg-lya-primary/10 lya:text-lya-primary lya:border-lya-primary/20 lya:hover:bg-lya-primary/20'
               }`}
             >
               <Grid size={18} /> Mesas
@@ -163,21 +195,23 @@ export const MesasPage = () => {
               onClick={() => setActiveTab('llevar')} 
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95 border ${
                 activeTab === 'llevar'
-                  ? 'bg-blue-500 text-white border-blue-500 shadow-md'
-                  : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-100 dark:border-blue-900/30'
+                  ? 'bg-blue-500 text-white border-blue-500 shadow-md lya:bg-lya-secondary lya:border-lya-secondary lya:shadow-lya-secondary/30'
+                  : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-100 dark:border-blue-900/30 lya:bg-lya-secondary/10 lya:text-lya-secondary lya:border-lya-secondary/20 lya:hover:bg-lya-secondary/20'
               }`}
             >
               <ShoppingBag size={18} /> Llevar
             </button>
             
             <button 
-              onClick={async () => {
-                const mesaVitrina = await nuevoPedidoVitrina();
-                if(mesaVitrina) setSelectedMesa(mesaVitrina);
-              }} 
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-amber-950 px-5 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_0_15px_rgba(251,191,36,0.3)] active:scale-95"
+              onClick={handleCreateMostrador}
+              disabled={isCreatingMostrador}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-2xl font-black text-sm transition-all shadow-[0_0_15px_rgba(251,191,36,0.3)] ${
+                isCreatingMostrador 
+                  ? 'bg-amber-400/70 text-amber-950/70 cursor-not-allowed' 
+                  : 'bg-amber-400 hover:bg-amber-500 text-amber-950 active:scale-95'
+              }`}
             >
-              <Zap size={18} /> Mostrador
+              {isCreatingMostrador ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />} Mostrador
             </button>
           </div>
         </div>
@@ -187,8 +221,8 @@ export const MesasPage = () => {
             title="Mesas Ocupadas" 
             value={`${mesasOcupadas} / ${mesasSalon.length}`} 
             icon={Grid} 
-            borderClass="border-orange-500 lya:border-orange-400" 
-            iconColors={{ bg: "bg-orange-500", text: "text-orange-500" }} 
+            borderClass="border-orange-500 lya:border-orange-400 lya:border-lya-primary" 
+            iconColors={{ bg: "bg-orange-500 lya:bg-lya-primary", text: "text-orange-500 lya:text-lya-primary" }} 
             onClick={() => { setActiveTab('salon'); setShowVendidos(false); setShowPapelera(false); }}
             isActive={activeTab === 'salon' && !showVendidos && !showPapelera}
           />
@@ -196,8 +230,8 @@ export const MesasPage = () => {
             title="Para Llevar" 
             value={mesasLlevar.length} 
             icon={ShoppingBag} 
-            borderClass="border-blue-500 lya:border-blue-400" 
-            iconColors={{ bg: "bg-blue-500", text: "text-blue-500" }} 
+            borderClass="border-blue-500 lya:border-blue-400 lya:border-lya-secondary" 
+            iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} 
             onClick={() => { setActiveTab('llevar'); setShowVendidos(false); setShowPapelera(false); }}
             isActive={activeTab === 'llevar' && !showVendidos && !showPapelera}
           />
@@ -205,7 +239,7 @@ export const MesasPage = () => {
             title="Vendidos Hoy" 
             value={ingresosTotales.length} 
             icon={CheckCircle} 
-            borderClass="border-[#24d366] lya:border-emerald-400" 
+            borderClass="border-[#24d366] lya:border-[#24d366]" 
             iconColors={{ bg: "bg-[#24d366]", text: "text-[#24d366]" }} 
             onClick={() => { setShowVendidos(true); setShowPapelera(false); }}
             isActive={showVendidos}
@@ -227,7 +261,7 @@ export const MesasPage = () => {
           <motion.div key="salon-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
             <div className="flex items-center gap-2 mb-4">
               <Grid className="text-gray-400" size={20} />
-              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">Mesas del Salón</h3>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesas del Salón</h3>
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -243,18 +277,18 @@ export const MesasPage = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="text-gray-400" size={20} />
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">Pedidos Para Llevar</h3>
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Pedidos Para Llevar</h3>
               </div>
               <button 
                 onClick={() => setShowLlevarModal(true)}
-                className="flex items-center gap-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
+                className="flex items-center gap-1.5 bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
               >
                 <Plus size={14} /> Nuevo Pedido
               </button>
             </div>
 
             {mesasLlevar.length === 0 ? (
-              <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-8 flex flex-col items-center justify-center text-gray-400">
+              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-8 flex flex-col items-center justify-center text-gray-400">
                 <ShoppingBag size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
                 <p className="text-sm font-medium">No hay pedidos activos para llevar.</p>
               </div>
@@ -291,7 +325,10 @@ export const MesasPage = () => {
                   tel = param2 || '';
                 }
                 const nuevaMesa = await nuevoPedidoLlevar(nombre, tel);
-                if(nuevaMesa) setSelectedMesa(nuevaMesa); 
+                if(nuevaMesa) {
+                  setSelectedMesa(nuevaMesa); 
+                  showToast('Pedido para llevar creado');
+                }
                 setShowLlevarModal(false);
               }} 
             />
@@ -299,8 +336,15 @@ export const MesasPage = () => {
 
           {selectedMesa && (
             <PosModal 
-              isOpen={!!selectedMesa} onClose={() => setSelectedMesa(null)} mesa={selectedMesa} todasLasMesas={mesasSalon}
-              onTableRelease={handleLiberarMesa} onUpdateTotal={handleUpdateTotal} onUnirMesas={handleUnirMesas} onPagoParcial={handlePagoParcial}
+              isOpen={!!selectedMesa} 
+              onClose={() => setSelectedMesa(null)} 
+              mesa={selectedMesa} 
+              todasLasMesas={mesasSalon}
+              onTableRelease={handleLiberarMesa} 
+              onUpdateTotal={handleUpdateTotal} 
+              onUnirMesas={handleUnirMesas} 
+              onPagoParcial={handlePagoParcial}
+              showToast={showToast} // 🔥 Pasamos el Toast al Modal
             />
           )}
 
@@ -348,9 +392,16 @@ export const MesasPage = () => {
                       disabled={isCanceling}
                       onClick={async () => {
                         setIsCanceling(true); 
-                        await handleCancelOrder(orderToCancel.orderId, 'Pedido para llevar descartado');
-                        setIsCanceling(false); 
-                        setOrderToCancel(null); 
+                        try {
+                          await handleCancelOrder(orderToCancel.orderId, 'Pedido para llevar descartado');
+                          await fetchSummary(); // 🔥 Refrescamos la UI
+                          showToast('Pedido cancelado correctamente');
+                        } catch (error) {
+                          showToast(error.response?.data?.message || 'Error al cancelar', 'error');
+                        } finally {
+                          setIsCanceling(false); 
+                          setOrderToCancel(null); 
+                        }
                       }}
                       className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg shadow-red-500/30 transition-all ${isCanceling ? 'bg-red-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'}`}
                     >
@@ -373,13 +424,13 @@ export const MesasPage = () => {
             {showPapelera && (
               <div className="fixed inset-0 z-[9990] flex justify-end overflow-hidden">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPapelera(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" />
-                <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 shadow-2xl flex flex-col">
-                  <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-2xl flex flex-col">
+                  <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
                     <div className="flex items-center gap-3 text-red-500">
                       <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl"><Trash2 size={24} /></div>
-                      <h2 className="text-xl font-black text-gray-900 dark:text-white">Papelera Hoy</h2>
+                      <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text">Papelera Hoy</h2>
                     </div>
-                    <button onClick={() => setShowPapelera(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><X size={20} className="text-gray-500" /></button>
+                    <button onClick={() => setShowPapelera(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><X size={20} className="text-gray-500" /></button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
                     
@@ -431,7 +482,7 @@ export const MesasPage = () => {
                             return (
                             <div key={order.id} className="p-4 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 rounded-2xl transition-all">
                               <div className="flex justify-between items-start mb-2">
-                                <span className="font-black text-gray-900 dark:text-white text-base">
+                                <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
                                   {tituloPrincipal}
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -455,7 +506,7 @@ export const MesasPage = () => {
                               </div>
 
                               <div className="mb-2">
-                                <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
+                                <div className="inline-flex flex-col bg-white dark:bg-gray-800 lya:bg-lya-bg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
                                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">
                                     {textoInsignia}
                                   </span>
@@ -542,11 +593,11 @@ export const MesasPage = () => {
                             }
 
                             return (
-                            <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between opacity-90 transition-opacity">
+                            <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-2xl flex items-center justify-between opacity-90 transition-opacity">
                               <div className="flex-1 pr-3">
-                                <p className="font-bold text-gray-800 dark:text-gray-200 text-sm"><span className="text-red-500">{item.quantity}x</span> {item.product?.name}</p>
+                                <p className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm"><span className="text-red-500">{item.quantity}x</span> {item.product?.name}</p>
                                 
-                                <div className="mt-1.5 mb-1 inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-700">
+                                <div className="mt-1.5 mb-1 inline-flex items-center bg-gray-100 dark:bg-gray-700/50 lya:bg-lya-surface rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30">
                                   <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{nombreOrigen}</span>
                                   <span className="mx-1.5 text-gray-300 dark:text-gray-600">•</span>
                                   <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
@@ -557,7 +608,7 @@ export const MesasPage = () => {
                                 <p className="text-[11px] text-gray-500 leading-snug mt-1">Motivo: {motivoLimpioItem}</p>
 
                                 <div className="flex items-center gap-2 mt-2">
-                                  <span className="bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                                  <span className="bg-gray-100 dark:bg-gray-700/50 lya:bg-lya-surface text-gray-500 dark:text-gray-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
                                     🕒 {new Date(item.cancelledAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                   </span>
                                 </div>
@@ -583,7 +634,7 @@ export const MesasPage = () => {
                                     </button>
                                 ) : (
                                     <span 
-                                        className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md" 
+                                        className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-2 py-1 rounded-md" 
                                         title="No se puede restaurar porque la cuenta/mesa ya fue cerrada o finalizada."
                                     >
                                         {textoCerrado}
@@ -613,13 +664,13 @@ export const MesasPage = () => {
             {showVendidos && (
               <div className="fixed inset-0 z-[9990] flex justify-end overflow-hidden">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowVendidos(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" />
-                <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 shadow-2xl flex flex-col">
-                  <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-2xl flex flex-col">
+                  <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
                     <div className="flex items-center gap-3 text-[#24d366]">
                       <div className="p-2 bg-[#24d366]/10 rounded-xl"><CheckCircle size={24} /></div>
-                      <h2 className="text-xl font-black text-gray-900 dark:text-white">Flujo de Caja Hoy</h2>
+                      <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text">Flujo de Caja Hoy</h2>
                     </div>
-                    <button onClick={() => setShowVendidos(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><X size={20} className="text-gray-500" /></button>
+                    <button onClick={() => setShowVendidos(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><X size={20} className="text-gray-500" /></button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pb-10">
                     
@@ -627,13 +678,13 @@ export const MesasPage = () => {
                       ingresosTotales.map(tx => {
                         const esReembolso = Number(tx.amount) < 0;
                         return (
-                        <div key={tx.id} className={`p-4 border rounded-2xl flex justify-between items-start group transition-colors shadow-sm ${esReembolso ? 'border-red-100 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20' : 'border-green-100 dark:border-green-900/30 bg-green-50/50 dark:bg-green-900/10 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
+                        <div key={tx.id} className={`p-4 border rounded-2xl flex justify-between items-start group transition-colors shadow-sm ${esReembolso ? 'border-red-100 dark:border-red-900/30 lya:border-red-900/50 bg-red-50/50 dark:bg-red-900/10 lya:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20' : 'border-green-100 dark:border-green-900/30 lya:border-emerald-900/50 bg-green-50/50 dark:bg-green-900/10 lya:bg-emerald-900/10 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
                           <div className="flex gap-3 w-full pr-3">
-                            <div className={`p-2.5 rounded-xl shadow-sm shrink-0 h-10 w-10 flex items-center justify-center border ${esReembolso ? 'bg-white dark:bg-gray-800 text-red-500 border-red-100 dark:border-red-900/50' : 'bg-white dark:bg-gray-800 text-[#24d366] border-green-100 dark:border-green-900/50'}`}>
+                            <div className={`p-2.5 rounded-xl shadow-sm shrink-0 h-10 w-10 flex items-center justify-center border ${esReembolso ? 'bg-white dark:bg-gray-800 lya:bg-lya-bg text-red-500 border-red-100 dark:border-red-900/50 lya:border-red-900/50' : 'bg-white dark:bg-gray-800 lya:bg-lya-bg text-[#24d366] border-green-100 dark:border-green-900/50 lya:border-emerald-900/50'}`}>
                               {esReembolso ? <RotateCcw size={20} /> : tx.paymentMethod === 'CASH' ? <Banknote size={20} /> : tx.paymentMethod === 'CARD' ? <CreditCard size={20} /> : <ArrowRightLeft size={20} />}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className={`font-black mb-0.5 text-sm tracking-tight ${esReembolso ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                              <p className={`font-black mb-0.5 text-sm tracking-tight ${esReembolso ? 'text-red-600 dark:text-red-400 lya:text-red-400' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>
                                 {tx.folio || (esReembolso ? 'Reembolso' : 'Cobro Exitoso')}
                               </p>
                               
@@ -690,6 +741,25 @@ export const MesasPage = () => {
                       </div>
                     )}
                   </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* NOTIFICACIÓN FLOTANTE PERSONALIZADA (TOAST CENTRADO ARRIBA) */}
+          <AnimatePresence>
+            {toastMessage && (
+              <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+                <motion.div 
+                  initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+                  animate={{ opacity: 1, y: 0, scale: 1 }} 
+                  exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                  className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
+                >
+                  <div className={`p-1.5 rounded-full shrink-0 ${toastType === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' : 'bg-red-100 dark:bg-red-500/20 text-red-500'}`}>
+                    {toastType === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+                  </div>
+                  <span className="text-sm">{toastMessage}</span>
                 </motion.div>
               </div>
             )}

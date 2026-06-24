@@ -2,7 +2,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import client from '../../../api/client.js';
 import { socket } from '../../../api/socket.js'; 
-import toast from 'react-hot-toast';
 
 export const useMesasController = () => {
   const [mesas, setMesas] = useState([]);
@@ -137,7 +136,7 @@ export const useMesasController = () => {
         paidAccounts: [] 
       };
     } catch (error) { 
-        toast.error('Error al abrir mostrador');
+        console.error('Error al abrir mostrador:', error);
         return null; 
     }
   };
@@ -176,7 +175,6 @@ export const useMesasController = () => {
       };
     } catch (error) { 
         console.error("Error creando pedido para llevar:", error);
-        toast.error('Error al crear pedido para llevar');
         return null; 
     }
   };
@@ -185,34 +183,30 @@ export const useMesasController = () => {
   const handleCancelOrder = async (orderId, reason = 'Cancelado desde vista general') => {
     try {
       await client.put(`/pos/orders/${orderId}/cancel`, { cancelReason: reason });
-      toast.success('Pedido para llevar eliminado correctamente');
       loadMesas();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al eliminar el pedido');
+      console.error('Error al eliminar el pedido:', error);
+      throw error; // Lanzamos el error para que la UI no muestre mensaje de éxito si falla
     }
   };
 
   const handleRestoreOrder = async (orderId) => {
     try {
       await client.put(`/pos/orders/${orderId}/restore`);
-      toast.success('Cuenta restaurada correctamente');
       loadMesas();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al restaurar la cuenta');
+      console.error('Error al restaurar la cuenta:', error);
+      throw error;
     }
   };
 
   const handleRestoreItem = async (orderId, itemId) => {
     try {
-      const res = await client.put(`/pos/orders/${orderId}/items/${itemId}/restore`);
-      if (res.data.wasRefundReversed) {
-        toast.success('Restaurado. Reembolso anulado en caja.');
-      } else {
-        toast.success('Producto restaurado correctamente');
-      }
+      await client.put(`/pos/orders/${orderId}/items/${itemId}/restore`);
       loadMesas();
     } catch (error) {
-      toast.error('Error al restaurar producto');
+      console.error('Error al restaurar producto:', error);
+      throw error;
     }
   };
 

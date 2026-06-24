@@ -2,11 +2,31 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInventoryController } from '../controllers/useInventoryController';
-import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2, Boxes } from 'lucide-react';
+
+// --- PANTALLA DE CARGA UNIFICADA (Idéntica a la de Almacén) ---
+const InventoryLoader = () => (
+  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
+    <motion.div
+      animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+      transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+    >
+      <Boxes size={40} className="text-orange-500 lya:text-lya-primary" />
+    </motion.div>
+    <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+      Cargando Inventario
+    </h2>
+    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+      <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando insumos...
+    </p>
+  </div>
+);
 
 export const InventoryReconciliationPage = () => {
-  const { inventory, loading, fetchInventory, processReconciliation } = useInventoryController();
+  // 🔥 CORRECCIÓN AQUÍ: Extrajimos `isLoading` (que es el nombre correcto en tu controlador) 
+  // y por si acaso dejamos `loading` para evitar cualquier error.
+  const { inventory, isLoading, loading, fetchInventory, processReconciliation } = useInventoryController();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [counts, setCounts] = useState({});
@@ -14,9 +34,19 @@ export const InventoryReconciliationPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [notes, setNotes] = useState('');
 
+  // Estados para nuestra notificación Toast personalizada
+  const [toastContent, setToastContent] = useState(null);
+  const [toastType, setToastType] = useState('success');
+
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  const showToast = (content, type = 'success') => {
+    setToastContent(content);
+    setToastType(type);
+    setTimeout(() => setToastContent(null), 4000); // 4 segundos para leer el resumen
+  };
 
   const handleCountChange = (id, value) => {
     setCounts(prev => ({
@@ -24,6 +54,10 @@ export const InventoryReconciliationPage = () => {
       [id]: value === '' ? '' : Number(value)
     }));
   };
+
+  // 🔥 EVALUACIÓN CORRECTA: Ahora sí verificará si está cargando de verdad
+  const isPageLoading = isLoading || loading;
+  if (isPageLoading) return <InventoryLoader />;
 
   const filteredInventory = inventory.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -59,9 +93,7 @@ export const InventoryReconciliationPage = () => {
     if (itemsToProcess.length === 0) return;
 
     if (!hasDifferences) {
-      toast.success('¡Todo cuadra perfectamente! El stock coincide, no hay ajustes.', {
-        icon: '✨'
-      });
+      showToast('¡Todo cuadra perfectamente! El stock coincide, no hay ajustes.', 'success');
       setCounts({}); 
       return;
     }
@@ -78,32 +110,33 @@ export const InventoryReconciliationPage = () => {
       setCounts({});
       setNotes('');
       
-      toast.success(
+      showToast(
         <div className="flex flex-col text-left w-full gap-0.5 py-0.5">
           <span className="text-[15px] font-black">¡Arqueo procesado!</span>
           <div className="text-[13px] font-medium opacity-90 mt-1 space-y-1.5">
             <p className="leading-tight">El inventario se ha actualizado correctamente.</p>
             
             {totalCOGS > 0 && (
-              <div className="flex justify-between items-center border-t border-black/10 dark:border-white/10 pt-1.5">
+              <div className="flex justify-between items-center border-t border-black/10 dark:border-white/10 pt-1.5 mt-1">
                 <span>Merma / Consumo:</span>
-                <span className="text-red-500 dark:text-red-400 font-bold">-${totalCOGS.toFixed(2)}</span>
+                <span className="text-red-500 dark:text-red-400 font-bold ml-4">-${totalCOGS.toFixed(2)}</span>
               </div>
             )}
             
             {totalSurplus > 0 && (
-              <div className="flex justify-between items-center border-t border-black/10 dark:border-white/10 pt-1.5">
+              <div className="flex justify-between items-center border-t border-black/10 dark:border-white/10 pt-1.5 mt-1">
                 <span>Ajuste Positivo:</span>
-                <span className="text-emerald-500 dark:text-emerald-400 font-bold">+${totalSurplus.toFixed(2)}</span>
+                <span className="text-emerald-500 dark:text-emerald-400 font-bold ml-4">+${totalSurplus.toFixed(2)}</span>
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        'success'
       );
 
     } catch (error) {
       console.error(error);
-      toast.error('Ocurrió un error al procesar el arqueo');
+      showToast('Ocurrió un error al procesar el arqueo', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -114,7 +147,7 @@ export const InventoryReconciliationPage = () => {
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
         <div className="flex items-center space-x-4">
@@ -142,9 +175,9 @@ export const InventoryReconciliationPage = () => {
           <button 
             onClick={handleProcessClick}
             disabled={itemsToProcess.length === 0}
-            className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold transition-all shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 ${
+            className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 ${
               itemsToProcess.length > 0 
-                ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30' 
+                ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 transform hover:-translate-y-0.5' 
                 : 'bg-gray-300 dark:bg-gray-800 text-gray-500 dark:text-gray-600 lya:bg-lya-border/40 lya:text-lya-text/40 cursor-not-allowed shadow-none'
             }`}
           >
@@ -166,9 +199,7 @@ export const InventoryReconciliationPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
-              {loading ? (
-                <tr><td colSpan="4" className="text-center p-10 text-gray-400 dark:text-gray-500 lya:text-lya-text/60 font-medium transition-colors">Cargando inventario...</td></tr>
-              ) : reconciliationItems.length === 0 ? (
+              {reconciliationItems.length === 0 ? (
                 <tr><td colSpan="4" className="text-center p-10 text-gray-400 dark:text-gray-500 lya:text-lya-text/60 font-medium transition-colors">No se encontraron insumos.</td></tr>
               ) : (
                 <AnimatePresence mode="popLayout">
@@ -187,7 +218,6 @@ export const InventoryReconciliationPage = () => {
                         <span className="text-xs text-gray-400 dark:text-gray-500 lya:text-lya-text/40 font-mono transition-colors">SKU: {item.sku || 'N/A'}</span>
                       </td>
                       
-                      {/* 🔥 STOCK LÓGICO MEJORADO (Color fuerte y pastilla de unidad) */}
                       <td className="p-5">
                         <div className="flex items-center justify-center gap-2">
                           <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text transition-colors">
@@ -199,7 +229,6 @@ export const InventoryReconciliationPage = () => {
                         </div>
                       </td>
                       
-                      {/* 🔥 CONTEO FÍSICO MEJORADO (Input y pastilla de unidad) */}
                       <td className="p-5">
                         <div className="flex items-center justify-center gap-2">
                           <input
@@ -248,7 +277,7 @@ export const InventoryReconciliationPage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 lya:border-lya-border/30"
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 lya:border-lya-border/30"
             >
               <div className="flex flex-col items-center text-center mb-6">
                 <div className="p-4 rounded-full mb-4 bg-blue-50 dark:bg-blue-900/30 lya:bg-lya-primary/10 transition-colors">
@@ -294,22 +323,45 @@ export const InventoryReconciliationPage = () => {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 transition-colors"
+                  disabled={isProcessing}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleConfirmReconciliation}
                   disabled={isProcessing}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-lg shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 transform transition-all hover:-translate-y-0.5"
+                  className={`flex-1 py-3 px-4 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-lg shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 transform transition-all ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'hover:-translate-y-0.5'}`}
                 >
-                  {isProcessing ? 'Procesando...' : 'Confirmar'}
+                  {isProcessing ? <><Loader2 size={18} className="animate-spin" /> Procesando...</> : 'Confirmar'}
                 </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      {/* NOTIFICACIÓN FLOTANTE PERSONALIZADA (TOAST CENTRADO ARRIBA) */}
+      <AnimatePresence>
+        {toastContent && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-[2rem] shadow-2xl flex items-start gap-4 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto max-w-sm sm:max-w-md w-full"
+            >
+              <div className={`p-1.5 rounded-full shrink-0 mt-0.5 ${toastType === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' : 'bg-red-100 dark:bg-red-500/20 text-red-500'}`}>
+                {toastType === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
+              </div>
+              <div className="flex flex-col flex-1">
+                {typeof toastContent === 'string' ? <span className="text-sm mt-1">{toastContent}</span> : toastContent}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 };

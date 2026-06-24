@@ -1,9 +1,9 @@
 // src/modules/inventory/views/ItemDetailsModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, History, ArrowDownToLine, Trash2, AlertTriangle, ArrowRightLeft, MessageSquare, ChevronDown, PackageMinus, PackagePlus } from 'lucide-react';
+import { X, History, ArrowDownToLine, Trash2, AlertTriangle, ArrowRightLeft, MessageSquare, ChevronDown, PackageMinus, PackagePlus, Loader2 } from 'lucide-react';
 
-export default function ItemDetailsModal({ item, isOpen, onClose, controller }) {
+export default function ItemDetailsModal({ item, isOpen, onClose, controller, showSuccess }) {
   const [activeTab, setActiveTab] = useState('history'); 
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -44,6 +44,7 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
     const res = await controller.deleteItem(item.id);
     setIsDeleting(false);
     if (res.success) {
+      if (showSuccess) showSuccess('Insumo eliminado del catálogo');
       setShowDeleteConfirm(false);
       onClose(); 
     } else {
@@ -67,6 +68,7 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
     });
 
     if (res.success) {
+      if (showSuccess) showSuccess(`Movimiento (${type === 'IN' ? 'Entrada' : 'Salida'}) registrado con éxito`);
       await loadHistory();
       setActiveTab('history');
       setQuantity('');
@@ -303,8 +305,8 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
                   ></textarea>
                 </div>
 
-                <button disabled={isSubmitting} type="submit" className={`w-full py-3.5 rounded-xl font-bold text-white transition-all transform hover:-translate-y-0.5 shadow-lg ${type === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-red-600 hover:bg-red-700 shadow-red-600/20'}`}>
-                  {isSubmitting ? 'Procesando...' : `Registrar ${type === 'IN' ? 'Compra' : 'Merma'}`}
+                <button disabled={isSubmitting} type="submit" className={`w-full py-3.5 rounded-xl font-bold text-white transition-all shadow-lg flex justify-center items-center gap-2 ${type === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-red-600 hover:bg-red-700 shadow-red-600/20'} ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}>
+                  {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Procesando...</> : `Registrar ${type === 'IN' ? 'Compra' : 'Merma'}`}
                 </button>
               </form>
             )}
@@ -334,16 +336,16 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller }) 
                 <button 
                   onClick={() => setShowDeleteConfirm(false)} 
                   disabled={isDeleting}
-                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors"
+                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={confirmDelete} 
                   disabled={isDeleting}
-                  className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5 flex justify-center items-center"
+                  className={`flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex justify-center items-center gap-2 ${isDeleting ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}
                 >
-                  {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                  {isDeleting ? <><Loader2 size={18} className="animate-spin" /> Eliminando...</> : 'Eliminar'}
                 </button>
               </div>
             </motion.div>
