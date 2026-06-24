@@ -41,12 +41,10 @@ export const MesasPage = () => {
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [isCanceling, setIsCanceling] = useState(false);
 
-  // 🔥 ESTADOS PARA BLOQUEAR LOS BOTONES MIENTRAS CARGAN
   const [isCreatingMostrador, setIsCreatingMostrador] = useState(false);
   const [restoringOrderId, setRestoringOrderId] = useState(null);
   const [restoringItemId, setRestoringItemId] = useState(null);
 
-  // 🔥 ESTADOS PARA LA NOTIFICACIÓN TOAST UNIVERSAL
   const [toastMessage, setToastMessage] = useState(null);
   const [toastType, setToastType] = useState('success');
 
@@ -98,13 +96,16 @@ export const MesasPage = () => {
 
   const ingresosTotales = dailySummary.transactions?.filter(t => t.type === 'INCOME') || [];
 
-  // 🔥 FUNCIONES ASÍNCRONAS REPARADAS (Refrescan el resumen automáticamente)
   const onRestoreOrder = async (orderId) => {
     setRestoringOrderId(orderId);
     try {
       await handleRestoreOrder(orderId);
-      await fetchSummary(); // <-- ¡ESTO ERA LO QUE FALTABA PARA LIMPIAR LA PAPELERA!
-      showToast('Cuenta restaurada con éxito');
+      setDailySummary(prev => ({
+        ...prev,
+        cancelledOrders: prev.cancelledOrders.filter(o => o.id !== orderId)
+      }));
+      showToast('Cuenta restaurada con éxito'); 
+      fetchSummary(); 
     } catch (error) {
       showToast(error.response?.data?.message || 'Error al restaurar la cuenta', 'error');
     } finally {
@@ -116,8 +117,12 @@ export const MesasPage = () => {
     setRestoringItemId(itemId);
     try {
       await handleRestoreItem(orderId, itemId);
-      await fetchSummary(); // <-- ¡ESTO TAMBIÉN!
-      showToast('Producto restaurado con éxito');
+      setDailySummary(prev => ({
+        ...prev,
+        cancelledItems: prev.cancelledItems.filter(i => i.id !== itemId)
+      }));
+      showToast('Producto restaurado con éxito'); 
+      fetchSummary(); 
     } catch (error) {
       showToast(error.response?.data?.message || 'Error al restaurar producto', 'error');
     } finally {
@@ -344,7 +349,7 @@ export const MesasPage = () => {
               onUpdateTotal={handleUpdateTotal} 
               onUnirMesas={handleUnirMesas} 
               onPagoParcial={handlePagoParcial}
-              showToast={showToast} // 🔥 Pasamos el Toast al Modal
+              showToast={showToast} 
             />
           )}
 
@@ -394,13 +399,14 @@ export const MesasPage = () => {
                         setIsCanceling(true); 
                         try {
                           await handleCancelOrder(orderToCancel.orderId, 'Pedido para llevar descartado');
-                          await fetchSummary(); // 🔥 Refrescamos la UI
-                          showToast('Pedido cancelado correctamente');
+                          showToast('Pedido cancelado correctamente'); 
                         } catch (error) {
                           showToast(error.response?.data?.message || 'Error al cancelar', 'error');
                         } finally {
+                          // 🔥 CORRECCIÓN CRUCIAL: Reseteamos isCanceling ANTES de cerrar la ventana
                           setIsCanceling(false); 
                           setOrderToCancel(null); 
+                          fetchSummary(); 
                         }
                       }}
                       className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg shadow-red-500/30 transition-all ${isCanceling ? 'bg-red-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'}`}

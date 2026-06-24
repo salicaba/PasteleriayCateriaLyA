@@ -58,7 +58,6 @@ export const useMesasController = () => {
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
           
-          // Identificamos el Mostrador por sus posibles prefijos
           const isVitrina = rawTicketId.startsWith('MOSTRADOR') || rawTicketId.startsWith('VITRINA') || rawTicketId.startsWith('MOS-');
           
           let numeroFinal = rawTicketId;
@@ -94,10 +93,12 @@ export const useMesasController = () => {
     }
   }, []);
 
+  // 🔥 CORRECCIÓN: Ahora el socket.off solo apaga ESTA función, no todo el sistema
   useEffect(() => { 
     loadMesas(); 
-    socket.on('pos:update', () => loadMesas());
-    return () => { socket.off('pos:update'); };
+    const onUpdate = () => loadMesas();
+    socket.on('pos:update', onUpdate);
+    return () => { socket.off('pos:update', onUpdate); };
   }, [loadMesas]);
 
   const mesasSalon = useMemo(() => mesas.filter(m => m.zona === 'salon'), [mesas]);
@@ -179,14 +180,13 @@ export const useMesasController = () => {
     }
   };
 
-  // 🔥 NUEVA FUNCIÓN PARA CANCELAR DIRECTO DESDE LA TARJETA
   const handleCancelOrder = async (orderId, reason = 'Cancelado desde vista general') => {
     try {
       await client.put(`/pos/orders/${orderId}/cancel`, { cancelReason: reason });
       loadMesas();
     } catch (error) {
       console.error('Error al eliminar el pedido:', error);
-      throw error; // Lanzamos el error para que la UI no muestre mensaje de éxito si falla
+      throw error; 
     }
   };
 
@@ -220,7 +220,7 @@ export const useMesasController = () => {
     handleUpdateTotal: loadMesas,
     handleUnirMesas: loadMesas,
     handlePagoParcial: loadMesas,
-    handleCancelOrder, // Exportamos la función
+    handleCancelOrder, 
     handleRestoreOrder,
     handleRestoreItem
   };
