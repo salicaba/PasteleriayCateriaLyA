@@ -31,11 +31,11 @@ export const TicketSidebar = ({
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInputValue, setModalInputValue] = useState('');
   
-  // ESTADO DE CARGA PARA EL MODAL DE CONFIRMACIÓN INTERNO
+  // ESTADOS DE CARGA
   const [isModalProcessing, setIsModalProcessing] = useState(false);
+  const [isClosingTable, setIsClosingTable] = useState(false);
   
   const [showCancelModal, setShowCancelModal] = useState(false);
-
   const [isDeliveringAll, setIsDeliveringAll] = useState(false);
   const [processingItems, setProcessingItems] = useState({});
 
@@ -145,6 +145,17 @@ export const TicketSidebar = ({
       if (onDeliverAll) await onDeliverAll();
     } finally {
       setIsDeliveringAll(false);
+    }
+  };
+
+  const handleCloseTableClick = async () => {
+    setIsClosingTable(true);
+    try {
+      if (onCloseTable) await onCloseTable();
+    } catch (error) {
+      console.error("Error cerrando mesa", error);
+    } finally {
+      setIsClosingTable(false);
     }
   };
 
@@ -625,8 +636,18 @@ export const TicketSidebar = ({
                   </button>
               )}
 
-              <button onClick={onCloseTable} className="flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase bg-red-500 text-white shadow-xl hover:bg-red-600 active:scale-95 transition-transform">
-                <XCircle size={16} /><span>{isVitrina ? 'Siguiente Venta' : (isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa')}</span>
+              <button 
+                 onClick={handleCloseTableClick}
+                 disabled={isClosingTable}
+                 className={clsx(
+                   "flex-[1.5] flex flex-col items-center justify-center gap-1 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl transition-transform",
+                   isClosingTable ? "bg-red-400 text-white cursor-wait opacity-80" : "bg-red-500 text-white hover:bg-red-600 active:scale-95"
+                 )}
+              >
+                {isClosingTable ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                <span>
+                   {isClosingTable ? 'Procesando...' : (isVitrina ? 'Siguiente Venta' : (isLlevar ? 'Finalizar Pedido' : 'Cerrar / Liberar Mesa'))}
+                </span>
               </button>
            </div>
         ) : (

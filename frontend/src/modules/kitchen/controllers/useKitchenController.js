@@ -7,6 +7,14 @@ export const useKitchenController = () => {
   const [loading, setLoading] = useState(true);
   const [processingItems, setProcessingItems] = useState(new Set());
   const [processingOrders, setProcessingOrders] = useState(new Set());
+  
+  // 🔥 ESTADO PARA EL TOAST ADAPTATIVO
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
 
   const fetchKitchenOrders = useCallback(async () => {
     try {
@@ -69,6 +77,7 @@ export const useKitchenController = () => {
     loading,
     processingItems,
     processingOrders,
+    toast, // Pasamos el toast a la vista
     
     toggleItemReady: async (orderId, itemId) => {
         setProcessingItems(prev => new Set(prev).add(itemId));
@@ -82,11 +91,19 @@ export const useKitchenController = () => {
 
         const newStatus = item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING';
         
+        // 🔥 OPTIMISTIC UI: Actualizamos la pantalla instantáneamente
+        setOrders(prev => prev.map(o => o.id === orderId ? {
+            ...o,
+            items: o.items.map(i => i.id === itemId ? { ...i, kitchenStatus: newStatus } : i)
+        } : o));
+
         try {
             await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
-            await fetchKitchenOrders();
+            fetchKitchenOrders(); // Sincronización silenciosa en 2do plano (SIN await)
         } catch(e){ 
             console.error("Error al cambiar estado individual"); 
+            showToast('Error al actualizar producto', 'error');
+            fetchKitchenOrders(); // Si falla, recargamos la verdad de la BD
         } finally {
             setProcessingItems(prev => { const next = new Set(prev); next.delete(itemId); return next; });
         }
@@ -100,14 +117,23 @@ export const useKitchenController = () => {
           return;
         }
 
+        // 🔥 OPTIMISTIC UI: Ponemos todo verde y listo instantáneamente
+        setOrders(prev => prev.map(o => o.id === orderId ? {
+            ...o,
+            items: o.items.map(i => ({ ...i, kitchenStatus: 'PREPARING' }))
+        } : o));
+
         try {
             const promises = order.items
                 .filter(i => i.kitchenStatus !== 'PREPARING')
                 .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'PREPARING' }));
             await Promise.all(promises);
-            await fetchKitchenOrders();
+            fetchKitchenOrders(); // Sincronización silenciosa
+            showToast('Todos los productos preparados');
         } catch(e){ 
             console.error("Error al marcar todo preparado"); 
+            showToast('Error al procesar comanda', 'error');
+            fetchKitchenOrders(); 
         } finally {
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
         }
@@ -121,12 +147,18 @@ export const useKitchenController = () => {
           return;
         }
 
+        // 🔥 OPTIMISTIC UI: Desaparecemos la tarjeta al segundo de darle click
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+
         try {
             const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
             await Promise.all(promises);
-            await fetchKitchenOrders();
+            fetchKitchenOrders(); // Sincronización silenciosa
+            showToast('¡Comanda despachada con éxito!');
         } catch(e){ 
             console.error("Error al enviar pedido a meseros"); 
+            showToast('Error al despachar la comanda', 'error');
+            fetchKitchenOrders();
         } finally {
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
         }

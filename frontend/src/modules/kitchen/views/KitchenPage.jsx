@@ -3,12 +3,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKitchenController } from '../controllers/useKitchenController';
 import { KitchenOrderCard } from './KitchenOrderCard';
-import { Flame, UtensilsCrossed, ShoppingBag, Loader2 } from 'lucide-react';
+import { Flame, UtensilsCrossed, ShoppingBag, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const KitchenPage = () => {
   const { 
     orders, toggleItemReady, completeOrder, markAllReady, 
-    loading, processingItems, processingOrders 
+    loading, processingItems, processingOrders, toast
   } = useKitchenController();
 
   const [vistaMovilActiva, setVistaMovilActiva] = useState('salon');
@@ -44,9 +44,33 @@ export const KitchenPage = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-6 transition-colors duration-300 overflow-hidden"
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-6 transition-colors duration-300 overflow-hidden relative"
     >
       
+      {/* TOAST UNIVERSAL DE COCINA */}
+      <AnimatePresence>
+        {toast?.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%", scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, x: "-50%", scale: 1 }}
+            exit={{ opacity: 0, y: -20, x: "-50%", scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className={`fixed top-6 left-1/2 z-[200] px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold border backdrop-blur-md ${
+              toast.type === 'error'
+                ? 'bg-red-50/90 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                : 'bg-white/90 dark:bg-gray-800/90 border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white lya:bg-lya-surface/90 lya:border-lya-border lya:text-lya-text'
+            }`}
+          >
+            {toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 lya:text-lya-primary shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4 md:mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 relative z-10 shrink-0">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-primary/10 p-3.5 rounded-xl text-orange-500 lya:text-lya-primary border border-orange-500/20 lya:border-lya-primary/20">

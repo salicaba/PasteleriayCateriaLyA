@@ -143,7 +143,7 @@ export const KitchenOrderCard = ({
                 if (!isItemProcessing) onToggleItem(order.id, item.id);
               }}
               className={`group flex items-start gap-3 p-2.5 rounded-xl transition-all duration-300 ${
-                isItemProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                isItemProcessing ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
               } ${
                 isReady 
                   ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-60' 
@@ -176,7 +176,6 @@ export const KitchenOrderCard = ({
                 </p>
 
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {/* 🔥 ETIQUETA VISUAL PARA LLEVAR */}
                   {item.isTakeaway && (
                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
                         isReady 
@@ -187,7 +186,6 @@ export const KitchenOrderCard = ({
                     </span>
                   )}
                   
-                  {/* 🔥 ETIQUETA VISUAL PARA SOLO SERVIR (Productos de vitrina) */}
                   {!item.requiereCocina && (
                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
                        isReady 
@@ -234,7 +232,7 @@ export const KitchenOrderCard = ({
             onClick={() => onComplete(order.id)}
             disabled={isOrderProcessing}
             className={`w-full py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 transition-all ${
-              isOrderProcessing ? 'opacity-60 cursor-not-allowed' : 'active:scale-[0.98]'
+              isOrderProcessing ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'
             }`}
           >
             {isOrderProcessing ? (
@@ -242,14 +240,14 @@ export const KitchenOrderCard = ({
             ) : (
               <BellRing size={16} className="animate-pulse" />
             )}
-            {isOrderProcessing ? 'Despachando...' : 'Entregar'}
+            {isOrderProcessing ? 'Procesando...' : 'Entregar'}
           </button>
         ) : (
           <button 
             onClick={() => onMarkAllReady(order.id)}
             disabled={isOrderProcessing}
             className={`w-full py-2.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:opacity-80 text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 ${
-              isOrderProcessing ? 'opacity-60 cursor-not-allowed' : 'active:scale-[0.98]'
+              isOrderProcessing ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'
             }`}
           >
             {isOrderProcessing ? (

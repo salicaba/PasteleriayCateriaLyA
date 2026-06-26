@@ -6,7 +6,7 @@ import { useInventoryController } from '../controllers/useInventoryController';
 import NewItemModal from './NewItemModal';
 import ItemDetailsModal from './ItemDetailsModal';
 
-// --- NUEVO COMPONENTE DE CARGA INICIAL ---
+// --- NUEVO COMPONENTE DE CARGA INICIAL (Ahora en tonos azules) ---
 const InventoryLoader = () => (
   <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
@@ -14,13 +14,13 @@ const InventoryLoader = () => (
       transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
       className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
     >
-      <Boxes size={40} className="text-orange-500 lya:text-lya-primary" />
+      <Boxes size={40} className="text-blue-500 dark:text-blue-400 lya:text-lya-secondary" />
     </motion.div>
     <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
       Cargando Inventario
     </h2>
     <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
-      <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando insumos...
+      <Loader2 size={16} className="animate-spin text-blue-500 dark:text-blue-400 lya:text-lya-secondary" /> Sincronizando insumos...
     </p>
   </div>
 );
@@ -60,7 +60,7 @@ export default function InventoryPage() {
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors duration-300">
         <div className="flex items-center space-x-4">
-          <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 dark:shadow-orange-900/30 lya:shadow-lya-primary/20">
+          <div className="bg-blue-500 dark:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-blue-500/20 dark:shadow-blue-900/30 lya:shadow-lya-secondary/20">
             <Boxes size={28} />
           </div>
           <div>
@@ -77,13 +77,13 @@ export default function InventoryPage() {
               placeholder="Buscar por nombre o SKU..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500/20 dark:focus:ring-orange-500/40 lya:focus:ring-lya-primary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
+              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
             />
           </div>
 
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:shadow-lya-primary/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
           >
             <PackagePlus size={20} /> <span>Añadir Insumo</span>
           </button>
@@ -172,7 +172,7 @@ export default function InventoryPage() {
             isOpen={isModalOpen} 
             onClose={() => setIsModalOpen(false)} 
             onCreate={createItem} 
-            showSuccess={showSuccess} // <-- Pasamos el Toast a la modal
+            showSuccess={showSuccess}
           />
         )}
       </AnimatePresence>
@@ -184,12 +184,12 @@ export default function InventoryPage() {
             isOpen={!!selectedItem}
             onClose={() => setSelectedItem(null)}
             controller={controller}
-            showSuccess={showSuccess} // <-- Pasamos el Toast a la modal
+            showSuccess={showSuccess}
           />
         )}
       </AnimatePresence>
 
-      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO (TOAST CENTRADO ARRIBA) */}
+      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO */}
       <AnimatePresence>
         {(successMessage || successScreen?.isOpen) && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">

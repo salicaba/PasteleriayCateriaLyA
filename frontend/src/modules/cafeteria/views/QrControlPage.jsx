@@ -3,21 +3,23 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, RefreshCw, Trash2, Smartphone, 
-  Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine
+  Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine,
+  CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 
 export const QrControlPage = () => {
   const { 
-    mesas, loading, isLoading, 
+    mesas, isLoading, isAdding, removingId, toast,
     zonas, zonaActiva, setZonaActiva, 
     addMesa, removeMesa 
   } = useQrController();
 
   const [previewMesa, setPreviewMesa] = useState(null);
+  const [mesaToDelete, setMesaToDelete] = useState(null); 
 
-  const isPageLoading = loading || isLoading || !zonas;
+  const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
   
   // ==========================================
   // PANTALLA DE CARGA ANIMADA NEO-BENTO
@@ -50,7 +52,30 @@ export const QrControlPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white"
     >
       
-      {/* MAGIA CSS PARA IMPRESIÓN REFORZADA CON LÍNEA DE RECORTE */}
+      {/* TOAST UNIVERSAL */}
+      <AnimatePresence>
+        {toast?.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%", scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, x: "-50%", scale: 1 }}
+            exit={{ opacity: 0, y: -20, x: "-50%", scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className={`fixed top-6 left-1/2 z-[200] px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold border backdrop-blur-md ${
+              toast.type === 'error'
+                ? 'bg-red-50/90 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                : 'bg-white/90 dark:bg-gray-800/90 border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white lya:bg-lya-surface/90 lya:border-lya-border lya:text-lya-text'
+            }`}
+          >
+            {toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-orange-500 lya:text-lya-primary shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { margin: 0; }
@@ -75,7 +100,6 @@ export const QrControlPage = () => {
       <header className="no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
-            {/* Ícono actualizado a ScanLine para ir a juego con la pantalla de carga */}
             <ScanLine size={28} />
           </div>
           <div>
@@ -110,10 +134,11 @@ export const QrControlPage = () => {
         {zonaActiva === 'salon' && (
           <button 
             onClick={addMesa}
-            className="flex items-center gap-2 bg-gray-900 dark:bg-orange-600 hover:bg-gray-800 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md"
+            disabled={isAdding}
+            className="flex items-center gap-2 bg-gray-900 dark:bg-orange-600 hover:bg-gray-800 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <Plus size={20} />
-            <span>Agregar Mesa</span>
+            {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
+            <span>{isAdding ? 'Procesando...' : 'Agregar Mesa'}</span>
           </button>
         )}
       </div>
@@ -147,8 +172,9 @@ export const QrControlPage = () => {
                         <h3 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Mesa {mesa.number}</h3>
                       </div>
                       <button 
-                        onClick={() => removeMesa(mesa.id)}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all"
+                        onClick={() => setMesaToDelete(mesa)}
+                        disabled={removingId === mesa.id}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Eliminar Mesa"
                       >
                         <Trash2 size={18} />
@@ -194,7 +220,9 @@ export const QrControlPage = () => {
                 >
                   <LayoutGrid size={48} className="mb-4 opacity-20" />
                   <p className="font-medium text-lg">No hay mesas en el sistema.</p>
-                  <button onClick={addMesa} className="mt-2 text-orange-500 lya:text-lya-primary font-bold hover:underline">Agregar Mesa</button>
+                  <button onClick={addMesa} disabled={isAdding} className="mt-2 text-orange-500 lya:text-lya-primary font-bold hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
+                    {isAdding ? 'Agregando...' : 'Agregar Mesa'}
+                  </button>
                 </motion.div>
               )}
             </motion.div>
@@ -317,6 +345,66 @@ export const QrControlPage = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* MODAL DE CONFIRMACIÓN CON ESTADOS DE CARGA */}
+      <AnimatePresence>
+        {mesaToDelete && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => {
+                if (removingId !== mesaToDelete.id) setMesaToDelete(null);
+              }}
+              className="absolute inset-0 bg-black/50 dark:bg-black/80 lya:bg-lya-text/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/20"
+            >
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-4">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white lya:text-lya-text mb-2">
+                ¿Eliminar Mesa {mesaToDelete.number}?
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8">
+                Esta acción no se puede deshacer. Las demás mesas se reordenarán automáticamente.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setMesaToDelete(null)}
+                  disabled={removingId === mesaToDelete.id}
+                  className="flex-1 py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    const success = await removeMesa(mesaToDelete.id);
+                    if (success) {
+                      setMesaToDelete(null);
+                    }
+                  }} 
+                  disabled={removingId === mesaToDelete.id}
+                  className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 disabled:bg-red-400 text-white rounded-2xl font-bold transition-colors shadow-lg shadow-red-500/20 lya:shadow-red-500/10 flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+                >
+                  {removingId === mesaToDelete.id ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Eliminando...</span>
+                    </>
+                  ) : (
+                    <span>Eliminar</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 };

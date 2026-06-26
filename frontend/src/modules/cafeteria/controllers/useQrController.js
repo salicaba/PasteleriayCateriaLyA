@@ -1,10 +1,16 @@
+// src/modules/cafeteria/controllers/useQrController.js
 import { useState, useEffect } from 'react';
 import client from '../../../api/client.js'; 
 
 export const useQrController = () => {
   const [mesas, setMesas] = useState([]);
   const [zonaActiva, setZonaActiva] = useState('salon');
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const zonas = [
     { id: 'salon', label: 'Mesas (Salón)' },
@@ -16,51 +22,61 @@ export const useQrController = () => {
     activo: true
   };
 
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 3000);
+  };
+
   useEffect(() => {
-    fetchTables();
+    fetchTables(true);
   }, []);
 
-  const fetchTables = async () => {
-    setIsLoading(true);
+  const fetchTables = async (showLoader = true) => {
+    if (showLoader) setIsLoading(true);
     try {
       const response = await client.get('/pos/tables');
       setMesas(response.data);
     } catch (error) {
       console.error("Error al cargar mesas:", error);
+      showToast('Error al sincronizar las mesas', 'error');
       setMesas([]);
     } finally {
-      setIsLoading(false);
+      if (showLoader) setIsLoading(false);
     }
   };
 
-  // Agregar sin pedir número (el backend lo calcula)
   const addMesa = async () => {
+    setIsAdding(true);
     try {
       await client.post('/pos/tables', { zone: 'salon' });
-      // Recargamos toda la lista para traer el número recién calculado
-      fetchTables(); 
+      await fetchTables(false); // Esperamos a que el servidor cree y devuelva los números
+      showToast('Mesa agregada exitosamente');
     } catch (error) {
       console.error("Error al crear la mesa:", error);
-      alert("Error al crear la mesa");
+      showToast('No se pudo crear la mesa', 'error');
+    } finally {
+      setIsAdding(false);
     }
   };
 
-  // Eliminar y traer lista reordenada
   const removeMesa = async (id) => {
-    if(!window.confirm("¿Eliminar mesa? Las demás se reordenarán automáticamente.")) return;
-    
+    setRemovingId(id);
     try {
-      // Optimizamos quitándola visualmente rápido
-      setMesas(prev => prev.filter(m => m.id !== id));
-      
-      // Hacemos la petición de borrado al backend
+      // Ya NO eliminamos optimísticamente de la lista aquí
       await client.delete(`/pos/tables/${id}`);
       
-      // Refrescamos la lista para obtener los nuevos números re-indexados (ej. la 3 pasa a ser la 2)
-      fetchTables();
+      // Esperamos a que el servidor confirme y nos dé la lista actualizada
+      await fetchTables(false); 
+      showToast('Mesa eliminada correctamente');
+      return true; // Éxito: avisamos a la vista para que cierre el modal
     } catch (error) {
       console.error("Error al eliminar:", error);
-      alert("Error al eliminar la mesa");
+      showToast('Error al eliminar la mesa', 'error');
+      return false; // Fallo: la vista no cerrará el modal
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -75,6 +91,9 @@ export const useQrController = () => {
   return { 
     mesas, 
     isLoading, 
+    isAdding,
+    removingId,
+    toast,
     generarQR, 
     revocarQR,
     zonas,

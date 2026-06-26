@@ -2,30 +2,28 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInventoryController } from '../controllers/useInventoryController';
-import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2, Boxes } from 'lucide-react';
+import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2 } from 'lucide-react';
 
-// --- PANTALLA DE CARGA UNIFICADA (Idéntica a la de Almacén) ---
-const InventoryLoader = () => (
+// --- PANTALLA DE CARGA EXCLUSIVA PARA EL ARQUEO ---
+const ReconciliationLoader = () => (
   <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
       animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
       transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
       className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
     >
-      <Boxes size={40} className="text-orange-500 lya:text-lya-primary" />
+      <ClipboardCheck size={40} className="text-blue-500 dark:text-blue-400 lya:text-lya-secondary" />
     </motion.div>
     <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
-      Cargando Inventario
+      Cargando Arqueo
     </h2>
     <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
-      <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando insumos...
+      <Loader2 size={16} className="animate-spin text-blue-500 dark:text-blue-400 lya:text-lya-secondary" /> Preparando hojas de conteo...
     </p>
   </div>
 );
 
 export const InventoryReconciliationPage = () => {
-  // 🔥 CORRECCIÓN AQUÍ: Extrajimos `isLoading` (que es el nombre correcto en tu controlador) 
-  // y por si acaso dejamos `loading` para evitar cualquier error.
   const { inventory, isLoading, loading, fetchInventory, processReconciliation } = useInventoryController();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +32,6 @@ export const InventoryReconciliationPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [notes, setNotes] = useState('');
 
-  // Estados para nuestra notificación Toast personalizada
   const [toastContent, setToastContent] = useState(null);
   const [toastType, setToastType] = useState('success');
 
@@ -45,7 +42,7 @@ export const InventoryReconciliationPage = () => {
   const showToast = (content, type = 'success') => {
     setToastContent(content);
     setToastType(type);
-    setTimeout(() => setToastContent(null), 4000); // 4 segundos para leer el resumen
+    setTimeout(() => setToastContent(null), 4000);
   };
 
   const handleCountChange = (id, value) => {
@@ -55,9 +52,8 @@ export const InventoryReconciliationPage = () => {
     }));
   };
 
-  // 🔥 EVALUACIÓN CORRECTA: Ahora sí verificará si está cargando de verdad
   const isPageLoading = isLoading || loading;
-  if (isPageLoading) return <InventoryLoader />;
+  if (isPageLoading) return <ReconciliationLoader />;
 
   const filteredInventory = inventory.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -151,7 +147,7 @@ export const InventoryReconciliationPage = () => {
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
         <div className="flex items-center space-x-4">
-          <div className="bg-blue-500 dark:bg-blue-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-blue-500/20 dark:shadow-blue-900/30 lya:shadow-lya-primary/20">
+          <div className="bg-blue-500 dark:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-blue-500/20 dark:shadow-blue-900/30 lya:shadow-lya-secondary/20">
             <ClipboardCheck size={28} />
           </div>
           <div>
@@ -168,7 +164,7 @@ export const InventoryReconciliationPage = () => {
               placeholder="Buscar insumo..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-primary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
+              className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
             />
           </div>
 
@@ -238,7 +234,7 @@ export const InventoryReconciliationPage = () => {
                             placeholder="0.00"
                             value={counts[item.id] !== undefined ? counts[item.id] : ''}
                             onChange={(e) => handleCountChange(item.id, e.target.value)}
-                            className="w-24 text-center p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-500/50 lya:focus:ring-lya-primary/40 font-bold transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-24 text-center p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-500/50 lya:focus:ring-lya-secondary/40 font-bold transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors">
                             {item.unit}
@@ -280,8 +276,8 @@ export const InventoryReconciliationPage = () => {
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 lya:border-lya-border/30"
             >
               <div className="flex flex-col items-center text-center mb-6">
-                <div className="p-4 rounded-full mb-4 bg-blue-50 dark:bg-blue-900/30 lya:bg-lya-primary/10 transition-colors">
-                  <Calculator size={28} className="text-blue-500 dark:text-blue-400 lya:text-lya-primary" />
+                <div className="p-4 rounded-full mb-4 bg-blue-50 dark:bg-blue-900/30 lya:bg-lya-secondary/10 transition-colors">
+                  <Calculator size={28} className="text-blue-500 dark:text-blue-400 lya:text-lya-secondary" />
                 </div>
                 <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-white lya:text-lya-text transition-colors">Confirmar Arqueo</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 transition-colors">Vas a actualizar el sistema con tu conteo físico. Revisa el impacto financiero:</p>
@@ -316,7 +312,7 @@ export const InventoryReconciliationPage = () => {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej: Conteo cierre de turno, faltó leche..."
-                  className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-gray-50 dark:bg-gray-800 lya:bg-lya-ui text-gray-800 dark:text-gray-200 lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-500/40 lya:focus:ring-lya-primary/30 text-sm resize-none transition-all"
+                  className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-gray-50 dark:bg-gray-800 lya:bg-lya-ui text-gray-800 dark:text-gray-200 lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 text-sm resize-none transition-all"
                 ></textarea>
               </div>
 

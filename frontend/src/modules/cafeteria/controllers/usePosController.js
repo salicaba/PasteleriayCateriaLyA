@@ -89,6 +89,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   }, [mesaInicial, todasLasMesas]);
 
   const isVitrina = mesaActual?.zona === 'vitrina';
+  const isLlevar = mesaActual?.zona === 'llevar';
 
   useEffect(() => {
     const loadData = async () => {
@@ -274,11 +275,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     try {
       let orderId = activeOrderId;
       if (!orderId) {
-        const isLlevar = mesaActual?.zona === 'llevar';
+        const isLlevarMode = mesaActual?.zona === 'llevar';
         const res = await client.post('/pos/orders', { 
-          orderType: isLlevar ? 'LLEVAR' : 'SALON', 
-          tableId: isLlevar ? null : mesaActual?.id, 
-          ticketId: isLlevar ? mesaActual?.numero : null 
+          orderType: isLlevarMode ? 'LLEVAR' : 'SALON', 
+          tableId: isLlevarMode ? null : mesaActual?.id, 
+          ticketId: isLlevarMode ? mesaActual?.numero : null 
         });
         orderId = res.data.order.id;
         setActiveOrderId(orderId);
@@ -779,16 +780,31 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     }
   };
 
+  // 🔥 NUEVA LOGICA PARA CERRAR MESA CON CARGA Y TOASTS
   const handleCloseTable = async (onComplete) => {
-      if(activeOrderId) { 
-        await client.put(`/pos/orders/${activeOrderId}/close`); 
-        localStorage.removeItem(`lya_phones_${activeOrderId}`); 
+      try {
+        if(activeOrderId) { 
+          await client.put(`/pos/orders/${activeOrderId}/close`); 
+          localStorage.removeItem(`lya_phones_${activeOrderId}`); 
+        }
+        setCart([]); 
+        setActiveOrderId(null); 
+        setOrderStatus('OPEN'); 
+        setPaidAccounts([]);
+        
+        if (isVitrina) {
+          toast.success('Venta finalizada exitosamente');
+        } else if (isLlevar) {
+          toast.success('Pedido finalizado exitosamente');
+        } else {
+          toast.success('Mesa liberada correctamente');
+        }
+
+        if(onComplete) onComplete();
+      } catch (error) {
+        toast.error("Error al finalizar la orden");
+        throw error;
       }
-      setCart([]); 
-      setActiveOrderId(null); 
-      setOrderStatus('OPEN'); 
-      setPaidAccounts([]);
-      if(onComplete) onComplete();
   };
 
   const handlePrintTicket = async (cuentaName = null) => {
