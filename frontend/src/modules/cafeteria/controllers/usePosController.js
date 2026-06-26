@@ -215,7 +215,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     let finalDetails = productWithDetails.detalles || {};
     let finalPrice = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
     
-    // 🔥 AUTO-INYECCIÓN: Si se agrega rápido ("Quick Add") y no trae detalles formales, buscamos sus opciones predeterminadas
+    // 🔥 AUTO-INYECCIÓN
     if (!productWithDetails.detalles) {
         const defaultCustoms = getDefaultCustomizations(productWithDetails);
         if (defaultCustoms) {
@@ -235,7 +235,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
              !!p.isTakeaway !== !!productWithDetails.isTakeaway) {
              return false;
          }
-         // 🔥 VALIDACIÓN ESTRICTA: Previene mezclar productos si tienen mismo precio pero distintas leches/tamaños
          return p.preparaciones.every(prep => JSON.stringify(prep) === detailStr);
       });
 
@@ -774,13 +773,19 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         });
       }
       setOrderStatus('PAID');
+      
+      // 🔥 FIX 2: Registrar todas las cuentas actuales como pagadas para soltar el bloqueo de "Cerrar Mesa"
+      setPaidAccounts(prev => {
+        const todasLasCuentas = Array.from(new Set(cart.map(i => i.cuenta || 'General')));
+        return Array.from(new Set([...prev, ...todasLasCuentas]));
+      });
+
       if (onComplete) onComplete();
     } catch (error) { 
       toast.error("Hubo un error al cobrar la mesa."); 
     }
   };
 
-  // 🔥 NUEVA LOGICA PARA CERRAR MESA CON CARGA Y TOASTS
   const handleCloseTable = async (onComplete) => {
       try {
         if(activeOrderId) { 

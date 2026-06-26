@@ -1,6 +1,7 @@
 // backend/src/modules/pos/pos.tables.controller.js
 import { getIO } from '../../config/socket.js'; 
 import Table from './Table.model.js';
+import Order from './Order.model.js'; // 🔥 Añadido para poder leer las órdenes
 
 // ==========================================
 // 🪑 GESTIÓN DE MESAS (CRUD)
@@ -39,6 +40,22 @@ export const createTable = async (req, res) => {
 export const deleteTable = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // 🔥 NUEVA VALIDACIÓN: Verificar si la mesa tiene una orden activa
+    const activeOrder = await Order.findOne({
+      where: {
+        tableId: id,
+        status: ['OPEN', 'PAID'] // Si la orden está Abierta o Pagada (pero no liberada), se bloquea
+      }
+    });
+
+    if (activeOrder) {
+      // Devolvemos el error 400 y tu mensaje personalizado
+      return res.status(400).json({ 
+        message: 'No se puede eliminar la mesa porque tiene productos o clientes activos.' 
+      });
+    }
+
     await Table.update({ status: 'inactive' }, { where: { id } });
     
     const remainingTables = await Table.findAll({ 

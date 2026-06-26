@@ -52,16 +52,17 @@ export const TicketSidebar = ({
       isCompletamentePagada = orderStatus === 'PAID';
   } else {
       const unpaidActiveItems = activeCart.filter(item => !(paidAccounts?.includes(item.cuenta || 'General')));
-      const allItemsPaid = unpaidActiveItems.length === 0;
+      const hasUnpaidItems = unpaidActiveItems.length > 0;
       
-      if (orderStatus === 'PAID') {
-          if (paidAccounts && paidAccounts.length > 0) {
-              isCompletamentePagada = allItemsPaid;
-          } else {
-              isCompletamentePagada = true;
-          }
+      if (hasUnpaidItems) {
+          isCompletamentePagada = false;
       } else {
-          isCompletamentePagada = allItemsPaid && activeCart.every(i => i.enviadoCocina);
+          const allSentToKitchen = activeCart.every(i => i.enviadoCocina) && activeCart.length > 0;
+          if (orderStatus === 'PAID' || allSentToKitchen) {
+              isCompletamentePagada = true;
+          } else {
+              isCompletamentePagada = false;
+          }
       }
   }
 
@@ -106,8 +107,8 @@ export const TicketSidebar = ({
 
   const visibleGroups = groupedCart.filter(g => {
       if (cuentasOcultas.includes(g.cuentaName)) return false;
-      if (g.items.length === 0) {
-          const otherGroupsWithItems = groupedCart.some(other => other.cuentaName !== g.cuentaName && other.items.length > 0);
+      if (g.items.length === 0 && g.cuentaName === 'General') {
+          const otherGroupsWithItems = groupedCart.some(other => other.cuentaName !== 'General' && other.items.length > 0);
           if (otherGroupsWithItems) return false;
       }
       return true;
@@ -159,7 +160,73 @@ export const TicketSidebar = ({
     }
   };
 
+  // 🔥 VARIABLES GLOBALES PARA CONOCER CANTIDADES
+  const totalItemsInCart = activeCart.reduce((acc, curr) => acc + curr.qty, 0);
+
+  const handleDeleteUnsent = (item) => {
+    const accountActiveItems = activeCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
+    const totalItemsInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0);
+    
+    // Ahora compara con item.qty para saber si al borrar ESTE grupo se vacía el carrito
+    const isLastInCart = totalItemsInCart === item.qty;
+    const isLastInAccount = totalItemsInAccount === item.qty;
+
+    if (isLastInCart) {
+        openConfirmModal({
+            title: 'Vaciar Orden',
+            message: `¿Seguro que deseas eliminar este producto? La orden quedará completamente vacía.`,
+            icon: Trash2,
+            color: 'red',
+            confirmText: 'Sí, Vaciar',
+            onConfirm: () => { onDelete(item); }
+        });
+    } else if (isLastInAccount) {
+        openConfirmModal({
+            title: 'Eliminar Último Producto',
+            message: `¿Seguro que deseas eliminar el producto "${item.nombre}"? Al ser el último, la cuenta "${item.cuenta || 'General'}" quedará vacía.`,
+            icon: Trash2,
+            color: 'red',
+            confirmText: 'Sí, Eliminar',
+            onConfirm: () => { onDelete(item); }
+        });
+    } else {
+        onDelete(item);
+    }
+  };
+
+  const handleRemoveUnsent = (item) => {
+    // Como el botón de restar siempre quita de a 1, aquí sí comparamos con === 1
+    const isLastInCart = totalItemsInCart === 1;
+    const accountActiveItems = activeCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
+    const isLastInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0) === 1;
+
+    if (isLastInCart) {
+         openConfirmModal({
+            title: 'Vaciar Orden',
+            message: `Al quitar este producto, la orden quedará completamente vacía. ¿Deseas continuar?`,
+            icon: Minus,
+            color: 'red',
+            confirmText: 'Sí, Quitar',
+            onConfirm: () => { onRemove(item); }
+        });
+    } else if (isLastInAccount) {
+         openConfirmModal({
+            title: 'Quitar Último Producto',
+            message: `Al quitar este producto, la cuenta "${item.cuenta || 'General'}" quedará vacía. ¿Deseas continuar?`,
+            icon: Minus,
+            color: 'red',
+            confirmText: 'Sí, Quitar',
+            onConfirm: () => { onRemove(item); }
+        });
+    } else {
+        onRemove(item);
+    }
+  };
+
   const handleCancelItem = (item) => {
+    const accountActiveItems = activeCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
+    const totalItemsInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0);
+
     if (item.qty > 1) {
         openConfirmModal({
             title: 'Cancelar Producto',
@@ -174,25 +241,58 @@ export const TicketSidebar = ({
             onConfirm: async (val) => {
                 const qtyToCancel = parseInt(val, 10);
                 if (qtyToCancel > 0 && qtyToCancel <= item.qty) {
-                    if (onCancelItem) await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, 'Cancelación parcial desde POS', qtyToCancel);
+                    
+                    // 🔥 LA MAGIA OCURRE AQUÍ: Evaluamos si la cantidad a cancelar vacía todo
+                    const isCancellingAllInCart = totalItemsInCart === qtyToCancel;
+                    const isCancellingAllInAccount = totalItemsInAccount === qtyToCancel;
+
+                    if (isCancellingAllInCart && onCancelFullOrder) {
+                        await onCancelFullOrder(`Cancelación de la totalidad de productos (${qtyToCancel}x)`);
+                    } else if (isCancellingAllInAccount && onCancelAccount) {
+                        await onCancelAccount(item.cuenta || 'General', `Cancelación parcial que vacía la cuenta (${qtyToCancel}x)`);
+                    } else {
+                        await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, 'Cancelación parcial desde POS', qtyToCancel);
+                    }
                 }
             }
         });
     } else {
-        openConfirmModal({
-            title: 'Cancelar Producto',
-            message: `¿Seguro que deseas cancelar 1x ${item.nombre}?`,
-            icon: XCircle, 
-            color: 'red', 
-            confirmText: 'Cancelar Producto',
-            requireInput: true, 
-            inputType: 'text', 
-            inputPlaceholder: 'Motivo (opcional)', 
-            inputDefault: 'Cancelado desde POS',
-            onConfirm: async (reason) => {
-                if (onCancelItem) await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, reason, 1);
-            }
-        });
+        const isLastInCart = totalItemsInCart === 1;
+        const isLastInAccount = totalItemsInAccount === 1;
+
+        if (isLastInCart && onCancelFullOrder) {
+            openConfirmModal({
+                title: isVitrina ? 'Cancelar Venta Express' : (isLlevar ? 'Cancelar Pedido Completo' : 'Cancelar Toda la Mesa'),
+                message: `Al cancelar este último producto, se cancelará ${isVitrina ? 'la venta' : (isLlevar ? 'el pedido' : 'la mesa')} por completo en el sistema. ¿Deseas continuar?`,
+                icon: AlertTriangle, 
+                color: 'red', 
+                confirmText: 'Sí, Cancelar Todo',
+                requireInput: true, 
+                inputType: 'text', 
+                inputPlaceholder: 'Motivo (opcional)', 
+                inputDefault: 'Cancelado desde POS',
+                onConfirm: async (reason) => {
+                    await onCancelFullOrder(reason);
+                }
+            });
+        } else {
+            openConfirmModal({
+                title: isLastInAccount ? 'Cancelar Último Producto' : 'Cancelar Producto',
+                message: isLastInAccount 
+                    ? `¿Seguro que deseas cancelar "${item.nombre}"? Al ser el último producto, la cuenta "${item.cuenta || 'General'}" se limpiará de las activas.`
+                    : `¿Seguro que deseas cancelar 1x ${item.nombre}?`,
+                icon: XCircle, 
+                color: 'red', 
+                confirmText: isLastInAccount ? 'Cancelar y Limpiar Cuenta' : 'Cancelar Producto',
+                requireInput: true, 
+                inputType: 'text', 
+                inputPlaceholder: 'Motivo (opcional)', 
+                inputDefault: 'Cancelado desde POS',
+                onConfirm: async (reason) => {
+                    await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, reason, 1);
+                }
+            });
+        }
     }
   };
 
@@ -268,6 +368,7 @@ export const TicketSidebar = ({
               const isDragTarget = dragOverCuenta === cuentaName;
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
               const isCuentaPagada = paidAccounts?.includes(cuentaName);
+              const isStatusLocked = isCuentaPagada || isCompletamentePagada;
 
               const isTodoEntregadoEnCuenta = items.length > 0 && items.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
 
@@ -317,8 +418,21 @@ export const TicketSidebar = ({
                   )}
                 >
                   <div 
-                      onClick={() => { if(!isCuentaPagada && !isLlevar && !isVitrina && setCuentaActiva) setCuentaActiva(cuentaName); }} 
-                      className={clsx("flex justify-between items-center p-4", (!isCuentaPagada && !isLlevar && !isVitrina) ? "cursor-pointer" : "")}
+                      onClick={() => { 
+                          if (isCuentaPagada) {
+                              openConfirmModal({
+                                  title: 'Cuenta Sellada',
+                                  message: `La cuenta "${cuentaName}" ya fue pagada. Si el cliente desea algo adicional, por favor crea una cuenta nueva para no alterar el cobro anterior.`,
+                                  icon: Lock,
+                                  color: 'blue',
+                                  confirmText: 'Entendido',
+                                  onConfirm: () => {}
+                              });
+                              return;
+                          }
+                          if(!isLlevar && !isVitrina && setCuentaActiva) setCuentaActiva(cuentaName); 
+                      }} 
+                      className="flex justify-between items-center p-4 cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
                       <div className={clsx("p-2.5 rounded-xl transition-colors shrink-0", 
@@ -340,7 +454,7 @@ export const TicketSidebar = ({
                           )}
                         </div>
                         {isCuentaPagada 
-                            ? <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider">Cobrada</span> 
+                            ? <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider flex items-center gap-1"><Lock size={10}/> Cobrada</span> 
                             : <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">{items.length} productos</span>}
                       </div>
                     </div>
@@ -350,6 +464,15 @@ export const TicketSidebar = ({
                           ${subtotalCuenta.toFixed(2)}
                       </span>
                       <div className="flex gap-1.5 flex-wrap justify-end pointer-events-auto">
+
+                        {items.length === 0 && cuentaName !== 'General' && (
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
+                              className="text-[10px] font-black bg-gray-100 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-500 px-2.5 py-1.5 rounded-lg uppercase flex gap-1.5 items-center active:scale-95 transition-colors"
+                          >
+                            <Trash2 size={12}/> Ocultar
+                          </button>
+                        )}
 
                         {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && subtotalCuenta > 0 && !isVitrina && (
                           <button 
@@ -378,12 +501,12 @@ export const TicketSidebar = ({
                           </button>
                         )}
 
-                        {!isVitrina && !isLlevar && isCuentaPagada && (
+                        {!isVitrina && !isLlevar && isCuentaPagada && items.length > 0 && (
                           <button 
                               onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
                               className="text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 px-2.5 py-1.5 rounded-lg uppercase flex gap-1.5 items-center active:scale-95 transition-colors"
                           >
-                            <XCircle size={12}/> Liberar
+                            <XCircle size={12}/> Ocultar
                           </button>
                         )}
                       </div>
@@ -393,7 +516,6 @@ export const TicketSidebar = ({
                   <div className="px-3 pb-3 space-y-2">
                     {items.map((item, idx) => {
                       const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}`;
-                      
                       const isProcessing = processingItems[item.backendItemId || item.id];
 
                       return (
@@ -465,11 +587,11 @@ export const TicketSidebar = ({
                                 {item.enviadoCocina ? (
                                   <button 
                                     onClick={() => handleToggleStatus(item)} 
-                                    disabled={isProcessing || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
+                                    disabled={isProcessing || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                                     className={clsx(
                                         "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-xl border uppercase transition-all duration-300 w-full text-center shadow-sm", 
                                         isProcessing ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
-                                        item.kitchenStatus === 'DELIVERED' ? "text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 cursor-pointer" 
+                                        item.kitchenStatus === 'DELIVERED' ? clsx("text-green-600 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50", isStatusLocked ? "cursor-default opacity-70" : "cursor-pointer") 
                                         : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 shadow-md active:scale-95 cursor-pointer animate-pulse" 
                                         : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
                                     )}
@@ -515,10 +637,10 @@ export const TicketSidebar = ({
                               )}>
                                 {!item.enviadoCocina && !isCuentaPagada && (
                                   <>
-                                    <button onClick={() => onRemove(item)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Minus size={isVitrina ? 18 : 14} /></button>
+                                    <button onClick={() => handleRemoveUnsent(item)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Minus size={isVitrina ? 18 : 14} /></button>
                                     <button onClick={() => onAdd(item, cuentaName)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-orange-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Plus size={isVitrina ? 18 : 14} /></button>
                                     <div className={clsx("bg-gray-200 dark:bg-gray-700 mx-0.5", isVitrina ? "w-px h-6" : "w-px h-3")} />
-                                    <button onClick={() => onDelete(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Trash2 size={isVitrina ? 18 : 14} /></button>
+                                    <button onClick={() => handleDeleteUnsent(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 hover:text-red-500 transition-colors", isVitrina ? "flex-1 py-2 flex justify-center" : "p-1")}><Trash2 size={isVitrina ? 18 : 14} /></button>
                                   </>
                                 )}
                                 {item.enviadoCocina && onCancelItem && (
@@ -626,7 +748,6 @@ export const TicketSidebar = ({
                   </button>
               )}
 
-              {/* Botón CANCELAR al lado de imprimir (solo sale cuando TODO está cobrado) */}
               {!isVitrina && (onCancelFullOrder || onCancelAccount) && (
                   <button 
                     onClick={() => setShowCancelModal(true)} 

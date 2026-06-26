@@ -64,16 +64,21 @@ export const useQrController = () => {
   const removeMesa = async (id) => {
     setRemovingId(id);
     try {
-      // Ya NO eliminamos optimísticamente de la lista aquí
       await client.delete(`/pos/tables/${id}`);
       
-      // Esperamos a que el servidor confirme y nos dé la lista actualizada
       await fetchTables(false); 
       showToast('Mesa eliminada correctamente');
       return true; // Éxito: avisamos a la vista para que cierre el modal
     } catch (error) {
       console.error("Error al eliminar:", error);
-      showToast('Error al eliminar la mesa', 'error');
+      
+      // 🔥 AQUÍ ESTÁ LA MAGIA: Extraemos el mensaje de protección del backend 
+      // Si el backend mandó mensaje lo usamos, sino usamos uno genérico
+      const errorMsg = error.response?.data?.message || 'Error al eliminar la mesa';
+      
+      // Mandamos llamar a la cápsula de error
+      showToast(errorMsg, 'error');
+      
       return false; // Fallo: la vista no cerrará el modal
     } finally {
       setRemovingId(null);
