@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, AlertTriangle, Phone, User } from 'lucide-react';
+import { X, Search, Phone, User, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -14,10 +14,14 @@ import { ProductOptionsModal } from './ProductOptionsModal';
 import { CheckoutModal } from './CheckoutModal'; 
 import { OpcionesMesaModal } from './OpcionesMesaModal';
 import { TicketPreviewModal } from './TicketPreviewModal';
-import MenuLoader from '../../../components/animations/MenuLoader'; // <-- IMPORTAMOS EL LOADER
+import MenuLoader from '../../../components/animations/MenuLoader';
 
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
-const modalVariants = { hidden: { y: "100%", opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 25, stiffness: 300 } }, exit: { y: "100%", opacity: 0 } };
+const modalVariants = { 
+  hidden: { y: "100%", opacity: 0 }, 
+  visible: { y: 0, opacity: 1, transition: { type: "spring", damping: 26, stiffness: 260 } }, 
+  exit: { y: "100%", opacity: 0 } 
+};
 
 export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial, inline = false }) => {
   
@@ -41,14 +45,20 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const nombreCajero = getLoggedUserName();
 
   const [isRendering, setIsRendering] = useState(true);
-  const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
-  const [alertMessage, setAlertMessage] = useState(null);
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
   const [previewTicketData, setPreviewTicketData] = useState(null);
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
+
+  // 🔥 ESTADO UNIFICADO PARA CÁPSULAS FLOTANTES
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
@@ -63,8 +73,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   useEffect(() => {
     if (isOpen) {
       setIsRendering(true);
-      // Incrementé ligeramente el timeout a 400ms para asegurar que la animación del loader se luzca
-      // y la carga sea fluida sin parpadeos.
       const timer = setTimeout(() => setIsRendering(false), 400); 
       return () => clearTimeout(timer);
     }
@@ -73,18 +81,23 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const isLlevar = mesa?.zona === 'llevar';
   const isVitrina = mesa?.zona === 'vitrina';
 
-  const handleConfirmOption = (productWithOptions) => { addToCart(productWithOptions); setSelectedProduct(null); };
+  const handleConfirmOption = (productWithOptions) => { 
+    addToCart(productWithOptions); 
+    setSelectedProduct(null); 
+    showToast('Producto añadido', 'success');
+  };
 
   const handleSendToKitchen = () => {
     if (!hasUnsentItems) return; 
     simulateKitchenSend(() => {
       if (onUpdateTable && unsentTotal > 0) onUpdateTable(mesa.id, unsentTotal);
+      showToast('Comanda enviada a cocina', 'success');
     });
   };
 
   const handleOpenCheckout = () => {
     if (!isVitrina && !validateAllDelivered()) { 
-      setAlertMessage("Todos los productos de la mesa deben estar marcados como ENTREGADOS en cocina antes de poder cobrar la cuenta completa."); 
+      showToast("Todos los productos deben estar marcados como ENTREGADOS antes de cobrar.", "warning");
       return; 
     }
     if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
@@ -94,11 +107,14 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
 
   const handleOpenPayCuenta = (cuentaName) => {
     if (!isVitrina && !validateAllDelivered(cuentaName)) { 
-      setAlertMessage(`Todos los productos de la cuenta "${cuentaName}" deben estar ENTREGADOS antes de poder cobrarla individualmente.`); 
+      showToast(`Los productos de la cuenta "${cuentaName}" deben estar ENTREGADOS antes de cobrar.`, "warning");
       return; 
     }
     const subtotal = getSubtotalByCuenta(cuentaName);
-    if (subtotal > 0) { setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal }); setShowCheckout(true); }
+    if (subtotal > 0) { 
+      setCheckoutTarget({ type: 'partial', cuentaName, amount: subtotal }); 
+      setShowCheckout(true); 
+    }
   };
 
   const handleFinalizePayment = async (paymentDetails) => {
@@ -108,7 +124,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
       await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
         setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${cuentaName}" ha sido pagada exitosamente.` });
-        setTimeout(() => setPaymentSuccessData(null), 1800);
+        setTimeout(() => setPaymentSuccessData(null), 2000);
         setShowCheckout(false); 
       }); 
       return; 
@@ -118,7 +134,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     
     await handleCheckout(paymentDetails, () => {
        setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `El total ha sido pagado exitosamente.` });
-       setTimeout(() => setPaymentSuccessData(null), 1800);
+       setTimeout(() => setPaymentSuccessData(null), 2000);
        setShowCheckout(false); 
     });
   };
@@ -134,9 +150,14 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const executeRealPrint = async () => {
     const targetCuenta = previewTicketData.cuentaName;
     setPreviewTicketData(null); 
-    setPaymentSuccessData({ title: '¡Enviado a Impresora!', message: 'El ticket se está imprimiendo.' });
-    try { await handlePrintTicket(targetCuenta); } catch (error) { console.error("Fallo al imprimir:", error); }
-    setTimeout(() => setPaymentSuccessData(null), 1800);
+    showToast('Enviando ticket a la impresora...', 'success');
+    
+    try { 
+      await handlePrintTicket(targetCuenta); 
+    } catch (error) { 
+      console.error("Fallo al imprimir:", error); 
+      showToast('Error al intentar imprimir el ticket', 'error');
+    }
   };
 
   if (!isOpen || !mesa) return null;
@@ -152,26 +173,25 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const telCliente = partesNumero[2];
 
   const HeaderTitle = () => {
-    if (isVitrina) return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mostrador ⚡</h3>;
+    if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
     
     if (isLlevar) {
       const folio = partesNumero[0]; 
-
       return (
         <div className="flex flex-col gap-2">
-          <h3 className="font-extrabold text-gray-900 dark:text-orange-500 text-xl flex items-center gap-2">
+          <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">
             {folio}
           </h3>
           {(nombreCliente || telCliente) && (
             <div className="flex flex-wrap items-center gap-2">
               {nombreCliente && (
-                <span className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <User size={14} className="text-orange-500" /> {nombreCliente}
+                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text bg-white dark:bg-gray-800 lya:bg-lya-bg px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm">
+                  <User size={14} className="text-orange-500 lya:text-lya-secondary" /> {nombreCliente}
                 </span>
               )}
               {telCliente && (
-                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 lya:text-lya-text/70 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <Phone size={12} className="text-orange-500" /> {telCliente}
+                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 lya:text-lya-text/70 bg-white dark:bg-gray-800 lya:bg-lya-bg px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm">
+                  <Phone size={12} className="text-orange-500 lya:text-lya-secondary" /> {telCliente}
                 </span>
               )}
             </div>
@@ -180,7 +200,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
       );
     }
     
-    return <h3 className="font-bold text-gray-900 dark:text-orange-500 text-lg flex items-center gap-2">Mesa #{numeroReal}</h3>;
+    return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mesa #{numeroReal}</h3>;
   };
 
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
@@ -199,22 +219,16 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     }
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
-
     const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cuentaName}*` : '';
-    
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
 
-    setPaymentSuccessData({
-      title: '¡Abriendo WhatsApp!',
-      message: 'Redirigiendo al chat con el cliente...'
-    });
-
-    setTimeout(() => setPaymentSuccessData(null), 1800);
+    showToast('Redirigiendo a WhatsApp...', 'success');
   };
 
+  // 🔥 Le pasamos showToast a TicketSidebar para que notifique movimientos
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -232,41 +246,57 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
-    nombreCliente: isLlevar ? nombreCliente : null 
+    nombreCliente: isLlevar ? nombreCliente : null,
+    showToast // Inyectado
   };
 
   const posContent = (
-    <div className={`relative w-full h-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg flex flex-col md:flex-row transition-colors duration-300 ${!inline ? 'md:rounded-3xl shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
+    <div className={`relative w-full h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg flex flex-col md:flex-row transition-colors duration-300 ${!inline ? 'md:rounded-[2.5rem] shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
+      
+      {/* SECCIÓN IZQUIERDA: MENÚ Y BÚSQUEDA */}
       <div className="flex-1 flex flex-col h-full relative z-0">
-        <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 pb-2 border-b border-gray-100 dark:border-gray-700 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors">
-          <div className="flex items-center gap-3 mb-3">
+        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors">
+          <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 text-gray-400 lya:text-lya-text/40" size={18} />
-              <input type="text" placeholder="Buscar producto..." value={filtroTexto} onChange={(e) => setFiltroTexto(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500/50 transition-all text-gray-800 dark:text-white" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 lya:text-lya-text/40" size={18} />
+              <input 
+                type="text" 
+                placeholder="Buscar producto..." 
+                value={filtroTexto} 
+                onChange={(e) => setFiltroTexto(e.target.value)} 
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/10 lya:focus:ring-lya-secondary/20 border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-500 lya:focus:border-lya-secondary transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
+              />
             </div>
             {!inline && (
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500"><X size={24} /></button>
+              <button 
+                onClick={onClose} 
+                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 rounded-2xl text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm"
+              >
+                <X size={20} />
+              </button>
             )}
           </div>
           <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar pb-32 md:pb-4 relative">
-          
-          {/* AQUI ESTÁ LA MAGIA DE ANIMATE PRESENCE */}
+        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative">
           <AnimatePresence mode="wait">
             {isRendering ? (
               <MenuLoader key="menu-loader" />
             ) : (
               <motion.div
                 key="product-grid"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
                 className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
               >
                 {filteredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} onClick={setSelectedProduct} onQuickAdd={(p) => {
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    onClick={setSelectedProduct} 
+                    onQuickAdd={(p) => {
                       let ops = p.opciones;
                       if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
                       let precioAdicional = 0, detalles = { tamano: 'Estándar' };
@@ -275,23 +305,29 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                          if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
                       }
                       addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
-                  }} />
+                      showToast('Producto añadido', 'success');
+                    }} 
+                  />
                 ))}
               </motion.div>
             )}
           </AnimatePresence>
-
         </div>
       </div>
 
-      <div className="hidden md:flex w-96 border-l border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 h-full shadow-xl z-20 flex-col">
-        <div className="p-4 bg-orange-500/5 dark:bg-orange-500/10 border-b border-orange-500/10 dark:border-orange-500/20 flex justify-between items-start">
+      {/* SECCIÓN DERECHA: TICKET SIDEBAR */}
+      <div className="hidden md:flex w-96 border-l border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface h-full shadow-2xl z-20 flex-col transition-colors">
+        <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors">
            <div>
               <HeaderTitle />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium">{isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}</p>
+              <p className="text-xs text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-1 font-bold tracking-wide uppercase">
+                {isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}
+              </p>
            </div>
         </div>
-        <div className="flex-1 overflow-hidden h-full"><TicketSidebar {...sidebarProps} /></div>
+        <div className="flex-1 overflow-hidden h-full">
+          <TicketSidebar {...sidebarProps} />
+        </div>
       </div>
     </div>
   );
@@ -304,13 +340,14 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
         typeof document !== 'undefined' ? createPortal(
           <>
             <div className="fixed inset-0 z-[9980] flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden">
-              <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" />
-              <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative z-10 w-full h-[100dvh] md:h-[90vh] md:max-w-7xl shadow-2xl md:rounded-3xl flex flex-col overflow-hidden">
+              <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm z-0 transition-colors" />
+              <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative z-10 w-full h-[100dvh] md:h-[92vh] md:max-w-7xl shadow-2xl md:rounded-[2.5rem] flex flex-col overflow-hidden">
                 {posContent}
               </motion.div>
             </div>
 
             <div className="relative z-[9999]">
+                {/* MODALES HIJOS */}
                 <TicketPreviewModal 
                   isOpen={!!previewTicketData} 
                   onClose={() => setPreviewTicketData(null)} 
@@ -324,6 +361,32 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                 />
 
                 <AnimatePresence>
+                  {/* CÁPSULA DE NOTIFICACIONES FLOTANTES (REEMPLAZA AL ALERT BLOQUEANTE) */}
+                  {toast && (
+                    <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+                      <motion.div 
+                        initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+                        animate={{ opacity: 1, y: 0, scale: 1 }} 
+                        exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                        className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                          toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
+                          toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
+                          'border-red-100 dark:border-red-900/30 lya:border-red-500/30'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-full shrink-0 ${
+                          toast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
+                          toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
+                          'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
+                        }`}>
+                          {toast.type === 'success' ? <CheckCircle2 size={20} /> : toast.type === 'warning' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}
+                        </div>
+                        <span className="text-sm">{toast.msg}</span>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {/* SUCCESS SCREEN PARA PAGOS */}
                   {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
                   
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
@@ -342,16 +405,15 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                     />
                   )}
 
-                  {showOpcionesMesa && <OpcionesMesaModal isOpen={showOpcionesMesa} onClose={() => setShowOpcionesMesa(false)} mesa={mesa} todasLasMesas={todasLasMesas} onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} />}
-                  
-                  {alertMessage && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                       <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white dark:bg-gray-900 rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
-                          <AlertTriangle size={32} className="text-orange-500 mb-4" />
-                          <p className="text-sm text-gray-500 mb-6">{alertMessage}</p>
-                          <button onClick={() => setAlertMessage(null)} className="w-full bg-orange-500 text-white py-3 rounded-2xl font-black uppercase">Entendido</button>
-                       </motion.div>
-                    </motion.div>
+                  {showOpcionesMesa && (
+                    <OpcionesMesaModal 
+                      isOpen={showOpcionesMesa} 
+                      onClose={() => setShowOpcionesMesa(false)} 
+                      mesa={mesa} 
+                      todasLasMesas={todasLasMesas} 
+                      onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} 
+                      onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} 
+                    />
                   )}
                 </AnimatePresence>
             </div>
