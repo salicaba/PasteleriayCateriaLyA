@@ -1,6 +1,5 @@
-// src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag, Loader2 } from 'lucide-react';
+import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const KitchenOrderCard = ({ 
@@ -22,7 +21,11 @@ export const KitchenOrderCard = ({
     timeBg: 'bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-primary/10 text-blue-600 dark:text-blue-400 lya:text-lya-primary'
   });
 
-  const allReady = order.items.every(i => i.kitchenStatus === 'PREPARING');
+  // 🔥 LÓGICA DE CANCELACIONES
+  const allCancelled = order.items.every(i => i.status === 'CANCELLED');
+  const activeItems = order.items.filter(i => i.status !== 'CANCELLED');
+  const allReady = activeItems.length > 0 && activeItems.every(i => i.kitchenStatus === 'PREPARING');
+  
   const isOrderProcessing = processingOrders.has(order.id);
 
   const getDisplayTitle = () => {
@@ -59,7 +62,16 @@ export const KitchenOrderCard = ({
       const currentProgress = Math.min((totalSecs / maxSecs) * 100, 100);
       setProgress(currentProgress);
 
-      if (allReady) {
+      if (allCancelled) {
+        setUrgency({
+          theme: 'cancelled',
+          textGlow: 'from-red-600 to-red-800 dark:from-red-400 dark:to-red-600',
+          border: 'border-red-500 dark:border-red-700',
+          shadow: 'shadow-xl shadow-red-500/30 dark:shadow-red-900/50 animate-pulse',
+          bar: 'bg-red-600 animate-pulse',
+          timeBg: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
+        });
+      } else if (allReady) {
         setUrgency({
           theme: 'ready',
           textGlow: 'from-emerald-600 to-teal-500 dark:from-emerald-400 dark:to-teal-400',
@@ -103,7 +115,7 @@ export const KitchenOrderCard = ({
     calculateTime();
     const timer = setInterval(calculateTime, 1000);
     return () => clearInterval(timer);
-  }, [order.createdAt, allReady]);
+  }, [order.createdAt, allReady, allCancelled]);
 
   return (
     <motion.div
@@ -125,14 +137,15 @@ export const KitchenOrderCard = ({
         </h3>
         
         <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-mono font-bold text-xs transition-colors duration-300 ${urgency.timeBg}`}>
-          {urgency.theme === 'critical' ? <Flame size={14} /> : <Timer size={14} />}
+          {urgency.theme === 'critical' || urgency.theme === 'cancelled' ? <Flame size={14} /> : <Timer size={14} />}
           {elapsed}
         </div>
       </div>
 
       <div className="flex-1 px-2.5 pb-2.5 space-y-2">
         {order.items.map(item => {
-          const isReady = item.kitchenStatus === 'PREPARING';
+          const isCancelled = item.status === 'CANCELLED';
+          const isReady = item.kitchenStatus === 'PREPARING' && !isCancelled;
           const isItemProcessing = processingItems.has(item.id) || isOrderProcessing;
           
           return (
@@ -145,20 +158,26 @@ export const KitchenOrderCard = ({
               className={`group flex items-start gap-3 p-2.5 rounded-xl transition-all duration-300 ${
                 isItemProcessing ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
               } ${
-                isReady 
-                  ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-60' 
-                  : 'bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 hover:shadow-sm hover:border-blue-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/40'
+                isCancelled
+                  ? 'bg-red-50/50 dark:bg-red-900/20 border-red-300 dark:border-red-800/50 hover:bg-red-100 dark:hover:bg-red-900/40 border-2 border-dashed'
+                  : isReady 
+                    ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-60' 
+                    : 'bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 hover:shadow-sm hover:border-blue-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/40'
               }`}
             >
               <div className={`relative w-8 h-8 mt-0.5 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
                 isItemProcessing
                   ? 'bg-gray-200 text-gray-500 dark:bg-gray-700'
-                  : isReady 
-                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 scale-95' 
-                    : 'bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-primary group-hover:bg-blue-100 dark:group-hover:bg-gray-600 lya:group-hover:bg-lya-primary/20'
+                  : isCancelled
+                    ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400'
+                    : isReady 
+                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 scale-95' 
+                      : 'bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-800 dark:text-gray-200 lya:text-lya-primary group-hover:bg-blue-100 dark:group-hover:bg-gray-600 lya:group-hover:bg-lya-primary/20'
               }`}>
                 {isItemProcessing ? (
                   <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" />
+                ) : isCancelled ? (
+                  <Trash2 size={16} />
                 ) : isReady ? (
                   <Check size={16} strokeWidth={3} />
                 ) : (
@@ -168,17 +187,26 @@ export const KitchenOrderCard = ({
               
               <div className="flex-1 min-w-0">
                 <p className={`text-sm sm:text-[15px] font-bold uppercase leading-snug break-words transition-all duration-300 ${
-                  isReady 
-                    ? 'line-through text-gray-400 dark:text-gray-500 decoration-2 decoration-gray-400/50' 
-                    : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'
+                  isCancelled
+                    ? 'line-through text-red-600 dark:text-red-400 decoration-2 decoration-red-400/50'
+                    : isReady 
+                      ? 'line-through text-gray-400 dark:text-gray-500 decoration-2 decoration-gray-400/50' 
+                      : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'
                 }`}>
                   {item.nombre}
                 </p>
 
                 <div className="flex flex-wrap gap-1 mt-1">
+                  {/* BUBBLE CANCELADO */}
+                  {isCancelled && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-800 text-red-600 dark:text-red-400">
+                      <AlertCircle size={10} /> Cancelado
+                    </span>
+                  )}
+                  
                   {item.isTakeaway && (
                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
-                        isReady 
+                        isCancelled || isReady 
                           ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
                           : 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400'
                     }`}>
@@ -188,7 +216,7 @@ export const KitchenOrderCard = ({
                   
                   {!item.requiereCocina && (
                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border transition-all ${
-                       isReady 
+                       isCancelled || isReady 
                         ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
                         : 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
                     }`}>
@@ -198,7 +226,7 @@ export const KitchenOrderCard = ({
                 </div>
                 
                 {item.preparaciones && item.preparaciones.length > 0 && (
-                  <div className={`mt-1 flex flex-wrap gap-1 transition-opacity duration-300 ${isReady ? 'opacity-40' : 'opacity-100'}`}>
+                  <div className={`mt-1 flex flex-wrap gap-1 transition-opacity duration-300 ${isReady || isCancelled ? 'opacity-40' : 'opacity-100'}`}>
                     {item.preparaciones.slice(0, 1).map((prep, idx) => (
                       <React.Fragment key={idx}>
                         {prep.tamano && prep.tamano !== 'Estándar' && (
@@ -227,7 +255,18 @@ export const KitchenOrderCard = ({
       </div>
 
       <div className="p-2.5 bg-transparent pt-0">
-        {allReady ? (
+        {allCancelled ? (
+          <button 
+            onClick={() => onComplete(order.id)}
+            disabled={isOrderProcessing}
+            className={`w-full py-2.5 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-black rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md shadow-red-500/25 transition-all ${
+              isOrderProcessing ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'
+            }`}
+          >
+            {isOrderProcessing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            {isOrderProcessing ? 'Descartando...' : 'Descartar Comanda'}
+          </button>
+        ) : allReady ? (
           <button 
             onClick={() => onComplete(order.id)}
             disabled={isOrderProcessing}
@@ -235,11 +274,7 @@ export const KitchenOrderCard = ({
               isOrderProcessing ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <BellRing size={16} className="animate-pulse" />
-            )}
+            {isOrderProcessing ? <Loader2 size={16} className="animate-spin" /> : <BellRing size={16} className="animate-pulse" />}
             {isOrderProcessing ? 'Procesando...' : 'Entregar'}
           </button>
         ) : (
@@ -250,11 +285,7 @@ export const KitchenOrderCard = ({
               isOrderProcessing ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing ? (
-              <Loader2 size={14} className="animate-spin text-orange-500 lya:text-lya-primary" />
-            ) : (
-              <ChefHat size={14} />
-            )}
+            {isOrderProcessing ? <Loader2 size={14} className="animate-spin text-orange-500 lya:text-lya-primary" /> : <ChefHat size={14} />}
             {isOrderProcessing ? 'Procesando...' : 'Todo Preparado'}
           </button>
         )}

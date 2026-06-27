@@ -7,9 +7,10 @@ export const useInventoryController = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 1. Obtener el catálogo de inventario
-  const fetchInventory = useCallback(async () => {
-    setIsLoading(true);
+  // 1. Obtener el catálogo de inventario (CON PARÁMETRO SILENT)
+  const fetchInventory = useCallback(async (silent = false) => {
+    // Si NO es silencioso, mostramos la pantalla de carga completa
+    if (!silent) setIsLoading(true); 
     try {
       const response = await fetch(`${API_URL}/inventory`);
       if (!response.ok) throw new Error('Error al cargar el inventario');
@@ -19,12 +20,12 @@ export const useInventoryController = () => {
       setError(err.message);
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchInventory();
+    fetchInventory(); // Carga inicial ruidosa (muestra loader)
   }, [fetchInventory]);
 
   // 2. Crear un nuevo insumo
@@ -39,7 +40,7 @@ export const useInventoryController = () => {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Error al crear el insumo');
       }
-      await fetchInventory(); 
+      await fetchInventory(true); // 🔥 Recarga silenciosa
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -79,7 +80,7 @@ export const useInventoryController = () => {
         throw new Error(errorData.message || 'Error al registrar el movimiento');
       }
       
-      await fetchInventory(); // Refrescar el catálogo general
+      await fetchInventory(true); // 🔥 Recarga silenciosa
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -94,7 +95,7 @@ export const useInventoryController = () => {
       });
       if (!response.ok) throw new Error('Error al eliminar el insumo');
       
-      await fetchInventory(); // Recargamos la tabla para que desaparezca
+      await fetchInventory(true); // 🔥 Recarga silenciosa
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -102,10 +103,10 @@ export const useInventoryController = () => {
     }
   };
 
-  // 6. PROCESAR ARQUEO (Corregido y con Token blindado)
+  // 6. PROCESAR ARQUEO (Corregido y sin parpadeos)
   const processReconciliation = async (itemsCounted, notes = '') => {
     try {
-      setIsLoading(true); 
+      // ELIMINADO: setIsLoading(true); <-- Esto era lo que te destruía el modal de confirmación
       
       const sessionStr = localStorage.getItem('lya_pos_session');
       let token = localStorage.getItem('lya_token'); 
@@ -115,7 +116,7 @@ export const useInventoryController = () => {
         const sessionData = JSON.parse(sessionStr);
         userId = sessionData.userData?.id;
         
-        // 🔥 Salvavidas: Si por alguna razón el token no está en 'lya_token', 
+        // Salvavidas: Si por alguna razón el token no está en 'lya_token', 
         // lo buscamos directamente dentro de los datos de sesión del usuario.
         if (!token && sessionData.userData?.token) {
           token = sessionData.userData.token;
@@ -146,16 +147,17 @@ export const useInventoryController = () => {
       }
       
       const data = await response.json();
-      await fetchInventory(); 
+      
+      await fetchInventory(true); // 🔥 Recarga silenciosa en segundo plano
+      
       return data;
 
     } catch (err) {
       console.error('Error procesando arqueo:', err);
       setError(err.message);
       throw err; // El frontend lo captura y lo muestra en consola
-    } finally {
-      setIsLoading(false); 
     }
+    // ELIMINADO: finally { setIsLoading(false); } <-- Ya no lo necesitamos aquí, el modal controla su propio "isProcessing"
   };
 
   return { 

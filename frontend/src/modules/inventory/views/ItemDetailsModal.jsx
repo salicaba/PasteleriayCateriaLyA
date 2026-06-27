@@ -1,4 +1,3 @@
-// src/modules/inventory/views/ItemDetailsModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, History, ArrowDownToLine, Trash2, AlertTriangle, ArrowRightLeft, MessageSquare, ChevronDown, PackageMinus, PackagePlus, Loader2 } from 'lucide-react';
@@ -70,7 +69,7 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller, sh
     if (res.success) {
       if (showSuccess) showSuccess(`Movimiento (${type === 'IN' ? 'Entrada' : 'Salida'}) registrado con éxito`);
       await loadHistory();
-      setActiveTab('history');
+      setActiveTab('history'); // Te desliza automáticamente de vuelta al Kardex
       setQuantity('');
       setNotes('');
     } else {
@@ -127,7 +126,6 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller, sh
             </div>
           </div>
 
-          {/* Pestañas estilo Cápsula (Igual a Caja y Ajustes) */}
           <div className="p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
             <div className="flex bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
               <button
@@ -153,7 +151,6 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller, sh
             </div>
           </div>
 
-          {/* Cuerpo del Modal */}
           <div className="p-6 overflow-y-auto flex-1 custom-scrollbar bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text">
             {activeTab === 'history' ? (
               <div className="space-y-3">
@@ -178,14 +175,12 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller, sh
                           const hasDetails = tx.notes || tx.reference;
                           const isExpanded = expandedTx === tx.id;
 
-                          // 🔥 Lógica de Colores y Signos
                           const isOutflow = ['OUT', 'WASTE', 'CONSUMPTION'].includes(tx.type);
                           const sign = isOutflow ? '-' : '+';
                           const colorClass = isOutflow 
                             ? 'text-red-600 dark:text-red-400 lya:text-red-500' 
                             : 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-500';
 
-                          // Configuración visual por tipo de transacción
                           const getTypeConfig = (type) => {
                             switch(type) {
                               case 'IN': return { label: 'COMPRA', icon: <ArrowDownToLine size={12}/> };
@@ -314,7 +309,6 @@ export default function ItemDetailsModal({ item, isOpen, onClose, controller, sh
         </motion.div>
       </motion.div>
 
-      {/* Confirmación de Eliminación 100% Consistente con el Sistema */}
       <AnimatePresence>
         {showDeleteConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

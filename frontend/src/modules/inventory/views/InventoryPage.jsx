@@ -1,4 +1,3 @@
-// src/modules/inventory/views/InventoryPage.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PackagePlus, Search, AlertCircle, Boxes, Loader2, CheckCircle2 } from 'lucide-react';
@@ -6,7 +5,6 @@ import { useInventoryController } from '../controllers/useInventoryController';
 import NewItemModal from './NewItemModal';
 import ItemDetailsModal from './ItemDetailsModal';
 
-// --- NUEVO COMPONENTE DE CARGA INICIAL (Ahora en tonos azules) ---
 const InventoryLoader = () => (
   <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
@@ -27,23 +25,19 @@ const InventoryLoader = () => (
 
 export default function InventoryPage() {
   const controller = useInventoryController();
-  // Extraemos successScreen del controlador por si la lógica global manda alertas
   const { inventory, isLoading, createItem, successScreen } = controller;
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   
-  // Estado local para notificaciones de éxito personalizadas
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Función para disparar la notificación y ocultarla a los 3 segundos
   const showSuccess = (msg) => {
     setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(''), 3000);
+    setTimeout(() => setSuccessMessage(''), 3000); // Se oculta suavemente tras 3 segundos
   };
 
-  // 🔥 Si está cargando, mostramos la pantalla de carga fluida
   if (isLoading) return <InventoryLoader />;
 
   const filteredInventory = inventory.filter(item => 
@@ -189,7 +183,7 @@ export default function InventoryPage() {
         )}
       </AnimatePresence>
 
-      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO */}
+      {/* CÁPSULA DE NOTIFICACIÓN FLOTANTE (Adaptable a todos los temas) */}
       <AnimatePresence>
         {(successMessage || successScreen?.isOpen) && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -210,7 +204,6 @@ export default function InventoryPage() {
           </div>
         )}
       </AnimatePresence>
-
     </motion.div>
   );
 }

@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/CheckoutModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2 } from 'lucide-react';
+import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
 import client from '../../../api/client'; 
 
 const modalVariants = {
@@ -30,6 +30,14 @@ export const CheckoutModal = ({
   
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // 🔥 ESTADO PARA LA NOTIFICACIÓN DE CÁPSULA
+  const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
+
+  const showToast = (message, type = 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
   useEffect(() => {
     if (isOpen) {
       setMethod('efectivo');
@@ -38,6 +46,7 @@ export const CheckoutModal = ({
       setSplitCount(1);
       setTransferInfo(null);
       setIsProcessing(false); 
+      setToast({ show: false, message: '', type: 'error' }); // Resetear toast
 
       // Solo permite iniciar en 'nominal' (Por Persona) si es un pedido de Salón
       if (initialTarget?.type === 'partial' && orderType === 'salon') {
@@ -74,8 +83,8 @@ export const CheckoutModal = ({
   }, [amountReceived, amountToPay, method]);
 
   const handlePayment = async () => {
-    if (amountToPay <= 0) return alert("No hay monto a cobrar en la selección actual.");
-    if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return alert("El monto recibido es insuficiente.");
+    if (amountToPay <= 0) return showToast("No hay monto a cobrar en la selección actual.", "error");
+    if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return showToast("El monto recibido es insuficiente.", "error");
     
     setIsProcessing(true); 
     
@@ -90,6 +99,7 @@ export const CheckoutModal = ({
       });
     } catch(e) {
       console.error(e);
+      showToast("Ocurrió un error al procesar el pago.", "error");
     } finally {
       setIsProcessing(false); 
     }
@@ -112,6 +122,27 @@ export const CheckoutModal = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      {/* NOTIFICACIÓN FLOTANTE (ESTILO CÁPSULA) */}
+      <AnimatePresence>
+        {toast.show && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
+            >
+              <div className={`p-1.5 rounded-full shrink-0 ${toast.type === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20'}`}>
+                {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} className="text-emerald-500 lya:text-lya-primary" />}
+              </div>
+              <div className="flex flex-col">
+                  <span className="text-sm">{toast.message}</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
       <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative w-full max-w-md bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[90vh]">

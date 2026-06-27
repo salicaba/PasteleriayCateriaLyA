@@ -1,4 +1,5 @@
-import { getIO } from '../../config/socket.js'; // <-- 🔥 AÑADIDO: Importamos el WebSocket
+import { getIO } from '../../config/socket.js';
+import { Op } from 'sequelize'; // <-- 🔥 IMPORTANTE: Necesario para los filtros
 import OrderItem from '../pos/OrderItem.model.js';
 import Order from '../pos/Order.model.js';
 import Product from '../menu/Product.model.js';
@@ -11,16 +12,18 @@ export const getKitchenTickets = async (req, res) => {
   try {
     const tickets = await OrderItem.findAll({
       where: {
-        // 🔥 REFACTOR FASE 1 y 2: Solo traemos los que están pendientes o en preparación. 
-        // Cuando pasen a 'READY' (Listo para Entregar), desaparecerán mágicamente de aquí.
+        // Solo traemos los que están pendientes o en preparación.
         kitchenStatus: ['PENDING', 'PREPARING']
       },
       include: [
         {
           model: Order,
           as: 'order',
-          attributes: ['id', 'orderType', 'ticketId', 'tableId', 'createdAt'],
-          where: { status: 'OPEN' },
+          attributes: ['id', 'orderType', 'ticketId', 'tableId', 'createdAt', 'status'], // 🔥 Se agregó status
+          where: { 
+            // 🔥 LA MAGIA: Permitimos que lleguen las órdenes Canceladas a la cocina para avisarles
+            status: { [Op.in]: ['OPEN', 'PAID', 'CANCELLED'] } 
+          },
           include: [
             {
               model: Table,
@@ -32,7 +35,6 @@ export const getKitchenTickets = async (req, res) => {
         {
           model: Product,
           as: 'product',
-          // 👇 AQUÍ ESTÁ LA MAGIA: Agregamos requiereCocina para que el frontend lo lea
           attributes: ['name', 'requiereCocina'] 
         }
       ],
@@ -60,7 +62,6 @@ export const updateKitchenStatus = async (req, res) => {
     item.kitchenStatus = status;
     await item.save();
 
-    // 🔥 AÑADIDO: Avisar al instante a TODAS las pantallas (Mesero y Caja) que el platillo cambió
     getIO().emit('pos:update');
 
     res.json({ message: `Estado actualizado a ${status}`, item });
