@@ -108,8 +108,6 @@ export const deleteCategory = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
-    // 🔥 CAMBIO IMPORTANTE: Eliminamos el filtro de isActive: true
-    // Para que el gestor de menú pueda cargar TANTO los activos como los inactivos
     const products = await Product.findAll({
       include: [{ model: Variant, as: 'variants' }]
     });
@@ -122,31 +120,15 @@ export const getProducts = async (req, res) => {
 export const createProduct = async (req, res) => {
   try {
     const { 
-      name, 
-      description, 
-      basePrice, 
-      imageUrl, 
-      controlarStock, 
-      stockQuantity, 
-      categoryId,
-      opciones,
-      departamento,
-      requiereCocina,
-      isActive // 🔥 Se asegura de extraerlo si se manda
+      name, description, basePrice, imageUrl, controlarStock, stockQuantity, 
+      categoryId, opciones, departamento, requiereCocina, isActive, 
+      isAgotado // 🔥 Recibimos el nuevo campo
     } = req.body;
     
     const newProduct = await Product.create({
-      name,
-      description,
-      basePrice,
-      imageUrl,
-      controlarStock,
-      stockQuantity,
-      categoryId,
-      opciones,
-      departamento, 
-      requiereCocina,
-      isActive: isActive !== undefined ? isActive : true
+      name, description, basePrice, imageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
+      isActive: isActive !== undefined ? isActive : true,
+      isAgotado: isAgotado || false // 🔥 Guardamos
     });
 
     res.status(201).json({ message: 'Producto creado', product: newProduct });
@@ -158,47 +140,26 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    
     const { 
-      name, 
-      description, 
-      basePrice, 
-      imageUrl, 
-      controlarStock, 
-      stockQuantity, 
-      categoryId, 
-      opciones, 
-      departamento, 
-      requiereCocina,
-      isActive,       // 🔥 AQUÍ ESTABA EL PROBLEMA: No se estaba recibiendo
-      disponible      // Por si el frontend lo manda como 'disponible'
+      name, description, basePrice, imageUrl, controlarStock, stockQuantity, 
+      categoryId, opciones, departamento, requiereCocina, isActive, disponible,
+      isAgotado // 🔥 Recibimos el nuevo campo
     } = req.body;
 
     const product = await Product.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
+    if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
 
-    // Determinar cuál campo de estado usar (isActive o disponible)
     const estadoFinal = isActive !== undefined ? isActive : (disponible !== undefined ? disponible : product.isActive);
+    const agotadoFinal = isAgotado !== undefined ? isAgotado : product.isAgotado;
 
     await product.update({
-      name, 
-      description, 
-      basePrice, 
-      imageUrl, 
-      controlarStock, 
-      stockQuantity, 
-      categoryId, 
-      opciones, 
-      departamento, 
-      requiereCocina,
-      isActive: estadoFinal // 🔥 AHORA SÍ SE GUARDA EL ESTADO
+      name, description, basePrice, imageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
+      isActive: estadoFinal,
+      isAgotado: agotadoFinal // 🔥 Actualizamos
     });
     
     res.json({ message: 'Producto actualizado', product });
   } catch (error) {
-    console.error('Error al actualizar el producto:', error);
     res.status(500).json({ message: 'Error al actualizar producto', error: error.message });
   }
 };
@@ -207,13 +168,9 @@ export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const product = await Product.findByPk(id);
-    
-    if (!product) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
+    if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
 
     await product.update({ isActive: false });
-
     res.json({ message: 'Producto eliminado (desactivado)' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar producto', error: error.message });

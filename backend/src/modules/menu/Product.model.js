@@ -1,4 +1,4 @@
-// src/modules/menu/Product.model.js
+// backend/src/modules/menu/Product.model.js
 import { DataTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 
@@ -40,16 +40,19 @@ const Product = sequelize.define('Product', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
-  // 🚀 AQUÍ ESTÁ LA MAGIA: El nuevo campo para los reportes financieros
+  // 🔥 NUEVO CAMPO: Pausa manual (Agotado)
+  isAgotado: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   departamento: {
     type: DataTypes.ENUM('cafeteria', 'pasteleria'),
     allowNull: false,
-    defaultValue: 'cafeteria', // Por defecto todo va a cafetería
+    defaultValue: 'cafeteria',
   },
-  // 🔥 NUEVO CAMPO: Para separar Vitrina de Cocina
   requiereCocina: {
     type: DataTypes.BOOLEAN,
-    defaultValue: true, // Por defecto asumimos que se prepara en cocina. En vitrina será false.
+    defaultValue: true,
   },
   opciones: {
     type: DataTypes.JSON,

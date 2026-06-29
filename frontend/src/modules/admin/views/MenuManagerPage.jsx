@@ -3,24 +3,32 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
 
 export const MenuManagerPage = () => {
+  // 🔥 ESTADO DE NOTIFICACIONES NEO-BENTO
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   const {
     products, categories, setCategories, handleDragEndAPI,
     isModalOpen, isCategoryManagerOpen, setIsCategoryManagerOpen,
-    editingProduct, toggleAvailability, deleteProduct, openModal, closeModal, saveProduct, saveCategory,
+    editingProduct, toggleAvailability, toggleAgotado, deleteProduct, openModal, closeModal, saveProduct, saveCategory,
     categoryToEdit, setCategoryToEdit,
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
     productToDelete, confirmRemoveProduct, cancelRemoveProduct,
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
     isLoading,
-    processingProducts // 🔥 Lo recibimos del controlador
-  } = useMenuManagerController();
+    processingProducts
+  } = useMenuManagerController({ showToast }); // 🔥 Pasamos la función al controlador
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isOptionsManagerOpen, setIsOptionsManagerOpen] = useState(false);
@@ -41,11 +49,11 @@ export const MenuManagerPage = () => {
   // ==========================================
   if (isLoading) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
         >
           <LayoutGrid size={40} className="text-orange-500 lya:text-lya-primary" />
         </motion.div>
@@ -99,29 +107,56 @@ export const MenuManagerPage = () => {
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
+      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
+      {/* 🔥 CÁPSULA DE NOTIFICACIONES */}
+      <AnimatePresence>
+        {toast && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
+                toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
+                'border-red-100 dark:border-red-900/30 lya:border-red-500/30'
+              }`}
+            >
+              <div className={`p-1.5 rounded-full shrink-0 ${
+                toast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
+                toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
+                'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
+              }`}>
+                {toast.type === 'success' ? <CheckCircle2 size={20} /> : toast.type === 'warning' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}
+              </div>
+              <span className="text-sm">{toast.message}</span>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
-          <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
+          <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
             <LayoutGrid size={28} />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">Gestor de Menú</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Catálogo completo de la Cafetería</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight">Gestor de Menú</h1>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Catálogo completo del sistema</p>
           </div>
         </div>
         
         <div className="flex flex-wrap space-x-0 space-y-3 md:space-y-0 md:space-x-3 w-full md:w-auto">
-          <button onClick={() => setIsOptionsManagerOpen(true)} className="w-full md:w-auto flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20">
+          <button onClick={() => setIsOptionsManagerOpen(true)} className="w-full md:w-auto flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20 active:scale-95">
             <Settings size={20} /> <span className="hidden sm:inline">Opciones Globales</span>
           </button>
           
-          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2">
+          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 active:scale-95">
             <LayoutGrid size={20} /> <span className="hidden sm:inline">Categorías</span>
           </button>
           
-          <button onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 lya:shadow-lya-primary/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2">
+          <button onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 transition-all active:scale-95 flex items-center justify-center space-x-2">
             <Plus size={20} /> <span>Nuevo Producto</span>
           </button>
         </div>
@@ -133,9 +168,9 @@ export const MenuManagerPage = () => {
             const categoryProducts = products.filter(p => p.categoryId === category.id || p.categoria === category.name);
             return (
               <div key={category.id} className="space-y-4">
-                <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text flex items-center space-x-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 pb-2">
-                  <span className="capitalize">{category.name}</span>
-                  <span className="bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 text-xs px-2 py-1 rounded-full">{categoryProducts.length}</span>
+                <h2 className="text-xl font-black text-gray-700 dark:text-gray-200 lya:text-lya-text flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 pb-3">
+                  <span className="capitalize tracking-tight">{category.name}</span>
+                  <span className="bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 text-xs px-2.5 py-1 rounded-md">{categoryProducts.length}</span>
                 </h2>
 
                 {categoryProducts.length > 0 ? (
@@ -143,6 +178,7 @@ export const MenuManagerPage = () => {
                     <AnimatePresence mode="popLayout">
                       {categoryProducts.map((product) => {
                         const isActive = product.isActive !== undefined ? product.isActive : product.disponible;
+                        const isAgotado = product.isAgotado || false;
                         const isProcessing = processingProducts?.has(product.id);
 
                         return (
@@ -152,45 +188,68 @@ export const MenuManagerPage = () => {
                           initial={{ opacity: 0, scale: 0.8, y: 20 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-5 shadow-sm border ${isActive ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30' : 'border-red-200 dark:border-red-900/50 opacity-75'}`}
+                          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-all ${
+                            !isActive ? 'border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-900/5 opacity-60 grayscale-[50%]' 
+                            : isAgotado ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10'
+                            : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 hover:border-gray-300 lya:hover:border-lya-secondary/40'
+                          }`}
                         >
                           <div className="flex items-center space-x-4 mb-4">
                             <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner flex items-center justify-center">
                               {product.image || product.imageUrl ? (
                                 <img src={product.image || product.imageUrl} alt={product.nombre || product.name} className="w-full h-full object-cover" />
                               ) : (
-                                <div className="text-3xl">{product.imagen || <ImageIcon size={24} className="text-gray-300 dark:text-gray-600 lya:text-lya-text/30" />}</div>
+                                <div className="text-3xl opacity-80">{product.imagen || <ImageIcon size={24} className="text-gray-300 dark:text-gray-600 lya:text-lya-text/30" />}</div>
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-bold text-lg leading-tight truncate ${!isActive ? 'text-gray-500 dark:text-gray-400 lya:text-lya-text/50' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
+                              <h3 className={`font-black text-base leading-tight truncate tracking-tight ${!isActive ? 'text-red-800 dark:text-red-300' : isAgotado ? 'text-amber-800 dark:text-amber-400' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                 <p className="text-orange-500 dark:text-orange-400 lya:text-lya-primary font-black">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
+                          
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto">
                             
-                            {/* 🔥 BOTÓN DE ACTIVAR/INACTIVAR CON SPINNER */}
-                            <button 
-                              onClick={() => !isProcessing && toggleAvailability(product.id)} 
-                              disabled={isProcessing}
-                              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                                isProcessing 
-                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-70 cursor-wait'
-                                  : isActive 
-                                    ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20' 
-                                    : 'text-red-600 bg-red-50 dark:bg-red-500/10 hover:bg-red-100'
-                              }`}
-                            >
-                              {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Power size={16} />} 
-                              <span>{isProcessing ? 'Cargando...' : (isActive ? 'Activo' : 'Inactivo')}</span>
-                            </button>
+                            <div className="flex flex-col gap-1.5 w-full mr-2">
+                              {/* 🔥 BOTÓN 1: INACTIVO (Esconder del sistema) */}
+                              <button 
+                                onClick={() => !isProcessing && toggleAvailability(product.id)} 
+                                disabled={isProcessing}
+                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border ${
+                                  isProcessing 
+                                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
+                                    : isActive 
+                                      ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100' 
+                                      : 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 hover:bg-red-100 shadow-sm'
+                                }`}
+                              >
+                                {isProcessing ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />} 
+                                <span>{isProcessing ? 'Espere...' : (isActive ? 'Activo' : 'Inactivo (Oculto)')}</span>
+                              </button>
+
+                              {/* 🔥 BOTÓN 2: PAUSA (Agotado a la vista) */}
+                              <button 
+                                onClick={() => !isProcessing && toggleAgotado(product.id)} 
+                                disabled={isProcessing || !isActive}
+                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border ${
+                                  !isActive || isProcessing
+                                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-50 cursor-not-allowed'
+                                    : isAgotado 
+                                      ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 hover:bg-amber-100 shadow-sm' 
+                                      : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                {isProcessing ? <Loader2 size={12} className="animate-spin" /> : (isAgotado ? <PauseCircle size={12} /> : <PlayCircle size={12} />)} 
+                                <span>{isAgotado ? 'Agotado (Pausado)' : 'En Stock'}</span>
+                              </button>
+                            </div>
                             
-                            <div className="flex space-x-2">
-                              <button onClick={() => openModal(product)} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors"><Edit2 size={18} /></button>
-                              <button onClick={() => deleteProduct(product.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                            <div className="flex flex-col space-y-1.5 shrink-0">
+                              <button onClick={() => openModal(product)} className="p-2 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 lya:text-lya-secondary lya:bg-lya-secondary/10 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-colors active:scale-90"><Edit2 size={14} /></button>
+                              <button onClick={() => deleteProduct(product.id)} className="p-2 text-red-500 bg-red-50 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-colors active:scale-90"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         </motion.div>
@@ -198,8 +257,8 @@ export const MenuManagerPage = () => {
                     </AnimatePresence>
                   </motion.div>
                 ) : (
-                  <div className="p-6 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
-                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium">Categoría vacía. Añade un producto aquí.</p>
+                  <div className="p-8 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
+                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">Categoría vacía. Añade un producto aquí.</p>
                   </div>
                 )}
               </div>

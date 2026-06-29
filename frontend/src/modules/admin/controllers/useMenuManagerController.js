@@ -1,9 +1,9 @@
-// src/modules/admin/controllers/useMenuManagerController.js
+// frontend/src/modules/admin/controllers/useMenuManagerController.js
 import { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
 import { adminMenuModel } from '../models/adminMenuModel';
 
-export const useMenuManagerController = () => {
+// 🔥 AHORA RECIBE LA FUNCIÓN DE NOTIFICACIONES NEO-BENTO
+export const useMenuManagerController = ({ showToast }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [globalOptions, setGlobalOptions] = useState([]);
@@ -17,7 +17,6 @@ export const useMenuManagerController = () => {
   
   const [categoryToEdit, setCategoryToEdit] = useState(null); 
   const [categoryToDelete, setCategoryToDelete] = useState(null);
-  
   const [productToDelete, setProductToDelete] = useState(null);
 
   const loadData = useCallback(async (showLoadingScreen = true) => {
@@ -32,11 +31,11 @@ export const useMenuManagerController = () => {
       setProducts(fetchedProducts);
       setGlobalOptions(fetchedOptions);
     } catch (error) {
-      toast.error('Error al cargar datos');
+      showToast('Error al cargar catálogo desde el servidor', 'error');
     } finally {
       if (showLoadingScreen) setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => { loadData(true); }, [loadData]);
 
@@ -47,15 +46,15 @@ export const useMenuManagerController = () => {
     try {
       if (categoryToEdit) {
         await adminMenuModel.updateCategory(categoryToEdit.id, name);
-        toast.success('Categoría actualizada');
+        showToast('Categoría actualizada correctamente', 'success');
       } else {
         await adminMenuModel.createCategory(name);
-        toast.success('Categoría creada');
+        showToast('Categoría creada exitosamente', 'success');
       }
       setCategoryToEdit(null);
       await loadData(false);
     } catch (error) {
-      toast.error('Error al guardar categoría');
+      showToast('Error al guardar la categoría', 'error');
     }
   };
 
@@ -66,10 +65,10 @@ export const useMenuManagerController = () => {
     if (!categoryToDelete) return;
     try {
       await adminMenuModel.deleteCategory(categoryToDelete);
-      toast.success('Categoría eliminada');
+      showToast('Categoría eliminada por completo', 'success');
       await loadData(false);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al eliminar categoría');
+      showToast(error.response?.data?.message || 'Error al eliminar categoría', 'error');
     } finally {
       setCategoryToDelete(null);
     }
@@ -79,9 +78,9 @@ export const useMenuManagerController = () => {
     try {
       const payload = newList.map((cat, index) => ({ id: cat.id, order: index }));
       await adminMenuModel.reorderCategories(payload);
-      toast.success('Orden guardado');
+      showToast('Orden del menú guardado', 'success');
     } catch (error) {
-      toast.error('Error al guardar orden');
+      showToast('Error al guardar el nuevo orden', 'error');
       await loadData(false);
     }
   };
@@ -95,11 +94,10 @@ export const useMenuManagerController = () => {
   };
 
   const saveProduct = async (data) => {
-    const toastId = toast.loading('Procesando producto...');
+    showToast('Procesando producto y subiendo imagen...', 'warning');
     try {
       let finalImageUrl = data.imageUrl;
       if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
-        toast.loading('Subiendo imagen a la nube...', { id: toastId });
         const formData = new FormData();
         formData.append('file', finalImageUrl);
         formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET); 
@@ -115,7 +113,6 @@ export const useMenuManagerController = () => {
       }
 
       const payload = { ...data, imageUrl: finalImageUrl };
-      toast.loading('Guardando en base de datos...', { id: toastId });
 
       if (editingProduct) {
         await adminMenuModel.updateProduct(editingProduct.id, payload);
@@ -125,9 +122,9 @@ export const useMenuManagerController = () => {
       
       setIsModalOpen(false);
       await loadData(false); 
-      toast.success('Producto guardado con éxito', { id: toastId });
+      showToast('Producto guardado con éxito', 'success');
     } catch (error) {
-      toast.error('Ocurrió un error al guardar', { id: toastId });
+      showToast('Ocurrió un error al guardar el producto', 'error');
     }
   };
 
@@ -136,59 +133,59 @@ export const useMenuManagerController = () => {
   
   const confirmRemoveProduct = async () => {
     if (!productToDelete) return;
-    const toastId = toast.loading('Eliminando producto...');
+    showToast('Eliminando producto del menú...', 'warning');
     try {
       await adminMenuModel.deleteProduct(productToDelete);
-      toast.success('Producto eliminado', { id: toastId });
+      showToast('Producto eliminado exitosamente', 'success');
       await loadData(false); 
     } catch (error) {
-      toast.error('Error al eliminar producto', { id: toastId });
+      showToast('Error al eliminar producto', 'error');
     } finally {
       setProductToDelete(null);
     }
   };
 
-  // 🔥 SOLUCIÓN A LA CONDICIÓN DE CARRERA (OPTIMISTIC UI)
+  // 🔥 INTERRUPTOR: ACTIVO / INACTIVO
   const toggleAvailability = async (id) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
     
     setProcessingProducts(prev => new Set(prev).add(id));
-    const toastId = toast.loading('Actualizando estado...');
-    
-    // Evaluamos el estado en el que está y cuál es su futuro
     const currentState = product.isActive !== undefined ? product.isActive : product.disponible;
     const newState = !currentState;
 
     try {
-      // 1. ACTUALIZACIÓN OPTIMISTA: Cambiamos localmente la UI sin esperar a la BD
-      setProducts(prevProducts => prevProducts.map(p => 
-        p.id === id ? { ...p, isActive: newState, disponible: newState } : p
-      ));
-
-      // 2. BACKEND: Mandamos todo el producto íntegro por si el servidor exige otros campos
-      await adminMenuModel.updateProduct(id, { 
-        ...product,
-        isActive: newState,
-        disponible: newState 
-      });
-      
-      toast.success('Estado actualizado', { id: toastId });
-      
-      // 3. Traemos datos reales de forma silenciosa por las dudas
+      setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isActive: newState, disponible: newState } : p));
+      await adminMenuModel.updateProduct(id, { ...product, isActive: newState, disponible: newState });
+      showToast(`Producto marcado como ${newState ? 'Activo' : 'Inactivo'}`, 'success');
       loadData(false); 
     } catch (error) {
-      // Si el backend tiró error, lo regresamos a como estaba antes
-      setProducts(prevProducts => prevProducts.map(p => 
-        p.id === id ? { ...p, isActive: currentState, disponible: currentState } : p
-      ));
-      toast.error('Error al actualizar estado', { id: toastId });
+      setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isActive: currentState, disponible: currentState } : p));
+      showToast('Error al actualizar disponibilidad', 'error');
     } finally {
-      setProcessingProducts(prev => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setProcessingProducts(prev => { const next = new Set(prev); next.delete(id); return next; });
+    }
+  };
+
+  // 🔥 NUEVO INTERRUPTOR: DISPONIBLE / AGOTADO (PAUSA)
+  const toggleAgotado = async (id) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    
+    setProcessingProducts(prev => new Set(prev).add(id));
+    const currentState = product.isAgotado || false;
+    const newState = !currentState;
+
+    try {
+      setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isAgotado: newState } : p));
+      await adminMenuModel.updateProduct(id, { ...product, isAgotado: newState });
+      showToast(newState ? '¡Producto marcado como AGOTADO!' : '¡Producto nuevamente en venta!', 'success');
+      loadData(false); 
+    } catch (error) {
+      setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isAgotado: currentState } : p));
+      showToast('Error al cambiar el estado de inventario', 'error');
+    } finally {
+      setProcessingProducts(prev => { const next = new Set(prev); next.delete(id); return next; });
     }
   };
 
@@ -196,24 +193,22 @@ export const useMenuManagerController = () => {
   // GESTIÓN DE OPCIONES GLOBALES
   // ==========================================
   const saveGlobalOption = async (tipo, nombre, precio) => {
-    const toastId = toast.loading('Guardando opción...');
     try {
       const res = await adminMenuModel.createGlobalOption({ tipo, nombre, precioAdicional: Number(precio) });
       setGlobalOptions(prev => [...prev, res]); 
-      toast.success('Opción añadida correctamente', { id: toastId });
+      showToast('Opción global añadida correctamente', 'success');
     } catch (error) {
-      toast.error('Error al guardar la opción', { id: toastId });
+      showToast('Error al guardar la opción global', 'error');
     }
   };
 
   const removeGlobalOption = async (id) => {
-    const toastId = toast.loading('Eliminando opción...');
     try {
       await adminMenuModel.deleteGlobalOption(id);
       setGlobalOptions(prev => prev.filter(o => o.id !== id));
-      toast.success('Opción eliminada', { id: toastId });
+      showToast('Opción global eliminada', 'success');
     } catch (error) {
-      toast.error('Error al eliminar opción', { id: toastId });
+      showToast('Error al eliminar opción global', 'error');
     }
   };
 
@@ -222,7 +217,7 @@ export const useMenuManagerController = () => {
       const payload = newList.map((opt, index) => ({ id: opt.id, order: index }));
       await adminMenuModel.reorderGlobalOptions(payload);
     } catch (error) {
-      toast.error('Error al guardar orden de opciones');
+      showToast('Error al reordenar la lista', 'error');
       await loadData(false); 
     }
   };
@@ -238,14 +233,10 @@ export const useMenuManagerController = () => {
     productToDelete, requestRemoveProduct, confirmRemoveProduct, cancelRemoveProduct,
     deleteProduct: requestRemoveProduct,
     toggleAvailability,
+    toggleAgotado, // 🔥 Exportamos la función
     processingProducts, 
     
-    globalOptions, 
-    setGlobalOptions, 
-    saveGlobalOption, 
-    removeGlobalOption,
-    handleDragEndOptionsAPI,
-
+    globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
     isLoading
   };
 };

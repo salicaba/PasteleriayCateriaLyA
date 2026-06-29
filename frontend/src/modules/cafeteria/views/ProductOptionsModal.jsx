@@ -1,12 +1,13 @@
 // src/modules/cafeteria/views/ProductOptionsModal.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Check, ShoppingBag } from 'lucide-react';
+import { X, Check, ShoppingBag, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
 export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(isVitrina || isLlevar || false);
+  const [isConfirming, setIsConfirming] = useState(false); // 🔥 Nuevo estado anti-doble clic
 
   if (!product) return null;
 
@@ -54,23 +55,18 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     return mods;
   }, [parsedOptions]);
 
-  // 3. 🔥 EFECTO CORREGIDO: Leer 'defaults' desde el Gestor de Menú
+  // 3. Efecto para leer 'defaults' desde el Gestor de Menú
   useEffect(() => {
     const initial = {};
     const defaults = parsedOptions.defaults || {};
 
     availableModifiers.forEach(mod => {
       if (mod.type === 'single' && mod.options.length > 0) {
-        
-        // Buscamos si el administrador guardó un valor por defecto
         let defaultValue = null;
         if (mod.id === 'tamano' && defaults.tamano) defaultValue = defaults.tamano;
         if (mod.id === 'leche' && defaults.leche) defaultValue = defaults.leche;
 
-        // Verificamos si ese valor existe en la lista actual
         const optionExists = defaultValue ? mod.options.find(o => o.id === defaultValue) : null;
-
-        // Usamos el configurado, o el primero por seguridad
         initial[mod.id] = optionExists ? optionExists.id : mod.options[0].id;
       }
     });
@@ -108,7 +104,8 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
   };
 
   const handleConfirm = () => {
-    if (isAgotado) return;
+    if (isAgotado || isConfirming) return;
+    setIsConfirming(true); // 🔥 Bloqueamos el botón inmediatamente
 
     let tamanoStr = 'Estándar';
     let lecheStr = null;
@@ -158,7 +155,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         exit={{ opacity: 0 }} 
-        onClick={onClose} 
+        onClick={() => !isConfirming && onClose()} 
         className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm pointer-events-auto transition-colors" 
       />
 
@@ -183,8 +180,9 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
             <p className="opacity-90 font-bold mt-1 text-orange-400 lya:text-lya-primary">${Number(product.precioBase || product.precio || 0).toFixed(2)} Base</p>
           </div>
           <button 
-            onClick={onClose} 
-            className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2.5 rounded-full backdrop-blur-md transition-all active:scale-90"
+            onClick={() => !isConfirming && onClose()} 
+            disabled={isConfirming}
+            className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2.5 rounded-full backdrop-blur-md transition-all active:scale-90 disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -217,9 +215,10 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                     return (
                       <button
                         key={opt.id}
+                        disabled={isConfirming}
                         onClick={() => handleToggle(mod.id, opt.id, mod.type)}
                         className={clsx(
-                          "px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all flex items-center justify-between gap-3 active:scale-95 flex-grow sm:flex-grow-0",
+                          "px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all flex items-center justify-between gap-3 active:scale-95 flex-grow sm:flex-grow-0 disabled:opacity-70",
                           isSelected 
                             ? "border-orange-500 bg-orange-500 dark:bg-orange-600 dark:border-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30" 
                             : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text lya:hover:border-lya-secondary/50"
@@ -253,10 +252,11 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
           {/* Toggle para Llevar */}
           {!isVitrina && !isLlevar && (
             <div className="mt-8 mb-2">
-              <label className="flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-900/50 lya:border-lya-secondary/30 bg-orange-50 dark:bg-orange-900/10 lya:bg-lya-secondary/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform">
+              <label className={`flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-900/50 lya:border-lya-secondary/30 bg-orange-50 dark:bg-orange-900/10 lya:bg-lya-secondary/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform ${isConfirming ? 'opacity-70 pointer-events-none' : ''}`}>
                 <input 
                   type="checkbox" 
                   checked={isTakeaway}
+                  disabled={isConfirming}
                   onChange={(e) => setIsTakeaway(e.target.checked)}
                   className="w-6 h-6 text-orange-500 dark:text-orange-600 lya:text-lya-secondary bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 dark:focus:ring-orange-600 lya:focus:ring-lya-secondary dark:ring-offset-gray-900 focus:ring-2 cursor-pointer transition-colors"
                 />
@@ -276,16 +276,25 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         {/* Footer / Confirmar */}
         <div className="p-5 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 transition-colors rounded-b-[2.5rem]">
           <button 
-            disabled={isAgotado}
+            disabled={isAgotado || isConfirming}
             onClick={handleConfirm}
             className={clsx(
               "w-full py-4 rounded-2xl font-black text-lg flex justify-between px-6 items-center transition-all",
               isAgotado 
                 ? "bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed lya:bg-lya-bg lya:text-lya-text/40 border border-transparent dark:border-gray-700"
-                : "bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 dark:shadow-emerald-900/30 active:scale-95 lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface lya:shadow-lya-primary/30"
+                : isConfirming
+                  ? "bg-emerald-400 dark:bg-emerald-500 text-white cursor-wait lya:bg-lya-primary/70"
+                  : "bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 dark:shadow-emerald-900/30 active:scale-95 lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface lya:shadow-lya-primary/30"
             )}
           >
-            <span>{isAgotado ? 'Agotado' : 'Añadir a la cuenta'}</span>
+            {isConfirming ? (
+              <div className="flex items-center gap-2">
+                <Loader2 size={20} className="animate-spin" />
+                <span>Añadiendo...</span>
+              </div>
+            ) : (
+              <span>{isAgotado ? 'Agotado' : 'Añadir a la cuenta'}</span>
+            )}
             <span className="bg-black/20 dark:bg-black/30 px-3 py-1 rounded-xl tracking-wide">${calculateTotal().toFixed(2)}</span>
           </button>
         </div>

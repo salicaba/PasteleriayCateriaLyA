@@ -51,7 +51,7 @@ export const MesasPage = () => {
   const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
     setToastType(type);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const [dailySummary, setDailySummary] = useState({
@@ -166,10 +166,12 @@ export const MesasPage = () => {
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8 transition-colors duration-300">
+    // 🔥 CAMBIO DE ARQUITECTURA: Ahora es un flex-col con h-full estricto
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 overflow-hidden">
       
-      <div>
-        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-6 md:p-8 mb-8 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6 transition-colors duration-300">
+      {/* 🔥 ENCABEZADO FIJO (No hace scroll) */}
+      <div className="shrink-0 p-4 md:p-6 pb-4 space-y-6 md:space-y-8 z-10 relative">
+        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6 transition-colors duration-300">
           <div className="flex items-center gap-5">
             <div className="p-4 bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-primary/20 text-orange-500 lya:text-lya-primary rounded-2xl flex-shrink-0">
               <Store size={32} strokeWidth={1.5} />
@@ -261,58 +263,62 @@ export const MesasPage = () => {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'salon' && (
-          <motion.div key="salon-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
-            <div className="flex items-center gap-2 mb-4">
-              <Grid className="text-gray-400" size={20} />
-              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesas del Salón</h3>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {mesasSalon.map(mesa => (
-                <MesaCard key={mesa.id} mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'llevar' && (
-          <motion.div key="llevar-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2 pb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <ShoppingBag className="text-gray-400" size={20} />
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Pedidos Para Llevar</h3>
+      {/* 🔥 CONTENIDO SCROLLABLE (Solo las tarjetas hacen scroll) */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-6 pb-24 relative z-0">
+        <AnimatePresence mode="wait">
+          {activeTab === 'salon' && (
+            <motion.div key="salon-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
+              <div className="flex items-center gap-2 mb-4 px-2">
+                <Grid className="text-gray-400" size={20} />
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesas del Salón</h3>
               </div>
-              <button 
-                onClick={() => setShowLlevarModal(true)}
-                className="flex items-center gap-1.5 bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
-              >
-                <Plus size={14} /> Nuevo Pedido
-              </button>
-            </div>
-
-            {mesasLlevar.length === 0 ? (
-              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-8 flex flex-col items-center justify-center text-gray-400">
-                <ShoppingBag size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
-                <p className="text-sm font-medium">No hay pedidos activos para llevar.</p>
-              </div>
-            ) : (
+              
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {mesasLlevar.map(pedido => (
-                  <MesaCard 
-                    key={pedido.id} 
-                    mesa={pedido} 
-                    onClick={() => setSelectedMesa(pedido)} 
-                    onCancel={() => setOrderToCancel(pedido)} 
-                  />
+                {mesasSalon.map(mesa => (
+                  <MesaCard key={mesa.id} mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
                 ))}
               </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
 
+          {activeTab === 'llevar' && (
+            <motion.div key="llevar-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
+              <div className="flex items-center justify-between mb-4 px-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="text-gray-400" size={20} />
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Pedidos Para Llevar</h3>
+                </div>
+                <button 
+                  onClick={() => setShowLlevarModal(true)}
+                  className="flex items-center gap-1.5 bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
+                >
+                  <Plus size={14} /> Nuevo Pedido
+                </button>
+              </div>
+
+              {mesasLlevar.length === 0 ? (
+                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-8 flex flex-col items-center justify-center text-gray-400">
+                  <ShoppingBag size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
+                  <p className="text-sm font-medium">No hay pedidos activos para llevar.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {mesasLlevar.map(pedido => (
+                    <MesaCard 
+                      key={pedido.id} 
+                      mesa={pedido} 
+                      onClick={() => setSelectedMesa(pedido)} 
+                      onCancel={() => setOrderToCancel(pedido)} 
+                    />
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* MODALES Y PORTALS (Se mantienen igual, fuera del flujo de layout) */}
       {typeof document !== 'undefined' && createPortal(
         <>
           {showLlevarModal && (
@@ -353,6 +359,7 @@ export const MesasPage = () => {
             />
           )}
 
+          {/* Modal de Cancelación de Pedido */}
           <AnimatePresence>
             {orderToCancel && (
               <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -403,7 +410,6 @@ export const MesasPage = () => {
                         } catch (error) {
                           showToast(error.response?.data?.message || 'Error al cancelar', 'error');
                         } finally {
-                          // 🔥 CORRECCIÓN CRUCIAL: Reseteamos isCanceling ANTES de cerrar la ventana
                           setIsCanceling(false); 
                           setOrderToCancel(null); 
                           fetchSummary(); 
@@ -426,6 +432,7 @@ export const MesasPage = () => {
             )}
           </AnimatePresence>
 
+          {/* Papelera Modal */}
           <AnimatePresence>
             {showPapelera && (
               <div className="fixed inset-0 z-[9990] flex justify-end overflow-hidden">
@@ -666,6 +673,7 @@ export const MesasPage = () => {
             )}
           </AnimatePresence>
 
+          {/* Ventas Hoy Modal */}
           <AnimatePresence>
             {showVendidos && (
               <div className="fixed inset-0 z-[9990] flex justify-end overflow-hidden">
@@ -752,7 +760,7 @@ export const MesasPage = () => {
             )}
           </AnimatePresence>
 
-          {/* NOTIFICACIÓN FLOTANTE PERSONALIZADA (TOAST CENTRADO ARRIBA) */}
+          {/* CÁPSULA DE NOTIFICACIÓN FLOTANTE PERSONALIZADA */}
           <AnimatePresence>
             {toastMessage && (
               <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
