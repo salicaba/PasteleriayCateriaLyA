@@ -4,15 +4,24 @@ import {
   Save, Landmark, Plus, Trash2, Edit2, Check, Printer, 
   Settings, Sliders, Info, Palette, Monitor, 
   Maximize, Minimize, Layout, Wifi, Usb, 
-  RefreshCw, AlertCircle, Barcode, Keyboard, Users, Shield, UserX, UserCheck, MessageCircle,
-  Mail, Eye, EyeOff // Nuevos íconos agregados para el formulario
+  RefreshCw, AlertCircle, CheckCircle2, Barcode, Keyboard, Users, Shield, UserX, UserCheck, MessageCircle,
+  Mail, Eye, EyeOff, Loader2 
 } from 'lucide-react';
 import client from '../../../api/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast';
 import { ThemeSelector } from '../../../components/ThemeSelector';
 
 export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
+  // --- ESTADO DE NOTIFICACIÓN CÁPSULA NEO-BENTO (DISEÑO CAFETERÍA) ---
+  const [notification, setNotification] = useState({ show: false, type: '', message: '' });
+
+  const showNotification = (type, message) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => {
+      setNotification((prev) => ({ ...prev, show: false }));
+    }, 4000);
+  };
+
   const [accounts, setAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
   
@@ -24,9 +33,10 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const [systemUsers, setSystemUsers] = useState([]);
   const [userForm, setUserForm] = useState({ id: '', fullName: '', username: '', email: '', password: '', role: 'Empleado', isActive: true });
   const [editingUserId, setEditingUserId] = useState(null);
-  const [showPassword, setShowPassword] = useState(false); // 🔥 Estado para mostrar/ocultar contraseña
+  const [showPassword, setShowPassword] = useState(false); 
 
   const [isScanning, setIsScanning] = useState(false);
+  const [isTestingPrint, setIsTestingPrint] = useState(false);
   const [detectedPorts, setDetectedPorts] = useState([]);
   const [printerStatus, setPrinterStatus] = useState('unknown'); 
 
@@ -68,7 +78,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       }
     } catch (err) {
       console.error("Error sincronizando con la API del POS:", err);
-      toast.error("Error de red al obtener los datos del sistema");
+      showNotification('error', "Error de red al obtener los datos del sistema");
     } finally {
       setFetching(false);
     }
@@ -87,7 +97,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(err => {
-        toast.error("El navegador bloqueó la pantalla completa automática.");
+        showNotification('error', "El navegador bloqueó la pantalla completa automática.");
       });
     } else {
       if (document.exitFullscreen) document.exitFullscreen();
@@ -104,16 +114,19 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
         whatsapp_number: whatsappNumber,
         ...payloadToOverride 
       });
-      toast.success("¡Configuración guardada en la Base de Datos!");
+      showNotification('success', "¡Configuración guardada en la Base de Datos!");
     } catch (e) {
-      toast.error("Error de base de datos al guardar ajustes");
-    } finally { setLoading(false); }
+      showNotification('error', "Error de base de datos al guardar ajustes");
+      throw e;
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleSaveToServer = () => saveSettingsToDB({});
 
   const handleAddOrUpdate = async () => {
-    if (!form.bank_name || !form.account_number) return toast.error("Completa los campos obligatorios");
+    if (!form.bank_name || !form.account_number) return showNotification('error', "Completa los campos obligatorios");
     
     let newAccounts;
     if (editingId) {
@@ -124,7 +137,11 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     
     setAccounts(newAccounts); 
     resetForm(); 
-    await saveSettingsToDB({ bank_accounts: newAccounts }); 
+    try {
+      await saveSettingsToDB({ bank_accounts: newAccounts }); 
+    } catch (err) {
+      // Capturado dentro de saveSettingsToDB
+    }
   };
 
   const editAccount = (acc) => { setEditingId(acc.id); setForm(acc); };
@@ -132,34 +149,32 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
   const deleteAccount = async (id) => { 
     const newAccounts = accounts.filter(a => a.id !== id);
     setAccounts(newAccounts); 
-    await saveSettingsToDB({ bank_accounts: newAccounts });
+    try {
+      await saveSettingsToDB({ bank_accounts: newAccounts });
+    } catch (err) {
+       // Capturado silenciosamente
+    }
   };
 
   // --- CRUD USUARIOS ---
   const handleUserSubmit = async () => {
-    if (!userForm.fullName || !userForm.username) return toast.error("Nombre completo y nombre de usuario requeridos");
-    if (!editingUserId && !userForm.password) return toast.error("La contraseña es requerida para nuevos usuarios");
-
-    // 🔥 Se eliminó la validación que forzaba a usar @gmail.com
-    // Ahora el sistema acepta Hotmail, Outlook, Yahoo, etc.
+    if (!userForm.fullName || !userForm.username) return showNotification('error', "Nombre completo y nombre de usuario requeridos");
+    if (!editingUserId && !userForm.password) return showNotification('error', "La contraseña es requerida para nuevos usuarios");
 
     setLoading(true);
-    const toastId = toast.loading(editingUserId ? 'Verificando datos...' : 'Creando usuario y enviando correo...');
     
     try {
       if (editingUserId) {
         const response = await client.put(`/users/${editingUserId}`, userForm);
         
-        // Magia Visual: Si el backend dice que no hubo cambios, mostramos información (ℹ️)
         if (response.data && response.data.changed === false) {
-          toast.success(response.data.message, { id: toastId, icon: 'ℹ️' });
+          showNotification('success', response.data.message); // Mapeado a success visualmente
         } else {
-          toast.success(response.data.message || "Usuario actualizado en la base de datos", { id: toastId });
+          showNotification('success', response.data.message || "Usuario actualizado en la base de datos");
         }
-
       } else {
         await client.post('/users', userForm);
-        toast.success("¡Personal registrado y credenciales enviadas!", { id: toastId });
+        showNotification('success', "¡Personal registrado y credenciales enviadas!");
       }
 
       resetUserForm();
@@ -167,7 +182,8 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       if (Array.isArray(resUsers.data)) setSystemUsers(resUsers.data);
 
     } catch (e) {
-      toast.error(e.response?.data?.message || "Error al procesar la transacción", { id: toastId });
+      showNotification('error', e.response?.data?.message || "Error al procesar la transacción");
+      throw e;
     } finally {
       setLoading(false);
     }
@@ -177,17 +193,17 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
     try {
       const nextStatus = !currentStatus;
       await client.put(`/users/${id}`, { isActive: nextStatus });
-      toast.success(nextStatus ? "Acceso al POS activado" : "Acceso revocado correctamente");
+      showNotification('success', nextStatus ? "Acceso al POS activado" : "Acceso revocado correctamente");
       setSystemUsers(systemUsers.map(u => u.id === id ? { ...u, isActive: nextStatus } : u));
     } catch (e) {
-      toast.error("No se pudo cambiar el estado de la credencial");
+      showNotification('error', "No se pudo cambiar el estado de la credencial");
     }
   };
 
   const editUser = (usr) => {
     setEditingUserId(usr.id);
     setUserForm({ id: usr.id, fullName: usr.fullName, username: usr.username, email: usr.email || '', role: usr.role, isActive: usr.isActive, password: '' }); 
-    setShowPassword(false); // Reseteamos la vista al editar
+    setShowPassword(false);
   };
 
   const resetUserForm = () => {
@@ -204,28 +220,31 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       const response = await client.get('/hardware/scan-printers');
       if (response.data && response.data.ports) {
         setDetectedPorts(response.data.ports);
-        toast.success("Puertos de hardware analizados");
+        showNotification('success', "Puertos de hardware analizados");
       } else {
         setDetectedPorts(['USB001', 'COM3', '/dev/usb/lp0']);
       }
     } catch (e) {
       setDetectedPorts(['USB001', 'COM3']);
+      showNotification('error', "Mostrando puertos por defecto");
     } finally {
       setIsScanning(false);
     }
   };
 
   const handleTestPrint = async () => {
-    if (!printerConfig.interface) return toast.error("Falta especificar la interfaz.");
+    if (!printerConfig.interface) return showNotification('error', "Falta especificar la interfaz.");
+    setIsTestingPrint(true);
     setPrinterStatus('unknown');
-    toast.loading("Enviando ráfaga a la miniprinter...", { id: 'print_test' });
     try {
       await client.post('/hardware/print-test', printerConfig);
-      toast.success("Ticket de prueba impreso", { id: 'print_test' });
+      showNotification('success', "Ticket de prueba impreso en miniprinter");
       setPrinterStatus('online'); 
     } catch (e) {
-      toast.error("La impresora no respondió", { id: 'print_test' });
+      showNotification('error', "La impresora no respondió");
       setPrinterStatus('offline');
+    } finally {
+      setIsTestingPrint(false);
     }
   };
 
@@ -291,8 +310,39 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -15 }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="h-full w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 overflow-y-auto custom-scrollbar p-4 md:p-6"
+      className="h-full w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 overflow-y-auto custom-scrollbar p-4 md:p-6 relative"
     >
+      {/* --- SISTEMA DE NOTIFICACIONES NEO-BENTO (DISEÑO CAFETERÍA) --- */}
+      <AnimatePresence>
+        {notification.show && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                notification.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
+              }`}
+            >
+              <div className={`p-1.5 rounded-full shrink-0 ${
+                notification.type === 'error' 
+                  ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
+                  : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
+              }`}>
+                {notification.type === 'error' ? (
+                  <AlertCircle size={20} />
+                ) : (
+                  <CheckCircle2 size={20} />
+                )}
+              </div>
+              <div className="flex flex-col">
+                  <span className="text-sm">{notification.message}</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-7xl mx-auto w-full space-y-6 pb-20">
         
         {/* ==========================================================
@@ -338,19 +388,17 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm font-mono" />
                   </div>
                   
-                  {/* 🔥 NUEVO CAMPO DE CORREO GMAIL */}
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Correo Electrónico (Notificación)</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Mail size={16} className="text-gray-400" />
                       </div>
                       <input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="empleado@gmail.com"
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" />
+                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white text-sm" />
                     </div>
                   </div>
 
-                  {/* 🔥 CONTRASEÑA CON OJITO */}
                   <div>
                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 mb-1">Contraseña de Acceso</label>
                     <div className="relative">
@@ -377,12 +425,11 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                       <select 
                         value={userForm.role} 
                         onChange={e => setUserForm({...userForm, role: e.target.value})}
-                        className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm font-bold appearance-none cursor-pointer"
+                        className="w-full pl-4 pr-12 py-3 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm font-bold appearance-none cursor-pointer"
                       >
                         <option value="Empleado">Empleado</option>
                         <option value="Administrador">Administrador</option>
                       </select>
-                      {/* Flechita personalizada Neo-Bento */}
                       <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
                         <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"></path>
@@ -400,7 +447,11 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     <button onClick={handleUserSubmit} disabled={loading}
                       className="flex-[2] py-3 bg-blue-600 lya:bg-lya-primary text-white font-bold rounded-xl text-xs shadow-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <Save size={14} /> {editingUserId ? 'Guardar Cambios' : 'Crear y Enviar Correo'}
+                      {loading ? (
+                        <><Loader2 className="animate-spin" size={14} /> Espere...</>
+                      ) : (
+                        <><Save size={14} /> {editingUserId ? 'Guardar Cambios' : 'Crear y Enviar Correo'}</>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -414,14 +465,14 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <AnimatePresence mode="popLayout">
-                    {systemUsers.map(usr => (
+                    {systemUsers.map((usr, index) => (
                       <motion.div 
                         key={usr.id}
                         layout
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ delay: index * 0.03, type: "spring", stiffness: 200, damping: 20 }}
                         className={`p-5 rounded-2xl border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-colors flex flex-col justify-between hover:shadow-md ${usr.isActive ? 'border-gray-200 dark:border-gray-700' : 'border-red-200 dark:border-red-900/30 opacity-80'}`}
                       >
                         
@@ -456,7 +507,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                           </div>
                         </div>
 
-                        {/* Mostrar el correo si lo tiene */}
                         {usr.email && (
                           <div className="mb-3 text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 rounded-md px-2 py-1">
                             <Mail size={12} /> <span className="truncate">{usr.email}</span>
@@ -503,7 +553,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
               </div>
             </div>
 
-            {/* Tarjeta Neo-Bento para WhatsApp */}
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col sm:flex-row items-center gap-6">
               <div className="w-14 h-14 rounded-full bg-emerald-500/10 lya:bg-lya-primary/10 flex items-center justify-center shrink-0">
                  <MessageCircle size={28} className="text-emerald-500 lya:text-lya-primary" />
@@ -522,16 +571,16 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                 />
                 <button 
                   onClick={() => saveSettingsToDB({ whatsapp_number: whatsappNumber })} 
-                  className="h-[52px] px-5 bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center" 
+                  disabled={loading}
+                  className="h-[52px] px-5 min-w-[52px] bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center disabled:opacity-50" 
                   title="Guardar Número"
                 >
-                  <Save size={20}/>
+                  {loading ? <Loader2 className="animate-spin w-5 h-5"/> : <Save size={20}/>}
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Formulario de Cuentas */}
               <section className="space-y-6">
                 <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
                   <div className="flex items-center gap-3 mb-8 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
@@ -564,14 +613,19 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     </div>
 
                     <button onClick={handleAddOrUpdate} disabled={loading} className="w-full py-4 bg-emerald-500 lya:bg-lya-primary text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50">
-                      {editingId ? <><Check size={20}/> Guardar Cambios</> : <><Plus size={20}/> Guardar Cuenta</>}
+                      {loading ? (
+                         <><Loader2 className="animate-spin" size={20}/> Espere...</>
+                      ) : editingId ? (
+                         <><Check size={20}/> Guardar Cambios</>
+                      ) : (
+                         <><Plus size={20}/> Guardar Cuenta</>
+                      )}
                     </button>
                     {editingId && <button onClick={resetForm} className="w-full text-sm text-gray-400 font-bold hover:text-red-500 transition-colors">Cancelar edición</button>}
                   </div>
                 </div>
               </section>
 
-              {/* Lista de Cuentas */}
               <section className="flex flex-col gap-6">
                 <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex-1 flex flex-col min-h-[400px]">
                   <div className="flex items-center justify-between mb-6">
@@ -583,9 +637,9 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                     <AnimatePresence mode="popLayout">
                       {accounts.length === 0 ? (
                         <motion.div 
-                          initial={{ opacity: 0, scale: 0.9 }} 
-                          animate={{ opacity: 1, scale: 1 }} 
-                          exit={{ opacity: 0, scale: 0.9 }}
+                          initial={{ opacity: 0, y: 20 }} 
+                          animate={{ opacity: 1, y: 0 }} 
+                          exit={{ opacity: 0, y: -20 }}
                           transition={{ type: "spring", stiffness: 200, damping: 20 }}
                           className="h-full flex flex-col items-center justify-center text-gray-400 italic py-20"
                         >
@@ -593,14 +647,14 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                           <p className="text-sm">Aún no has agregado cuentas bancarias.</p>
                         </motion.div>
                       ) : (
-                        accounts.map(acc => (
+                        accounts.map((acc, index) => (
                           <motion.div 
                             key={acc.id} 
                             layout 
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }} 
-                            animate={{ opacity: 1, scale: 1, y: 0 }} 
-                            exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                            initial={{ opacity: 0, y: 20 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ delay: index * 0.03, type: "spring", stiffness: 200, damping: 20 }}
                             className="group relative p-5 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:border-emerald-500/30 lya:hover:border-lya-primary/30 transition-colors flex justify-between items-start"
                           >
                             
@@ -642,7 +696,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   </div>
 
                   <div className="pt-6 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/20">
-                    <button onClick={() => accounts.length > 0 ? setShowPrintModal(true) : toast.error("No hay cuentas para imprimir")}
+                    <button onClick={() => accounts.length > 0 ? setShowPrintModal(true) : showNotification('error', "No hay cuentas para imprimir")}
                       className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all active:scale-95"
                     >
                       <Printer size={18} /> Imprimir Tarjetas para Mesas
@@ -681,7 +735,6 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-5 flex-1">Personaliza los colores del sistema POS.</p>
                 
-                {/* 🔥 HACK DE CSS: Envolvemos ThemeSelector para forzarlo a ser idéntico al control de Tamaño */}
                 <div className="flex bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg rounded-xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 h-[56px] w-full [&>div]:w-full [&>div]:h-full [&>div]:bg-transparent [&>div]:border-none [&>div]:p-0 [&>div]:flex [&>div]:gap-0 [&_button]:flex-1 [&_button]:h-full [&_button]:rounded-lg [&_button]:text-sm [&_button]:font-bold [&_button]:flex [&_button]:items-center [&_button]:justify-center">
                   <ThemeSelector />
                 </div>
@@ -720,7 +773,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
             
             <div className="flex justify-end mt-4">
               <button onClick={handleSaveToServer} disabled={loading} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-black dark:bg-purple-500 dark:hover:bg-purple-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-xl text-sm font-black shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                <Save size={18} /> {loading ? 'Guardando...' : 'Guardar Interfaz'}
+                {loading ? <><Loader2 className="animate-spin" size={18} /> Espere...</> : <><Save size={18} /> Guardar Interfaz</>}
               </button>
             </div>
           </motion.div>
@@ -780,12 +833,14 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                       ) : (
                         <input type="text" value={printerConfig.interface} onChange={e => { setPrinterConfig({...printerConfig, interface: e.target.value}); setPrinterStatus('unknown'); }} placeholder={printerConfig.type === 'network' ? "Ej. 192.168.1.100" : "Ingresa puerto o escanea"} className="flex-1 px-5 py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm font-mono" />
                       )}
-                      {printerConfig.type === 'usb' && <button onClick={scanPrinters} disabled={isScanning} className="px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 lya:text-lya-primary rounded-2xl font-bold flex items-center justify-center transition-colors disabled:opacity-50"><RefreshCw size={20} className={isScanning ? 'animate-spin' : ''} /></button>}
+                      {printerConfig.type === 'usb' && <button onClick={scanPrinters} disabled={isScanning} className="px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 lya:text-lya-primary rounded-2xl font-bold flex items-center justify-center transition-colors disabled:opacity-50">{isScanning ? <Loader2 className="animate-spin" size={20}/> : <RefreshCw size={20} />}</button>}
                     </div>
                   </div>
 
                   <div className="pt-2">
-                    <button onClick={handleTestPrint} className="w-full py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 active:scale-[0.98]"><Printer size={16}/> Realizar Prueba de Conexión</button>
+                    <button onClick={handleTestPrint} disabled={isTestingPrint} className="w-full py-3.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 active:scale-[0.98] disabled:opacity-50">
+                      {isTestingPrint ? <><Loader2 className="animate-spin" size={16}/> Espere...</> : <><Printer size={16}/> Realizar Prueba de Conexión</>}
+                    </button>
                   </div>
                 </div>
               </section>
@@ -823,7 +878,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
 
             <div className="flex justify-end mt-4">
               <button onClick={handleSaveToServer} disabled={loading} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-xl text-sm font-black shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                <Save size={18} /> {loading ? 'Guardando...' : 'Guardar Hardware'}
+                {loading ? <><Loader2 className="animate-spin" size={18} /> Espere...</> : <><Save size={18} /> Guardar Hardware</>}
               </button>
             </div>
           </motion.div>
