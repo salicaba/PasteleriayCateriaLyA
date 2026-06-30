@@ -2,14 +2,31 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, Trash2, Power, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle } from 'lucide-react';
+import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
 
+// 🔥 IMPORTAMOS TU COMPONENTE STATCARD DE MESAS (Adaptado para el Menú)
+const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
+  <div 
+    onClick={onClick}
+    className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center transition-all ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-md' : ''} ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-80 hover:opacity-100'}`}
+  >
+    <div>
+      <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
+      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text">{value}</h3>
+    </div>
+    <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${iconColors.bg}`}>
+      <Icon size={24} className={iconColors.text} />
+    </div>
+  </div>
+);
+
 export const MenuManagerPage = () => {
   const [toast, setToast] = useState(null);
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -19,10 +36,9 @@ export const MenuManagerPage = () => {
   const {
     products, categories, setCategories, handleDragEndAPI,
     isModalOpen, isCategoryManagerOpen, setIsCategoryManagerOpen,
-    editingProduct, toggleAvailability, toggleAgotado, deleteProduct, openModal, closeModal, saveProduct, saveCategory,
+    editingProduct, toggleAvailability, toggleAgotado, openModal, closeModal, saveProduct, saveCategory,
     categoryToEdit, setCategoryToEdit,
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
-    productToDelete, confirmRemoveProduct, cancelRemoveProduct,
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
     isLoading,
     processingActions 
@@ -79,10 +95,8 @@ export const MenuManagerPage = () => {
       const tipoOptions = globalOptions.filter(o => o.tipo === tipo);
       const oldIndex = tipoOptions.findIndex(o => o.id === active.id);
       const newIndex = tipoOptions.findIndex(o => o.id === over.id);
-
       const newTipoOptions = arrayMove(tipoOptions, oldIndex, newIndex);
       const otherOptions = globalOptions.filter(o => o.tipo !== tipo);
-      
       setGlobalOptions([...otherOptions, ...newTipoOptions]);
       if (handleDragEndOptionsAPI) handleDragEndOptionsAPI(newTipoOptions);
     }
@@ -94,6 +108,13 @@ export const MenuManagerPage = () => {
       setNewCategoryName('');
     }
   };
+
+  // 🔥 Separamos los productos visualmente (Los que se ven en la cuadrícula vs Papelera)
+  const visibleProducts = products.filter(p => p.isActive !== false && p.disponible !== false);
+  const hiddenProducts = products.filter(p => p.isActive === false || p.disponible === false);
+
+  // 🔥 La cuenta real para la tarjeta: Solo los visibles que NO están pausados/agotados
+  const productosRealmenteActivos = visibleProducts.filter(p => !p.isAgotado).length;
 
   return (
     <motion.div 
@@ -128,6 +149,7 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
+      {/* HEADER PRINCIPAL */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
@@ -154,24 +176,51 @@ export const MenuManagerPage = () => {
         </div>
       </header>
 
+      {/* 🔥 FILA DE TARJETAS DE ESTADÍSTICAS (STATCARDS) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-8 shrink-0 z-10 relative">
+        <StatCard 
+          title="Total en Catálogo" 
+          value={products.length} 
+          icon={LayoutGrid} 
+          borderClass="border-blue-500 lya:border-lya-secondary" 
+          iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} 
+        />
+        <StatCard 
+          title="Productos Activos" 
+          value={productosRealmenteActivos} // 🔥 AQUÍ ESTÁ TU LÓGICA APLICADA: Resta los agotados
+          icon={CheckCircle2} 
+          borderClass="border-emerald-500 lya:border-emerald-400" 
+          iconColors={{ bg: "bg-emerald-500 lya:bg-emerald-500", text: "text-emerald-500 lya:text-emerald-500" }} 
+        />
+        <StatCard 
+          title="Papelera (Ocultos)" 
+          value={hiddenProducts.length} 
+          icon={ArchiveRestore} 
+          borderClass="border-red-500 lya:border-red-400" 
+          iconColors={{ bg: "bg-red-500 lya:bg-red-500", text: "text-red-500 lya:text-red-500" }} 
+          onClick={() => setIsTrashModalOpen(true)}
+          isActive={isTrashModalOpen}
+        />
+      </div>
+
+      {/* CUERPO: LISTA DE CATEGORÍAS Y PRODUCTOS VISIBLES */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
         <div className="space-y-10">
           {categories.map((category) => {
-            const categoryProducts = products.filter(p => p.categoryId === category.id || p.categoria === category.name);
+            const categoryVisibleProducts = visibleProducts.filter(p => p.categoryId === category.id || p.categoria === category.name);
+            
             return (
               <div key={category.id} className="space-y-4">
                 <h2 className="text-xl font-black text-gray-700 dark:text-gray-200 lya:text-lya-text flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 pb-3">
                   <span className="capitalize tracking-tight">{category.name}</span>
-                  <span className="bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 text-xs px-2.5 py-1 rounded-md">{categoryProducts.length}</span>
+                  <span className="bg-gray-200 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 text-xs px-2.5 py-1 rounded-md">{categoryVisibleProducts.length}</span>
                 </h2>
 
-                {categoryProducts.length > 0 ? (
+                {categoryVisibleProducts.length > 0 ? (
                   <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <AnimatePresence mode="popLayout">
-                      {categoryProducts.map((product, index) => {
-                        const isActive = product.isActive !== undefined ? product.isActive : product.disponible;
+                      {categoryVisibleProducts.map((product, index) => {
                         const isAgotado = product.isAgotado || false;
-                        
                         const currentAction = processingActions?.[product.id];
                         const isProcessingAvailability = currentAction === 'availability';
                         const isProcessingAgotado = currentAction === 'agotado';
@@ -181,15 +230,13 @@ export const MenuManagerPage = () => {
                         <motion.div 
                           key={product.id} 
                           layout 
-                          // 🔥 AQUÍ ESTÁ LA NUEVA MAGIA: Sin "scale", solo deslizamiento hacia arriba ("y")
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                           whileHover={{ y: -4, transition: { duration: 0.2 } }}
                           transition={{ type: "spring", stiffness: 300, damping: 25, delay: index * 0.03 }}
                           className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors ${
-                            !isActive ? 'border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-900/5 opacity-60 grayscale-[50%]' 
-                            : isAgotado ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10'
+                            isAgotado ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10'
                             : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 hover:border-gray-300 lya:hover:border-lya-secondary/40'
                           }`}
                         >
@@ -202,7 +249,7 @@ export const MenuManagerPage = () => {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-black text-base leading-tight truncate tracking-tight ${!isActive ? 'text-red-800 dark:text-red-300' : isAgotado ? 'text-amber-800 dark:text-amber-400' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
+                              <h3 className={`font-black text-base leading-tight truncate tracking-tight ${isAgotado ? 'text-amber-800 dark:text-amber-400' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                 <p className="text-orange-500 dark:text-orange-400 lya:text-lya-primary font-black">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
                               </div>
@@ -213,43 +260,39 @@ export const MenuManagerPage = () => {
                             
                             <div className="flex flex-col gap-1.5 w-full mr-2">
                               <button 
-                                onClick={() => !isProcessingAny && toggleAvailability(product.id)} 
-                                disabled={isProcessingAny}
-                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                                  isProcessingAvailability 
-                                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
-                                    : isProcessingAny 
-                                      ? 'opacity-50 cursor-not-allowed grayscale bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                                      : isActive 
-                                        ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 active:scale-95' 
-                                        : 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 hover:bg-red-100 shadow-sm active:scale-95'
-                                }`}
-                              >
-                                {isProcessingAvailability ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />} 
-                                <span>{isProcessingAvailability ? 'Espere...' : (isActive ? 'Activo' : 'Inactivo (Oculto)')}</span>
-                              </button>
-
-                              <button 
                                 onClick={() => !isProcessingAny && toggleAgotado(product.id)} 
-                                disabled={isProcessingAny || !isActive}
-                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                                disabled={isProcessingAny}
+                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
                                   isProcessingAgotado
                                     ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
-                                    : (!isActive || isProcessingAny)
-                                      ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-50 cursor-not-allowed grayscale'
-                                      : isAgotado 
-                                        ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 hover:bg-amber-100 shadow-sm active:scale-95' 
-                                        : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95'
+                                    : isAgotado 
+                                      ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 hover:bg-amber-100 shadow-sm active:scale-95' 
+                                      : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700/50 hover:bg-emerald-100 active:scale-95'
                                 }`}
                               >
                                 {isProcessingAgotado ? <Loader2 size={12} className="animate-spin" /> : (isAgotado ? <PauseCircle size={12} /> : <PlayCircle size={12} />)} 
-                                <span>{isProcessingAgotado ? 'Espere...' : (isAgotado ? 'Agotado (Pausado)' : 'En Stock')}</span>
+                                <span>{isProcessingAgotado ? 'Espere...' : (isAgotado ? 'Agotado (Pausado)' : 'En Stock (Activo)')}</span>
                               </button>
                             </div>
                             
-                            <div className="flex flex-col space-y-1.5 shrink-0">
-                              <button onClick={() => openModal(product)} className="p-2 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 lya:text-lya-secondary lya:bg-lya-secondary/10 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-colors active:scale-90"><Edit2 size={14} /></button>
-                              <button onClick={() => deleteProduct(product.id)} className="p-2 text-red-500 bg-red-50 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-colors active:scale-90"><Trash2 size={14} /></button>
+                            <div className="flex items-center space-x-1.5 shrink-0">
+                              <button onClick={() => openModal(product)} className="p-2.5 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 lya:text-lya-secondary lya:bg-lya-secondary/10 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-colors active:scale-90" title="Editar">
+                                <Edit2 size={16} />
+                              </button>
+                              
+                              {/* BOTÓN DE OCULTAR / INACTIVAR */}
+                              <button 
+                                onClick={() => !isProcessingAny && toggleAvailability(product.id)} 
+                                disabled={isProcessingAny}
+                                className={`p-2.5 rounded-xl transition-colors active:scale-90 ${
+                                  isProcessingAvailability 
+                                    ? 'text-gray-400 bg-gray-100 dark:bg-gray-800 opacity-70 cursor-wait' 
+                                    : 'text-gray-500 bg-gray-100 hover:bg-red-100 hover:text-red-500 dark:bg-gray-800 dark:hover:bg-red-900/40 dark:hover:text-red-400 lya:bg-lya-border/20 lya:hover:bg-red-500/20'
+                                }`} 
+                                title="Inactivar (Ocultar del sistema y enviar a Papelera)"
+                              >
+                                {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <EyeOff size={16} />}
+                              </button>
                             </div>
                           </div>
                         </motion.div>
@@ -270,6 +313,80 @@ export const MenuManagerPage = () => {
       {/* FORMULARIO DE CREAR/EDITAR PRODUCTO */}
       <AnimatePresence>
         {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} globalOptions={globalOptions} />}
+      </AnimatePresence>
+
+      {/* MODAL DE LA PAPELERA (Se abre al hacer clic en el StatCard) */}
+      <AnimatePresence>
+        {isTrashModalOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 lya:bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+            >
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-red-100 dark:bg-red-900/30 rounded-xl text-red-500">
+                    <ArchiveRestore size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">Papelera de Productos</h3>
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Productos inactivos ocultos del menú principal</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsTrashModalOpen(false)} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 lya:hover:text-lya-text rounded-full transition-colors"><X size={24} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
+                {hiddenProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-10 text-center">
+                    <ArchiveRestore size={48} className="text-gray-300 dark:text-gray-700 mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400 font-bold">La papelera está vacía.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {hiddenProducts.map((product) => {
+                      const isProcessingAvailability = processingActions?.[product.id] === 'availability';
+                      
+                      return (
+                        <div key={product.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                              {product.image || product.imageUrl ? (
+                                <img src={product.image || product.imageUrl} className="h-full w-full object-cover rounded-xl" />
+                              ) : (
+                                <ImageIcon size={20} className="text-gray-400" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">{product.nombre || product.name}</h4>
+                              <p className="text-xs text-gray-500 mt-0.5 truncate">{product.categoria || 'Sin categoría'}</p>
+                            </div>
+                          </div>
+                          
+                          <button 
+                            onClick={() => !isProcessingAvailability && toggleAvailability(product.id)}
+                            disabled={isProcessingAvailability}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ml-2 shrink-0 ${
+                              isProcessingAvailability 
+                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-wait'
+                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 active:scale-95'
+                            }`}
+                          >
+                            {isProcessingAvailability ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
+                            <span className="hidden sm:inline">Restaurar</span>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* MODAL DE GESTIÓN DE CATEGORÍAS */}
@@ -340,37 +457,6 @@ export const MenuManagerPage = () => {
                   Cancelar
                 </button>
                 <button onClick={confirmRemoveCategory} className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5">
-                  Eliminar
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* MODAL PARA ELIMINAR PRODUCTO */}
-      <AnimatePresence>
-        {productToDelete && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
-            >
-              <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
-                <AlertTriangle size={36} />
-              </div>
-              <h3 className="text-2xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text mb-2">¿Eliminar Producto?</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed px-2">
-                ¿Estás seguro de que deseas eliminar este producto del menú? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex w-full gap-3">
-                <button onClick={cancelRemoveProduct} className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors">
-                  Cancelar
-                </button>
-                <button onClick={confirmRemoveProduct} className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5">
                   Eliminar
                 </button>
               </div>
