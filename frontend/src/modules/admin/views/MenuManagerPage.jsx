@@ -1,5 +1,4 @@
-// src/modules/admin/views/MenuManagerPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
@@ -10,13 +9,12 @@ import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
 
 export const MenuManagerPage = () => {
-  // 🔥 ESTADO DE NOTIFICACIONES NEO-BENTO
   const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
-  };
+  }, []);
 
   const {
     products, categories, setCategories, handleDragEndAPI,
@@ -27,8 +25,8 @@ export const MenuManagerPage = () => {
     productToDelete, confirmRemoveProduct, cancelRemoveProduct,
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
     isLoading,
-    processingProducts
-  } = useMenuManagerController({ showToast }); // 🔥 Pasamos la función al controlador
+    processingActions 
+  } = useMenuManagerController({ showToast }); 
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isOptionsManagerOpen, setIsOptionsManagerOpen] = useState(false);
@@ -44,9 +42,6 @@ export const MenuManagerPage = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // ==========================================
-  // PANTALLA DE CARGA ANIMADA NEO-BENTO
-  // ==========================================
   if (isLoading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
@@ -67,7 +62,6 @@ export const MenuManagerPage = () => {
     );
   }
 
-  // Drag & Drop para Categorías
   const handleDragEnd = (event) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -79,7 +73,6 @@ export const MenuManagerPage = () => {
     }
   };
 
-  // Drag & Drop para Opciones Globales
   const handleDragEndOptions = (event, tipo) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -109,7 +102,6 @@ export const MenuManagerPage = () => {
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
-      {/* 🔥 CÁPSULA DE NOTIFICACIONES */}
       <AnimatePresence>
         {toast && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -176,20 +168,26 @@ export const MenuManagerPage = () => {
                 {categoryProducts.length > 0 ? (
                   <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <AnimatePresence mode="popLayout">
-                      {categoryProducts.map((product) => {
+                      {categoryProducts.map((product, index) => {
                         const isActive = product.isActive !== undefined ? product.isActive : product.disponible;
                         const isAgotado = product.isAgotado || false;
-                        const isProcessing = processingProducts?.has(product.id);
+                        
+                        const currentAction = processingActions?.[product.id];
+                        const isProcessingAvailability = currentAction === 'availability';
+                        const isProcessingAgotado = currentAction === 'agotado';
+                        const isProcessingAny = !!currentAction;
 
                         return (
                         <motion.div 
                           key={product.id} 
                           layout 
-                          initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-all ${
+                          // 🔥 AQUÍ ESTÁ LA NUEVA MAGIA: Sin "scale", solo deslizamiento hacia arriba ("y")
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+                          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                          transition={{ type: "spring", stiffness: 300, damping: 25, delay: index * 0.03 }}
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors ${
                             !isActive ? 'border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-900/5 opacity-60 grayscale-[50%]' 
                             : isAgotado ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10'
                             : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 hover:border-gray-300 lya:hover:border-lya-secondary/40'
@@ -214,36 +212,38 @@ export const MenuManagerPage = () => {
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto">
                             
                             <div className="flex flex-col gap-1.5 w-full mr-2">
-                              {/* 🔥 BOTÓN 1: INACTIVO (Esconder del sistema) */}
                               <button 
-                                onClick={() => !isProcessing && toggleAvailability(product.id)} 
-                                disabled={isProcessing}
-                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border ${
-                                  isProcessing 
+                                onClick={() => !isProcessingAny && toggleAvailability(product.id)} 
+                                disabled={isProcessingAny}
+                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                                  isProcessingAvailability 
                                     ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
-                                    : isActive 
-                                      ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100' 
-                                      : 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 hover:bg-red-100 shadow-sm'
+                                    : isProcessingAny 
+                                      ? 'opacity-50 cursor-not-allowed grayscale bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                      : isActive 
+                                        ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 active:scale-95' 
+                                        : 'text-red-600 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 hover:bg-red-100 shadow-sm active:scale-95'
                                 }`}
                               >
-                                {isProcessing ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />} 
-                                <span>{isProcessing ? 'Espere...' : (isActive ? 'Activo' : 'Inactivo (Oculto)')}</span>
+                                {isProcessingAvailability ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />} 
+                                <span>{isProcessingAvailability ? 'Espere...' : (isActive ? 'Activo' : 'Inactivo (Oculto)')}</span>
                               </button>
 
-                              {/* 🔥 BOTÓN 2: PAUSA (Agotado a la vista) */}
                               <button 
-                                onClick={() => !isProcessing && toggleAgotado(product.id)} 
-                                disabled={isProcessing || !isActive}
-                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border ${
-                                  !isActive || isProcessing
-                                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-50 cursor-not-allowed'
-                                    : isAgotado 
-                                      ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 hover:bg-amber-100 shadow-sm' 
-                                      : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                onClick={() => !isProcessingAny && toggleAgotado(product.id)} 
+                                disabled={isProcessingAny || !isActive}
+                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                                  isProcessingAgotado
+                                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
+                                    : (!isActive || isProcessingAny)
+                                      ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-50 cursor-not-allowed grayscale'
+                                      : isAgotado 
+                                        ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 hover:bg-amber-100 shadow-sm active:scale-95' 
+                                        : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95'
                                 }`}
                               >
-                                {isProcessing ? <Loader2 size={12} className="animate-spin" /> : (isAgotado ? <PauseCircle size={12} /> : <PlayCircle size={12} />)} 
-                                <span>{isAgotado ? 'Agotado (Pausado)' : 'En Stock'}</span>
+                                {isProcessingAgotado ? <Loader2 size={12} className="animate-spin" /> : (isAgotado ? <PauseCircle size={12} /> : <PlayCircle size={12} />)} 
+                                <span>{isProcessingAgotado ? 'Espere...' : (isAgotado ? 'Agotado (Pausado)' : 'En Stock')}</span>
                               </button>
                             </div>
                             

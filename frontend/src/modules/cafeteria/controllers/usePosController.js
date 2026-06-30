@@ -1,4 +1,3 @@
-// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import client from '../../../api/client.js';
 import toast from 'react-hot-toast';
@@ -336,8 +335,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
     } catch (error) { 
         setIsSuccess(false); 
-        if (onComplete) onComplete(); 
         console.error("Error al enviar a cocina:", error);
+        throw error;
     }
   };
 
@@ -560,6 +559,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         }
     } catch (error) { 
       console.error("Error al mover en BD", error); 
+      throw error;
     }
   };
 
@@ -614,9 +614,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         });
     } catch (e) { 
       console.error("Error al actualizar entrega", e); 
+      throw e; // 🔥 FIX: Para que el Sidebar atrape el error
     }
   };
 
+  // 🔥 FIX: Aquí es donde estaba el mensaje de éxito duplicado
   const deliverAllActiveItems = async () => {
     if (!activeOrderId) return;
     try {
@@ -626,9 +628,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           ? { ...item, kitchenStatus: 'DELIVERED' } 
           : item
         ));
-        toast.success('Todos los productos marcados como entregados');
+        // Se borró el toast.success duplicado que estaba aquí.
     } catch (error) { 
-      toast.error('Error al actualizar los productos'); 
+      console.error("Error en deliverAllActiveItems:", error);
+      throw error; // 🔥 FIX: Para que el Sidebar detenga su loading y muestre su error nativo
     }
   };
 
@@ -682,13 +685,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             ));
         }
         
+        // Dejamos este toast activo ya que contiene información valiosa de reembolsos automáticos
         if (response.data.wasRefunded) {
           toast.success('Cancelado. Reembolso registrado en caja.');
-        } else {
-          toast.success('Producto cancelado correctamente.');
         }
     } catch (error) { 
-      toast.error('Error al cancelar el producto'); 
+      throw error; 
     }
   };
 
@@ -712,9 +714,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           ? { ...item, status: 'CANCELLED' } 
           : item
         ));
-        toast.success(`Cuenta ${cuentaName} cancelada`);
     } catch (error) { 
-      toast.error('Error al cancelar la cuenta'); 
+      throw error; 
     }
   };
 
@@ -725,13 +726,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         setOrderStatus('CANCELLED');
         setCart(prev => prev.map(item => item.enviadoCocina ? { ...item, status: 'CANCELLED' } : item));
         
+        // Dejamos este toast para mostrarle al cajero exactamente de cuánto fue el reembolso
         if (response.data.refundedAmount > 0) {
           toast.success(`Orden cancelada. Reembolso de $${response.data.refundedAmount} registrado.`);
-        } else {
-          toast.success('Orden cancelada correctamente.');
         }
     } catch (error) { 
-      toast.error(error.response?.data?.message || 'Error al cancelar la orden'); 
+      throw error; 
     }
   };
 
@@ -756,14 +756,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       setPaidAccounts(prev => [...prev, nombreCuenta]);
       if (onComplete) onComplete();
     } catch (error) { 
-      toast.error("Hubo un error al procesar el pago."); 
+      throw error; 
     }
   };
 
   const handleCheckout = async (paymentDetails, onComplete) => {
     try {
       if (cart.some(p => !p.enviadoCocina)) {
-        await new Promise(resolve => simulateKitchenSend(resolve));
+        await new Promise((resolve, reject) => simulateKitchenSend(resolve).catch(reject));
       }
       const method = paymentDetails?.method || 'efectivo';
       if(activeOrderId) {
@@ -774,7 +774,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       }
       setOrderStatus('PAID');
       
-      // 🔥 FIX 2: Registrar todas las cuentas actuales como pagadas para soltar el bloqueo de "Cerrar Mesa"
       setPaidAccounts(prev => {
         const todasLasCuentas = Array.from(new Set(cart.map(i => i.cuenta || 'General')));
         return Array.from(new Set([...prev, ...todasLasCuentas]));
@@ -782,7 +781,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
 
       if (onComplete) onComplete();
     } catch (error) { 
-      toast.error("Hubo un error al cobrar la mesa."); 
+      throw error; 
     }
   };
 
@@ -797,17 +796,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         setOrderStatus('OPEN'); 
         setPaidAccounts([]);
         
-        if (isVitrina) {
-          toast.success('Venta finalizada exitosamente');
-        } else if (isLlevar) {
-          toast.success('Pedido finalizado exitosamente');
-        } else {
-          toast.success('Mesa liberada correctamente');
-        }
-
         if(onComplete) onComplete();
       } catch (error) {
-        toast.error("Error al finalizar la orden");
         throw error;
       }
   };

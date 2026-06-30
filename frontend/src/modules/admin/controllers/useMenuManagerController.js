@@ -1,4 +1,3 @@
-// frontend/src/modules/admin/controllers/useMenuManagerController.js
 import { useState, useEffect, useCallback } from 'react';
 import { adminMenuModel } from '../models/adminMenuModel';
 
@@ -9,7 +8,8 @@ export const useMenuManagerController = ({ showToast }) => {
   const [globalOptions, setGlobalOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [processingProducts, setProcessingProducts] = useState(new Set());
+  // 🔥 FIX: Ahora es un objeto para saber EXACTAMENTE qué botón está cargando
+  const [processingActions, setProcessingActions] = useState({});
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
@@ -150,7 +150,9 @@ export const useMenuManagerController = ({ showToast }) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
     
-    setProcessingProducts(prev => new Set(prev).add(id));
+    // Registramos que ESTE producto está cargando LA DISPONIBILIDAD
+    setProcessingActions(prev => ({ ...prev, [id]: 'availability' }));
+    
     const currentState = product.isActive !== undefined ? product.isActive : product.disponible;
     const newState = !currentState;
 
@@ -163,16 +165,18 @@ export const useMenuManagerController = ({ showToast }) => {
       setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isActive: currentState, disponible: currentState } : p));
       showToast('Error al actualizar disponibilidad', 'error');
     } finally {
-      setProcessingProducts(prev => { const next = new Set(prev); next.delete(id); return next; });
+      setProcessingActions(prev => { const next = { ...prev }; delete next[id]; return next; });
     }
   };
 
-  // 🔥 NUEVO INTERRUPTOR: DISPONIBLE / AGOTADO (PAUSA)
+  // 🔥 INTERRUPTOR: DISPONIBLE / AGOTADO (PAUSA)
   const toggleAgotado = async (id) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
     
-    setProcessingProducts(prev => new Set(prev).add(id));
+    // Registramos que ESTE producto está cargando EL STOCK
+    setProcessingActions(prev => ({ ...prev, [id]: 'agotado' }));
+    
     const currentState = product.isAgotado || false;
     const newState = !currentState;
 
@@ -185,7 +189,7 @@ export const useMenuManagerController = ({ showToast }) => {
       setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isAgotado: currentState } : p));
       showToast('Error al cambiar el estado de inventario', 'error');
     } finally {
-      setProcessingProducts(prev => { const next = new Set(prev); next.delete(id); return next; });
+      setProcessingActions(prev => { const next = { ...prev }; delete next[id]; return next; });
     }
   };
 
@@ -233,8 +237,8 @@ export const useMenuManagerController = ({ showToast }) => {
     productToDelete, requestRemoveProduct, confirmRemoveProduct, cancelRemoveProduct,
     deleteProduct: requestRemoveProduct,
     toggleAvailability,
-    toggleAgotado, // 🔥 Exportamos la función
-    processingProducts, 
+    toggleAgotado, 
+    processingActions, // 🔥 Exportamos el nuevo objeto
     
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
     isLoading

@@ -1,11 +1,12 @@
-// src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 
 export const ProductCard = ({ product, onClick, onQuickAdd }) => {
   const [imgError, setImgError] = useState(false);
-  const isAgotado = product.controlarStock === true && product.stock <= 0;
+  
+  // 🔥 FIX CRÍTICO: Ahora escucha tanto el stock automático como el botón de Pausa manual del Gestor
+  const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
   const imageUrl = product.image || product.imagen;
 
   // 🔍 Lógica premium optimizada con useMemo: 
