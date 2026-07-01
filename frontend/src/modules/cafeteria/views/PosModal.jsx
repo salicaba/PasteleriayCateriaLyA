@@ -257,7 +257,20 @@ export const PosModal = ({
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
     orderStatus, paidAccounts, 
-    onPrintTicket: (c) => setPreviewTicketData({ cuentaName: c, telefono: cuentasTelefonos[c] || '' }), 
+    onPrintTicket: (c) => {
+      let telefonoPredeterminado = '';
+      if (c) {
+        // Si se imprime el ticket de una cuenta específica
+        telefonoPredeterminado = cuentasTelefonos[c] || '';
+      } else {
+        // Si es el ticket general, buscamos si hay UN ÚNICO teléfono en toda la mesa
+        const telefonosGuardados = Object.values(cuentasTelefonos).filter(t => t && t.trim() !== '');
+        if (telefonosGuardados.length === 1) {
+          telefonoPredeterminado = telefonosGuardados[0];
+        }
+      }
+      setPreviewTicketData({ cuentaName: c, telefono: telefonoPredeterminado });
+    }, 
     onCloseTable: finalizeTable, toggleDeliveredStatus, 
     isLlevar: (isLlevar || isVitrina), 
     isVitrina, 

@@ -162,10 +162,20 @@ export const TicketSidebar = ({
     setIsClosingTable(true);
     try {
       if (onCloseTable) await onCloseTable();
-      toast('Mesa liberada exitosamente', 'success');
+      
+      let successMsg = 'Mesa liberada exitosamente';
+      if (isVitrina) successMsg = 'Venta en mostrador finalizada exitosamente';
+      else if (isLlevar) successMsg = 'Pedido para llevar finalizado exitosamente';
+      
+      toast(successMsg, 'success');
     } catch (error) {
-      console.error("Error cerrando mesa", error);
-      toast('Error al liberar la mesa', 'error');
+      console.error("Error finalizando el pedido/mesa", error);
+      
+      let errorMsg = 'Error al liberar la mesa';
+      if (isVitrina) errorMsg = 'Error al finalizar la venta';
+      else if (isLlevar) errorMsg = 'Error al finalizar el pedido';
+      
+      toast(errorMsg, 'error');
     } finally {
       setIsClosingTable(false);
     }
@@ -176,7 +186,6 @@ export const TicketSidebar = ({
     try {
       if (onCheckout) await onCheckout();
     } finally {
-      // Breve retraso para que la animación del modal termine de abrirse
       setTimeout(() => setIsCheckingOut(false), 500);
     }
   };
@@ -426,11 +435,13 @@ export const TicketSidebar = ({
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar && !isVitrina) setDragOverCuenta(cuentaName);
                   }}
                   onDragLeave={() => setDragOverCuenta(null)}
-                  onDrop={(e) => {
+                  onDrop={async (e) => {
                     e.preventDefault();
                     setDragOverCuenta(null);
                     if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar && !isVitrina) {
                       let qtyToMove = draggedItem.item.qty;
+                      const itemIdToProcess = draggedItem.item.backendItemId || draggedItem.item.id;
+
                       if (qtyToMove > 1) {
                           openConfirmModal({
                               title: 'Mover Producto',
@@ -445,21 +456,27 @@ export const TicketSidebar = ({
                               onConfirm: async (val) => { 
                                   const qty = parseInt(val, 10); 
                                   if (qty > 0 && qty <= qtyToMove) { 
+                                      setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
                                       try {
                                         await onMoveItem(draggedItem.item, cuentaName, qty); 
                                         toast(`Movido a ${cuentaName}`, 'success');
                                       } catch (error) {
                                         toast('Error al mover el producto', 'error');
+                                      } finally {
+                                        setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: false }));
                                       }
                                   } 
                               }
                           });
                       } else {
+                          setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
                           try {
-                            onMoveItem(draggedItem.item, cuentaName, 1);
+                            await onMoveItem(draggedItem.item, cuentaName, 1);
                             toast(`Movido a ${cuentaName}`, 'success');
                           } catch (error) {
                             toast('Error al mover el producto', 'error');
+                          } finally {
+                            setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: false }));
                           }
                       }
                     }
@@ -582,20 +599,28 @@ export const TicketSidebar = ({
                       return (
                       <motion.div 
                         key={currentItemKey} layout
-                        draggable={!isCuentaPagada && !isLlevar && !isVitrina}
+                        draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isProcessing}
                         onDragStart={(e) => { 
-                            if (isCuentaPagada || isLlevar || isVitrina) return; 
+                            if (isCuentaPagada || isLlevar || isVitrina || isProcessing) return; 
                             setDraggedItem({ item, cuentaName }); 
                             e.dataTransfer.effectAllowed = 'move'; 
                         }}
                         onDragEnd={() => setDraggedItem(null)}
                         className={clsx(
                             "relative group flex flex-col p-2.5 rounded-xl transition-all overflow-hidden border", 
-                            (!isCuentaPagada && !isLlevar && !isVitrina) ? "cursor-grab active:cursor-grabbing" : "", 
+                            (!isCuentaPagada && !isLlevar && !isVitrina && !isProcessing) ? "cursor-grab active:cursor-grabbing" : "", 
                             draggedItem?.item === item ? "opacity-40 scale-95" : "opacity-100", 
-                            item.enviadoCocina ? "bg-gray-50/80 dark:bg-gray-800/50 lya:bg-lya-bg/50 border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20" : "bg-white dark:bg-gray-800 lya:bg-lya-bg border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-sm"
+                            item.enviadoCocina ? "bg-gray-50/80 dark:bg-gray-800/50 lya:bg-lya-bg/50 border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20" : "bg-white dark:bg-gray-800 lya:bg-lya-bg border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-sm",
+                            isProcessing && "pointer-events-none opacity-60"
                         )}
                       >
+                        {isProcessing && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 dark:bg-black/40 lya:bg-lya-bg/40 backdrop-blur-[2px] rounded-xl">
+                                <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-primary drop-shadow-md" />
+                                <span className="text-[9px] font-black mt-1 text-orange-700 dark:text-orange-400 lya:text-lya-primary drop-shadow-sm uppercase tracking-wider">Cargando...</span>
+                            </div>
+                        )}
+
                         <div className="flex gap-2.5">
                           <div className="w-12 h-12 rounded-lg overflow-hidden bg-white dark:bg-gray-900 lya:bg-lya-surface flex-shrink-0 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow">
                             {item.imagen || item.image ? <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" /> : <span className="text-lg opacity-80">🧁</span>}

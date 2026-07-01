@@ -281,6 +281,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         });
         orderId = res.data.order.id;
         setActiveOrderId(orderId);
+
+        // 🔥 LA CORRECCIÓN MÁGICA: Ahora que ya tenemos un ID de orden real, 
+        // guardamos los teléfonos que estaban pendientes en memoria.
+        setCuentasTelefonos(prev => {
+            if (Object.keys(prev).length > 0) {
+                localStorage.setItem(`lya_phones_${orderId}`, JSON.stringify(prev));
+            }
+            return prev;
+        });
       }
 
       const payload = itemsNuevos.map(item => ({ 
@@ -614,11 +623,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         });
     } catch (e) { 
       console.error("Error al actualizar entrega", e); 
-      throw e; // 🔥 FIX: Para que el Sidebar atrape el error
+      throw e;
     }
   };
 
-  // 🔥 FIX: Aquí es donde estaba el mensaje de éxito duplicado
   const deliverAllActiveItems = async () => {
     if (!activeOrderId) return;
     try {
@@ -628,10 +636,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           ? { ...item, kitchenStatus: 'DELIVERED' } 
           : item
         ));
-        // Se borró el toast.success duplicado que estaba aquí.
     } catch (error) { 
       console.error("Error en deliverAllActiveItems:", error);
-      throw error; // 🔥 FIX: Para que el Sidebar detenga su loading y muestre su error nativo
+      throw error; 
     }
   };
 
@@ -685,7 +692,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             ));
         }
         
-        // Dejamos este toast activo ya que contiene información valiosa de reembolsos automáticos
         if (response.data.wasRefunded) {
           toast.success('Cancelado. Reembolso registrado en caja.');
         }
@@ -726,7 +732,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         setOrderStatus('CANCELLED');
         setCart(prev => prev.map(item => item.enviadoCocina ? { ...item, status: 'CANCELLED' } : item));
         
-        // Dejamos este toast para mostrarle al cajero exactamente de cuánto fue el reembolso
         if (response.data.refundedAmount > 0) {
           toast.success(`Orden cancelada. Reembolso de $${response.data.refundedAmount} registrado.`);
         }
