@@ -28,7 +28,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 overflow-y-auto custom-scrollbar p-4 md:p-6 relative"
     >
-      {/* --- SISTEMA DE NOTIFICACIONES NEO-BENTO (DISEÑO CAFETERÍA 𝓛𝔂𝓐) --- */}
+      {/* --- SISTEMA DE NOTIFICACIONES NEO-BENTO (DISEÑO CAFETERÍA 𝓛𝔂𝓪) --- */}
       <AnimatePresence>
         {notification.show && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">

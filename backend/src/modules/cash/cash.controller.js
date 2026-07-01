@@ -1,3 +1,4 @@
+// backend/src/modules/cash/cash.controller.js
 import InventoryTransaction from '../inventory/InventoryTransaction.model.js';
 import Transaction from './Transaction.model.js';
 import Order from '../pos/Order.model.js';
@@ -7,34 +8,44 @@ import { Op } from 'sequelize';
 
 export const getTransactions = async (req, res) => {
   try {
-    const { date, type } = req.query; 
+    // 🔥 NUEVO: Recibimos 'source' para poder filtrar solo los MANUALES
+    const { date, startDate, endDate, type, source } = req.query; 
     let whereClause = {};
 
-    if (date) {
-      // date viene como "YYYY-MM-DD"
+    if (startDate && endDate) {
+      const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+      const start = new Date(Date.UTC(sYear, sMonth - 1, sDay, 6, 0, 0));
+
+      const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+      const end = new Date(Date.UTC(eYear, eMonth - 1, eDay + 1, 5, 59, 59));
+      
+      whereClause.createdAt = { [Op.between]: [start, end] };
+    } 
+    else if (date) {
       const [year, month, day] = date.split('-').map(Number);
+      const start = new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
+      const end = new Date(Date.UTC(year, month - 1, day + 1, 5, 59, 59));
       
-      // 🔥 SOLUCIÓN MATEMÁTICA: Chiapas es UTC-6 permanentemente.
-      // 00:00:00 en Chiapas = 06:00:00 en el reloj global (UTC).
-      // 23:59:59 en Chiapas = 05:59:59 del DÍA SIGUIENTE en el reloj global.
-      const startDate = new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
-      const endDate = new Date(Date.UTC(year, month - 1, day + 1, 5, 59, 59));
-      
-      whereClause.createdAt = { [Op.between]: [startDate, endDate] };
-    } else {
-      // Si no hay fecha, calculamos HOY en Chiapas
+      whereClause.createdAt = { [Op.between]: [start, end] };
+    } 
+    else {
       const now = new Date();
       const chiapasTime = new Date(now.getTime() - (6 * 60 * 60 * 1000));
       const year = chiapasTime.getUTCFullYear();
       const month = chiapasTime.getUTCMonth();
       const day = chiapasTime.getUTCDate();
 
-      const startDate = new Date(Date.UTC(year, month, day, 6, 0, 0));
-      whereClause.createdAt = { [Op.gte]: startDate };
+      const start = new Date(Date.UTC(year, month, day, 6, 0, 0));
+      whereClause.createdAt = { [Op.gte]: start };
     }
 
     if (type) {
       whereClause.type = type;
+    }
+    
+    // 🔥 NUEVO: Filtramos por origen si nos lo piden desde el Frontend
+    if (source) {
+      whereClause.source = source;
     }
 
     const transactions = await Transaction.findAll({
@@ -53,21 +64,27 @@ export const getTransactions = async (req, res) => {
   }
 };
 
-// REGISTRAR GASTOS/EGRESOS MANUALES
 export const registerManualTransaction = async (req, res) => {
   try {
-    const { amount, description, expenseCategory } = req.body;
+    const { amount, description, expenseCategory, expenseDate } = req.body;
     
     if (!amount || amount <= 0) return res.status(400).json({ message: 'El monto debe ser mayor a 0' });
     if (!description) return res.status(400).json({ message: 'La descripción es obligatoria' });
 
+    let createdAt = new Date();
+    if (expenseDate) {
+      const [year, month, day] = expenseDate.split('-').map(Number);
+      createdAt = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    }
+
     const newTx = await Transaction.create({
       folio: `EGR-${Date.now().toString().slice(-6)}`, 
       type: 'EXPENSE',
-      source: 'MANUAL',
+      source: 'MANUAL', // <-- Esto es lo que define un Gasto Operativo
       expenseCategory: expenseCategory || 'OTHER',
       amount,
       description,
+      createdAt,
       createdBy: req.user.id
     });
 
@@ -173,7 +190,6 @@ export const restoreTransaction = async (req, res) => {
   }
 };
 
-// ESTADO DE RESULTADOS (GANANCIAS NETAS) CON CORRECCIÓN DE ZONA HORARIA
 export const getFinancialSummary = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -196,19 +212,27 @@ export const getFinancialSummary = async (req, res) => {
       end = new Date(Date.UTC(year, month + 1, 1, 5, 59, 59));
     }
 
+    // Ingresos por ventas
     const incomes = await Transaction.sum('amount', {
       where: { type: 'INCOME', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
+    
+    // Egresos por reembolsos (Lo restaremos a las ventas brutas para que sea exacto)
+    const refunds = await Transaction.sum('amount', {
+      where: { type: 'EXPENSE', source: { [Op.ne]: 'MANUAL' }, status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
+    });
 
+    // 🔥 CORRECCIÓN: Los Gastos Operativos (OPEX) SOLO deben ser los MANUALES
     const opex = await Transaction.sum('amount', {
-      where: { type: 'EXPENSE', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
+      where: { type: 'EXPENSE', source: 'MANUAL', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
 
     const cogs = await InventoryTransaction.sum('totalCost', {
       where: { type: 'CONSUMPTION', createdAt: { [Op.between]: [start, end] } }
     });
 
-    const totalIncome = parseFloat(incomes || 0);
+    // Descontamos las cancelaciones para tener el Ingreso Bruto Real
+    const totalIncome = parseFloat(incomes || 0) - parseFloat(refunds || 0);
     const totalOpex = parseFloat(opex || 0);
     const totalCogs = parseFloat(cogs || 0);
     

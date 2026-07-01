@@ -5,15 +5,22 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 export const useFinanceController = () => {
   const [expenses, setExpenses] = useState([]);
-  const [summary, setSummary] = useState(null); // 🔥 Nuevo estado para el Dashboard
+  const [summary, setSummary] = useState(null); 
   const [isLoading, setIsLoading] = useState(false);
-  const [isSummaryLoading, setIsSummaryLoading] = useState(false); // 🔥 Nuevo loading
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false); 
 
-  const fetchExpenses = useCallback(async (dateString) => {
+  const fetchExpenses = useCallback(async (startDate, endDate) => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('lya_token');
-      const response = await fetch(`${API_URL}/cash?date=${dateString}&type=EXPENSE`, {
+      // 🔥 AÑADIDO: source=MANUAL para ignorar los reembolsos de Cafetería/Pastelería
+      let url = `${API_URL}/cash?type=EXPENSE&source=MANUAL`;
+      
+      if (startDate && endDate) {
+        url += `&startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar gastos');
@@ -48,14 +55,12 @@ export const useFinanceController = () => {
     }
   };
 
-  // 🔥 NUEVA FUNCIÓN: Obtener Resumen Financiero
   const fetchFinancialSummary = useCallback(async (startDate, endDate) => {
     setIsSummaryLoading(true);
     try {
       const token = localStorage.getItem('lya_token');
       let url = `${API_URL}/cash/summary`;
       
-      // Si mandamos fechas, las agregamos a la URL
       if (startDate && endDate) {
         url += `?startDate=${startDate}&endDate=${endDate}`;
       }

@@ -117,7 +117,7 @@ export const AccountsTab = ({ showNotification }) => {
     const htmlContent = `
       <html>
         <head>
-          <title>Datos de Transferencia - 𝓛𝔂𝓐</title>
+          <title>Datos de Transferencia - 𝓛𝔂𝓪</title>
           <style>
             body { font-family: sans-serif; padding: 20px; background: white; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
@@ -136,7 +136,7 @@ export const AccountsTab = ({ showNotification }) => {
           <div class="grid">
             ${tarjetasArray.map(() => `
               <div class="card">
-                <div class="logo"> 𝓛𝔂𝓐 </div>
+                <div class="logo"> 𝓛𝔂𝓪 </div>
                 <div class="subtitle">Datos de Transferencia</div>
                 ${accounts.map(acc => `
                   <div class="bank">${acc.bank_name}</div>
