@@ -23,7 +23,10 @@ const modalVariants = {
   exit: { y: "100%", opacity: 0 } 
 };
 
-export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, onUnirMesas, onPagoParcial, inline = false }) => {
+export const PosModal = ({ 
+  isOpen, onClose, mesa, todasLasMesas, onTableRelease, onUpdateTable, 
+  onUnirMesas, onPagoParcial, inline = false, showToast: externalShowToast 
+}) => {
   
   const getLoggedUserName = () => {
     try {
@@ -52,12 +55,16 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
   const [previewTicketData, setPreviewTicketData] = useState(null);
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
-  // 🔥 ESTADO UNIFICADO PARA CÁPSULAS FLOTANTES
-  const [toast, setToast] = useState(null);
+  // 🔥 ESTADO UNIFICADO: Fallback local en caso de que no exista el padre
+  const [localToast, setLocalToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    if (externalShowToast) {
+      externalShowToast(msg, type);
+    } else {
+      setLocalToast({ msg, type });
+      setTimeout(() => setLocalToast(null), 3500);
+    }
   };
 
   const { 
@@ -87,12 +94,22 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     showToast('Producto añadido', 'success');
   };
 
-  const handleSendToKitchen = () => {
+  // 🔥 TRINIDAD UX: Se asegura que el envío a cocina detenga la interfaz de forma asíncrona
+  const handleSendToKitchen = async () => {
     if (!hasUnsentItems) return; 
-    simulateKitchenSend(() => {
-      if (onUpdateTable && unsentTotal > 0) onUpdateTable(mesa.id, unsentTotal);
-      showToast('Comanda enviada a cocina', 'success');
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        simulateKitchenSend(() => {
+          if (onUpdateTable && unsentTotal > 0) onUpdateTable(mesa.id, unsentTotal);
+          showToast('Comanda enviada a cocina', 'success');
+          resolve();
+        }).catch(reject);
+      });
+    } catch (error) {
+      console.error(error);
+      showToast('Error al enviar comanda', 'error');
+      throw error;
+    }
   };
 
   const handleOpenCheckout = () => {
@@ -139,12 +156,17 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     });
   };
 
-  const finalizeTable = () => { 
+  // 🔥 SOLUCIÓN ESTRELLA: Se asegura que el Loader no pare hasta cerrar la mesa en Base de Datos.
+  const finalizeTable = async () => { 
     if (onPagoParcial && total > 0) onPagoParcial(mesa.id, total);
-    handleCloseTable(() => { 
-      if (onTableRelease) onTableRelease(mesa.id); 
-      if (!inline) onClose(); 
-    }); 
+    try {
+      await handleCloseTable(); // 1. Espera a que Supabase confirme
+      if (onTableRelease) await Promise.resolve(onTableRelease(mesa.id)); // 2. Actualiza la vista padre
+      if (!inline) onClose(); // 3. Se cierra y se muestra la cápsula inmortal
+    } catch (error) {
+      console.error("Error liberando mesa:", error);
+      throw error; // Esto lanza el error al catch del TicketSidebar para que siga el UI correcto
+    }
   };
 
   const executeRealPrint = async () => {
@@ -228,7 +250,6 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     showToast('Redirigiendo a WhatsApp...', 'success');
   };
 
-  // 🔥 Le pasamos showToast a TicketSidebar para que notifique movimientos
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -247,7 +268,7 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
     nombreCliente: isLlevar ? nombreCliente : null,
-    showToast // Inyectado
+    showToast 
   };
 
   const posContent = (
@@ -361,27 +382,27 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                 />
 
                 <AnimatePresence>
-                  {/* CÁPSULA DE NOTIFICACIONES FLOTANTES (REEMPLAZA AL ALERT BLOQUEANTE) */}
-                  {toast && (
+                  {/* 🔥 CÁPSULA NEO-BENTO DE FALLBACK LOCAL */}
+                  {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
                       <motion.div 
                         initial={{ opacity: 0, y: -50, scale: 0.9 }} 
                         animate={{ opacity: 1, y: 0, scale: 1 }} 
                         exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                        className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
-                          toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
-                          toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
-                          'border-red-100 dark:border-red-900/30 lya:border-red-500/30'
+                        className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                          localToast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
+                          localToast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
+                          'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
                         }`}
                       >
                         <div className={`p-1.5 rounded-full shrink-0 ${
-                          toast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
-                          toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
+                          localToast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
+                          localToast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
                           'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
                         }`}>
-                          {toast.type === 'success' ? <CheckCircle2 size={20} /> : toast.type === 'warning' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}
+                          {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
                         </div>
-                        <span className="text-sm">{toast.msg}</span>
+                        <span className="text-[15px]">{localToast.msg}</span>
                       </motion.div>
                     </div>
                   )}
@@ -405,14 +426,14 @@ export const PosModal = ({ isOpen, onClose, mesa, todasLasMesas, onTableRelease,
                     />
                   )}
 
+                  {/* 🔥 CORRECCIÓN: Pasar onUnir al modal en vez del incorrecto onUnirMesas */}
                   {showOpcionesMesa && (
                     <OpcionesMesaModal 
                       isOpen={showOpcionesMesa} 
                       onClose={() => setShowOpcionesMesa(false)} 
                       mesa={mesa} 
                       todasLasMesas={todasLasMesas} 
-                      onLiberarMesa={(id) => { onTableRelease(id); setShowOpcionesMesa(false); if(!inline) onClose(); }} 
-                      onUnirMesas={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} 
+                      onUnir={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} 
                     />
                   )}
                 </AnimatePresence>

@@ -8,18 +8,18 @@ import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
 
-// 🔥 IMPORTAMOS TU COMPONENTE STATCARD DE MESAS (Adaptado para el Menú)
+// 🔥 COMPONENTE STATCARD (Neo-Bento Compact)
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
     onClick={onClick}
-    className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center transition-all ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-md' : ''} ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-80 hover:opacity-100'}`}
+    className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-5 shadow-sm border-l-4 flex justify-between items-center transition-all duration-300 ${onClick ? 'cursor-pointer active:scale-[0.98] hover:shadow-md' : ''} ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-80 hover:opacity-100'}`}
   >
     <div>
       <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
-      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text">{value}</h3>
+      <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text">{value}</h3>
     </div>
-    <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${iconColors.bg}`}>
-      <Icon size={24} className={iconColors.text} />
+    <div className={`p-3 rounded-2xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${iconColors.bg}`}>
+      <Icon size={24} className={iconColors.text} strokeWidth={2.5} />
     </div>
   </div>
 );
@@ -27,6 +27,11 @@ const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, 
 export const MenuManagerPage = () => {
   const [toast, setToast] = useState(null);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+
+  // 🔥 ESTADOS TRINIDAD UX (Prevención de Doble Clic)
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [isSavingOption, setIsSavingOption] = useState(false);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -58,20 +63,62 @@ export const MenuManagerPage = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // 🔥 FUNCIONES BLINDADAS PARA PREVENIR DOBLE CLIC Y ERRORES
+  const handleCreateOrUpdateCategory = async () => {
+    if (newCategoryName.trim() && !isSavingCategory) {
+      setIsSavingCategory(true);
+      try {
+        await Promise.resolve(saveCategory(newCategoryName));
+        setNewCategoryName('');
+      } catch (error) {
+        console.error("Error al guardar categoría:", error);
+      } finally {
+        setIsSavingCategory(false);
+      }
+    }
+  };
+
+  const handleConfirmRemoveCategory = async () => {
+    if (isDeletingCategory) return;
+    setIsDeletingCategory(true);
+    try {
+      await Promise.resolve(confirmRemoveCategory());
+    } catch (error) {
+      console.error("Error al eliminar categoría:", error);
+    } finally {
+      setIsDeletingCategory(false);
+    }
+  };
+
+  const handleSaveOption = async () => {
+    if (newOpt.nombre.trim() && !isSavingOption) {
+      setIsSavingOption(true);
+      try {
+        await Promise.resolve(saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio));
+        setNewOpt({ tipo: newOpt.tipo, nombre: '', precio: 0 });
+      } catch (error) {
+        console.error("Error al guardar opción:", error);
+      } finally {
+        setIsSavingOption(false);
+      }
+    }
+  };
+
   if (isLoading) {
+    // 🔥 SPLASH SCREEN INMERSIVO NEO-BENTO
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
+      <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-gray-50/90 dark:bg-gray-950/90 lya:bg-lya-bg/90 backdrop-blur-md transition-colors duration-300">
         <motion.div
-          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          animate={{ scale: [0.95, 1.05, 0.95], opacity: [0.8, 1, 0.8] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
         >
-          <LayoutGrid size={40} className="text-orange-500 lya:text-lya-primary" />
+          <LayoutGrid size={40} className="text-orange-500 lya:text-lya-primary" strokeWidth={2.5} />
         </motion.div>
         <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
           Cargando Gestor de Menú
         </h2>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
           <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando catálogo...
         </p>
       </div>
@@ -102,13 +149,6 @@ export const MenuManagerPage = () => {
     }
   };
 
-  const handleCreateOrUpdateCategory = () => {
-    if (newCategoryName.trim()) {
-      saveCategory(newCategoryName);
-      setNewCategoryName('');
-    }
-  };
-
   // 🔥 Separamos los productos visualmente (Los que se ven en la cuadrícula vs Papelera)
   const visibleProducts = products.filter(p => p.isActive !== false && p.disponible !== false);
   const hiddenProducts = products.filter(p => p.isActive === false || p.disponible === false);
@@ -118,22 +158,24 @@ export const MenuManagerPage = () => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }} 
+      initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
+      {/* CÁPSULA NEO-BENTO (Notificaciones) */}
       <AnimatePresence>
         {toast && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
             <motion.div 
-              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              initial={{ opacity: 0, y: -50, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
-                toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
-                toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
-                'border-red-100 dark:border-red-900/30 lya:border-red-500/30'
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                toast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
+                toast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
+                'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
               }`}
             >
               <div className={`p-1.5 rounded-full shrink-0 ${
@@ -141,66 +183,46 @@ export const MenuManagerPage = () => {
                 toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
                 'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
               }`}>
-                {toast.type === 'success' ? <CheckCircle2 size={20} /> : toast.type === 'warning' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}
+                {toast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : toast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
               </div>
-              <span className="text-sm">{toast.message}</span>
+              <span className="text-[15px]">{toast.message}</span>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
       {/* HEADER PRINCIPAL */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
-          <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
-            <LayoutGrid size={28} />
+          <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3.5 rounded-[1.5rem] shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
+            <LayoutGrid size={28} strokeWidth={2.5} />
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight">Gestor de Menú</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Catálogo completo del sistema</p>
+            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Catálogo completo del sistema</p>
           </div>
         </div>
         
         <div className="flex flex-wrap space-x-0 space-y-3 md:space-y-0 md:space-x-3 w-full md:w-auto">
-          <button onClick={() => setIsOptionsManagerOpen(true)} className="w-full md:w-auto flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20 active:scale-95">
+          <button onClick={() => setIsOptionsManagerOpen(true)} className="w-full md:w-auto flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-5 py-3.5 rounded-[1.2rem] font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20 active:scale-[0.98]">
             <Settings size={20} /> <span className="hidden sm:inline">Opciones Globales</span>
           </button>
           
-          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 active:scale-95">
+          <button onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text px-5 py-3.5 rounded-[1.2rem] font-bold transition-all flex items-center justify-center space-x-2 active:scale-[0.98]">
             <LayoutGrid size={20} /> <span className="hidden sm:inline">Categorías</span>
           </button>
           
-          <button onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 transition-all active:scale-95 flex items-center justify-center space-x-2">
-            <Plus size={20} /> <span>Nuevo Producto</span>
+          <button onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-[1.2rem] font-bold shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 transition-all active:scale-[0.98] flex items-center justify-center space-x-2">
+            <Plus size={20} strokeWidth={2.5} /> <span>Nuevo Producto</span>
           </button>
         </div>
       </header>
 
-      {/* 🔥 FILA DE TARJETAS DE ESTADÍSTICAS (STATCARDS) */}
+      {/* FILA DE TARJETAS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-8 shrink-0 z-10 relative">
-        <StatCard 
-          title="Total en Catálogo" 
-          value={products.length} 
-          icon={LayoutGrid} 
-          borderClass="border-blue-500 lya:border-lya-secondary" 
-          iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} 
-        />
-        <StatCard 
-          title="Productos Activos" 
-          value={productosRealmenteActivos} // 🔥 AQUÍ ESTÁ TU LÓGICA APLICADA: Resta los agotados
-          icon={CheckCircle2} 
-          borderClass="border-emerald-500 lya:border-emerald-400" 
-          iconColors={{ bg: "bg-emerald-500 lya:bg-emerald-500", text: "text-emerald-500 lya:text-emerald-500" }} 
-        />
-        <StatCard 
-          title="Papelera (Ocultos)" 
-          value={hiddenProducts.length} 
-          icon={ArchiveRestore} 
-          borderClass="border-red-500 lya:border-red-400" 
-          iconColors={{ bg: "bg-red-500 lya:bg-red-500", text: "text-red-500 lya:text-red-500" }} 
-          onClick={() => setIsTrashModalOpen(true)}
-          isActive={isTrashModalOpen}
-        />
+        <StatCard title="Total en Catálogo" value={products.length} icon={LayoutGrid} borderClass="border-blue-500 lya:border-lya-secondary" iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} />
+        <StatCard title="Productos Activos" value={productosRealmenteActivos} icon={CheckCircle2} borderClass="border-emerald-500 lya:border-emerald-400" iconColors={{ bg: "bg-emerald-500 lya:bg-emerald-500", text: "text-emerald-500 lya:text-emerald-500" }} />
+        <StatCard title="Papelera (Ocultos)" value={hiddenProducts.length} icon={ArchiveRestore} borderClass="border-red-500 lya:border-red-400" iconColors={{ bg: "bg-red-500 lya:bg-red-500", text: "text-red-500 lya:text-red-500" }} onClick={() => setIsTrashModalOpen(true)} isActive={isTrashModalOpen} />
       </div>
 
       {/* CUERPO: LISTA DE CATEGORÍAS Y PRODUCTOS VISIBLES */}
@@ -230,18 +252,18 @@ export const MenuManagerPage = () => {
                         <motion.div 
                           key={product.id} 
                           layout 
-                          initial={{ opacity: 0, y: 20 }}
+                          initial={{ opacity: 0, y: 15 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+                          exit={{ opacity: 0, y: -15, transition: { duration: 0.2 } }}
                           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                          transition={{ type: "spring", stiffness: 300, damping: 25, delay: index * 0.03 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors ${
+                          transition={{ type: "spring", stiffness: 350, damping: 28, delay: index * 0.03 }}
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-5 shadow-sm border transition-colors ${
                             isAgotado ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10'
                             : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 hover:border-gray-300 lya:hover:border-lya-secondary/40'
                           }`}
                         >
                           <div className="flex items-center space-x-4 mb-4">
-                            <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner flex items-center justify-center">
+                            <div className="h-16 w-16 flex-shrink-0 rounded-[1.2rem] overflow-hidden bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner flex items-center justify-center">
                               {product.image || product.imageUrl ? (
                                 <img src={product.image || product.imageUrl} alt={product.nombre || product.name} className="w-full h-full object-cover" />
                               ) : (
@@ -257,7 +279,6 @@ export const MenuManagerPage = () => {
                           </div>
                           
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto">
-                            
                             <div className="flex flex-col gap-1.5 w-full mr-2">
                               <button 
                                 onClick={() => !isProcessingAny && toggleAgotado(product.id)} 
@@ -277,10 +298,9 @@ export const MenuManagerPage = () => {
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
                               <button onClick={() => openModal(product)} className="p-2.5 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 lya:text-lya-secondary lya:bg-lya-secondary/10 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-colors active:scale-90" title="Editar">
-                                <Edit2 size={16} />
+                                <Edit2 size={16} strokeWidth={2.5} />
                               </button>
                               
-                              {/* BOTÓN DE OCULTAR / INACTIVAR */}
                               <button 
                                 onClick={() => !isProcessingAny && toggleAvailability(product.id)} 
                                 disabled={isProcessingAny}
@@ -291,7 +311,7 @@ export const MenuManagerPage = () => {
                                 }`} 
                                 title="Inactivar (Ocultar del sistema y enviar a Papelera)"
                               >
-                                {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <EyeOff size={16} />}
+                                {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <EyeOff size={16} strokeWidth={2.5} />}
                               </button>
                             </div>
                           </div>
@@ -300,7 +320,7 @@ export const MenuManagerPage = () => {
                     </AnimatePresence>
                   </motion.div>
                 ) : (
-                  <div className="p-8 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
+                  <div className="p-8 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
                     <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">Categoría vacía. Añade un producto aquí.</p>
                   </div>
                 )}
@@ -310,26 +330,25 @@ export const MenuManagerPage = () => {
         </div>
       </div>
 
-      {/* FORMULARIO DE CREAR/EDITAR PRODUCTO */}
       <AnimatePresence>
         {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} globalOptions={globalOptions} />}
       </AnimatePresence>
 
-      {/* MODAL DE LA PAPELERA (Se abre al hacer clic en el StatCard) */}
+      {/* MODAL DE LA PAPELERA */}
       <AnimatePresence>
         {isTrashModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 lya:bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-red-100 dark:bg-red-900/30 rounded-xl text-red-500">
-                    <ArchiveRestore size={24} />
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-500">
+                    <ArchiveRestore size={24} strokeWidth={2.5} />
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">Papelera de Productos</h3>
@@ -342,16 +361,15 @@ export const MenuManagerPage = () => {
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
                 {hiddenProducts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center p-10 text-center">
-                    <ArchiveRestore size={48} className="text-gray-300 dark:text-gray-700 mb-4" />
+                    <ArchiveRestore size={48} className="text-gray-300 dark:text-gray-700 mb-4" strokeWidth={1.5} />
                     <p className="text-gray-500 dark:text-gray-400 font-bold">La papelera está vacía.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {hiddenProducts.map((product) => {
                       const isProcessingAvailability = processingActions?.[product.id] === 'availability';
-                      
                       return (
-                        <div key={product.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 hover:opacity-100 transition-opacity">
+                        <div key={product.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 hover:opacity-100 transition-opacity">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
                               {product.image || product.imageUrl ? (
@@ -394,11 +412,11 @@ export const MenuManagerPage = () => {
         {isCategoryManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 lya:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]"
+              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2.5rem] shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]"
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">Administrar Categorías</h3>
@@ -408,15 +426,27 @@ export const MenuManagerPage = () => {
               </div>
 
               <div className="flex space-x-2 mb-6">
-                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 font-medium transition-all ${categoryToEdit ? 'border-blue-200 dark:border-blue-900 lya:border-lya-secondary focus:ring-blue-500 lya:focus:ring-lya-secondary' : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:ring-orange-500 lya:focus:ring-lya-primary'}`} onKeyDown={(e) => e.key === 'Enter' && handleCreateOrUpdateCategory()} />
-                {categoryToEdit && <button onClick={() => setCategoryToEdit(null)} className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-border/40 lya:hover:bg-lya-border/60 transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text px-3 py-3 rounded-xl font-bold"><X size={20} /></button>}
-                <button onClick={handleCreateOrUpdateCategory} className={`${categoryToEdit ? 'bg-blue-500 hover:bg-blue-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90' : 'bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90'} transition-colors text-white lya:text-lya-surface px-4 py-3 rounded-xl font-bold`}>
-                  {categoryToEdit ? <Save size={20} /> : <Plus size={20} />}
+                <input 
+                  type="text" 
+                  value={newCategoryName} 
+                  onChange={(e) => setNewCategoryName(e.target.value)} 
+                  placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} 
+                  disabled={isSavingCategory}
+                  className={`flex-1 p-3.5 rounded-[1.2rem] border bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 font-bold transition-all disabled:opacity-50 ${categoryToEdit ? 'border-blue-200 dark:border-blue-900 lya:border-lya-secondary focus:ring-blue-500 lya:focus:ring-lya-secondary' : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:ring-orange-500 lya:focus:ring-lya-primary'}`} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateOrUpdateCategory()} 
+                />
+                {categoryToEdit && <button onClick={() => setCategoryToEdit(null)} className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-border/40 lya:hover:bg-lya-border/60 transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text px-3 py-3 rounded-[1.2rem] font-bold"><X size={20} /></button>}
+                <button 
+                  onClick={handleCreateOrUpdateCategory} 
+                  disabled={isSavingCategory}
+                  className={`${categoryToEdit ? 'bg-blue-500 hover:bg-blue-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90' : 'bg-orange-500 hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90'} transition-colors text-white lya:text-lya-surface px-5 py-3.5 rounded-[1.2rem] font-bold disabled:opacity-50`}
+                >
+                  {isSavingCategory ? <Loader2 size={20} className="animate-spin" /> : (categoryToEdit ? <Save size={20} /> : <Plus size={20} strokeWidth={2.5} />)}
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 font-semibold uppercase tracking-wider text-center">Orden del Menú (Arrastra para reordenar)</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-4 font-black uppercase tracking-widest text-center">Orden del Menú (Arrastra)</p>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                     {categories.map((cat) => (
@@ -439,25 +469,33 @@ export const MenuManagerPage = () => {
         {categoryToDelete && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
+              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
             >
               <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
-                <AlertTriangle size={36} />
+                <AlertTriangle size={36} strokeWidth={2} />
               </div>
               <h3 className="text-2xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text mb-2">¿Eliminar Categoría?</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed px-2">
                 Esta acción no se puede deshacer. Recuerda que <strong className="text-gray-700 dark:text-gray-300 lya:text-lya-text">no puedes eliminar una categoría si aún tiene productos</strong> dentro.
               </p>
               <div className="flex w-full gap-3">
-                <button onClick={cancelRemoveCategory} className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors">
+                <button 
+                  onClick={cancelRemoveCategory} 
+                  disabled={isDeletingCategory}
+                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 rounded-xl font-bold transition-colors disabled:opacity-50"
+                >
                   Cancelar
                 </button>
-                <button onClick={confirmRemoveCategory} className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform hover:-translate-y-0.5">
-                  Eliminar
+                <button 
+                  onClick={handleConfirmRemoveCategory} 
+                  disabled={isDeletingCategory}
+                  className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all disabled:opacity-50 flex justify-center items-center"
+                >
+                  {isDeletingCategory ? <Loader2 size={20} className="animate-spin" /> : "Eliminar"}
                 </button>
               </div>
             </motion.div>
@@ -470,11 +508,11 @@ export const MenuManagerPage = () => {
         {isOptionsManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
                 <div>
@@ -491,7 +529,8 @@ export const MenuManagerPage = () => {
                 <select 
                   value={newOpt.tipo} 
                   onChange={e => setNewOpt({...newOpt, tipo: e.target.value})}
-                  className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all"
+                  disabled={isSavingOption}
+                  className="p-3.5 rounded-[1.2rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all disabled:opacity-50"
                 >
                   <option value="tamanos">Tamaño</option>
                   <option value="leches">Leche</option>
@@ -500,24 +539,18 @@ export const MenuManagerPage = () => {
                 <input 
                   type="text" placeholder="Nombre (Ej: Deslactosada)" 
                   value={newOpt.nombre} onChange={e => setNewOpt({...newOpt, nombre: e.target.value})}
-                  className="md:col-span-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all"
+                  disabled={isSavingOption}
+                  className="md:col-span-2 p-3.5 rounded-[1.2rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none text-sm font-bold focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all disabled:opacity-50"
                   onKeyDown={e => {
-                    if(e.key === 'Enter' && newOpt.nombre.trim()){
-                      saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); 
-                      setNewOpt({...newOpt, nombre: '', precio: 0});
-                    }
+                    if(e.key === 'Enter') handleSaveOption()
                   }}
                 />
                 <button 
-                  onClick={() => { 
-                    if(newOpt.nombre.trim()){
-                      saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); 
-                      setNewOpt({...newOpt, nombre: '', precio: 0}); 
-                    }
-                  }}
-                  className="bg-blue-500 hover:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface font-bold rounded-xl lya:hover:opacity-90 transition-all shadow-lg shadow-blue-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2"
+                  onClick={handleSaveOption}
+                  disabled={isSavingOption}
+                  className="bg-blue-500 hover:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface font-bold rounded-[1.2rem] lya:hover:opacity-90 transition-all shadow-lg shadow-blue-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Plus size={18} /> Añadir
+                  {isSavingOption ? <Loader2 size={18} className="animate-spin" /> : <><Plus size={18} strokeWidth={2.5} /> Añadir</>}
                 </button>
               </div>
 
@@ -526,11 +559,11 @@ export const MenuManagerPage = () => {
                   const opcionesDelTipo = globalOptions.filter(o => o.tipo === tipo);
                   return (
                     <div key={tipo}>
-                      <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 pb-2">
+                      <h4 className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 pb-2">
                         {tipo === 'tamanos' ? 'TAMAÑOS' : tipo}
                       </h4>
                       {opcionesDelTipo.length === 0 ? (
-                        <p className="text-sm text-gray-400 dark:text-gray-600 lya:text-lya-text/60 italic px-2 bg-white/50 dark:bg-gray-900/50 lya:bg-lya-surface p-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
+                        <p className="text-sm font-bold text-gray-400 dark:text-gray-600 lya:text-lya-text/60 italic px-2 bg-white/50 dark:bg-gray-900/50 lya:bg-lya-surface p-4 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
                           Aún no has registrado {tipo}.
                         </p>
                       ) : (
