@@ -48,7 +48,7 @@ export const QrControlPage = () => {
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white"
     >
       
@@ -155,10 +155,10 @@ export const QrControlPage = () => {
           {zonaActiva === 'salon' ? (
             <motion.div 
               key="salon" 
-              initial={{ opacity: 0, x: 20 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className={`grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 items-start auto-rows-max ${previewMesa ? 'no-print' : ''}`}
             >
               <AnimatePresence mode='popLayout'>
@@ -166,10 +166,9 @@ export const QrControlPage = () => {
                   <motion.div 
                     key={mesa.id}
                     layout
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className="w-full max-w-[320px] mx-auto md:mx-0 bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-[2rem] shadow-sm relative group overflow-hidden flex flex-col transition-all hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700 lya:hover:border-lya-border/50"
                   >
                     <div className="flex justify-between items-start mb-6">
@@ -224,7 +223,7 @@ export const QrControlPage = () => {
 
               {mesas.length === 0 && (
                 <motion.div 
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                   className="col-span-full py-24 flex flex-col items-center justify-center w-full text-gray-400 lya:text-lya-text/50"
                 >
                   <div className="bg-gray-100 dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-full mb-5 shadow-inner">
@@ -240,13 +239,16 @@ export const QrControlPage = () => {
           ) : (
             <motion.div 
               key="llevar" 
-              initial={{ opacity: 0, x: 20 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className={`flex justify-center print:fixed print:inset-0 print:items-start print:bg-white pt-4 ${previewMesa ? 'no-print' : ''}`}
             >
-              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-10 max-w-[400px] w-full shadow-2xl flex flex-col items-center text-center print-card print:bg-white">
+              <motion.div 
+                whileHover={{ y: -4, scale: 1.02 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-10 max-w-[400px] w-full shadow-2xl flex flex-col items-center text-center print-card print:bg-white transition-all"
+              >
                 
                 <div className="no-print bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-secondary/10 p-5 rounded-[2rem] mb-6 shadow-sm border border-orange-100 dark:border-orange-800/50 lya:border-lya-secondary/20">
                   <Smartphone className="w-12 h-12 text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
@@ -285,7 +287,7 @@ export const QrControlPage = () => {
                 >
                   <QrCode size={18} strokeWidth={2.5} /> Pantalla Completa
                 </button>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

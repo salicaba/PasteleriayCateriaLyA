@@ -151,8 +151,9 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
         </div>
 
         {isOcupada && (
-          <div className="flex justify-between items-center mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70">
+          /* 🔥 LA SOLUCIÓN ESTÁ AQUÍ: Se agregó flex-wrap, gap-y-2 y gap-x-2 */
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-2 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70 shrink-0">
               <span className="w-5 h-5 rounded flex items-center justify-center font-bold text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 lya:bg-lya-primary/20 lya:text-lya-primary">
                 {mesa.cuentasActivas || 1}
               </span>
@@ -160,24 +161,25 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             </div>
 
             {totalItems > 0 && (
-              <div className="flex gap-1.5 text-[11px] font-bold">
+              /* 🔥 Y AQUÍ: También agregué flex-wrap al contenedor de las insignias por si hay muchas */
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
                 {/* Indicador de cosas pendientes por cocinar */}
                 {pendientes > 0 && (
-                  <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#FDE8E8] px-2 py-0.5 rounded-md">
+                  <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#FDE8E8] px-2 py-0.5 rounded-md shrink-0">
                     <ChefHat size={13} className="animate-pulse" />
                     {pendientes} cocina
                   </span>
                 )}
                 {/* 🔥 Indicador de cosas Listas para entregar (MULTI-TEMA) */}
                 {listos > 0 && (
-                  <span className="flex items-center gap-1.5 text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40 lya:text-blue-700 lya:bg-blue-100 px-2 py-0.5 rounded-md shadow-sm">
+                  <span className="flex items-center gap-1.5 text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40 lya:text-blue-700 lya:bg-blue-100 px-2 py-0.5 rounded-md shadow-sm shrink-0">
                     <BellRing size={13} className="animate-pulse" />
                     {listos} listos
                   </span>
                 )}
                 {/* Si no hay pendientes ni listos (TODO ENTREGADO) */}
                 {pendientes === 0 && listos === 0 && (
-                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 lya:text-[#03543F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#DEF7EC] px-2 py-0.5 rounded-md">
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 lya:text-[#03543F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#DEF7EC] px-2 py-0.5 rounded-md shrink-0">
                     <Check size={13} strokeWidth={3} />
                     Entregados
                   </span>
