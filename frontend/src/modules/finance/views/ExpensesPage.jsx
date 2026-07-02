@@ -249,7 +249,7 @@ export const ExpensesPage = () => {
               Cargando Gastos
             </h2>
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin text-red-500 lya:text-lya-primary" /> Sincronizando operaciones de 𝓛𝔂�...
+              <Loader2 size={16} className="animate-spin text-red-500 lya:text-lya-primary" /> Sincronizando operaciones...
             </p>
           </motion.div>
         ) : (
