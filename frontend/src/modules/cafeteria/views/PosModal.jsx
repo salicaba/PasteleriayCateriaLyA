@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Phone, User, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { X, Search, Phone, User, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -55,7 +55,10 @@ export const PosModal = ({
   const [previewTicketData, setPreviewTicketData] = useState(null);
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
-  // 🔥 ESTADO UNIFICADO: Fallback local en caso de que no exista el padre
+  // 🔥 ESTADO DE UX MÓVIL: Controla el cajón deslizable de la comanda
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
+  // Fallback local en caso de que no exista el padre
   const [localToast, setLocalToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -94,7 +97,6 @@ export const PosModal = ({
     showToast('Producto añadido', 'success');
   };
 
-  // 🔥 TRINIDAD UX: Se asegura que el envío a cocina detenga la interfaz de forma asíncrona
   const handleSendToKitchen = async () => {
     if (!hasUnsentItems) return; 
     try {
@@ -156,16 +158,15 @@ export const PosModal = ({
     });
   };
 
-  // 🔥 SOLUCIÓN ESTRELLA: Se asegura que el Loader no pare hasta cerrar la mesa en Base de Datos.
   const finalizeTable = async () => { 
     if (onPagoParcial && total > 0) onPagoParcial(mesa.id, total);
     try {
-      await handleCloseTable(); // 1. Espera a que Supabase confirme
-      if (onTableRelease) await Promise.resolve(onTableRelease(mesa.id)); // 2. Actualiza la vista padre
-      if (!inline) onClose(); // 3. Se cierra y se muestra la cápsula inmortal
+      await handleCloseTable(); 
+      if (onTableRelease) await Promise.resolve(onTableRelease(mesa.id)); 
+      if (!inline) onClose(); 
     } catch (error) {
       console.error("Error liberando mesa:", error);
-      throw error; // Esto lanza el error al catch del TicketSidebar para que siga el UI correcto
+      throw error; 
     }
   };
 
@@ -260,10 +261,8 @@ export const PosModal = ({
     onPrintTicket: (c) => {
       let telefonoPredeterminado = '';
       if (c) {
-        // Si se imprime el ticket de una cuenta específica
         telefonoPredeterminado = cuentasTelefonos[c] || '';
       } else {
-        // Si es el ticket general, buscamos si hay UN ÚNICO teléfono en toda la mesa
         const telefonosGuardados = Object.values(cuentasTelefonos).filter(t => t && t.trim() !== '');
         if (telefonosGuardados.length === 1) {
           telefonoPredeterminado = telefonosGuardados[0];
@@ -283,6 +282,9 @@ export const PosModal = ({
     nombreCliente: isLlevar ? nombreCliente : null,
     showToast 
   };
+
+  // 🔥 CÁLCULO DE CARRITO PARA EL BADGE MÓVIL
+  const totalItemsInCart = cart.filter(item => item.status !== 'CANCELLED').reduce((acc, curr) => acc + curr.qty, 0);
 
   const posContent = (
     <div className={`relative w-full h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg flex flex-col md:flex-row transition-colors duration-300 ${!inline ? 'md:rounded-[2.5rem] shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
@@ -349,7 +351,7 @@ export const PosModal = ({
         </div>
       </div>
 
-      {/* SECCIÓN DERECHA: TICKET SIDEBAR */}
+      {/* SECCIÓN DERECHA: TICKET SIDEBAR (ESCRITORIO) */}
       <div className="hidden md:flex w-96 border-l border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface h-full shadow-2xl z-20 flex-col transition-colors">
         <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors">
            <div>
@@ -363,6 +365,60 @@ export const PosModal = ({
           <TicketSidebar {...sidebarProps} />
         </div>
       </div>
+
+      {/* 🔥 NUEVO: BOTÓN FLOTANTE (FAB) EXCLUSIVO PARA MÓVILES */}
+      <div className="md:hidden absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none px-4">
+        <button
+          onClick={() => setIsMobileCartOpen(true)}
+          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[1.5rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary"
+        >
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <ShoppingBag size={22} />
+              {totalItemsInCart > 0 && (
+                <span className="absolute -top-2 -right-2 bg-orange-500 lya:bg-lya-secondary text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-gray-900 dark:border-white lya:border-lya-primary shadow-sm">
+                  {totalItemsInCart}
+                </span>
+              )}
+            </div>
+            <span className="text-sm uppercase tracking-wider">Comanda</span>
+          </div>
+          <span className="text-lg bg-white/10 dark:bg-black/10 px-3 py-1 rounded-xl">${(total).toFixed(2)}</span>
+        </button>
+      </div>
+
+      {/* 🔥 NUEVO: CAJÓN DESLIZABLE DE COMANDA (MÓVILES) */}
+      <AnimatePresence>
+        {isMobileCartOpen && (
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 26, stiffness: 220 }}
+            className="md:hidden absolute inset-0 z-[100] bg-white dark:bg-gray-900 lya:bg-lya-surface flex flex-col shadow-2xl"
+          >
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg flex items-center justify-between border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm z-10">
+              <div>
+                <HeaderTitle />
+                <p className="text-[10px] text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-0.5 font-bold tracking-wider uppercase">
+                  {isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsMobileCartOpen(false)}
+                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 active:scale-95 transition-transform"
+              >
+                <ChevronDown size={20} className="text-gray-900 dark:text-white lya:text-lya-text" />
+              </button>
+            </div>
+            {/* Aquí reutilizamos tu componente intacto */}
+            <div className="flex-1 overflow-hidden h-full">
+              <TicketSidebar {...sidebarProps} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 
@@ -395,14 +451,14 @@ export const PosModal = ({
                 />
 
                 <AnimatePresence>
-                  {/* 🔥 CÁPSULA NEO-BENTO DE FALLBACK LOCAL */}
+                  {/* CÁPSULA NEO-BENTO DE FALLBACK LOCAL */}
                   {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
                       <motion.div 
                         initial={{ opacity: 0, y: -50, scale: 0.9 }} 
                         animate={{ opacity: 1, y: 0, scale: 1 }} 
                         exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                        className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                        className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
                           localToast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
                           localToast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
                           'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
@@ -415,7 +471,9 @@ export const PosModal = ({
                         }`}>
                           {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
                         </div>
-                        <span className="text-[15px]">{localToast.msg}</span>
+                        <div className="flex flex-col items-center justify-center text-center w-full">
+                          <span className="text-[15px] leading-tight">{localToast.msg}</span>
+                        </div>
                       </motion.div>
                     </div>
                   )}
@@ -439,7 +497,6 @@ export const PosModal = ({
                     />
                   )}
 
-                  {/* 🔥 CORRECCIÓN: Pasar onUnir al modal en vez del incorrecto onUnirMesas */}
                   {showOpcionesMesa && (
                     <OpcionesMesaModal 
                       isOpen={showOpcionesMesa} 

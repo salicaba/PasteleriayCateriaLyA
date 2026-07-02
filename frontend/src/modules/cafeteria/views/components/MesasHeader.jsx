@@ -5,13 +5,18 @@ import { Grid, ShoppingBag, CheckCircle, Trash2, Store, Zap, Loader2 } from 'luc
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
     onClick={onClick}
-    className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all active:scale-95 hover:shadow-md ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-70 hover:opacity-100'}`}
+    className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all duration-200 active:scale-95 hover:shadow-md ${borderClass} ${
+      isActive 
+        ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' 
+        : 'opacity-70 hover:opacity-100'
+    }`}
   >
     <div>
       <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
       <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text">{value}</h3>
     </div>
-    <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${iconColors.bg}`}>
+    {/* 🔥 Refactorizado: Se eliminó bg-opacity obsoleto para usar la sintaxis moderna de Tailwind */}
+    <div className={`p-2 sm:p-3 rounded-xl ${iconColors.bg}`}>
       <Icon size={24} className={iconColors.text} />
     </div>
   </div>
@@ -34,6 +39,8 @@ export const MesasHeader = ({
 }) => {
   return (
     <div className="shrink-0 p-4 md:p-6 pb-4 space-y-6 md:space-y-8 z-10 relative">
+      
+      {/* TARJETA PRINCIPAL Y BOTONES NAVEGACIÓN */}
       <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6 transition-colors duration-300">
         <div className="flex items-center gap-5">
           <div className="p-4 bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-primary/20 text-orange-500 lya:text-lya-primary rounded-2xl flex-shrink-0">
@@ -86,13 +93,17 @@ export const MesasHeader = ({
         </div>
       </div>
       
+      {/* CUADRÍCULA DE ESTADÍSTICAS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard 
           title="Mesas Ocupadas" 
           value={`${mesasOcupadas} / ${mesasSalonLength}`} 
           icon={Grid} 
           borderClass="border-orange-500 lya:border-orange-400 lya:border-lya-primary" 
-          iconColors={{ bg: "bg-orange-500 lya:bg-lya-primary", text: "text-orange-500 lya:text-lya-primary" }} 
+          iconColors={{ 
+            bg: "bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-primary/20", 
+            text: "text-orange-500 lya:text-lya-primary" 
+          }} 
           onClick={() => { setActiveTab('salon'); setShowVendidos(false); setShowPapelera(false); }}
           isActive={activeTab === 'salon' && !showVendidos && !showPapelera}
         />
@@ -101,7 +112,10 @@ export const MesasHeader = ({
           value={mesasLlevarLength} 
           icon={ShoppingBag} 
           borderClass="border-blue-500 lya:border-blue-400 lya:border-lya-secondary" 
-          iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} 
+          iconColors={{ 
+            bg: "bg-blue-500/10 dark:bg-blue-500/20 lya:bg-lya-secondary/20", 
+            text: "text-blue-500 lya:text-lya-secondary" 
+          }} 
           onClick={() => { setActiveTab('llevar'); setShowVendidos(false); setShowPapelera(false); }}
           isActive={activeTab === 'llevar' && !showVendidos && !showPapelera}
         />
@@ -110,7 +124,10 @@ export const MesasHeader = ({
           value={ingresosTotalesLength} 
           icon={CheckCircle} 
           borderClass="border-[#24d366] lya:border-[#24d366]" 
-          iconColors={{ bg: "bg-[#24d366]", text: "text-[#24d366]" }} 
+          iconColors={{ 
+            bg: "bg-[#24d366]/10 dark:bg-[#24d366]/20 lya:bg-[#24d366]/20", 
+            text: "text-[#24d366]" 
+          }} 
           onClick={() => { setShowVendidos(true); setShowPapelera(false); }}
           isActive={showVendidos}
         />
@@ -119,7 +136,10 @@ export const MesasHeader = ({
           value={papeleraCount} 
           icon={Trash2} 
           borderClass="border-red-500 lya:border-red-400" 
-          iconColors={{ bg: "bg-red-500", text: "text-red-500" }} 
+          iconColors={{ 
+            bg: "bg-red-500/10 dark:bg-red-500/20 lya:bg-red-500/20", 
+            text: "text-red-500" 
+          }} 
           onClick={() => { setShowPapelera(true); setShowVendidos(false); }}
           isActive={showPapelera}
         />

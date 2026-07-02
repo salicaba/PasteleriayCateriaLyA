@@ -18,7 +18,8 @@ import { CancelOrderModal } from './modals/CancelOrderModal';
 import { PapeleraModal } from './modals/PapeleraModal';
 import { VentasHoyModal } from './modals/VentasHoyModal';
 
-export const MesasPage = () => {
+// 🔥 AÑADIDO: Recibimos globalScroll como prop desde App.jsx
+export const MesasPage = ({ globalScroll }) => {
   const { 
     mesasSalon, mesasLlevar, isLoading, 
     handleLiberarMesa, handleUpdateTotal, handleUnirMesas, handlePagoParcial,
@@ -149,9 +150,10 @@ export const MesasPage = () => {
     }
   };
 
+  // 🔥 Pantalla de Carga Neo-Bento (Responsiva al globalScroll)
   if (isLoading) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
+      <div className={`w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-[80vh]' : 'h-full'}`}>
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -159,10 +161,10 @@ export const MesasPage = () => {
         >
           <Store size={40} className="text-orange-500 lya:text-lya-primary" />
         </motion.div>
-        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight text-center">
           Cargando Punto de Venta
         </h2>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2 text-center">
           <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando datos...
         </p>
       </div>
@@ -172,7 +174,8 @@ export const MesasPage = () => {
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 overflow-hidden">
+    /* 🔥 CONTENEDOR PRINCIPAL: Condicionado por globalScroll */
+    <div className={`flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-full' : 'h-full overflow-hidden'}`}>
       
       <MesasHeader 
         activeTab={activeTab}
@@ -190,7 +193,8 @@ export const MesasPage = () => {
         setShowPapelera={setShowPapelera}
       />
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-6 pb-24 relative z-0">
+      {/* 🔥 CONTENEDOR DE CUADRÍCULA: Condicionado por globalScroll para soltar el scroll o retenerlo */}
+      <div className={`flex-1 px-4 md:px-6 pb-24 relative z-0 ${globalScroll ? '' : 'overflow-y-auto custom-scrollbar'}`}>
         <AnimatePresence mode="wait">
           {activeTab === 'salon' && (
             <motion.div key="salon-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
@@ -216,16 +220,16 @@ export const MesasPage = () => {
                 </div>
                 <button 
                   onClick={() => setShowLlevarModal(true)}
-                  className="flex items-center gap-1.5 bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
+                  className="flex items-center justify-center gap-1.5 bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
                 >
                   <Plus size={14} /> Nueva Cuenta
                 </button>
               </div>
 
               {mesasLlevar.length === 0 ? (
-                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2rem] p-8 flex flex-col items-center justify-center text-gray-400">
+                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-400 shadow-sm">
                   <ShoppingBag size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
-                  <p className="text-sm font-medium">No hay cuentas activas para llevar.</p>
+                  <p className="text-sm font-bold text-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60">No hay cuentas activas para llevar en este momento.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">

@@ -51,12 +51,10 @@ function App() {
     return null;
   });
 
-  // 🔥 NUEVO: El estado inicial de la pestaña es dinámico dependiendo del rol
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('lya_active_tab');
     if (savedTab) return savedTab;
     
-    // Si no hay pestaña guardada, revisamos la sesión actual para decidir el Inicio
     const savedSession = localStorage.getItem('lya_pos_session');
     if (savedSession) {
       try {
@@ -64,13 +62,19 @@ function App() {
         return userData?.role === 'Empleado' ? 'mesas' : 'caja';
       } catch (e) {}
     }
-    return 'caja'; // Por defecto (Administrador o nuevo)
+    return 'caja'; 
   });
 
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const savedGroups = localStorage.getItem('lya_expanded_groups');
     return savedGroups ? JSON.parse(savedGroups) : []; 
   }); 
+
+  // 🔥 NUEVO: Estado del Scroll Global
+  const [globalScroll, setGlobalScroll] = useState(() => {
+    const savedScroll = localStorage.getItem('lya_global_scroll');
+    return savedScroll ? JSON.parse(savedScroll) : false; // Por defecto: Elementos Fijos
+  });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -85,6 +89,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('lya_expanded_groups', JSON.stringify(expandedGroups));
   }, [expandedGroups]);
+
+  // 🔥 NUEVO: Persistencia del Scroll Global
+  useEffect(() => {
+    localStorage.setItem('lya_global_scroll', JSON.stringify(globalScroll));
+  }, [globalScroll]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -131,7 +140,6 @@ function App() {
     
     setUser(userData);
     
-    // 🔥 NUEVO: En el login, redirigimos inmediatamente a la pantalla principal según su rol
     const initialTab = userData.role === 'Empleado' ? 'mesas' : 'caja';
     setActiveTab(initialTab);
     localStorage.setItem('lya_active_tab', initialTab);
@@ -162,9 +170,7 @@ function App() {
 
   const menuConfig = [
     { id: 'caja', label: 'Caja', icon: Wallet },
-
     { id: 'reportes', label: 'Reportes', icon: PieChart },
-    
     {
       id: 'cafeteria_group',
       label: 'Cafetería',
@@ -188,7 +194,6 @@ function App() {
         { id: 'catalogo', label: 'Catálogo', icon: Tags },
       ]
     },
-    
     {
       id: 'inventario_group',
       label: 'Inventario',
@@ -199,7 +204,6 @@ function App() {
         { id: 'arqueo', label: 'Arqueo Insumos', icon: ClipboardCheck },
       ]
     },
-
     {
       id: 'finanzas_group',
       label: 'Finanzas',
@@ -210,7 +214,6 @@ function App() {
         { id: 'dashboard', label: 'Ganancias Netas', icon: Landmark },
       ]
     },
-
     {
       id: 'sistema_group',
       label: 'Sistema',
@@ -234,7 +237,7 @@ function App() {
 
   useEffect(() => {
     if (user?.role === 'Empleado' && ['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab)) {
-      setActiveTab('mesas'); // Si un empleado intenta acceder a sistema por glitch, lo regresamos a mesas
+      setActiveTab('mesas'); 
     }
   }, [user, activeTab]);
 
@@ -390,7 +393,9 @@ function App() {
             </div>
           </motion.aside>
 
-          <div className="flex flex-col h-full relative min-w-0 w-full shrink-0 md:w-auto md:flex-1 md:shrink">
+          {/* 🔥 CONTENEDOR MAESTRO: Si globalScroll es true, este div se encarga del scroll y oculta la cabecera al bajar */}
+          <div className={`flex flex-col relative min-w-0 w-full shrink-0 md:w-auto md:flex-1 md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full'}`}>
+            
             <AnimatePresence>
               {isSidebarOpen && (
                 <motion.div
@@ -403,7 +408,7 @@ function App() {
               )}
             </AnimatePresence>
 
-            <header className="h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 z-10 transition-colors duration-300 relative">
+            <header className={`h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors duration-300 relative ${globalScroll ? 'z-10' : 'z-10 sticky top-0'}`}>
               <div className="flex items-center gap-2 sm:gap-4">
                  <button
                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -463,8 +468,11 @@ function App() {
               </div>
             </header>
 
-            <main className="flex-1 overflow-hidden relative transition-colors">
-              {activeTab === 'mesas' && <MesasPage />}
+            {/* 🔥 MAIN: Si globalScroll es true, este div deja de ocultar el scroll y se expande, permitiendo que el padre controle el scroll */}
+            <main className={`flex-1 relative transition-colors ${globalScroll ? 'overflow-visible' : 'overflow-hidden'}`}>
+              
+              {/* Le pasamos globalScroll a las vistas que lo necesiten */}
+              {activeTab === 'mesas' && <MesasPage globalScroll={globalScroll} />}
               {activeTab === 'qr' && <QrControlPage />}
               {activeTab === 'cocina' && <KitchenPage />}
               {activeTab === 'pedidos' && <PasteleriaDashboard />} 
@@ -480,7 +488,13 @@ function App() {
               {activeTab === 'dashboard' && <NetProfitDashboard />} 
               
               {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
-                <SettingsPage uiSize={uiSize} setUiSize={setUiSize} activeTab={activeTab} />
+                <SettingsPage 
+                  uiSize={uiSize} 
+                  setUiSize={setUiSize} 
+                  activeTab={activeTab} 
+                  globalScroll={globalScroll} 
+                  setGlobalScroll={setGlobalScroll}
+                />
               )}
               
               {activeTab === 'reportes' && <ReportsPage />}

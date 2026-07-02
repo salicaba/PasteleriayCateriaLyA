@@ -9,8 +9,7 @@ import { AccountsTab } from './settings-tabs/AccountsTab';
 import { InterfaceTab } from './settings-tabs/InterfaceTab';
 import { HardwareTab } from './settings-tabs/HardwareTab';
 
-export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
-  // --- ESTADO DE NOTIFICACIÓN CÁPSULA NEO-BENTO GLOBALES ---
+export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGlobalScroll }) => {
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
 
   const showNotification = (type, message) => {
@@ -26,9 +25,12 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -15 }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="h-full w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 overflow-y-auto custom-scrollbar p-4 md:p-6 relative"
+      // 🔥 APLICANDO EL MODELO MESASPAGE: Flexbox estricto condicionado
+      className={`w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 relative flex flex-col ${
+        globalScroll ? 'min-h-full p-4 md:p-6' : 'h-full overflow-hidden p-4 md:p-6'
+      }`}
     >
-      {/* --- SISTEMA DE NOTIFICACIONES NEO-BENTO (DISEÑO CAFETERÍA 𝓛𝔂𝓪) --- */}
+      {/* --- SISTEMA DE NOTIFICACIONES NEO-BENTO (DISEÑO 𝓛𝔂𝓪) --- */}
       <AnimatePresence>
         {notification.show && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -36,7 +38,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto ${
                 notification.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
             >
@@ -51,21 +53,45 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab }) => {
                   <CheckCircle2 size={20} />
                 )}
               </div>
-              <div className="flex flex-col">
-                  <span className="text-sm">{notification.message}</span>
+              <div className="flex flex-col items-center justify-center text-center w-full">
+                  <span className="text-sm leading-tight">{notification.message}</span>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto w-full space-y-6 pb-20">
+      {/* Si globalScroll es true, crece. Si es false, delegamos el scroll al componente hijo (Tab) */}
+      <div className={`max-w-7xl mx-auto w-full flex flex-col ${globalScroll ? 'space-y-6 pb-20' : 'flex-1 overflow-hidden'}`}>
         
         {/* ENRUTADOR DE MÓDULOS */}
-        {activeTab === 'usuarios' && <UsersTab showNotification={showNotification} />}
-        {activeTab === 'cuentas' && <AccountsTab showNotification={showNotification} />}
-        {activeTab === 'interfaz' && <InterfaceTab uiSize={uiSize} setUiSize={setUiSize} showNotification={showNotification} />}
-        {activeTab === 'hardware' && <HardwareTab showNotification={showNotification} />}
+        {activeTab === 'usuarios' && (
+          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-20'}>
+            <UsersTab showNotification={showNotification} />
+          </div>
+        )}
+        {activeTab === 'cuentas' && (
+          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-20'}>
+            <AccountsTab showNotification={showNotification} />
+          </div>
+        )}
+        
+        {/* 🔥 InterfaceTab maneja su propia arquitectura interna de scroll y encabezado */}
+        {activeTab === 'interfaz' && (
+          <InterfaceTab 
+            uiSize={uiSize} 
+            setUiSize={setUiSize}
+            globalScroll={globalScroll}
+            setGlobalScroll={setGlobalScroll}
+            showNotification={showNotification} 
+          />
+        )}
+        
+        {activeTab === 'hardware' && (
+          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-20'}>
+            <HardwareTab showNotification={showNotification} />
+          </div>
+        )}
 
       </div>
     </motion.div>
