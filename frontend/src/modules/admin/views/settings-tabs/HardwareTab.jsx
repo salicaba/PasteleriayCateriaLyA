@@ -90,12 +90,9 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
     }
   };
 
-  // ==========================================
-  // PANTALLA DE CARGA ANIMADA NEO-BENTO
-  // ==========================================
   if (fetching) {
     return (
-      <div className={`w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-[60vh]' : 'h-full'}`}>
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -113,14 +110,15 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
     );
   }
 
-  // ==========================================
-  // RENDERIZADO PRINCIPAL (Control de Arquitectura)
-  // ==========================================
   return (
-    // 🔥 CONTENEDOR MAESTRO: Control estricto de Flexbox para scroll interno
-    <div className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}>
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
+    >
       
-      {/* HEADER PRINCIPAL (Inamovible en modo Fijos) */}
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
         <div className="bg-gray-900 dark:bg-gray-700 lya:bg-lya-primary p-4 rounded-[1.5rem] text-white shadow-lg shrink-0">
           <Printer size={32} />
@@ -135,11 +133,9 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
-      {/* ÁREA DE CONTENIDO Y SCROLL */}
       <div className={`flex-1 w-full relative flex flex-col ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 flex-1">
           
-          {/* SECCIÓN DE IMPRESORA TÉRMICA */}
           <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
               <div className="flex items-center gap-3">
@@ -249,7 +245,6 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
             </div>
           </section>
 
-          {/* SECCIÓN DE LECTOR DE CÓDIGOS */}
           <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
               <div className="flex items-center gap-3">
@@ -299,7 +294,6 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
           </section>
         </div>
 
-        {/* BOTÓN DE GUARDAR GLOBAL */}
         <div className="flex justify-end mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 shrink-0">
           <button 
             onClick={saveSettingsToDB} 
@@ -314,6 +308,6 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };

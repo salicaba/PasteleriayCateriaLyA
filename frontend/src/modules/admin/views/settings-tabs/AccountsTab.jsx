@@ -84,9 +84,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       await saveSettingsToDB({ bank_accounts: newAccounts });
       setAccounts(newAccounts); 
       resetForm(); 
-    } catch (err) {
-      // El error ya se notifica en saveSettingsToDB
-    } finally {
+    } catch (err) {} finally {
       setIsSavingAccount(false);
     }
   };
@@ -106,9 +104,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     try {
       await saveSettingsToDB({ bank_accounts: newAccounts });
       setAccounts(newAccounts); 
-    } catch (err) {
-      // Error manejado internamente
-    }
+    } catch (err) {}
   };
 
   const executePrint = () => {
@@ -118,16 +114,12 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     
     const tarjetasArray = Array.from({ length: cantidad });
     const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute'; 
-    iframe.style.width = '0px'; 
-    iframe.style.height = '0px'; 
-    iframe.style.border = 'none';
+    iframe.style.position = 'absolute'; iframe.style.width = '0px'; iframe.style.height = '0px'; iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
-    // Aplicando regla de negocio estricta: Mesa vs Llevar
     const footerText = whatsappNumber 
-      ? `<b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b> (ej. Llevar #1).<br>Envía tu comprobante al WhatsApp <b>${whatsappNumber}</b> o muéstraselo a tu mesero. ¡Gracias!`
-      : `<b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b> (ej. Llevar #1).<br>Muestra tu comprobante al mesero. ¡Gracias!`;
+      ? `<b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b>.<br>Envía tu comprobante al WhatsApp <b>${whatsappNumber}</b> o muéstraselo a tu mesero. ¡Gracias!`
+      : `<b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b>.<br>Muestra tu comprobante al mesero. ¡Gracias!`;
 
     const htmlContent = `
       <html>
@@ -163,11 +155,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               </div>
             `).join('')}
           </div>
-          <script>
-            window.onload = function() { 
-              setTimeout(() => { window.print(); }, 500); 
-            }
-          </script>
+          <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }</script>
         </body>
       </html>
     `;
@@ -176,19 +164,12 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     iframe.contentWindow.document.write(htmlContent); 
     iframe.contentWindow.document.close();
     
-    setTimeout(() => { 
-      if (document.body.contains(iframe)) document.body.removeChild(iframe); 
-    }, 10000);
+    setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 10000);
   };
 
-  // ==========================================
-  // PANTALLA DE CARGA ANIMADA (SEPARADA)
-  // ==========================================
-  // Al hacer un 'return' temprano aquí, obligamos a que el motion.div principal
-  // nazca desde cero justo cuando termina de cargar, logrando el efecto de QrControlPage.
   if (fetching) {
     return (
-      <div className={`w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-[60vh]' : 'h-full'}`}>
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -206,19 +187,14 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     );
   }
 
-  // ==========================================
-  // RENDERIZADO PRINCIPAL (Animación Exacta de Control QR)
-  // ==========================================
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
     >
-      
-      {/* HEADER PRINCIPAL */}
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
         <div className="bg-emerald-500 lya:bg-lya-primary p-4 rounded-[1.5rem] text-white shadow-lg shrink-0">
           <Landmark size={32} />
@@ -231,10 +207,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
-      {/* ÁREA DE CONTENIDO Y SCROLL */}
       <div className={`flex-1 w-full relative ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
-        
-        {/* Configuración de WhatsApp */}
         <motion.div 
           whileHover={{ y: -2, scale: 1.01 }}
           className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col md:flex-row items-center gap-6 transition-all"
@@ -268,7 +241,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </motion.div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Formulario de Cuentas */}
           <section className="space-y-6">
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
               <div className="flex items-center gap-4 mb-8 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
@@ -327,7 +299,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
             </div>
           </section>
 
-          {/* Lista de Cuentas */}
           <section className="flex flex-col gap-6">
             <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex-1 flex flex-col min-h-[350px]">
               <div className="flex items-center justify-between mb-6 shrink-0">
@@ -350,47 +321,49 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                       <p className="text-sm font-medium text-center">Aún no has agregado cuentas bancarias.</p>
                     </motion.div>
                   ) : (
-                    accounts.map((acc, index) => (
+                    accounts.map((acc) => (
                       <motion.div 
                         key={acc.id} 
                         layout 
-                        initial={{ opacity: 0, y: 20 }} 
+                        initial={{ opacity: 0, y: 10 }} 
                         animate={{ opacity: 1, y: 0 }} 
-                        exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                        transition={{ delay: index * 0.03, type: "spring", stiffness: 200, damping: 20 }}
-                        // 🔥 APLICANDO EFECTOS DE TARJETA TIPO QR_CONTROL 🔥
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
                         whileHover={{ y: -4, scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="group relative p-5 rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/30 transition-all flex justify-between items-start"
                       >
-                        <div className="flex-1 pr-4 space-y-2">
+                        {/* 🔥 AQUÍ ESTÁ LA MAGIA: min-w-0 para que el texto se pueda truncar y no empuje los botones */}
+                        <div className="flex-1 pr-2 sm:pr-4 space-y-2 min-w-0">
                           <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight flex items-center gap-2">
-                            <Landmark size={16} className="text-emerald-500 lya:text-lya-primary" /> {acc.bank_name}
+                            <Landmark size={16} className="text-emerald-500 lya:text-lya-primary shrink-0" /> 
+                            <span className="truncate">{acc.bank_name}</span>
                           </p>
                           
                           {acc.account_holder && (
                             <div className="flex items-center gap-2 text-xs">
-                              <span className="text-[10px] uppercase font-bold text-gray-400 w-16 shrink-0">Titular</span>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 w-12 sm:w-16 shrink-0">Titular</span>
                               <span className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90 font-medium truncate">{acc.account_holder}</span>
                             </div>
                           )}
                           
                           {acc.account_number && (
                             <div className="flex items-center gap-2 text-xs">
-                              <span className="text-[10px] uppercase font-bold text-gray-400 w-16 shrink-0">Cuenta</span>
-                              <span className="font-mono font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{acc.account_number}</span>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 w-12 sm:w-16 shrink-0">Cuenta</span>
+                              <span className="font-mono font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text truncate">{acc.account_number}</span>
                             </div>
                           )}
 
                           {acc.clabe && (
                             <div className="flex items-center gap-2 text-xs">
-                              <span className="text-[10px] uppercase font-bold text-gray-400 w-16 shrink-0">CLABE</span>
-                              <span className="font-mono font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{acc.clabe}</span>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 w-12 sm:w-16 shrink-0">CLABE</span>
+                              <span className="font-mono font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text truncate">{acc.clabe}</span>
                             </div>
                           )}
                         </div>
 
-                        <div className="flex gap-2 flex-col shrink-0">
+                        {/* 🔥 AGREGAMOS shrink-0 y ml-2 para asegurar que los botones tengan su espacio protegido */}
+                        <div className="flex gap-2 flex-col shrink-0 ml-2">
                           <button onClick={() => editAccount(acc)} className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
                             <Edit2 size={18}/>
                           </button>
@@ -417,7 +390,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
-      {/* --- MODAL DE IMPRESIÓN DE TICKETS DE TRANSFERENCIA --- */}
       <AnimatePresence>
         {showPrintModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

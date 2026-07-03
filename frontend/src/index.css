@@ -54,3 +54,16 @@
     display: none;
   }
 }
+
+/* Ocultar barra de desplazamiento en Chrome, Safari y navegadores WebKit */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Ocultar barra de desplazamiento globalmente para Firefox y Edge */
+* {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE y Edge */
+}

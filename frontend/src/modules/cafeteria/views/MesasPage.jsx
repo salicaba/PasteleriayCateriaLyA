@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/MesasPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Grid, ShoppingBag, Plus, Store, Loader2 } from 'lucide-react';
+import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket'; 
@@ -11,14 +11,11 @@ import { MesaCard } from './MesaCard';
 import { PosModal } from './PosModal';
 import { NuevoPedidoLlevarModal } from './NuevoPedidoLlevarModal';
 
-// Nuevos componentes refactorizados
 import { MesasHeader } from './components/MesasHeader';
-import { ToastNotification } from './components/ToastNotification';
 import { CancelOrderModal } from './modals/CancelOrderModal';
 import { PapeleraModal } from './modals/PapeleraModal';
 import { VentasHoyModal } from './modals/VentasHoyModal';
 
-// 🔥 AÑADIDO: Recibimos globalScroll como prop desde App.jsx
 export const MesasPage = ({ globalScroll }) => {
   const { 
     mesasSalon, mesasLlevar, isLoading, 
@@ -38,6 +35,7 @@ export const MesasPage = ({ globalScroll }) => {
   const [restoringOrderId, setRestoringOrderId] = useState(null);
   const [restoringItemId, setRestoringItemId] = useState(null);
 
+  // --- SISTEMA DE NOTIFICACIONES NEO-BENTO NATIVO ---
   const [toastMessage, setToastMessage] = useState(null);
   const [toastType, setToastType] = useState('success');
 
@@ -97,7 +95,7 @@ export const MesasPage = ({ globalScroll }) => {
         ...prev,
         cancelledOrders: prev.cancelledOrders.filter(o => o.id !== orderId)
       }));
-      showToast('Cuenta restaurada con éxito'); 
+      showToast('Cuenta restaurada con éxito', 'success'); 
       fetchSummary(); 
     } catch (error) {
       showToast(error.response?.data?.message || 'Error al restaurar la cuenta', 'error');
@@ -114,7 +112,7 @@ export const MesasPage = ({ globalScroll }) => {
         ...prev,
         cancelledItems: prev.cancelledItems.filter(i => i.id !== itemId)
       }));
-      showToast('Producto restaurado con éxito'); 
+      showToast('Producto restaurado con éxito', 'success'); 
       fetchSummary(); 
     } catch (error) {
       showToast(error.response?.data?.message || 'Error al restaurar producto', 'error');
@@ -129,7 +127,7 @@ export const MesasPage = ({ globalScroll }) => {
       const mesaVitrina = await nuevoPedidoVitrina();
       if(mesaVitrina) {
         setSelectedMesa(mesaVitrina);
-        showToast('Cuenta de mostrador abierta');
+        showToast('Cuenta de mostrador abierta', 'success');
       }
     } finally {
       setIsCreatingMostrador(false);
@@ -140,7 +138,7 @@ export const MesasPage = ({ globalScroll }) => {
     setIsCanceling(true); 
     try {
       await handleCancelOrder(orderId, 'Cuenta cancelada desde POS');
-      showToast('Cuenta eliminada correctamente'); 
+      showToast('Cuenta eliminada correctamente', 'success'); 
     } catch (error) {
       showToast(error.response?.data?.message || 'Error al cancelar', 'error');
     } finally {
@@ -150,10 +148,10 @@ export const MesasPage = ({ globalScroll }) => {
     }
   };
 
-  // 🔥 Pantalla de Carga Neo-Bento (Responsiva al globalScroll)
+  // 🔥 PANTALLA DE CARGA CORREGIDA: Eliminamos el min-h-[80vh] y aseguramos flex-1, h-full y w-full
   if (isLoading) {
     return (
-      <div className={`w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-[80vh]' : 'h-full'}`}>
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -174,9 +172,41 @@ export const MesasPage = ({ globalScroll }) => {
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
 
   return (
-    /* 🔥 CONTENEDOR PRINCIPAL: Condicionado por globalScroll */
-    <div className={`flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-full' : 'h-full overflow-hidden'}`}>
+    /* 🔥 CONTENEDOR PRINCIPAL: Aseguramos el flex-1 para que llene todo el espacio sin dejar huecos */
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={`flex flex-col flex-1 w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-full' : 'h-full overflow-hidden'}`}
+    >
       
+      {/* NOTIFICACIONES NATIVAS NEO-BENTO */}
+      <AnimatePresence>
+        {toastMessage && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto ${
+                toastType === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
+              }`}
+            >
+              <div className={`p-1.5 rounded-full shrink-0 ${
+                toastType === 'error' 
+                  ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
+                  : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
+              }`}>
+                {toastType === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+              </div>
+              <div className="flex flex-col items-center justify-center text-center w-full">
+                  <span className="text-sm leading-tight text-center">{toastMessage}</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <MesasHeader 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -193,8 +223,7 @@ export const MesasPage = ({ globalScroll }) => {
         setShowPapelera={setShowPapelera}
       />
 
-      {/* 🔥 CONTENEDOR DE CUADRÍCULA: Condicionado por globalScroll para soltar el scroll o retenerlo */}
-      <div className={`flex-1 px-4 md:px-6 pb-24 relative z-0 ${globalScroll ? '' : 'overflow-y-auto custom-scrollbar'}`}>
+      <div className={`flex-1 w-full relative px-4 md:px-6 pb-6 ${globalScroll ? '' : 'overflow-y-auto custom-scrollbar'}`}>
         <AnimatePresence mode="wait">
           {activeTab === 'salon' && (
             <motion.div key="salon-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
@@ -203,11 +232,19 @@ export const MesasPage = ({ globalScroll }) => {
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesas del Salón</h3>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {mesasSalon.map(mesa => (
-                  <MesaCard key={mesa.id} mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
-                ))}
-              </div>
+              {/* ESTADO VACÍO PARA SALÓN */}
+              {mesasSalon.length === 0 ? (
+                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-400 shadow-sm mt-2">
+                  <Store size={48} className="mb-3 opacity-50 text-gray-300 dark:text-gray-600 lya:text-lya-text/40" strokeWidth={1.5} />
+                  <p className="text-sm font-bold text-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60">No hay mesas en el salón en este momento.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {mesasSalon.map(mesa => (
+                    <MesaCard key={mesa.id} mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -226,9 +263,10 @@ export const MesasPage = ({ globalScroll }) => {
                 </button>
               </div>
 
+              {/* ESTADO VACÍO PARA LLEVAR */}
               {mesasLlevar.length === 0 ? (
-                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-400 shadow-sm">
-                  <ShoppingBag size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
+                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-400 shadow-sm mt-2">
+                  <ShoppingBag size={48} className="mb-3 opacity-50 text-gray-300 dark:text-gray-600 lya:text-lya-text/40" strokeWidth={1.5} />
                   <p className="text-sm font-bold text-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60">No hay cuentas activas para llevar en este momento.</p>
                 </div>
               ) : (
@@ -267,7 +305,7 @@ export const MesasPage = ({ globalScroll }) => {
                 const nuevaMesa = await nuevoPedidoLlevar(nombre, tel);
                 if(nuevaMesa) {
                   setSelectedMesa(nuevaMesa); 
-                  showToast('Cuenta para llevar creada');
+                  showToast('Cuenta para llevar creada', 'success');
                 }
                 setShowLlevarModal(false);
               }} 
@@ -313,11 +351,9 @@ export const MesasPage = ({ globalScroll }) => {
             onClose={() => setShowVendidos(false)}
             ingresosTotales={ingresosTotales}
           />
-
-          <ToastNotification message={toastMessage} type={toastType} />
         </>,
         document.body
       )}
-    </div>
+    </motion.div>
   );
 };

@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Shield, Mail, Eye, EyeOff, Loader2, Save, Edit2, UserX, UserCheck, Info, List, ArchiveRestore, X } from 'lucide-react';
 import client from '../../../../api/client';
 
-// TARJETA DE ESTADÍSTICA COMPACTA (Estilo Neo-Bento)
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
     onClick={onClick}
@@ -131,12 +130,9 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
   const activeUsers = systemUsers.filter(u => u.isActive);
   const inactiveUsers = systemUsers.filter(u => !u.isActive);
 
-  // ==========================================
-  // PANTALLA DE CARGA ANIMADA NEO-BENTO
-  // ==========================================
   if (fetching) {
     return (
-      <div className={`w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-[60vh]' : 'h-full'}`}>
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -154,18 +150,13 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
     );
   }
 
-  // ==========================================
-  // RENDERIZADO PRINCIPAL
-  // ==========================================
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.98, y: 15 }} 
-      animate={{ opacity: 1, scale: 1, y: 0 }} 
-      exit={{ opacity: 0, scale: 0.98, y: -15 }}
-      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }} 
+      initial={{ opacity: 0, y: 10 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
     >
-      {/* HEADER PRINCIPAL */}
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
         <div className="bg-blue-600 lya:bg-lya-primary p-4 rounded-[1.5rem] text-white shadow-lg shrink-0">
           <Users size={32} />
@@ -174,14 +165,12 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight leading-none">
             Control de Usuarios
           </h1>
-          {/* CORRECCIÓN: Se eliminó el "hidden sm:block" para que siempre sea visible */}
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 text-justify sm:text-left">
             Administra los accesos al sistema, roles y credenciales para el personal de <strong>𝓛𝔂𝓪</strong>.
           </p>
         </div>
       </div>
 
-      {/* --- SWITCHER PARA MÓVILES --- */}
       <div className="lg:hidden flex bg-gray-200/50 dark:bg-gray-800 lya:bg-lya-surface p-1 rounded-2xl shrink-0 mb-4 mx-1">
         <button 
           onClick={() => setMobileView('list')}
@@ -205,13 +194,9 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
         </button>
       </div>
 
-      {/* ÁREA DE CONTENIDO Y SCROLL */}
       <div className={`flex-1 w-full relative flex flex-col ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start">
           
-          {/* ==================================================== */}
-          {/* FORMULARIO DE USUARIO */}
-          {/* ==================================================== */}
           <div className={`${mobileView === 'form' ? 'block' : 'hidden'} lg:block bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 h-fit lg:sticky lg:top-0`}>
             <h3 className="font-bold text-gray-800 dark:text-white lya:text-lya-text mb-6 text-xl flex items-center gap-3 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20 pb-4">
               <Shield size={24} className="text-blue-500 lya:text-lya-primary" />
@@ -321,22 +306,14 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                   disabled={loading || !userForm.fullName || !userForm.username || (!editingUserId && !userForm.password)}
                   className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-bold rounded-2xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-blue-600"
                 >
-                  {loading ? (
-                    <><Loader2 className="animate-spin" size={18} /> Procesando...</>
-                  ) : (
-                    <><Save size={18} /> {editingUserId ? 'Guardar Cambios' : 'Crear Usuario'}</>
-                  )}
+                  {loading ? <><Loader2 className="animate-spin" size={18} /> Procesando...</> : <><Save size={18} /> {editingUserId ? 'Guardar Cambios' : 'Crear Usuario'}</>}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* ==================================================== */}
-          {/* LISTA DE USUARIOS (ACTIVOS) + TARJETA SUSPENDIDOS */}
-          {/* ==================================================== */}
           <div className={`${mobileView === 'list' ? 'block' : 'hidden'} lg:block lg:col-span-2 space-y-4`}>
             
-            {/* TARJETAS DE ESTADÍSTICA / ACCESO A PAPELERA */}
             <div className="grid grid-cols-2 gap-4 mb-2">
                <StatCard 
                 title="Usuarios Activos" 
@@ -374,15 +351,14 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     <motion.div 
                       key={usr.id}
                       layout
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ delay: index * 0.03, type: "spring", stiffness: 200, damping: 20 }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
                       className="p-6 rounded-[2rem] border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between hover:shadow-md border-gray-100 dark:border-gray-700 lya:border-lya-border/40 hover:border-blue-200 lya:hover:border-lya-primary/30"
                     >
                       <div className="flex items-start justify-between mb-5">
                         
-                        {/* CORRECCIÓN: flex-1 y min-w-0 para evitar que el texto empuje los botones en móviles */}
                         <div className="flex items-center gap-3.5 pr-2 flex-1 min-w-0">
                           <div className={`w-12 h-12 rounded-[1.2rem] flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
                             usr.role === 'Administrador' 
@@ -452,9 +428,6 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
-      {/* ==================================================== */}
-      {/* MODAL DE LA PAPELERA (Usuarios Suspendidos) */}
-      {/* ==================================================== */}
       <AnimatePresence>
         {isTrashModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 lya:bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
@@ -489,7 +462,6 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     {inactiveUsers.map((usr) => (
                       <div key={usr.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 opacity-80 hover:opacity-100 transition-opacity">
                         
-                        {/* CORRECCIÓN: flex-1 y min-w-0 para evitar desbordamiento */}
                         <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
                           <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
                             {getInitials(usr.fullName)}

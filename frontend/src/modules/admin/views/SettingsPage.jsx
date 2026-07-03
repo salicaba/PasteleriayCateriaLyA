@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
-// Importación de los nuevos submódulos (Tabs)
 import { UsersTab } from './settings-tabs/UsersTab';
 import { AccountsTab } from './settings-tabs/AccountsTab';
 import { InterfaceTab } from './settings-tabs/InterfaceTab';
@@ -25,12 +24,10 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -15 }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      // 🔥 Flexbox estricto condicionado. Se eliminaron márgenes inferiores fantasma.
       className={`w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 relative flex flex-col ${
         globalScroll ? 'min-h-full p-4 md:p-6' : 'h-full overflow-hidden p-4 md:p-6'
       }`}
     >
-      {/* --- SISTEMA DE NOTIFICACIONES NEO-BENTO (DISEÑO 𝓛𝔂𝓪) --- */}
       <AnimatePresence>
         {notification.show && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -47,11 +44,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
                   ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
                   : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
               }`}>
-                {notification.type === 'error' ? (
-                  <AlertCircle size={20} />
-                ) : (
-                  <CheckCircle2 size={20} />
-                )}
+                {notification.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
               </div>
               <div className="flex flex-col items-center justify-center text-center w-full">
                   <span className="text-sm leading-tight text-center">{notification.message}</span>
@@ -61,25 +54,17 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
         )}
       </AnimatePresence>
 
-      {/* CORRECCIÓN CRÍTICA: Se cambió el 'pb-20' a 'pb-4' para eliminar el espacio muerto inferior.
-        Si globalScroll es true, crece. Si es false, delegamos el scroll al componente hijo (Tab).
-      */}
-      <div className={`max-w-7xl mx-auto w-full flex flex-col ${globalScroll ? 'space-y-6 pb-4' : 'flex-1 overflow-hidden'}`}>
+      {/* 🔥 AQUÍ ESTÁ LA MAGIA: Aseguramos flex-1 siempre, y quitamos el pb-4 que afectaba el centro */}
+      <div className={`max-w-7xl mx-auto w-full flex flex-col flex-1 ${globalScroll ? 'space-y-6' : 'overflow-hidden'}`}>
         
-        {/* ENRUTADOR DE MÓDULOS */}
         {activeTab === 'usuarios' && (
-          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'}>
-            <UsersTab showNotification={showNotification} />
-          </div>
+          <UsersTab showNotification={showNotification} globalScroll={globalScroll} />
         )}
         
         {activeTab === 'cuentas' && (
-          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'}>
-            <AccountsTab showNotification={showNotification} globalScroll={globalScroll} />
-          </div>
+          <AccountsTab showNotification={showNotification} globalScroll={globalScroll} />
         )}
         
-        {/* 🔥 InterfaceTab maneja su propia arquitectura interna de scroll y encabezado */}
         {activeTab === 'interfaz' && (
           <InterfaceTab 
             uiSize={uiSize} 
@@ -91,9 +76,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
         )}
         
         {activeTab === 'hardware' && (
-          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'}>
-            <HardwareTab showNotification={showNotification} />
-          </div>
+          <HardwareTab showNotification={showNotification} globalScroll={globalScroll} />
         )}
 
       </div>
