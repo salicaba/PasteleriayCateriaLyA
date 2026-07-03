@@ -116,7 +116,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         }));
         
         setDbProducts(activeProducts); 
-        setDbCategories(cats);
+
+        // 🔥 NUEVO: Inyectamos "Todas" al principio de las categorías para el POS
+        const hasTodas = cats.some(c => c.id === 'todas' || c.name.trim().toLowerCase() === 'todas');
+        const finalCats = hasTodas ? cats : [{ id: 'todas', name: 'Todas' }, ...cats];
+        
+        setDbCategories(finalCats);
       } catch (error) {
         console.error("Error al cargar menú en POS", error);
       }

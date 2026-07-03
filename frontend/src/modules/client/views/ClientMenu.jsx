@@ -283,11 +283,14 @@ export default function ClientMenu({ clientData, type, tableId }) {
           client.get('/menu/products') 
         ]);
         
-        const catsData = catsRes.data;
-        const prodsData = prodsRes.data;
+        // 🔥 NUEVO: Agregar la categoría "Todas" virtualmente al inicio
+        const fetchedCats = catsRes.data;
+        const hasTodas = fetchedCats.some(c => c.id === 'todas' || c.name.trim().toLowerCase() === 'todas');
+        const catsData = hasTodas ? fetchedCats : [{ id: 'todas', name: 'Todas' }, ...fetchedCats];
 
         setCategories(catsData);
         
+        const prodsData = prodsRes.data;
         const activeProducts = prodsData.filter(p => {
           const estado = p.isActive !== undefined ? p.isActive : p.disponible;
           if (estado === false || estado === 0 || estado === '0') return false;
@@ -303,12 +306,8 @@ export default function ClientMenu({ clientData, type, tableId }) {
         
         setProducts(activeProducts);
 
-        const todasCat = catsData.find(c => c.name.trim().toLowerCase() === 'todas');
-        if (todasCat) {
-          setActiveCategory(todasCat.id);
-        } else if (catsData.length > 0) {
-          setActiveCategory(catsData[0].id);
-        }
+        // 🔥 Forzamos a que inicie seleccionando "Todas"
+        setActiveCategory('todas');
       } catch (error) {
         console.error("Error al cargar el menú real:", error);
       } finally {
