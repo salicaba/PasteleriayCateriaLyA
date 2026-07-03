@@ -35,12 +35,16 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
 
   const handleSaveInterface = () => {
     setLoading(true);
+    // Simulamos guardado de preferencias
     setTimeout(() => {
       setLoading(false);
       showNotification('success', "¡Configuración de interfaz guardada exitosamente!");
-    }, 600);
+    }, 800);
   };
 
+  // ==========================================
+  // PANTALLA DE CARGA ANIMADA NEO-BENTO
+  // ==========================================
   if (fetching) {
     return (
       <div className={`w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-[60vh]' : 'h-full'}`}>
@@ -61,55 +65,77 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
     );
   }
 
+  // ==========================================
+  // RENDERIZADO PRINCIPAL (Control de Arquitectura)
+  // ==========================================
   return (
-    // 🔥 CONTENEDOR MAESTRO: Hereda la lógica de MesasPage
-    <div className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}>
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98, y: 15 }} 
+      animate={{ opacity: 1, scale: 1, y: 0 }} 
+      exit={{ opacity: 0, scale: 0.98, y: -15 }}
+      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }} 
+      // 🔥 CONTENEDOR MAESTRO: Control estricto de Flexbox
+      className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
+    >
       
-      {/* ENCABEZADO NEO-BENTO (Shrink-0 lo ancla a la parte superior cuando el contenedor inferior hace scroll) */}
-      <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface p-5 sm:p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex items-center gap-4 shadow-sm ${globalScroll ? '' : 'mb-6 z-10'}`}>
-        <div className="bg-purple-500 lya:bg-lya-primary p-3.5 rounded-2xl text-white shadow-lg shrink-0">
-          <Palette size={28} />
+      {/* HEADER PRINCIPAL (Inamovible en modo Fijos) */}
+      <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
+        <div className="bg-purple-500 lya:bg-lya-primary p-4 rounded-[1.5rem] text-white shadow-lg shrink-0">
+          <Palette size={32} />
         </div>
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight leading-none">Interfaz y Pantalla</h1>
-          <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Personaliza el aspecto, colores y tamaño visual de 𝓛𝔂𝓪</p>
+        <div className="text-center sm:text-left flex-1">
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight leading-none">
+            Interfaz y Pantalla
+          </h1>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 text-justify sm:text-left">
+            Personaliza el aspecto, colores, tamaño visual y comportamiento de navegación de <strong>𝓛𝔂𝓪</strong>.
+          </p>
         </div>
       </div>
 
-      {/* CONTENEDOR DE SCROLL INTERNO (Se activa en modo Fijo) */}
-      <div className={`flex-1 w-full relative ${globalScroll ? '' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-24'}`}>
+      {/* ÁREA DE CONTENIDO Y SCROLL */}
+      <div className={`flex-1 w-full relative flex flex-col ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start">
+          
           {/* SECCIÓN: APARIENCIA */}
-          <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col">
+          <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
-              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0"><Palette size={20} /></div>
-              <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">Apariencia</h2>
+              <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
+                <Palette size={24} />
+              </div>
+              <h2 className="font-bold text-xl text-gray-900 dark:text-white lya:text-lya-text">Apariencia</h2>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-5 flex-1 text-justify">
-              Personaliza los colores del sistema POS para adaptarlos al entorno visual que prefieras durante la operación.
+            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 flex-1 text-justify">
+              Personaliza los colores del sistema POS para adaptarlos al entorno visual que prefieras durante la operación y reducir la fatiga visual.
             </p>
             
-            <div className="flex bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg rounded-xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 h-[56px] w-full [&>div]:w-full [&>div]:h-full [&>div]:bg-transparent [&>div]:border-none [&>div]:p-0 [&>div]:flex [&>div]:gap-0 [&_button]:flex-1 [&_button]:h-full [&_button]:rounded-lg [&_button]:text-sm [&_button]:font-bold [&_button]:flex [&_button]:items-center [&_button]:justify-center">
+            <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 h-[64px] w-full [&>div]:w-full [&>div]:h-full [&>div]:bg-transparent [&>div]:border-none [&>div]:p-0 [&>div]:flex [&>div]:gap-0 [&_button]:flex-1 [&_button]:h-full [&_button]:rounded-[1rem] [&_button]:text-sm [&_button]:font-bold [&_button]:flex [&_button]:items-center [&_button]:justify-center">
               <ThemeSelector />
             </div>
           </section>
 
           {/* SECCIÓN: TAMAÑO DE INTERFAZ */}
-          <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col">
+          <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
-              <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0"><Layout size={20} /></div>
-              <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">Tamaño Visual</h2>
+              <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
+                <Layout size={24} />
+              </div>
+              <h2 className="font-bold text-xl text-gray-900 dark:text-white lya:text-lya-text">Tamaño Visual</h2>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-5 flex-1 text-justify">
-              Ajusta la escala visual y el tamaño de los elementos del sistema para mejorar la precisión en pantallas táctiles.
+            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 flex-1 text-justify">
+              Ajusta la escala visual y el tamaño de los elementos del sistema para mejorar la precisión y comodidad en pantallas táctiles o monitores pequeños.
             </p>
             
-            <div className="flex bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg rounded-xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 h-[56px] w-full">
+            <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 h-[64px] w-full">
               {['small', 'medium', 'large'].map((size) => (
-                <button key={size} onClick={() => setUiSize(size)}
-                  className={`flex-1 flex items-center justify-center text-sm font-bold rounded-lg transition-all ${
-                    uiSize === size ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm lya:border lya:border-lya-border/30' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
+                <button 
+                  key={size} 
+                  onClick={() => setUiSize(size)}
+                  className={`flex-1 flex items-center justify-center text-sm font-bold rounded-[1rem] transition-all active:scale-[0.98] ${
+                    uiSize === size 
+                      ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
+                      : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
                   }`}
                 >
                   {size === 'small' ? 'Chica' : size === 'medium' ? 'Media' : 'Grande'}
@@ -119,61 +145,76 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
           </section>
 
           {/* SECCIÓN: NAVEGACIÓN Y SCROLL */}
-          <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col">
+          <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0"><Monitor size={20} /></div>
-              <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">Navegación</h2>
+              <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                <Monitor size={24} />
+              </div>
+              <h2 className="font-bold text-xl text-gray-900 dark:text-white lya:text-lya-text">Navegación</h2>
             </div>
             
-            <div className="space-y-6 flex-1">
+            <div className="space-y-8 flex-1">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
-                  Expande el sistema para obtener una experiencia inmersiva libre de distracciones externas del navegador.
+                  Expande el sistema a Pantalla Completa para obtener una experiencia inmersiva libre de distracciones del navegador.
                 </p>
-                <button onClick={toggleFullscreen} className="w-full h-[48px] bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 active:scale-[0.98] border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 text-sm">
-                  {isFullscreen ? <Minimize size={18}/> : <Maximize size={18}/>} {isFullscreen ? 'Contraer Pantalla' : 'Expandir Pantalla'}
+                <button 
+                  onClick={toggleFullscreen} 
+                  className="w-full py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 active:scale-95 border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-sm shadow-sm"
+                >
+                  {isFullscreen ? <Minimize size={20}/> : <Maximize size={20}/>} 
+                  {isFullscreen ? 'Contraer Pantalla' : 'Expandir Pantalla'}
                 </button>
               </div>
 
-              <div className="pt-5 border-t border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
+              <div className="pt-6 border-t border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
-                  Libera el scroll para ocultar encabezados al bajar. Excelente opción para maximizar el área de visión en móviles.
+                  Libera el scroll global para ocultar encabezados al bajar. Recomendado para maximizar el área de visión en móviles.
                 </p>
-                <div className="flex bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg rounded-xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 h-[48px] w-full">
+                <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 h-[64px] w-full">
                   <button 
                     onClick={() => setGlobalScroll(false)}
-                    className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold rounded-lg transition-all ${
-                      !globalScroll ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm lya:border lya:border-lya-border/30' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
+                    className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold rounded-[1rem] transition-all active:scale-[0.98] ${
+                      !globalScroll 
+                        ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
+                        : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
                     }`}
                   >
-                    <Pin size={16} /> Fijos
+                    <Pin size={18} /> Fijos
                   </button>
                   <button 
                     onClick={() => setGlobalScroll(true)}
-                    className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold rounded-lg transition-all ${
-                      globalScroll ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm lya:border lya:border-lya-border/30' : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
+                    className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold rounded-[1rem] transition-all active:scale-[0.98] ${
+                      globalScroll 
+                        ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
+                        : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text'
                     }`}
                   >
-                    <ArrowUpDown size={16} /> Libre
+                    <ArrowUpDown size={18} /> Libre
                   </button>
                 </div>
               </div>
             </div>
           </section>
+
         </div>
         
-        {/* BOTÓN GUARDAR (Dentro del área que hace scroll) */}
-        <div className="flex justify-end mt-4">
+        {/* BOTÓN GUARDAR */}
+        <div className="flex justify-end mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 shrink-0">
           <button 
             onClick={handleSaveInterface} 
             disabled={loading} 
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-gray-900 hover:bg-black dark:bg-purple-500 dark:hover:bg-purple-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-xl text-sm font-black shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-gray-900 hover:bg-black dark:bg-purple-500 dark:hover:bg-purple-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl text-sm font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
-            {loading ? <><Loader2 className="animate-spin" size={18} /> Guardando...</> : <><Save size={18} /> Guardar Cambios</>}
+            {loading ? (
+              <><Loader2 className="animate-spin" size={20} /> Guardando...</>
+            ) : (
+              <><Save size={20} /> Guardar Cambios</>
+            )}
           </button>
         </div>
 
       </div>
-    </div>
+    </motion.div>
   );
 };

@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2 } from 'lucide-react';
+import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer } from 'lucide-react';
 import clsx from 'clsx';
 
 export const TicketCartGroup = ({

@@ -25,7 +25,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -15 }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      // 🔥 APLICANDO EL MODELO MESASPAGE: Flexbox estricto condicionado
+      // 🔥 Flexbox estricto condicionado. Se eliminaron márgenes inferiores fantasma.
       className={`w-full bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg transition-colors duration-300 relative flex flex-col ${
         globalScroll ? 'min-h-full p-4 md:p-6' : 'h-full overflow-hidden p-4 md:p-6'
       }`}
@@ -54,25 +54,28 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
                 )}
               </div>
               <div className="flex flex-col items-center justify-center text-center w-full">
-                  <span className="text-sm leading-tight">{notification.message}</span>
+                  <span className="text-sm leading-tight text-center">{notification.message}</span>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Si globalScroll es true, crece. Si es false, delegamos el scroll al componente hijo (Tab) */}
-      <div className={`max-w-7xl mx-auto w-full flex flex-col ${globalScroll ? 'space-y-6 pb-20' : 'flex-1 overflow-hidden'}`}>
+      {/* CORRECCIÓN CRÍTICA: Se cambió el 'pb-20' a 'pb-4' para eliminar el espacio muerto inferior.
+        Si globalScroll es true, crece. Si es false, delegamos el scroll al componente hijo (Tab).
+      */}
+      <div className={`max-w-7xl mx-auto w-full flex flex-col ${globalScroll ? 'space-y-6 pb-4' : 'flex-1 overflow-hidden'}`}>
         
         {/* ENRUTADOR DE MÓDULOS */}
         {activeTab === 'usuarios' && (
-          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-20'}>
+          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'}>
             <UsersTab showNotification={showNotification} />
           </div>
         )}
+        
         {activeTab === 'cuentas' && (
-          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-20'}>
-            <AccountsTab showNotification={showNotification} />
+          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'}>
+            <AccountsTab showNotification={showNotification} globalScroll={globalScroll} />
           </div>
         )}
         
@@ -88,7 +91,7 @@ export const SettingsPage = ({ uiSize, setUiSize, activeTab, globalScroll, setGl
         )}
         
         {activeTab === 'hardware' && (
-          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-20'}>
+          <div className={globalScroll ? '' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'}>
             <HardwareTab showNotification={showNotification} />
           </div>
         )}
