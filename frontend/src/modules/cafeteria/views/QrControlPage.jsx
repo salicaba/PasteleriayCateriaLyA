@@ -21,6 +21,10 @@ export const QrControlPage = () => {
 
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
   
+  // 🔥 NUEVO: Obtenemos la URL actual dinámica (local, IP de red o producción)
+  const baseUrl = window.location.origin;
+  const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); // Para mostrarlo bonito sin "http://"
+  
   // ==========================================
   // PANTALLA DE CARGA ANIMADA NEO-BENTO
   // ==========================================
@@ -52,7 +56,7 @@ export const QrControlPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white"
     >
       
-      {/* NOTIFICACIÓN FLOTANTE (ESTILO CÁPSULA NEO-BENTO) */}
+      {/* NOTIFICACIÓN FLOTANTE */}
       <AnimatePresence>
         {toast?.show && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -190,7 +194,7 @@ export const QrControlPage = () => {
                     
                     <div className="w-full bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-6 mb-5 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors shadow-inner">
                        <QRCodeSVG 
-                         value={`https://lya.menu/m/${mesa.number}`} 
+                         value={`${baseUrl}/m/${mesa.number}`} // 🔥 Código dinámico
                          size={120} 
                          bgColor="transparent" 
                          fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
@@ -202,12 +206,12 @@ export const QrControlPage = () => {
                     <div className="bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-5 group-hover:border-orange-300 dark:group-hover:border-orange-700 lya:group-hover:border-lya-secondary/50 transition-colors shadow-inner">
                       <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
                       <a 
-                        href={`https://lya.menu/m/${mesa.number}`} 
+                        href={`${baseUrl}/m/${mesa.number}`} // 🔥 Enlace dinámico
                         target="_blank" 
                         rel="noreferrer" 
                         className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate hover:text-orange-600 dark:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors font-bold outline-none tracking-wide"
                       >
-                        lya.menu/m/{mesa.number}
+                        {displayBaseUrl}/m/{mesa.number} {/* 🔥 Muestra la IP o el Dominio actual */}
                       </a>
                     </div>
                     
@@ -265,7 +269,7 @@ export const QrControlPage = () => {
 
                 <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-10 mb-6 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 print:py-8 print:bg-white print:border-none shadow-inner">
                    <QRCodeSVG 
-                     value="https://lya.menu/llevar" 
+                     value={`${baseUrl}/llevar`} // 🔥 Código Dinámico
                      size={160} 
                      bgColor="transparent" 
                      fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
@@ -276,9 +280,14 @@ export const QrControlPage = () => {
 
                 <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-4 w-full rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-8 print:bg-white print:border-none shadow-sm">
                   <LinkIcon className="no-print w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
-                  <span className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest print:text-black print:text-xl">
-                    lya.menu/llevar
-                  </span>
+                  <a 
+                    href={`${baseUrl}/llevar`} // 🔥 Enlace Dinámico
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest hover:text-orange-600 dark:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors outline-none print:text-black print:text-xl print:pointer-events-none"
+                  >
+                    {displayBaseUrl}/llevar
+                  </a>
                 </div>
 
                 <button 
@@ -337,7 +346,7 @@ export const QrControlPage = () => {
 
               <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full print:bg-white print:border-none print:shadow-none print:p-0">
                 <QRCodeSVG 
-                   value={previewMesa.isLlevar ? 'https://lya.menu/llevar' : `https://lya.menu/m/${previewMesa.number}`}
+                   value={previewMesa.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa.number}`} // 🔥 Códigos Dinámicos
                    size={220} 
                    bgColor="transparent" 
                    fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
@@ -348,8 +357,9 @@ export const QrControlPage = () => {
 
               <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-8 print:bg-white print:border-none shadow-sm">
                 <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0 no-print" />
-                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest print:text-black print:text-2xl uppercase">
-                  {previewMesa.isLlevar ? 'lya.menu/llevar' : `lya.menu/m/${previewMesa.number}`}
+                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest print:text-black print:text-2xl">
+                  {/* 🔥 Textos dinámicos en pantalla completa */}
+                  {previewMesa.isLlevar ? `${displayBaseUrl}/llevar` : `${displayBaseUrl}/m/${previewMesa.number}`}
                 </span>
               </div>
 
