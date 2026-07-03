@@ -57,6 +57,9 @@ export const PosModal = ({
 
   // 🔥 ESTADO DE UX MÓVIL: Controla el cajón deslizable de la comanda
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+  
+  // 🔥 CANDADO GLOBAL: Previene doble envíos desde la raíz
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // Fallback local en caso de que no exista el padre
   const [localToast, setLocalToast] = useState(null);
@@ -98,7 +101,8 @@ export const PosModal = ({
   };
 
   const handleSendToKitchen = async () => {
-    if (!hasUnsentItems) return; 
+    if (!hasUnsentItems || isProcessingAction) return; 
+    setIsProcessingAction(true);
     try {
       await new Promise((resolve, reject) => {
         simulateKitchenSend(() => {
@@ -111,6 +115,8 @@ export const PosModal = ({
       console.error(error);
       showToast('Error al enviar comanda', 'error');
       throw error;
+    } finally {
+      setIsProcessingAction(false);
     }
   };
 
@@ -171,6 +177,9 @@ export const PosModal = ({
   };
 
   const executeRealPrint = async () => {
+    if (isProcessingAction) return;
+    setIsProcessingAction(true);
+    
     const targetCuenta = previewTicketData.cuentaName;
     setPreviewTicketData(null); 
     showToast('Enviando ticket a la impresora...', 'success');
@@ -180,6 +189,8 @@ export const PosModal = ({
     } catch (error) { 
       console.error("Fallo al imprimir:", error); 
       showToast('Error al intentar imprimir el ticket', 'error');
+    } finally {
+      setIsProcessingAction(false);
     }
   };
 
@@ -286,12 +297,13 @@ export const PosModal = ({
   // 🔥 CÁLCULO DE CARRITO PARA EL BADGE MÓVIL
   const totalItemsInCart = cart.filter(item => item.status !== 'CANCELLED').reduce((acc, curr) => acc + curr.qty, 0);
 
+  // 🔥 ESTRUCTURA FLEX ESTRICTA
   const posContent = (
-    <div className={`relative w-full h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg flex flex-col md:flex-row transition-colors duration-300 ${!inline ? 'md:rounded-[2.5rem] shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-3xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
+    <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${!inline ? 'md:rounded-[2.5rem] shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
       
       {/* SECCIÓN IZQUIERDA: MENÚ Y BÚSQUEDA */}
-      <div className="flex-1 flex flex-col h-full relative z-0">
-        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors">
+      <div className="flex-1 flex flex-col h-full relative z-0 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors shrink-0">
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 lya:text-lya-text/40" size={18} />
@@ -300,13 +312,13 @@ export const PosModal = ({
                 placeholder="Buscar producto..." 
                 value={filtroTexto} 
                 onChange={(e) => setFiltroTexto(e.target.value)} 
-                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/10 lya:focus:ring-lya-secondary/20 border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-500 lya:focus:border-lya-secondary transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-[1.5rem] text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/10 lya:focus:ring-lya-secondary/20 border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-500 lya:focus:border-lya-secondary transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
               />
             </div>
             {!inline && (
               <button 
                 onClick={onClose} 
-                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 rounded-2xl text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm"
+                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm shrink-0"
               >
                 <X size={20} />
               </button>
@@ -315,6 +327,7 @@ export const PosModal = ({
           <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
         </div>
 
+        {/* CONTENEDOR DE PRODUCTOS CON SCROLL INDEPENDIENTE */}
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative">
           <AnimatePresence mode="wait">
             {isRendering ? (
@@ -322,9 +335,10 @@ export const PosModal = ({
             ) : (
               <motion.div
                 key="product-grid"
-                initial={{ opacity: 0, y: 15 }}
+                // 🔥 ANIMACIÓN ESTRICTA
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
                 className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
               >
                 {filteredProducts.map(product => (
@@ -352,8 +366,8 @@ export const PosModal = ({
       </div>
 
       {/* SECCIÓN DERECHA: TICKET SIDEBAR (ESCRITORIO) */}
-      <div className="hidden md:flex w-96 border-l border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface h-full shadow-2xl z-20 flex-col transition-colors">
-        <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors">
+      <div className="hidden md:flex w-96 border-l border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface h-full shadow-2xl z-20 flex-col transition-colors shrink-0 overflow-hidden">
+        <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors shrink-0">
            <div>
               <HeaderTitle />
               <p className="text-xs text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-1 font-bold tracking-wide uppercase">
@@ -366,11 +380,11 @@ export const PosModal = ({
         </div>
       </div>
 
-      {/* 🔥 NUEVO: BOTÓN FLOTANTE (FAB) EXCLUSIVO PARA MÓVILES */}
+      {/* 🔥 BOTÓN FLOTANTE (FAB) EXCLUSIVO PARA MÓVILES */}
       <div className="md:hidden absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none px-4">
         <button
           onClick={() => setIsMobileCartOpen(true)}
-          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[1.5rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary"
+          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary"
         >
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -387,7 +401,7 @@ export const PosModal = ({
         </button>
       </div>
 
-      {/* 🔥 NUEVO: CAJÓN DESLIZABLE DE COMANDA (MÓVILES) */}
+      {/* 🔥 CAJÓN DESLIZABLE DE COMANDA (MÓVILES) */}
       <AnimatePresence>
         {isMobileCartOpen && (
           <motion.div
@@ -395,9 +409,9 @@ export const PosModal = ({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 26, stiffness: 220 }}
-            className="md:hidden absolute inset-0 z-[100] bg-white dark:bg-gray-900 lya:bg-lya-surface flex flex-col shadow-2xl"
+            className="md:hidden absolute inset-0 z-[100] bg-white dark:bg-gray-900 lya:bg-lya-surface flex flex-col shadow-2xl overflow-hidden"
           >
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg flex items-center justify-between border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm z-10">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg flex items-center justify-between border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm z-10 shrink-0">
               <div>
                 <HeaderTitle />
                 <p className="text-[10px] text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-0.5 font-bold tracking-wider uppercase">
@@ -406,12 +420,11 @@ export const PosModal = ({
               </div>
               <button
                 onClick={() => setIsMobileCartOpen(false)}
-                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 active:scale-95 transition-transform"
+                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 active:scale-95 transition-transform shrink-0"
               >
                 <ChevronDown size={20} className="text-gray-900 dark:text-white lya:text-lya-text" />
               </button>
             </div>
-            {/* Aquí reutilizamos tu componente intacto */}
             <div className="flex-1 overflow-hidden h-full">
               <TicketSidebar {...sidebarProps} />
             </div>
@@ -451,7 +464,7 @@ export const PosModal = ({
                 />
 
                 <AnimatePresence>
-                  {/* CÁPSULA NEO-BENTO DE FALLBACK LOCAL */}
+                  {/* CÁPSULA NEO-BENTO DE FALLBACK LOCAL (Texto Centrado) */}
                   {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
                       <motion.div 
@@ -472,7 +485,7 @@ export const PosModal = ({
                           {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
                         </div>
                         <div className="flex flex-col items-center justify-center text-center w-full">
-                          <span className="text-[15px] leading-tight">{localToast.msg}</span>
+                          <span className="text-[15px] leading-tight text-center">{localToast.msg}</span>
                         </div>
                       </motion.div>
                     </div>

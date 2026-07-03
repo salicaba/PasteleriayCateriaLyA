@@ -2,7 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFinanceController } from '../controllers/useFinanceController';
-import { Zap, Wrench, Package, Briefcase, Megaphone, HelpCircle, Plus, Calendar, AlertTriangle, Loader2, CheckCircle2, AlertCircle, ChevronDown } from 'lucide-react';
+import { 
+  Zap, Wrench, Package, Briefcase, Megaphone, HelpCircle, Plus, 
+  Calendar, AlertTriangle, Loader2, CheckCircle2, AlertCircle, ChevronDown, 
+  Trash2, ArchiveRestore, X 
+} from 'lucide-react';
 import { useTheme } from '../../../hooks/useTheme';
 
 const CATEGORIES = [
@@ -14,9 +18,6 @@ const CATEGORIES = [
   { id: 'OTHER', label: 'Otros Gastos', icon: HelpCircle, color: 'text-gray-500 bg-gray-50 dark:bg-gray-500/10 lya:bg-gray-500/10' },
 ];
 
-/* ==========================================
-   COMPONENTE SELECTOR 100% TEMATIZADO
-   ========================================== */
 const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassName, buttonClassName }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -81,7 +82,7 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
 
 export const ExpensesPage = () => {
   const { theme } = useTheme();
-  const { expenses, isLoading, fetchExpenses, registerExpense } = useFinanceController();
+  const { expenses, isLoading, fetchExpenses, registerExpense, cancelExpense, restoreExpense } = useFinanceController();
   
   const formatLocalDate = (date) => {
     const year = date.getFullYear();
@@ -107,10 +108,13 @@ export const ExpensesPage = () => {
   const [expenseDate, setExpenseDate] = useState(formatLocalDate(new Date())); 
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null); 
   const [notification, setNotification] = useState(null);
-
-  // 🔥 SOLUCIÓN MAESTRA: Este estado nace en TRUE. Obliga a mostrar la carga al montar el componente.
   const [isFullScreenLoader, setIsFullScreenLoader] = useState(true);
+
+  // Modales
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, expenseId: null, reason: '' });
   
   const isDarkMode = document.documentElement.classList.contains('dark');
 
@@ -119,17 +123,16 @@ export const ExpensesPage = () => {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🔥 En lugar de depender ciegamente del isLoading del controlador, controlamos el cierre nosotros
   useEffect(() => {
     const loadData = async () => {
       await fetchExpenses(startDate, endDate);
-      setIsFullScreenLoader(false); // Cerramos el telón cuando ya hay datos seguros
+      setIsFullScreenLoader(false);
     };
     loadData();
   }, [startDate, endDate, fetchExpenses]);
 
   const handleRangeChange = (val) => {
-    setIsFullScreenLoader(true); // Bloqueamos la pantalla instantáneamente al hacer clic
+    setIsFullScreenLoader(true);
     setTimeRange(val);
     const now = new Date();
     let start, end;
@@ -170,7 +173,7 @@ export const ExpensesPage = () => {
   };
 
   const handleCustomDateChange = (val, type) => {
-    setIsFullScreenLoader(true); // Bloqueamos la pantalla al usar el calendario
+    setIsFullScreenLoader(true);
     setTimeRange('custom');
     if (type === 'start') setStartDate(val);
     if (type === 'end') setEndDate(val);
@@ -193,7 +196,6 @@ export const ExpensesPage = () => {
       setAmount('');
       setDescription('');
       setExpenseDate(formatLocalDate(new Date())); 
-      // Al registrar, NO bloqueamos la pantalla, solo usamos fetchExpenses para el loader chiquito
       fetchExpenses(startDate, endDate);
     } else {
       showNotification(res.error || 'Error al registrar el gasto', 'error');
@@ -201,35 +203,75 @@ export const ExpensesPage = () => {
     setIsSubmitting(false);
   };
 
-  const totalGastos = (expenses || [])
-    .filter(ex => ex.status === 'ACTIVE')
-    .reduce((sum, ex) => sum + parseFloat(ex.amount), 0);
+  const handleConfirmCancel = async () => {
+    setActionLoadingId(cancelModal.expenseId);
+    const res = await cancelExpense(cancelModal.expenseId, cancelModal.reason);
+    if (res.success) {
+      showNotification('Gasto anulado. El dinero ha vuelto a caja.', 'success');
+      setCancelModal({ isOpen: false, expenseId: null, reason: '' });
+      fetchExpenses(startDate, endDate);
+    } else {
+      showNotification(res.error || 'No se pudo anular el gasto', 'error');
+    }
+    setActionLoadingId(null);
+  };
+
+  const handleRestore = async (id) => {
+    setActionLoadingId(id);
+    const res = await restoreExpense(id);
+    if (res.success) {
+      showNotification('Gasto restaurado correctamente.', 'success');
+      fetchExpenses(startDate, endDate);
+    } else {
+      showNotification(res.error || 'No se pudo restaurar el gasto', 'error');
+    }
+    setActionLoadingId(null);
+  };
+
+  const todayStr = new Date().toLocaleDateString('es-MX');
+
+  const activeExpenses = (expenses || []).filter(ex => ex.status === 'ACTIVE');
+  const cancelledExpenses = (expenses || []).filter(ex => {
+    if (ex.status !== 'CANCELLED') return false;
+    const cancelDate = ex.cancelledAt ? new Date(ex.cancelledAt) : new Date(ex.createdAt);
+    return cancelDate.toLocaleDateString('es-MX') === todayStr;
+  });
+
+  const totalGastos = activeExpenses.reduce((sum, ex) => sum + parseFloat(ex.amount), 0);
 
   return (
     <>
       <AnimatePresence>
         {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="fixed top-8 left-0 right-0 flex justify-center z-[9999] pointer-events-none px-4"
-          >
-            <div className={`backdrop-blur-xl rounded-full shadow-2xl border px-5 py-3 flex items-center gap-3 transition-colors ${
-              notification.type === 'success'
-                ? 'bg-emerald-50/90 dark:bg-emerald-900/80 border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 lya:bg-lya-surface/90 lya:border-emerald-500/30'
-                : 'bg-red-50/90 dark:bg-red-900/80 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 lya:bg-lya-surface/90 lya:border-red-500/30'
-            }`}>
-              {notification.type === 'success' ? <CheckCircle2 size={20} className="lya:text-emerald-500" /> : <AlertCircle size={20} className="lya:text-red-500" />}
-              <span className="font-bold text-sm lya:text-lya-text">{notification.message}</span>
-            </div>
-          </motion.div>
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
+                notification.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
+              }`}
+            >
+              <div className={`p-1.5 rounded-full shrink-0 ${
+                notification.type === 'error' 
+                  ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
+                  : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
+              }`}>
+                {notification.type === 'error' ? (
+                  <AlertCircle size={20} />
+                ) : (
+                  <CheckCircle2 size={20} />
+                )}
+              </div>
+              <div className="flex flex-col">
+                  <span className="text-sm text-center">{notification.message}</span>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
-        {/* 🔥 PANTALLA DE CARGA ABSOLUTA: Controlada por isFullScreenLoader */}
         {isFullScreenLoader ? (
           <motion.div
             key="loader-screen"
@@ -267,7 +309,7 @@ export const ExpensesPage = () => {
                 </div>
                 <div>
                   <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight transition-colors">Gastos Operativos</h1>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Registra aquí el pago de luz, nóminas y otros egresos de 𝓛𝔂𝓪.</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors text-justify">Registra aquí el pago de luz, nóminas y otros egresos de 𝓛𝔂𝓪.</p>
                 </div>
               </div>
               
@@ -324,6 +366,7 @@ export const ExpensesPage = () => {
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 relative">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
+                {/* FORMULARIO DE REGISTRO */}
                 <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 h-fit transition-colors">
                   <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white lya:text-lya-text border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors">Registrar Nuevo Gasto</h2>
                   <form onSubmit={handleSubmit} className="space-y-5">
@@ -407,6 +450,7 @@ export const ExpensesPage = () => {
                   </form>
                 </div>
 
+                {/* HISTORIAL Y TOTAL */}
                 <div className="lg:col-span-2 flex flex-col gap-6 relative">
                   <div className="bg-red-50 dark:bg-red-900/10 lya:bg-lya-secondary/10 border border-red-100 dark:border-red-900/30 lya:border-lya-secondary/20 p-8 rounded-[2rem] flex justify-between items-center shadow-sm transition-colors relative z-10">
                     <div>
@@ -423,27 +467,37 @@ export const ExpensesPage = () => {
                   </div>
 
                   <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex-1 p-6 transition-colors relative overflow-hidden">
-                    {/* 🔥 EL SPINNER SILENCIOSO PARA CUANDO GUARDAS UN GASTO */}
                     {isLoading && !isFullScreenLoader && (
                        <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-sm z-20">
                          <Loader2 className="animate-spin text-red-500 lya:text-lya-primary" size={32} />
                        </div>
                     )}
 
-                    <h3 className="font-bold text-gray-800 dark:text-white lya:text-lya-text mb-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors">Historial de Gastos</h3>
+                    <div className="flex justify-between items-center mb-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors">
+                      <h3 className="font-bold text-gray-800 dark:text-white lya:text-lya-text">Historial de Gastos</h3>
+                      <button 
+                        onClick={() => setIsTrashOpen(true)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-xs transition-all active:scale-95 ${
+                          isTrashOpen 
+                            ? 'bg-red-500 text-white shadow-md lya:bg-lya-primary lya:text-lya-surface' 
+                            : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 lya:bg-lya-primary/10 lya:text-lya-primary'
+                        }`}
+                      >
+                        <Trash2 size={16} />
+                        Papelera ({cancelledExpenses.length})
+                      </button>
+                    </div>
                     
-                    {!isLoading && (!expenses || expenses.length === 0) ? (
+                    {!isLoading && activeExpenses.length === 0 ? (
                       <div className="text-center py-16 text-gray-400 dark:text-gray-500 lya:text-lya-text/50">
                         <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
-                        <p className="font-bold text-lg">No hay gastos registrados en este periodo.</p>
+                        <p className="font-bold text-lg">No hay gastos activos registrados.</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {(expenses || []).map((ex, idx) => {
+                        {activeExpenses.map((ex, idx) => {
                           const catConfig = CATEGORIES.find(c => c.id === ex.expenseCategory) || CATEGORIES[5];
                           const Icon = catConfig.icon;
-                          const isCancelled = ex.status === 'CANCELLED';
-                          
                           const dateObj = new Date(ex.createdAt);
                           const formattedDate = dateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
                           const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
@@ -453,35 +507,43 @@ export const ExpensesPage = () => {
                               key={ex.id} 
                               initial={{ opacity: 0, y: 15 }} 
                               animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
                               transition={{ type: "spring", stiffness: 300, damping: 24, delay: idx * 0.04 }}
-                              className={`flex items-center justify-between p-5 rounded-2xl border transition-all ${
-                                isCancelled 
-                                  ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 opacity-60 grayscale lya:bg-lya-bg lya:border-lya-border/20' 
-                                  : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/50 shadow-sm'
-                              }`}
+                              // 🔥 FIX APLICADO AQUÍ: flex-row estricto, items-start y gap-4 inquebrantable
+                              className="flex flex-row items-start justify-between p-4 sm:p-5 rounded-[1.5rem] border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/50 shadow-sm transition-all gap-4"
                             >
-                              <div className="flex items-center gap-4">
-                                <div className={`p-3.5 rounded-xl transition-colors ${catConfig.color}`}>
-                                  <Icon size={24} />
+                              {/* CAJA IZQUIERDA BLINDADA CONTRA DESBORDES */}
+                              <div className="flex flex-row items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                                <div className={`p-3 sm:p-3.5 rounded-xl shrink-0 transition-colors ${catConfig.color}`}>
+                                  <Icon size={20} className="sm:w-6 sm:h-6" />
                                 </div>
-                                <div>
-                                  <p className={`font-bold text-base transition-colors ${isCancelled ? 'line-through text-gray-400 dark:text-gray-500 lya:text-lya-text/50' : 'text-gray-800 dark:text-white lya:text-lya-text'}`}>
+                                <div className="flex flex-col min-w-0 flex-1 pt-0.5">
+                                  <p className="font-bold text-sm sm:text-base text-gray-800 dark:text-white lya:text-lya-text truncate w-full">
                                     {ex.description}
                                   </p>
-                                  <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold transition-colors">
-                                    <span className="capitalize">{formattedDate}</span>
-                                    <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border">•</span>
-                                    <span>{formattedTime}</span>
-                                    <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border">•</span>
-                                    <span className="uppercase tracking-widest text-[10px]">{catConfig.label}</span>
+                                  {/* Metadatos flex-wrap para que bajen de línea antes de chocar */}
+                                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">
+                                    <span className="capitalize whitespace-nowrap">{formattedDate}</span>
+                                    <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
+                                    <span className="whitespace-nowrap">{formattedTime}</span>
                                   </div>
+                                  <span className="uppercase tracking-widest text-[9px] sm:text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 truncate w-full mt-1">
+                                    {catConfig.label}
+                                  </span>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <p className={`font-black text-xl transition-colors ${isCancelled ? 'text-gray-400 dark:text-gray-500 lya:text-lya-text/50' : 'text-red-600 dark:text-red-400 lya:text-red-500'}`}>
+                              
+                              {/* CAJA DERECHA ASEGURADA (Monto y Botón) */}
+                              <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
+                                <p className="font-black text-lg sm:text-xl text-red-600 dark:text-red-400 lya:text-red-500 transition-colors">
                                   -${parseFloat(ex.amount).toFixed(2)}
                                 </p>
-                                {isCancelled && <span className="text-[10px] font-black text-red-500 dark:text-red-400 lya:text-red-600 uppercase tracking-widest bg-red-50 dark:bg-red-900/20 lya:bg-red-500/10 px-2 py-0.5 rounded mt-1 inline-block transition-colors">Anulado</span>}
+                                <button
+                                  onClick={() => setCancelModal({ isOpen: true, expenseId: ex.id, reason: '' })}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 lya:bg-lya-bg text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors text-[10px] font-bold uppercase tracking-wider active:scale-95"
+                                >
+                                  <Trash2 size={14} /> Anular
+                                </button>
                               </div>
                             </motion.div>
                           );
@@ -493,6 +555,175 @@ export const ExpensesPage = () => {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔥 MODAL DE CONFIRMACIÓN DE ANULACIÓN (TEMA NEO-BENTO DE QR CONTROL) */}
+      <AnimatePresence>
+        {cancelModal.isOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => {
+                if (actionLoadingId !== cancelModal.expenseId) {
+                  setCancelModal({ isOpen: false, expenseId: null, reason: '' });
+                }
+              }}
+              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+            >
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
+                <AlertTriangle size={32} strokeWidth={1.5} />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight text-center">
+                Anular Gasto
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-6 leading-relaxed px-2 text-center">
+                ¿Estás seguro que deseas eliminar este gasto de los registros? El monto regresará a caja.
+              </p>
+
+              <div className="w-full mb-8">
+                <label className="block text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/50 tracking-widest mb-2 w-full text-center">
+                  Motivo de anulación (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. Error en la cantidad..."
+                  value={cancelModal.reason}
+                  onChange={(e) => setCancelModal({ ...cancelModal, reason: e.target.value })}
+                  className="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-900 dark:text-white lya:text-lya-text text-sm font-medium outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 transition-all text-center"
+                />
+              </div>
+
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setCancelModal({ isOpen: false, expenseId: null, reason: '' })}
+                  disabled={actionLoadingId === cancelModal.expenseId}
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleConfirmCancel} 
+                  disabled={actionLoadingId === cancelModal.expenseId}
+                  className="flex-[1.5] py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500"
+                >
+                  {actionLoadingId === cancelModal.expenseId ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Anulando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={18} strokeWidth={2.5} />
+                      <span>Sí, Anular</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔥 MODAL DE PAPELERA DE RECICLAJE (TEMA NEO-BENTO DE QR CONTROL) */}
+      <AnimatePresence>
+        {isTrashOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsTrashOpen(false)}
+              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-3xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors overflow-hidden"
+            >
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 lya:bg-red-500/10 rounded-2xl text-red-500 lya:text-red-500 shadow-sm border border-red-200 dark:border-red-800/50 lya:border-red-500/20">
+                    <Trash2 size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text tracking-tight">Papelera de Gastos</h3>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Los gastos eliminados hoy desaparecerán a medianoche</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsTrashOpen(false)} 
+                  className="p-2.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:hover:text-lya-text lya:hover:bg-lya-border/30 rounded-xl transition-all active:scale-90"
+                >
+                  <X size={20} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
+                {cancelledExpenses.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4">
+                      <Trash2 size={40} className="text-gray-400 dark:text-gray-600 lya:text-lya-text/30" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 font-bold lya:text-lya-text/60 text-lg text-center">No hay gastos anulados el día de hoy.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {cancelledExpenses.map((ex) => {
+                      const catConfig = CATEGORIES.find(c => c.id === ex.expenseCategory) || CATEGORIES[5];
+                      const Icon = catConfig.icon;
+                      const dateObj = new Date(ex.cancelledAt || ex.createdAt);
+                      const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+
+                      return (
+                        <div key={ex.id} className="flex flex-row items-start justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 hover:opacity-100 transition-opacity gap-4">
+                          
+                          {/* CAJA IZQUIERDA PAPELERA BLINDADA */}
+                          <div className="flex flex-row items-start gap-3 flex-1 min-w-0 pr-2">
+                            <div className={`h-12 w-12 flex-shrink-0 rounded-[1.25rem] ${catConfig.color} flex items-center justify-center border border-gray-100 dark:border-gray-700 lya:border-transparent`}>
+                              <Icon size={20} />
+                            </div>
+                            <div className="min-w-0 flex-1 pt-0.5">
+                              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 lya:text-lya-text truncate w-full">{ex.description}</h4>
+                              <div className="flex flex-wrap items-center gap-x-1 mt-0.5">
+                                <span className="text-xs font-medium text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
+                                  Anulado: {formattedTime}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* CAJA DERECHA PAPELERA ASEGURADA */}
+                          <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
+                            <span className="font-black text-base text-red-500 lya:text-red-400">
+                              ${parseFloat(ex.amount).toFixed(2)}
+                            </span>
+                            <button 
+                              onClick={() => handleRestore(ex.id)}
+                              disabled={actionLoadingId === ex.id}
+                              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50"
+                            >
+                              {actionLoadingId === ex.id ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
+                              <span className="hidden sm:inline">
+                                {actionLoadingId === ex.id ? 'Restaurando' : 'Restaurar'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </>

@@ -13,7 +13,7 @@ export const useFinanceController = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('lya_token');
-      // 🔥 AÑADIDO: source=MANUAL para ignorar los reembolsos de Cafetería/Pastelería
+      // source=MANUAL para ignorar reembolsos automáticos
       let url = `${API_URL}/cash?type=EXPENSE&source=MANUAL`;
       
       if (startDate && endDate) {
@@ -55,6 +55,49 @@ export const useFinanceController = () => {
     }
   };
 
+  // 🔥 NUEVO: Función para Anular Gasto (con motivo opcional)
+  const cancelExpense = async (id, reason) => {
+    try {
+      const token = localStorage.getItem('lya_token');
+      const response = await fetch(`${API_URL}/cash/${id}/cancel`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // 🔥 NUEVO: Función para Restaurar Gasto
+  const restoreExpense = async (id) => {
+    try {
+      const token = localStorage.getItem('lya_token');
+      const response = await fetch(`${API_URL}/cash/${id}/restore`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   const fetchFinancialSummary = useCallback(async (startDate, endDate) => {
     setIsSummaryLoading(true);
     try {
@@ -86,6 +129,8 @@ export const useFinanceController = () => {
     isSummaryLoading, 
     fetchExpenses, 
     registerExpense,
+    cancelExpense,
+    restoreExpense,
     fetchFinancialSummary 
   };
 };

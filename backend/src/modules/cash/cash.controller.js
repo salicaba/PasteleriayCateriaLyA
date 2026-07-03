@@ -8,7 +8,6 @@ import { Op } from 'sequelize';
 
 export const getTransactions = async (req, res) => {
   try {
-    // 🔥 NUEVO: Recibimos 'source' para poder filtrar solo los MANUALES
     const { date, startDate, endDate, type, source } = req.query; 
     let whereClause = {};
 
@@ -43,7 +42,6 @@ export const getTransactions = async (req, res) => {
       whereClause.type = type;
     }
     
-    // 🔥 NUEVO: Filtramos por origen si nos lo piden desde el Frontend
     if (source) {
       whereClause.source = source;
     }
@@ -80,7 +78,7 @@ export const registerManualTransaction = async (req, res) => {
     const newTx = await Transaction.create({
       folio: `EGR-${Date.now().toString().slice(-6)}`, 
       type: 'EXPENSE',
-      source: 'MANUAL', // <-- Esto es lo que define un Gasto Operativo
+      source: 'MANUAL', 
       expenseCategory: expenseCategory || 'OTHER',
       amount,
       description,
@@ -102,6 +100,9 @@ export const cancelTransaction = async (req, res) => {
     }
 
     const { id } = req.params;
+    // 🔥 Extraemos el motivo opcional del Frontend
+    const { reason } = req.body;
+
     const tx = await Transaction.findByPk(id);
 
     if (!tx) return res.status(404).json({ message: 'Transacción no encontrada' });
@@ -130,6 +131,12 @@ export const cancelTransaction = async (req, res) => {
     tx.status = 'CANCELLED';
     tx.cancelledBy = req.user.id;
     tx.cancelledAt = new Date();
+    
+    // 🔥 Guardamos el registro del motivo de cancelación con total seguridad
+    if (reason && reason.trim() !== '') {
+      tx.description = `${tx.description} (Motivo Anulación: ${reason})`;
+    }
+
     await tx.save();
 
     res.json({ message: 'Movimiento anulado correctamente.', data: tx });
@@ -212,17 +219,14 @@ export const getFinancialSummary = async (req, res) => {
       end = new Date(Date.UTC(year, month + 1, 1, 5, 59, 59));
     }
 
-    // Ingresos por ventas
     const incomes = await Transaction.sum('amount', {
       where: { type: 'INCOME', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
     
-    // Egresos por reembolsos (Lo restaremos a las ventas brutas para que sea exacto)
     const refunds = await Transaction.sum('amount', {
       where: { type: 'EXPENSE', source: { [Op.ne]: 'MANUAL' }, status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
 
-    // 🔥 CORRECCIÓN: Los Gastos Operativos (OPEX) SOLO deben ser los MANUALES
     const opex = await Transaction.sum('amount', {
       where: { type: 'EXPENSE', source: 'MANUAL', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
@@ -231,7 +235,6 @@ export const getFinancialSummary = async (req, res) => {
       where: { type: 'CONSUMPTION', createdAt: { [Op.between]: [start, end] } }
     });
 
-    // Descontamos las cancelaciones para tener el Ingreso Bruto Real
     const totalIncome = parseFloat(incomes || 0) - parseFloat(refunds || 0);
     const totalOpex = parseFloat(opex || 0);
     const totalCogs = parseFloat(cogs || 0);

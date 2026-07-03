@@ -7,7 +7,7 @@ import clsx from 'clsx';
 export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(isVitrina || isLlevar || false);
-  const [isConfirming, setIsConfirming] = useState(false); // 🔥 Nuevo estado anti-doble clic
+  const [isConfirming, setIsConfirming] = useState(false); // 🔥 Estado anti-doble clic
 
   if (!product) return null;
 
@@ -103,54 +103,63 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     return total;
   };
 
-  const handleConfirm = () => {
+  // 🔥 FIX CRÍTICO: Función asíncrona para que el Loader2 funcione con la promesa superior
+  const handleConfirm = async () => {
     if (isAgotado || isConfirming) return;
-    setIsConfirming(true); // 🔥 Bloqueamos el botón inmediatamente
+    setIsConfirming(true); // Bloqueamos el botón y disparamos loader
 
-    let tamanoStr = 'Estándar';
-    let lecheStr = null;
-    let extrasArr = [];
+    try {
+      let tamanoStr = 'Estándar';
+      let lecheStr = null;
+      let extrasArr = [];
 
-    availableModifiers.forEach(mod => {
-      const selected = selections[mod.id];
-      if (!selected) return;
+      availableModifiers.forEach(mod => {
+        const selected = selections[mod.id];
+        if (!selected) return;
 
-      if (mod.type === 'single') {
-        const opt = mod.options.find(o => o.id === selected);
-        if (opt) {
-           const idLower = String(mod.id).toLowerCase();
-           const titleLower = String(mod.title).toLowerCase();
-           if (idLower.includes('leche') || titleLower.includes('leche')) {
-               lecheStr = opt.label;
-           } else if (idLower.includes('taman') || idLower.includes('tamañ') || titleLower.includes('tamañ')) {
-               tamanoStr = opt.label;
-           } else {
-               extrasArr.push(opt.label);
-           }
+        if (mod.type === 'single') {
+          const opt = mod.options.find(o => o.id === selected);
+          if (opt) {
+             const idLower = String(mod.id).toLowerCase();
+             const titleLower = String(mod.title).toLowerCase();
+             if (idLower.includes('leche') || titleLower.includes('leche')) {
+                 lecheStr = opt.label;
+             } else if (idLower.includes('taman') || idLower.includes('tamañ') || titleLower.includes('tamañ')) {
+                 tamanoStr = opt.label;
+             } else {
+                 extrasArr.push(opt.label);
+             }
+          }
+        } else {
+          selected.forEach(sId => {
+            const opt = mod.options.find(o => o.id === sId);
+            if (opt) extrasArr.push(opt.label);
+          });
         }
-      } else {
-        selected.forEach(sId => {
-          const opt = mod.options.find(o => o.id === sId);
-          if (opt) extrasArr.push(opt.label);
-        });
-      }
-    });
+      });
 
-    onConfirm({
-      ...product,
-      precioFinal: calculateTotal(),
-      detalles: {
-         tamano: tamanoStr,
-         ...(lecheStr && { leche: lecheStr }),
-         ...(extrasArr.length > 0 && { extras: extrasArr })
-      },
-      isTakeaway, 
-      uniqueId: Date.now()
-    });
+      // Await para esperar a que el controlador superior procese el carrito
+      await onConfirm({
+        ...product,
+        precioFinal: calculateTotal(),
+        detalles: {
+           tamano: tamanoStr,
+           ...(lecheStr && { leche: lecheStr }),
+           ...(extrasArr.length > 0 && { extras: extrasArr })
+        },
+        isTakeaway, 
+        uniqueId: Date.now()
+      });
+
+    } finally {
+      // Si el modal no se desmonta (ej. error), liberamos el botón
+      setIsConfirming(false); 
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center pointer-events-none overflow-hidden">
+      {/* Fondo con blur */}
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
@@ -159,6 +168,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm pointer-events-auto transition-colors" 
       />
 
+      {/* Modal tipo Neo-Bento Bottom Sheet */}
       <motion.div 
         initial={{ y: "100%" }} 
         animate={{ y: 0 }} 
@@ -167,7 +177,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         className="relative z-10 bg-white dark:bg-gray-900 lya:bg-lya-surface w-full md:w-[500px] md:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[90dvh] md:max-h-[85vh] transition-colors md:border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
       >
         
-        {/* Cabecera con Imagen */}
+        {/* Cabecera con Imagen (Mantenida exactamente igual) */}
         <div className="relative h-48 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg shrink-0 p-2 border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/30 transition-colors">
           {product.image || product.imagen ? (
             <img src={product.image || product.imagen} className="w-full h-full object-contain drop-shadow-md opacity-90" alt={product.nombre} />
@@ -249,7 +259,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
             ))
           )}
 
-          {/* Toggle para Llevar */}
+          {/* Toggle para Llevar (Texto Justificado aplicado) */}
           {!isVitrina && !isLlevar && (
             <div className="mt-8 mb-2">
               <label className={`flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-900/50 lya:border-lya-secondary/30 bg-orange-50 dark:bg-orange-900/10 lya:bg-lya-secondary/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform ${isConfirming ? 'opacity-70 pointer-events-none' : ''}`}>
@@ -264,7 +274,8 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                   <span className="font-black text-orange-900 dark:text-orange-100 lya:text-lya-text text-sm flex items-center gap-2">
                     <ShoppingBag size={16} /> Empaquetar para Llevar
                   </span>
-                  <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 lya:text-lya-text/60 mt-0.5">
+                  {/* Regla tipográfica aplicada aquí */}
+                  <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 lya:text-lya-text/60 mt-0.5 text-justify leading-tight">
                     Se enviará a cocina con indicación de empaque desechable.
                   </span>
                 </div>
