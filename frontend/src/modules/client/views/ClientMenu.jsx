@@ -288,10 +288,10 @@ export default function ClientMenu({ clientData, type, tableId }) {
       // Si el cliente ya confirmó su pedido o está en proceso de pago, NO lo sacamos.
       if (isConfirmed || isSubmitting) return;
       
-      // 10 minutos de inactividad (600,000 ms)
+      // 25 minutos de inactividad (1,500,000 ms)
       timeoutId = setTimeout(() => {
         handleLogout();
-      }, 600000); 
+      }, 1500000); 
     };
 
     // Escuchamos cualquier evento que signifique que el cliente sigue viendo el menú
