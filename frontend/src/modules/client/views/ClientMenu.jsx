@@ -19,7 +19,6 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
-// 🔥 RECIBIMOS LA PROP onLogout DESDE ClientApp.jsx
 export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -97,29 +96,34 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting]);
 
-  // 🔥 LÓGICA MEJORADA: Cierre de Sesión Completo (Abandono de Mesa)
+  // 🔥 LÓGICA A PRUEBA DE BALAS: Cierre de Sesión Completo
   const handleLogout = async () => {
     setIsLoggingOut(true);
     
-    // Delay simulado de 800ms para que se vea el spinner de carga y de tiempo de limpiar variables
+    // Delay simulado de 800ms para UX
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Limpieza Agresiva: Destruimos todos los posibles rastros de la sesión del cliente
+    // Limpieza Agresiva
     const keysToRemove = [
       'lya_client_order_id', 
       'lya_client_snapshot', 
       'lya_client_data', 
-      'lya_client_session', // Aseguramos matar la sesión local
+      'lya_client_session', 
       'lya_token', 
       'lya_user',
       'clientData'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
-    // 🔥 EN LUGAR DEL RELOAD, LLAMAMOS AL PADRE (ClientApp.jsx)
-    if (onLogout) {
+    // 1. Intentamos de la forma limpia (Notificando a ClientApp)
+    if (typeof onLogout === 'function') {
       onLogout();
     }
+    
+    // 2. BACKUP RÚSTICO: Si pasados 500ms React no te ha mandado al login, recargamos a la fuerza.
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
   };
 
   useEffect(() => {
@@ -326,9 +330,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // ==========================================
-  // PANTALLA DE BLOQUEO 1: SESIÓN EXPIRADA POR INACTIVIDAD
-  // ==========================================
   if (sessionExpired) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
@@ -362,9 +363,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // ==========================================
-  // PANTALLA DE BLOQUEO 2: KILL-SWITCH ACTIVO Y NO HA PEDIDO
-  // ==========================================
   if (!isQrActive && !isConfirmed) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
@@ -398,9 +396,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // ==========================================
-  // SI EL CLIENTE YA HABÍA CONFIRMADO (MUESTRA TICKET, PASA isQrActive Y onOpenSettings)
-  // ==========================================
   if (isConfirmed) {
     return (
       <ClientOrderSuccess 
@@ -424,7 +419,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
       
-      {/* CÁPSULAS NEO-BENTO DE NOTIFICACIÓN */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -453,7 +447,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      {/* HEADER */}
       <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
@@ -491,7 +484,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         </div>
       </header>
 
-      {/* LISTA DE PRODUCTOS */}
       <motion.div 
         initial={{ opacity: 0, y: 10 }} 
         animate={{ opacity: 1, y: 0 }} 
@@ -551,7 +543,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </motion.div>
 
-      {/* BOTÓN "MI NOTA" FLOTANTE */}
       <AnimatePresence>
         {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div 
@@ -572,7 +563,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      {/* BOTÓN "REVISAR PEDIDO" FLOTANTE */}
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
@@ -621,6 +611,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
             showLogout={!isConfirmed} 
+            // 🔥 SOLUCIÓN AQUÍ: Inyectamos todas las combinaciones posibles que pudiera tener tu archivo original
+            onLogout={() => {
+              setShowSettings(false);
+              setShowLogoutConfirm(true);
+            }}
             onLogoutClick={() => {
               setShowSettings(false);
               setShowLogoutConfirm(true);
@@ -629,14 +624,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      {/* Acepta ambas propiedades onLogout y onConfirm por si usas el modal viejo o el nuevo */}
       <AnimatePresence>
         {showLogoutConfirm && (
           <ClientLogoutModal 
             isOpen={showLogoutConfirm}
+            show={showLogoutConfirm} // 🔥 Por si usa 'show'
             onClose={() => setShowLogoutConfirm(false)}
             onLogout={handleLogout}
-            onConfirm={handleLogout} 
+            onConfirm={handleLogout} // 🔥 Por si usa 'onConfirm'
           />
         )}
       </AnimatePresence>
