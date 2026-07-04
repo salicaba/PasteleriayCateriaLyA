@@ -19,6 +19,9 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
+// 🔥 Importamos el logo de 𝓛𝔂𝓪 para la pantalla de carga
+import logoLyA from '../../../assets/logo.jpeg'; 
+
 export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -316,16 +319,35 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return cat ? cat.name : 'Delicia';
   };
 
+  // 🔥 NUEVA PANTALLA DE CARGA ELEGANTE 𝓛𝔂𝓪
   if (isLoading) {
     return (
-      <div className="fixed top-0 left-0 w-screen h-screen z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg">
-        <div className="relative w-16 h-16 mb-5">
-          <div className="absolute inset-0 border-4 border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-full" />
-          <div className="absolute inset-0 border-4 border-orange-500 dark:border-orange-400 lya:border-lya-primary rounded-full border-t-transparent animate-spin" />
-        </div>
-        <p className="font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 animate-pulse text-sm tracking-wide text-center">
-          Cargando el menú de <b>𝓛𝔂𝓪</b>...
-        </p>
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md">
+         <div className="relative w-28 h-28 mb-6">
+            <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-lya-border/40" />
+            <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-400 lya:border-lya-primary border-t-transparent animate-spin" />
+            <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
+              <img src={logoLyA} alt="Logo Lya" className="w-full h-full object-cover animate-pulse" />
+            </div>
+         </div>
+         
+         <motion.h2 
+            initial={{ y: 10, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            transition={{ delay: 0.2 }}
+            className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse"
+         >
+            Preparando tu mesa...
+         </motion.h2>
+         <motion.p 
+            initial={{ y: 10, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            transition={{ delay: 0.4 }}
+            className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm flex items-center gap-2"
+         >
+            <CheckCircle2 size={16} className="text-green-500" />
+            Cargando el menú más fresco
+         </motion.p>
       </div>
     );
   }
