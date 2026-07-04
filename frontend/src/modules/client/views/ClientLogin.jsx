@@ -1,92 +1,111 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Coffee, Utensils, ChevronRight } from 'lucide-react';
-import logoLyA from '../../../assets/logo.jpeg'; 
+// src/modules/client/views/ClientLogin.jsx
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Utensils, ArrowRight, Loader2, Settings } from 'lucide-react';
+import ClientSettingsModal from './components/ClientSettingsModal';
+import { THEME_CLASSES, SIZES, getInitialTheme, getInitialSize } from './utils/clientMenuUtils';
 
-export default function ClientLogin({ onLogin, type, tableId }) {
+export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  
+  // Estados para Ajustes desde el Login
+  const [showSettings, setShowSettings] = useState(false);
+  const [themeIndex, setThemeIndex] = useState(getInitialTheme);
+  const [sizeIndex, setSizeIndex] = useState(getInitialSize);
+
+  // Sincronizar Tema y Tamaño globalmente
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark', 'theme-lya');
+    root.classList.add(THEME_CLASSES[themeIndex]);
+    localStorage.setItem('lya_client_theme', themeIndex);
+  }, [themeIndex]);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = SIZES[sizeIndex].val;
+    localStorage.setItem('lya_client_size', sizeIndex);
+  }, [sizeIndex]);
+
+  const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
+  const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    onLogin({ name: name.trim(), phone: phone.trim() });
+    if (name.trim()) onLogin({ name: name.trim() });
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex-1 flex flex-col items-center justify-center p-6 relative w-full"
-    >
-      <div className="w-full max-w-sm space-y-8">
-        
-        {/* Header Identidad */}
-        <div className="flex flex-col items-center text-center space-y-4">
-          <motion.div 
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="w-24 h-24 rounded-[2rem] overflow-hidden border-4 border-white/80 dark:border-gray-800 lya:border-lya-surface shadow-xl"
-          >
-            <img src={logoLyA} alt="Logo 𝓛𝔂𝓪" className="w-full h-full object-cover" />
-          </motion.div>
-          
-          <div>
-            <h1 className="text-5xl font-bold tracking-tight mb-3" style={{ letterSpacing: '-0.08em' }}>
-              𝓛𝔂𝓪
-            </h1>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/50 dark:bg-white/10 lya:bg-lya-surface/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">
-              {type === 'mesa' ? (
-                <><Utensils size={16} /> Mesa {tableId}</>
-              ) : (
-                <><Coffee size={16} /> Pedido para Llevar</>
-              )}
-            </div>
-          </div>
-        </div>
+    <div className="h-full w-full flex-1 flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden relative">
+      
+      {/* Botón de Ajustes en el Login */}
+      <motion.button 
+        whileTap={{ scale: 0.95 }} 
+        onClick={() => setShowSettings(true)} 
+        className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 transition-colors z-50"
+      >
+        <Settings size={24} strokeWidth={2.5} />
+      </motion.button>
 
-        {/* Formulario Neo-Bento */}
-        <motion.form 
-          onSubmit={handleSubmit}
-          className="backdrop-blur-2xl border p-6 rounded-[2rem] shadow-2xl space-y-5 bg-white/40 dark:bg-black/40 lya:bg-lya-surface/60 border-white/50 dark:border-white/10 lya:border-lya-border/40 transition-colors"
-        >
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+        animate={{ opacity: 1, y: 0, scale: 1 }} 
+        transition={{ type: 'spring', damping: 25 }}
+        className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 sm:p-10 shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+      >
+        <div className="w-20 h-20 bg-orange-100 dark:bg-orange-500/20 lya:bg-lya-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+          <Utensils size={32} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
+        </div>
+        
+        <h2 className="text-3xl font-black text-center text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">
+          ¡Bienvenido!
+        </h2>
+        
+        {/* REGLA TIPOGRÁFICA: Justificado */}
+        <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm text-justify mb-8 px-2 font-medium">
+          {type === 'mesa' 
+            ? `Estás en la Mesa ${tableId}. Por favor, ingresa tu nombre para iniciar tu orden digital y personalizar tus platillos.`
+            : `Estás en la sección para Llevar. Por favor, ingresa tu nombre para que podamos llamarte cuando tu pedido esté listo.`}
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-bold opacity-80 px-1 text-gray-800 dark:text-gray-200 lya:text-lya-text">¿Cómo te llamas?</label>
-            <input
-              type="text"
-              required
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text ml-2">¿Cómo te llamas?</label>
+            <input 
+              type="text" 
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej. Juan López"
-              className="w-full px-4 py-3.5 rounded-2xl bg-white/60 dark:bg-black/50 lya:bg-white/80 border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:outline-none focus:ring-2 focus:ring-orange-500/50 dark:focus:ring-orange-400/50 lya:focus:ring-lya-primary/50 backdrop-blur-sm transition-all text-base placeholder:text-gray-400 dark:placeholder:text-gray-600 lya:placeholder:text-lya-text/40 text-gray-900 dark:text-white lya:text-lya-text"
+              placeholder="Ej. María López"
+              disabled={isSubmitting}
+              className="w-full px-5 py-4 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-900 outline-none transition-all text-gray-900 dark:text-white lya:text-lya-text font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
+              required
+              autoFocus
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-bold opacity-80 px-1 text-gray-800 dark:text-gray-200 lya:text-lya-text">Celular <span className="opacity-50 font-normal">(Opcional para el ticket)</span></label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Para avisarte de tu pedido"
-              className="w-full px-4 py-3.5 rounded-2xl bg-white/60 dark:bg-black/50 lya:bg-white/80 border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:outline-none focus:ring-2 focus:ring-orange-500/50 dark:focus:ring-orange-400/50 lya:focus:ring-lya-primary/50 backdrop-blur-sm transition-all text-base placeholder:text-gray-400 dark:placeholder:text-gray-600 lya:placeholder:text-lya-text/40 text-gray-900 dark:text-white lya:text-lya-text"
-            />
-          </div>
-
-          <button
+          <motion.button 
+            whileTap={name.trim() && !isSubmitting ? { scale: 0.95 } : {}}
+            disabled={!name.trim() || isSubmitting}
             type="submit"
-            disabled={!name.trim()}
-            className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold transition-all active:scale-[0.98] ${
-              !name.trim() 
-                ? 'bg-gray-300 dark:bg-gray-800 lya:bg-lya-border/50 text-gray-500 dark:text-gray-500 lya:text-lya-text/40 cursor-not-allowed' 
-                : 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white shadow-lg shadow-orange-500/20 dark:shadow-orange-900/20 lya:shadow-lya-primary/20 hover:brightness-110'
-            }`}
+            className="w-full py-4 rounded-[1.5rem] bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
           >
-            Ver Menú Digital
-            <ChevronRight size={20} strokeWidth={3} />
-          </button>
-        </motion.form>
-      </div>
-    </motion.div>
+            {isSubmitting ? <><Loader2 size={20} className="animate-spin" /><span>Entrando...</span></> : <><span>Ir al Menú</span><ArrowRight size={20} strokeWidth={3} /></>}
+          </motion.button>
+        </form>
+      </motion.div>
+
+      {/* Modal de Ajustes (Ocultando Cerrar Sesión) */}
+      <AnimatePresence>
+        {showSettings && (
+          <ClientSettingsModal 
+            themeIndex={themeIndex} 
+            sizeIndex={sizeIndex} 
+            cycleTheme={cycleTheme} 
+            cycleSize={cycleSize} 
+            onClose={() => setShowSettings(false)} 
+            showLogout={false} // 🔥 Ocultamos "Abandonar Mesa" en el Login
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

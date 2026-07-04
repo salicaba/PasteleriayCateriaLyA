@@ -1,9 +1,9 @@
 // src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, HelpCircle, ReceiptText, Check, PowerOff } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, HelpCircle, ReceiptText, Check, PowerOff, Settings } from 'lucide-react';
 
-export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive }) {
+export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
   // Obtenemos solo el primer nombre para un trato más cercano
@@ -18,17 +18,27 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         exit={{ opacity: 0, y: 15 }}
         className="flex-1 flex flex-col w-full h-full pb-10"
       >
-        <header className="px-6 pt-6 pb-4 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors z-30 flex items-center gap-3 shadow-sm">
+        <header className="px-6 pt-6 pb-4 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors z-30 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowReadOnlyMenu(false)}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text active:scale-90 transition-transform md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
+            >
+              <ArrowLeft size={20} strokeWidth={2.5} />
+            </button>
+            <div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text leading-tight">Menú de Consulta</h3>
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase tracking-wider mt-0.5">Modo Solo Lectura</p>
+            </div>
+          </div>
+
+          {/* 🔥 BOTÓN DE AJUSTES EN MODO SOLO LECTURA */}
           <button 
-            onClick={() => setShowReadOnlyMenu(false)}
+            onClick={onOpenSettings} 
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text active:scale-90 transition-transform md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
           >
-            <ArrowLeft size={20} strokeWidth={2.5} />
+             <Settings size={20} strokeWidth={2.5} />
           </button>
-          <div>
-            <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text leading-tight">Menú de Consulta</h3>
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase tracking-wider mt-0.5">Modo Solo Lectura</p>
-          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
@@ -77,10 +87,19 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }} 
       animate={{ opacity: 1, scale: 1 }} 
-      className="flex-1 flex flex-col items-center justify-start p-6 text-center space-y-7 w-full max-w-sm mx-auto overflow-y-auto custom-scrollbar pt-12 pb-12"
+      className="flex-1 flex flex-col items-center justify-start p-6 text-center space-y-7 w-full max-w-sm mx-auto overflow-y-auto custom-scrollbar pt-12 pb-12 relative"
     >
       
-      {/* 🔥 Icono de Éxito Animado (Spring + Latido + Glow) */}
+      {/* 🔥 BOTÓN DE AJUSTES FLOTANTE EN EL TICKET */}
+      <motion.button 
+        whileTap={{ scale: 0.95 }} 
+        onClick={onOpenSettings}
+        className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-50"
+      >
+        <Settings size={20} strokeWidth={2.5} />
+      </motion.button>
+
+      {/* Icono de Éxito Animado (Spring + Latido + Glow) */}
       <div className="relative mb-4 mt-2">
         {/* Resplandor de fondo latiendo */}
         <motion.div 
@@ -143,7 +162,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             <div key={idx} className="flex justify-between items-start text-sm font-medium text-gray-800 dark:text-gray-200 lya:text-lya-text pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-lya-border/10 last:border-0 last:pb-0">
               
               <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
-                <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-lya-secondary bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5 text-left">
+                <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-lya-secondary bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
                   x{item.qty}
                 </span>
                 
@@ -188,12 +207,12 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         </div>
       </div>
 
-      {/* 🔥 Mensaje Importante: Dudas y Cuenta (Centrado según la nueva regla para notificaciones) */}
+      {/* 🔥 Mensaje Importante: Dudas y Cuenta (Centrado según la regla para notificaciones) */}
       <div className="w-full text-xs font-semibold text-gray-600 dark:text-gray-300 lya:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg/50 px-5 py-4 rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm shrink-0 text-center">
         <p className="flex items-center justify-center gap-2 mb-1.5 text-gray-900 dark:text-white font-black text-sm">
           <span className="text-orange-500 lya:text-lya-secondary">🛎️</span> ¿Necesitas tu cuenta?
         </p>
-        <p className="leading-relaxed opacity-80 text-[11.5px]">
+        <p className="leading-relaxed opacity-80 text-[11.5px] text-justify">
           Para solicitar tu cuenta final, realizar modificaciones al pedido o resolver cualquier duda, <b>por favor solicita asistencia a nuestro personal</b>.
         </p>
       </div>
@@ -220,7 +239,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
              <p className="flex items-center justify-center gap-2 mb-2 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 font-black text-sm">
                <PowerOff size={16} strokeWidth={2.5} /> Servicio Pausado
              </p>
-             <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-[11.5px] font-medium leading-relaxed px-2">
+             <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-[11.5px] font-medium leading-relaxed px-2 text-justify">
                Los pedidos digitales se han apagado temporalmente. Si deseas ordenar algo más, por favor habla directamente con nuestro personal en mostrador o en tu mesa.
              </p>
           </div>

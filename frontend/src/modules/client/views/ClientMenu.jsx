@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
-  Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, AlertCircle, PowerOff
+  Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, AlertCircle, PowerOff, Clock
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -39,8 +39,9 @@ export default function ClientMenu({ clientData, type, tableId }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
-  // 🔥 NUEVO ESTADO: Kill-Switch (Control de QR activo/inactivo)
+  // 🔥 ESTADOS DEL NEGOCIO (Kill-Switch y Caducidad)
   const [isQrActive, setIsQrActive] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
@@ -48,7 +49,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🔥 NUEVA LÓGICA: POLLING PARA VERIFICAR SI APAGARON EL QR DESDE CAJA (Cada 15 segundos)
+  // POLLING PARA VERIFICAR SI APAGARON EL QR DESDE CAJA (Cada 15 segundos)
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -63,13 +64,18 @@ export default function ClientMenu({ clientData, type, tableId }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // LÓGICA: Auto-cierre de sesión por inactividad (10 minutos)
+  // 🔥 LÓGICA: Auto-cierre de sesión por inactividad (10 minutos)
   useEffect(() => {
     let timeoutId;
     const resetTimer = () => {
       clearTimeout(timeoutId);
-      if (isConfirmed || isSubmitting) return;
-      timeoutId = setTimeout(() => handleLogout(), 1500000); 
+      // Si ya confirmó un pedido, NO caducamos la sesión porque su ticket es su comprobante vivo
+      if (isConfirmed || isSubmitting) return; 
+      
+      // 10 Minutos = 600,000 milisegundos
+      timeoutId = setTimeout(() => {
+        setSessionExpired(true);
+      }, 600000); 
     };
 
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
@@ -82,7 +88,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
     };
   }, [isConfirmed, isSubmitting]);
 
-  // LÓGICA: Cierre de Sesión (Abandono de Mesa)
+  // LÓGICA: Cierre de Sesión Completo (Abandono de Mesa)
   const handleLogout = () => {
     localStorage.removeItem('lya_client_order_id');
     localStorage.removeItem('lya_client_snapshot');
@@ -295,7 +301,42 @@ export default function ClientMenu({ clientData, type, tableId }) {
   }
 
   // ==========================================
-  // 🔥 PANTALLA DE BLOQUEO NEO-BENTO (KILL-SWITCH ACTIVO Y NO HA PEDIDO)
+  // 🔥 PANTALLA DE BLOQUEO 1: SESIÓN EXPIRADA POR INACTIVIDAD
+  // ==========================================
+  if (sessionExpired) {
+    return (
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          transition={{ type: 'spring', damping: 25 }} 
+          className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+        >
+          <div className="w-20 h-20 bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-lya-secondary">
+             <Clock size={40} strokeWidth={2} />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
+             Sesión Expirada
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify px-2">
+             Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente, ya que no detectamos ninguna orden confirmada. 
+             <br/><br/>
+             Si deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre en el sistema presionando el botón de abajo.
+          </p>
+          <motion.button 
+            whileTap={{ scale: 0.95 }} 
+            onClick={handleLogout} 
+            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 text-center"
+          >
+             Volver a Iniciar Sesión
+          </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 🔥 PANTALLA DE BLOQUEO 2: KILL-SWITCH ACTIVO Y NO HA PEDIDO
   // ==========================================
   if (!isQrActive && !isConfirmed) {
     return (
@@ -312,7 +353,6 @@ export default function ClientMenu({ clientData, type, tableId }) {
           <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
              Servicio Suspendido
           </h2>
-          {/* REGLA TIPOGRÁFICA: Texto largo justificado */}
           <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify">
              El servicio de pedidos digitales por código QR se encuentra temporalmente deshabilitado. Esto ocurre cuando cerramos cocina o pausamos los pedidos web. 
              <br/><br/>
@@ -331,7 +371,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
   }
 
   // ==========================================
-  // SI EL CLIENTE YA HABÍA CONFIRMADO (MUESTRA TICKET, PASA isQrActive)
+  // SI EL CLIENTE YA HABÍA CONFIRMADO (MUESTRA TICKET, PASA isQrActive Y onOpenSettings)
   // ==========================================
   if (isConfirmed) {
     return (
@@ -344,10 +384,11 @@ export default function ClientMenu({ clientData, type, tableId }) {
         products={products}
         categories={categories}
         getCategoryName={getCategoryName}
-        isQrActive={isQrActive} // 🔥 Pasamos esta prop para que ClientOrderSuccess pueda ocultar el botón de "Seguir comprando" si se desactiva
+        isQrActive={isQrActive} 
         onReset={() => {
-          if (isQrActive) setIsConfirmed(false); // Solo permite regresar si está activo
+          if (isQrActive) setIsConfirmed(false); 
         }}
+        onOpenSettings={() => setShowSettings(true)}
       />
     );
   }
@@ -551,6 +592,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
             cycleTheme={cycleTheme}
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
+            showLogout={!isConfirmed} // 🔥 Oculta salir si ya hay ticket confirmado
             onLogoutClick={() => {
               setShowSettings(false);
               setShowLogoutConfirm(true);

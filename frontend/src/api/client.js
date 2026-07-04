@@ -39,9 +39,10 @@ client.interceptors.response.use(
       localStorage.removeItem('lya_token');
       localStorage.removeItem('lya_user');
       
-      // Evitamos un ciclo infinito si ya estamos en el login
+      // Evitamos un ciclo infinito si ya estamos en el login.
+      // Usamos .replace() en lugar de .href para forzar la salida y limpiar el historial
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login'; 
+        window.location.replace('/login'); 
       }
     }
     return Promise.reject(error);
