@@ -1,12 +1,13 @@
 // src/modules/client/views/ClientLogin.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Utensils, ArrowRight, Loader2, Settings } from 'lucide-react';
+import { Utensils, ArrowRight, Loader2, Settings, Phone } from 'lucide-react';
 import ClientSettingsModal from './components/ClientSettingsModal';
 import { THEME_CLASSES, SIZES, getInitialTheme, getInitialSize } from './utils/clientMenuUtils';
 
 export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState(''); // 🔥 Restaurado: Estado para el Celular
   
   // Estados para Ajustes desde el Login
   const [showSettings, setShowSettings] = useState(false);
@@ -31,7 +32,13 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (name.trim()) onLogin({ name: name.trim() });
+    // 🔥 Ahora exige ambos campos antes de enviar la data al sistema
+    if (name.trim() && phone.trim()) {
+      onLogin({ 
+        name: name.trim(), 
+        phone: phone.trim() 
+      });
+    }
   };
 
   return (
@@ -41,7 +48,7 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
       <motion.button 
         whileTap={{ scale: 0.95 }} 
         onClick={() => setShowSettings(true)} 
-        className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 transition-colors z-50"
+        className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-50"
       >
         <Settings size={24} strokeWidth={2.5} />
       </motion.button>
@@ -50,7 +57,7 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
         initial={{ opacity: 0, y: 20, scale: 0.95 }} 
         animate={{ opacity: 1, y: 0, scale: 1 }} 
         transition={{ type: 'spring', damping: 25 }}
-        className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 sm:p-10 shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+        className="w-full max-w-md bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 sm:p-10 shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-y-auto custom-scrollbar max-h-[90vh]"
       >
         <div className="w-20 h-20 bg-orange-100 dark:bg-orange-500/20 lya:bg-lya-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
           <Utensils size={32} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
@@ -60,15 +67,15 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
           ¡Bienvenido!
         </h2>
         
-        {/* REGLA TIPOGRÁFICA: Justificado */}
-        <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm text-justify mb-8 px-2 font-medium">
+        {/* REGLA TIPOGRÁFICA 4: Texto descriptivo justificado */}
+        <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm text-justify mb-8 px-2 font-medium leading-relaxed">
           {type === 'mesa' 
-            ? `Estás en la Mesa ${tableId}. Por favor, ingresa tu nombre para iniciar tu orden digital y personalizar tus platillos.`
-            : `Estás en la sección para Llevar. Por favor, ingresa tu nombre para que podamos llamarte cuando tu pedido esté listo.`}
+            ? `Estás en la Mesa ${tableId}. Ingresa tus datos para iniciar tu orden digital. Tu número nos sirve para asociar tu ticket y notificarte cualquier detalle.`
+            : `Estás en la sección para Llevar. Por favor, ingresa tus datos para que podamos enviarte tu ticket y llamarte cuando tu pedido esté listo.`}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2 text-left">
             <label className="text-sm font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text ml-2">¿Cómo te llamas?</label>
             <input 
               type="text" 
@@ -82,13 +89,38 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
             />
           </div>
 
+          <div className="space-y-2 text-left">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text ml-2 flex items-center gap-2">
+              <Phone size={16} /> Número de WhatsApp
+            </label>
+            <input 
+              type="tel" 
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s-]/g, ''))} // Solo permite números, espacios y guiones
+              placeholder="Ej. 961 123 4567"
+              disabled={isSubmitting}
+              className="w-full px-5 py-4 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-900 outline-none transition-all text-gray-900 dark:text-white lya:text-lya-text font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
+              required
+            />
+          </div>
+
           <motion.button 
-            whileTap={name.trim() && !isSubmitting ? { scale: 0.95 } : {}}
-            disabled={!name.trim() || isSubmitting}
+            whileTap={name.trim() && phone.trim() && !isSubmitting ? { scale: 0.95 } : {}}
+            disabled={!name.trim() || !phone.trim() || isSubmitting}
             type="submit"
-            className="w-full py-4 rounded-[1.5rem] bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
+            className="w-full py-4 mt-2 rounded-[1.5rem] bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
           >
-            {isSubmitting ? <><Loader2 size={20} className="animate-spin" /><span>Entrando...</span></> : <><span>Ir al Menú</span><ArrowRight size={20} strokeWidth={3} /></>}
+            {isSubmitting ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                <span>Entrando...</span>
+              </>
+            ) : (
+              <>
+                <span>Ir al Menú</span>
+                <ArrowRight size={20} strokeWidth={3} />
+              </>
+            )}
           </motion.button>
         </form>
       </motion.div>
