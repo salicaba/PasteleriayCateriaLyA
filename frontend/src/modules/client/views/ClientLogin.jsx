@@ -49,18 +49,15 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
     }
   };
 
-  // 🔥 SOLUCIÓN: Función mágica para forzar al navegador a subir el formulario 
-  // cuando el teclado del celular aparece
+  // Función para forzar al navegador a subir el formulario con el teclado
   const handleFocus = (e) => {
     const target = e.target;
-    // Le damos 300ms de tiempo al teclado para que termine de subir
     setTimeout(() => {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 300);
   };
 
   return (
-    // Agregamos pb-32 (padding-bottom) para asegurarnos de que haya espacio "vacío" abajo y el scroll pueda subir sin problemas
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-4 py-8 pb-32 sm:p-6 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative overflow-y-auto transition-colors duration-500 custom-scrollbar">
       
       {/* PANTALLA DE CARGA ELEGANTE 𝓛𝔂𝓪 */}
@@ -124,8 +121,9 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
                 <Utensils size={32} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
               </div>
               
-              <h2 className="text-3xl font-black text-center text-gray-900 dark:text-white lya:text-lya-text mb-6 tracking-tight">
-                ¡Bienvenido!
+              {/* 🔥 TÍTULO ACTUALIZADO CON LA MARCA */}
+              <h2 className="text-3xl font-black text-center text-gray-900 dark:text-white lya:text-lya-text mb-6 tracking-tight flex items-center justify-center flex-wrap gap-x-2">
+                ¡Bienvenido a <span className="inline-block transform scale-105">𝓛𝔂𝓪</span>!
               </h2>
               
               <div className="bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 border border-orange-100 dark:border-orange-500/20 lya:border-lya-secondary/20 rounded-2xl p-4 mb-6 flex flex-col items-center text-center shadow-inner">
@@ -137,8 +135,8 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
                 </span>
                 <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs font-medium leading-relaxed px-2">
                   {type === 'mesa' 
-                    ? "Ingresa tus datos para iniciar tu orden. Tu número de celular nos sirve para notificarte cualquier detalle de tu ticket."
-                    : "Ingresa tus datos para comenzar. Te enviaremos tu nota digital y te avisaremos en cuanto tu pedido esté empacado."}
+                    ? "Ingresa tus datos para iniciar tu orden. Tu número de celular nos sirve para mandar tu ticket digital."
+                    : "Ingresa tus datos para comenzar. Te enviaremos tu ticket digital y te avisaremos en cuanto tu pedido esté empacado si estamos libres."}
                 </p>
               </div>
 
@@ -149,7 +147,7 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
                     type="text" 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    onFocus={handleFocus} // 🔥 Le aplicamos el efecto al tocarlo
+                    onFocus={handleFocus}
                     placeholder="Ej. María López"
                     disabled={isSubmitting || showLoadingScreen}
                     className="w-full px-5 py-4 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-900 outline-none transition-all text-gray-900 dark:text-white lya:text-lya-text font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
@@ -165,7 +163,7 @@ export default function ClientLogin({ onLogin, isSubmitting, type, tableId }) {
                     type="tel" 
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s-]/g, ''))}
-                    onFocus={handleFocus} // 🔥 Y también al campo del teléfono
+                    onFocus={handleFocus}
                     placeholder="Ej. 961 123 4567"
                     disabled={isSubmitting || showLoadingScreen}
                     className="w-full px-5 py-4 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-900 outline-none transition-all text-gray-900 dark:text-white lya:text-lya-text font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
