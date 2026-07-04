@@ -19,7 +19,7 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
-// 🔥 Importamos el logo de 𝓛𝔂𝓪 para la pantalla de carga
+// Importamos el logo de 𝓛𝔂𝓪 para la pantalla de carga
 import logoLyA from '../../../assets/logo.jpeg'; 
 
 export default function ClientMenu({ clientData, type, tableId, onLogout }) {
@@ -97,20 +97,16 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting]);
 
-  // 🔥 LÓGICA DE SALIDA PERFECTA: Sin parpadeos y con pantalla de carga de 𝓛𝔂𝓪
+  // LÓGICA DE SALIDA PERFECTA: Sin parpadeos y con pantalla de carga de 𝓛𝔂𝓪
   const handleLogout = async () => {
-    // 1. Ocultamos el modal y los ajustes instantáneamente
     setShowLogoutConfirm(false);
     setShowSettings(false);
     setIsLoggingOut(true);
 
-    // 2. Activamos la pantalla de carga global
     setIsLoading(true);
 
-    // 3. Esperamos 1.5 segundos para la transición fluida
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // 4. Limpiamos únicamente la memoria del cliente
     const keysToRemove = [
       'lya_client_order_id', 
       'lya_client_snapshot', 
@@ -119,7 +115,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
-    // 5. Mandamos al usuario al Login sin recargar la página (evita el parpadeo blanco)
     if (typeof onLogout === 'function') {
       onLogout();
     } else {
@@ -317,7 +312,31 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return cat ? cat.name : 'Delicia';
   };
 
-  // 🔥 PANTALLA DE CARGA GLOBAL (SE USA TANTO AL ENTRAR COMO AL SALIR DE LA SESIÓN)
+  // 🔥 ANIMACIONES DE CASCADA PARA LOS PRODUCTOS
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08, // Velocidad a la que entra cada tarjeta (0.08s)
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30, scale: 0.95 },
+    show: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1, 
+      transition: { 
+        type: "spring", 
+        stiffness: 300, 
+        damping: 24 
+      } 
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md transition-opacity duration-300">
@@ -506,14 +525,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         </div>
       </header>
 
+      {/* 🔥 LISTA DE PRODUCTOS CON ANIMACIÓN EN CASCADA */}
       <motion.div 
-        initial={{ opacity: 0, y: 10 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        transition={{ duration: 0.4, ease: "easeOut" }} 
+        key={activeCategory} // Este key hace que la animación se repita al cambiar de categoría
+        variants={containerVariants}
+        initial="hidden" 
+        animate="show" 
         className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar"
       >
         {visibleProducts.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-lya-text/40 font-medium text-sm">No se encontraron productos en esta categoría.</div>
+          <motion.div variants={itemVariants} className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-lya-text/40 font-medium text-sm">
+            No se encontraron productos en esta categoría.
+          </motion.div>
         ) : (
           visibleProducts.map(product => {
             const hasImage = product.imagen && !product.imagen.includes('default-product');
@@ -521,7 +544,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             const isAdding = addingToCartId === product.id;
 
             return (
-              <motion.div key={product.id} layout whileTap={isCustomizable ? { scale: 0.98 } : {}} onClick={() => isCustomizable && setSelectedProduct(product)} className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''}`}>
+              <motion.div 
+                key={product.id} 
+                layout 
+                variants={itemVariants} // Le aplicamos la variante individual a cada tarjeta
+                whileTap={isCustomizable ? { scale: 0.98 } : {}} 
+                onClick={() => isCustomizable && setSelectedProduct(product)} 
+                className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''}`}
+              >
                 <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center shadow-inner pointer-events-none">
                   {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-lya-text/20" size={28} />}
                 </div>
@@ -652,7 +682,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             show={showLogoutConfirm}
             onClose={() => setShowLogoutConfirm(false)}
             onLogout={handleLogout}
-            onConfirm={handleLogout}
+            onConfirm={handleLogout} 
           />
         )}
       </AnimatePresence>
