@@ -57,13 +57,13 @@ export default function ClientLogin({ onLogin, type, tableId }) {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej. Emmanuel"
+              placeholder="Ej. Juan López"
               className="w-full px-4 py-3.5 rounded-2xl bg-white/60 dark:bg-black/50 lya:bg-white/80 border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:outline-none focus:ring-2 focus:ring-orange-500/50 dark:focus:ring-orange-400/50 lya:focus:ring-lya-primary/50 backdrop-blur-sm transition-all text-base placeholder:text-gray-400 dark:placeholder:text-gray-600 lya:placeholder:text-lya-text/40 text-gray-900 dark:text-white lya:text-lya-text"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold opacity-80 px-1 text-gray-800 dark:text-gray-200 lya:text-lya-text">Celular <span className="opacity-50 font-normal">(Opcional)</span></label>
+            <label className="text-sm font-bold opacity-80 px-1 text-gray-800 dark:text-gray-200 lya:text-lya-text">Celular <span className="opacity-50 font-normal">(Opcional para el ticket)</span></label>
             <input
               type="tel"
               value={phone}

@@ -1,6 +1,6 @@
+// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 import client from '../../../api/client.js';
-import toast from 'react-hot-toast';
 
 // ----------------------------------------------------------------------
 // HELPER FUNCTIONS: INYECCIÓN DE OPCIONES PREDETERMINADAS
@@ -82,6 +82,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
 
+  // 🔥 NUEVO ESTADO: Sistema de Notificaciones Nativo (Reemplaza react-hot-toast)
+  const [notification, setNotification] = useState(null);
+  const triggerNotification = (msg, type = 'success') => {
+    setNotification({ msg, type, show: true });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
   const mesaActual = useMemo(() => {
     if (!mesaInicial) return null;
     return todasLasMesas.find(m => m.id === mesaInicial.id) || mesaInicial;
@@ -101,7 +108,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         const prods = prodsRes.data;
         const cats = catsRes.data;
 
-        // 🔥 FILTRAMOS Y TRADUCIMOS AL ESPAÑOL PARA LA VISTA
+        // FILTRAMOS Y TRADUCIMOS AL ESPAÑOL PARA LA VISTA
         const activeProducts = prods.filter(p => {
           const estado = p.isActive !== undefined ? p.isActive : p.disponible;
           if (estado === false || estado === 0 || estado === '0') return false;
@@ -117,7 +124,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         
         setDbProducts(activeProducts); 
 
-        // 🔥 NUEVO: Inyectamos "Todas" al principio de las categorías para el POS
+        // INYECTAMOS "Todas" AL PRINCIPIO
         const hasTodas = cats.some(c => c.id === 'todas' || c.name.trim().toLowerCase() === 'todas');
         const finalCats = hasTodas ? cats : [{ id: 'todas', name: 'Todas' }, ...cats];
         
@@ -219,7 +226,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     let finalDetails = productWithDetails.detalles || {};
     let finalPrice = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
     
-    // 🔥 AUTO-INYECCIÓN
     if (!productWithDetails.detalles) {
         const defaultCustoms = getDefaultCustomizations(productWithDetails);
         if (defaultCustoms) {
@@ -287,8 +293,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         orderId = res.data.order.id;
         setActiveOrderId(orderId);
 
-        // 🔥 LA CORRECCIÓN MÁGICA: Ahora que ya tenemos un ID de orden real, 
-        // guardamos los teléfonos que estaban pendientes en memoria.
         setCuentasTelefonos(prev => {
             if (Object.keys(prev).length > 0) {
                 localStorage.setItem(`lya_phones_${orderId}`, JSON.stringify(prev));
@@ -573,6 +577,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         }
     } catch (error) { 
       console.error("Error al mover en BD", error); 
+      triggerNotification("Error al mover los ítems de cuenta.", "error");
       throw error;
     }
   };
@@ -628,6 +633,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         });
     } catch (e) { 
       console.error("Error al actualizar entrega", e); 
+      triggerNotification("No se pudo actualizar el estado de entrega.", "error");
       throw e;
     }
   };
@@ -643,6 +649,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         ));
     } catch (error) { 
       console.error("Error en deliverAllActiveItems:", error);
+      triggerNotification("Hubo un error al entregar todo.", "error");
       throw error; 
     }
   };
@@ -697,10 +704,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             ));
         }
         
+        // 🔥 Reemplazado toast de terceros por notificación nativa Neo-Bento
         if (response.data.wasRefunded) {
-          toast.success('Cancelado. Reembolso registrado en caja.');
+          triggerNotification('Cancelado. Reembolso registrado en caja.', 'success');
+        } else {
+          triggerNotification('Item cancelado de la orden.', 'success');
         }
     } catch (error) { 
+      triggerNotification("Error al cancelar el ítem.", "error");
       throw error; 
     }
   };
@@ -725,7 +736,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           ? { ...item, status: 'CANCELLED' } 
           : item
         ));
+        triggerNotification(`Ítems de la cuenta ${cuentaName} cancelados.`, 'success');
     } catch (error) { 
+      triggerNotification("Error al cancelar los ítems de la cuenta.", "error");
       throw error; 
     }
   };
@@ -737,10 +750,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         setOrderStatus('CANCELLED');
         setCart(prev => prev.map(item => item.enviadoCocina ? { ...item, status: 'CANCELLED' } : item));
         
+        // 🔥 Reemplazado toast de terceros por notificación nativa Neo-Bento
         if (response.data.refundedAmount > 0) {
-          toast.success(`Orden cancelada. Reembolso de $${response.data.refundedAmount} registrado.`);
+          triggerNotification(`Orden cancelada. Reembolso de $${response.data.refundedAmount} registrado.`, 'success');
+        } else {
+          triggerNotification(`Orden anulada correctamente.`, 'success');
         }
     } catch (error) { 
+      triggerNotification("Error crítico al anular la orden.", "error");
       throw error; 
     }
   };
@@ -861,6 +878,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     handleCheckout, handleCloseTable, handlePrintTicket, simulateKitchenSend, isSuccess,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     dbCategories, orderStatus, paidAccounts, validateAllDelivered, toggleItemTakeaway, cuentasTelefonos,
-    deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems 
+    deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems, 
+    notification, triggerNotification // 🔥 Exportamos el estado para que la Vista lo dibuje
   };
 };
