@@ -38,6 +38,12 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // 🔥 FUNCIÓN CLAVE AÑADIDA: Borra la sesión local y resetea la pantalla
+  const handleClientLogout = () => {
+    localStorage.removeItem('lya_client_session');
+    setClientData(null);
+  };
+
   return (
     <div className="min-h-screen transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       <Toaster position="top-center" />
@@ -52,7 +58,12 @@ export default function ClientApp({ type }) {
             tableId={tableId} 
           />
         ) : (
-          <ClientMenu clientData={clientData} type={type} tableId={tableId} />
+          <ClientMenu 
+            clientData={clientData} 
+            type={type} 
+            tableId={tableId} 
+            onLogout={handleClientLogout} /* 🔥 CONEXIÓN AL MENÚ AÑADIDA */
+          />
         )}
       </main>
     </div>

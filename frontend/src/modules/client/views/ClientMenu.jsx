@@ -19,7 +19,8 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
-export default function ClientMenu({ clientData, type, tableId }) {
+// 🔥 RECIBIMOS LA PROP onLogout DESDE ClientApp.jsx
+export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,14 +40,14 @@ export default function ClientMenu({ clientData, type, tableId }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
-  // 🔥 NUEVO ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
+  // ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Estados del negocio (Kill-Switch y Caducidad)
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   
-  // 🔥 REFERENCIA DE TIEMPO REAL PARA MÓVILES
+  // REFERENCIA DE TIEMPO REAL PARA MÓVILES
   const lastActivityRef = useRef(Date.now());
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -70,7 +71,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // 🔥 LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos) - A prueba de teléfonos bloqueados
+  // LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos) - A prueba de teléfonos bloqueados
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -98,27 +99,27 @@ export default function ClientMenu({ clientData, type, tableId }) {
 
   // 🔥 LÓGICA MEJORADA: Cierre de Sesión Completo (Abandono de Mesa)
   const handleLogout = async () => {
-    return new Promise((resolve) => {
-      setIsLoggingOut(true);
-      
-      // Delay simulado de 800ms para que se vea el spinner de carga y de tiempo de limpar variables
-      setTimeout(() => {
-        // Limpieza Agresiva: Destruimos todos los posibles rastros de la sesión del cliente
-        const keysToRemove = [
-          'lya_client_order_id', 
-          'lya_client_snapshot', 
-          'lya_client_data', 
-          'lya_token', 
-          'lya_user',
-          'clientData'
-        ];
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        
-        // Reemplazamos la ruta actual forzando al navegador a ir a la raíz sin parpadear
-        window.location.replace(window.location.pathname);
-        resolve();
-      }, 800);
-    });
+    setIsLoggingOut(true);
+    
+    // Delay simulado de 800ms para que se vea el spinner de carga y de tiempo de limpiar variables
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Limpieza Agresiva: Destruimos todos los posibles rastros de la sesión del cliente
+    const keysToRemove = [
+      'lya_client_order_id', 
+      'lya_client_snapshot', 
+      'lya_client_data', 
+      'lya_client_session', // Aseguramos matar la sesión local
+      'lya_token', 
+      'lya_user',
+      'clientData'
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // 🔥 EN LUGAR DEL RELOAD, LLAMAMOS AL PADRE (ClientApp.jsx)
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   useEffect(() => {
@@ -326,7 +327,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
   }
 
   // ==========================================
-  // 🔥 PANTALLA DE BLOQUEO 1: SESIÓN EXPIRADA POR INACTIVIDAD
+  // PANTALLA DE BLOQUEO 1: SESIÓN EXPIRADA POR INACTIVIDAD
   // ==========================================
   if (sessionExpired) {
     return (
@@ -352,7 +353,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
             whileTap={isLoggingOut ? {} : { scale: 0.95 }} 
             disabled={isLoggingOut}
             onClick={handleLogout} 
-            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed"
+            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed outline-none"
           >
             {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <span>Volver a Iniciar Sesión</span>}
           </motion.button>
@@ -362,7 +363,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
   }
 
   // ==========================================
-  // 🔥 PANTALLA DE BLOQUEO 2: KILL-SWITCH ACTIVO Y NO HA PEDIDO
+  // PANTALLA DE BLOQUEO 2: KILL-SWITCH ACTIVO Y NO HA PEDIDO
   // ==========================================
   if (!isQrActive && !isConfirmed) {
     return (
@@ -388,9 +389,9 @@ export default function ClientMenu({ clientData, type, tableId }) {
             whileTap={isLoggingOut ? {} : { scale: 0.95 }} 
             disabled={isLoggingOut}
             onClick={handleLogout} 
-            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed"
+            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed outline-none"
           >
-             {isLoggingOut ? <Loader2 size={20} className="animate-spin text-white dark:text-gray-900" /> : <span>Entendido, cerrar menú</span>}
+             {isLoggingOut ? <Loader2 size={20} className="animate-spin text-white dark:text-gray-900 lya:text-lya-surface" /> : <span>Entendido, cerrar menú</span>}
           </motion.button>
         </motion.div>
       </div>
@@ -466,7 +467,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
             
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
               <Settings size={18} strokeWidth={2.5} />
             </motion.button>
           </div>
@@ -478,7 +479,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
               whileTap={{ scale: 0.95 }}
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
-              className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors shadow-sm border text-center ${
+              className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors shadow-sm border text-center outline-none ${
                 activeCategory === cat.id 
                   ? 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white border-transparent' 
                   : 'bg-white dark:bg-gray-800 lya:bg-lya-surface border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-600 dark:text-gray-400 lya:text-lya-text/80'
@@ -538,7 +539,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
                           setAddingToCartId(null);
                         }
                       }} 
-                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow transition-transform md:hover:scale-110 shrink-0"
+                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow transition-transform md:hover:scale-110 shrink-0 outline-none"
                     >
                       {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
                     </motion.button>
@@ -560,7 +561,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
             className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")}
             style={{ width: 'calc(100% - 3rem)' }}
           >
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-200/50 dark:border-gray-700/50 lya:border-lya-border/50 transition-colors text-gray-800 dark:text-gray-200 lya:text-lya-text text-center">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-200/50 dark:border-gray-700/50 lya:border-lya-border/50 transition-colors text-gray-800 dark:text-gray-200 lya:text-lya-text text-center outline-none">
               <div className="relative">
                 <ReceiptText size={20} className="text-orange-500 lya:text-lya-secondary" />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border border-white dark:border-gray-800 lya:border-lya-surface animate-pulse"></span>
@@ -575,7 +576,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center">
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center outline-none">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 lya:bg-white/25 flex items-center justify-center font-black text-sm">{totalItems}</div>
                 <span className="text-base tracking-wide font-black">Revisar Pedido</span>
@@ -628,11 +629,14 @@ export default function ClientMenu({ clientData, type, tableId }) {
         )}
       </AnimatePresence>
 
+      {/* Acepta ambas propiedades onLogout y onConfirm por si usas el modal viejo o el nuevo */}
       <AnimatePresence>
         {showLogoutConfirm && (
           <ClientLogoutModal 
+            isOpen={showLogoutConfirm}
             onClose={() => setShowLogoutConfirm(false)}
-            onConfirm={handleLogout}
+            onLogout={handleLogout}
+            onConfirm={handleLogout} 
           />
         )}
       </AnimatePresence>

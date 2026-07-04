@@ -79,7 +79,6 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
-  // 🔥 NUEVOS ESTADOS: Modal de confirmación y carga de cierre de sesión
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
@@ -111,7 +110,7 @@ function App() {
     if (uiSize === 'small') root.style.fontSize = '12px';  
   }, [uiSize]);
 
-  // 🔥 NUEVO: Cierre de sesión por INACTIVIDAD REAL (25 minutos sin tocar el sistema)
+  // Cierre de sesión por INACTIVIDAD REAL (25 minutos sin tocar el sistema)
   useEffect(() => {
     if (!user) return;
 
@@ -120,8 +119,9 @@ function App() {
       clearTimeout(inactivityTimer);
       // 25 minutos = 25 * 60 * 1000 = 1500000 ms
       inactivityTimer = setTimeout(() => {
+        // En inactividad, mostramos un mensaje antes de recargar
+        alert("Sesión cerrada por 25 minutos de inactividad.");
         handleLogout();
-        toast("Sesión cerrada por 25 minutos de inactividad.", { icon: '🌙', duration: 6000 });
       }, 1500000);
     };
 
@@ -144,11 +144,8 @@ function App() {
       if (savedSession) {
         const { expiresAt } = JSON.parse(savedSession);
         if (new Date().getTime() >= expiresAt) {
-          handleLogout();
-          toast("El turno ha finalizado (12:00 AM). Inicia sesión para el nuevo día.", {
-            icon: '🌙',
-            duration: 6000
-          });
+          alert("El turno ha finalizado (12:00 AM). El sistema se reiniciará para el nuevo día.");
+          handleLogout(); 
         }
       } else {
         handleLogout(); 
@@ -157,12 +154,12 @@ function App() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // 🔥 NUEVO: Escuchar evento de error 401 desde el Axios Client para evitar recargas completas (Flicker)
+  // Escuchar evento de error 401 desde el Axios Client (client.js)
   useEffect(() => {
     const handleAuthError = () => {
       if (user) {
+        alert("Tu sesión ha expirado por seguridad. Vuelve a ingresar.");
         handleLogout();
-        toast.error("Tu sesión ha expirado por seguridad. Vuelve a ingresar.");
       }
     };
     window.addEventListener('auth_error', handleAuthError);
@@ -185,16 +182,17 @@ function App() {
     localStorage.setItem('lya_active_tab', initialTab);
   };
 
+  // 🔥 MAGIA DE RECARGA APLICADA AQUÍ: 
   const handleLogout = () => {
+    // 1. Limpiamos por completo toda la basura del navegador
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
     localStorage.removeItem('lya_user'); 
     localStorage.removeItem('lya_active_tab'); 
     localStorage.removeItem('lya_expanded_groups'); 
-    setUser(null);
-    setActiveTab('caja'); 
-    setExpandedGroups([]); 
-    setShowLogoutModal(false); 
+    
+    // 2. Ejecutamos tu idea: Recargamos el navegador como debe ser en el sistema
+    window.location.reload(); 
   };
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
@@ -424,7 +422,6 @@ function App() {
               </nav>
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
-                {/* 🔥 BOTÓN QUE AHORA ABRE EL MODAL */}
                 <button 
                   onClick={() => setShowLogoutModal(true)}
                   className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold active:scale-95 outline-none"
@@ -539,7 +536,7 @@ function App() {
               {activeTab === 'reportes' && <ReportsPage />}
             </main>
 
-            {/* 🔥 MODAL DE CERRAR SESIÓN */}
+            {/* MODAL DE CERRAR SESIÓN */}
             <AnimatePresence>
               {showLogoutModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -569,10 +566,9 @@ function App() {
                       <button
                         onClick={async () => {
                           setIsLoggingOut(true);
-                          // Breve retardo para UX (Se ve el spinner y evita doble clic)
-                          await new Promise(r => setTimeout(r, 800)); 
+                          // Breve retardo para que se vea la animación
+                          await new Promise(r => setTimeout(r, 600)); 
                           handleLogout();
-                          setIsLoggingOut(false);
                         }}
                         disabled={isLoggingOut}
                         className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed"
