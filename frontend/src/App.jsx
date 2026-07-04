@@ -70,15 +70,18 @@ function App() {
     return savedGroups ? JSON.parse(savedGroups) : []; 
   }); 
 
-  // 🔥 NUEVO: Estado del Scroll Global
   const [globalScroll, setGlobalScroll] = useState(() => {
     const savedScroll = localStorage.getItem('lya_global_scroll');
-    return savedScroll ? JSON.parse(savedScroll) : false; // Por defecto: Elementos Fijos
+    return savedScroll ? JSON.parse(savedScroll) : false; 
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
+  
+  // 🔥 NUEVOS ESTADOS: Modal de confirmación y carga de cierre de sesión
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   const { theme } = useTheme();
 
@@ -90,7 +93,6 @@ function App() {
     localStorage.setItem('lya_expanded_groups', JSON.stringify(expandedGroups));
   }, [expandedGroups]);
 
-  // 🔥 NUEVO: Persistencia del Scroll Global
   useEffect(() => {
     localStorage.setItem('lya_global_scroll', JSON.stringify(globalScroll));
   }, [globalScroll]);
@@ -109,6 +111,32 @@ function App() {
     if (uiSize === 'small') root.style.fontSize = '12px';  
   }, [uiSize]);
 
+  // 🔥 NUEVO: Cierre de sesión por INACTIVIDAD REAL (25 minutos sin tocar el sistema)
+  useEffect(() => {
+    if (!user) return;
+
+    let inactivityTimer;
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      // 25 minutos = 25 * 60 * 1000 = 1500000 ms
+      inactivityTimer = setTimeout(() => {
+        handleLogout();
+        toast("Sesión cerrada por 25 minutos de inactividad.", { icon: '🌙', duration: 6000 });
+      }, 1500000);
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetTimer));
+    
+    resetTimer(); // Iniciar cuenta regresiva al cargar
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+      clearTimeout(inactivityTimer);
+    };
+  }, [user]);
+
+  // Cierre automático al llegar la medianoche (Cierre de Turno)
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
@@ -127,6 +155,18 @@ function App() {
       }
     }, 10000); 
     return () => clearInterval(interval);
+  }, [user]);
+
+  // 🔥 NUEVO: Escuchar evento de error 401 desde el Axios Client para evitar recargas completas (Flicker)
+  useEffect(() => {
+    const handleAuthError = () => {
+      if (user) {
+        handleLogout();
+        toast.error("Tu sesión ha expirado por seguridad. Vuelve a ingresar.");
+      }
+    };
+    window.addEventListener('auth_error', handleAuthError);
+    return () => window.removeEventListener('auth_error', handleAuthError);
   }, [user]);
 
   const handleLogin = (userData) => {
@@ -148,11 +188,13 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
+    localStorage.removeItem('lya_user'); 
     localStorage.removeItem('lya_active_tab'); 
     localStorage.removeItem('lya_expanded_groups'); 
     setUser(null);
     setActiveTab('caja'); 
     setExpandedGroups([]); 
+    setShowLogoutModal(false); 
   };
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
@@ -382,9 +424,10 @@ function App() {
               </nav>
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
+                {/* 🔥 BOTÓN QUE AHORA ABRE EL MODAL */}
                 <button 
-                  onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold"
+                  onClick={() => setShowLogoutModal(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold active:scale-95 outline-none"
                 >
                   <LogOut size={16} />
                   Cerrar Sesión
@@ -393,7 +436,6 @@ function App() {
             </div>
           </motion.aside>
 
-          {/* 🔥 CONTENEDOR MAESTRO: Si globalScroll es true, este div se encarga del scroll y oculta la cabecera al bajar */}
           <div className={`flex flex-col relative min-w-0 w-full shrink-0 md:w-auto md:flex-1 md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full'}`}>
             
             <AnimatePresence>
@@ -468,10 +510,7 @@ function App() {
               </div>
             </header>
 
-            {/* 🔥 MAIN: Si globalScroll es true, este div deja de ocultar el scroll y se expande, permitiendo que el padre controle el scroll */}
             <main className={`flex-1 relative transition-colors ${globalScroll ? 'overflow-visible' : 'overflow-hidden'}`}>
-              
-              {/* Le pasamos globalScroll a las vistas que lo necesiten */}
               {activeTab === 'mesas' && <MesasPage globalScroll={globalScroll} />}
               {activeTab === 'qr' && <QrControlPage />}
               {activeTab === 'cocina' && <KitchenPage />}
@@ -499,6 +538,60 @@ function App() {
               
               {activeTab === 'reportes' && <ReportsPage />}
             </main>
+
+            {/* 🔥 MODAL DE CERRAR SESIÓN */}
+            <AnimatePresence>
+              {showLogoutModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 text-center"
+                  >
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <LogOut size={32} strokeWidth={2.5} />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2">
+                      ¿Cerrar Sesión?
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm">
+                      Tendrás que volver a ingresar tus credenciales para acceder al sistema POS.
+                    </p>
+                    <div className="flex gap-3 w-full">
+                      <button
+                        onClick={() => !isLoggingOut && setShowLogoutModal(false)}
+                        disabled={isLoggingOut}
+                        className="flex-1 py-3 rounded-2xl font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setIsLoggingOut(true);
+                          // Breve retardo para UX (Se ve el spinner y evita doble clic)
+                          await new Promise(r => setTimeout(r, 800)); 
+                          handleLogout();
+                          setIsLoggingOut(false);
+                        }}
+                        disabled={isLoggingOut}
+                        className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed"
+                      >
+                        {isLoggingOut ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Saliendo...</span>
+                          </>
+                        ) : (
+                          'Sí, salir'
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
           </div>
         </div>
       )}

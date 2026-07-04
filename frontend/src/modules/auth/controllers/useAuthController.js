@@ -41,8 +41,10 @@ export const useAuthController = (onLoginCallback) => {
   };
 
   const logout = () => {
+    // 🔥 FIX: Asegurar que se limpien todas las variables críticas, incluyendo la sesión POS
     localStorage.removeItem('lya_token');
     localStorage.removeItem('lya_user');
+    localStorage.removeItem('lya_pos_session');
   };
 
   return { 

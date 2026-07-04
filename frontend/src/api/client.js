@@ -1,7 +1,7 @@
 // frontend/src/api/client.js
 import axios from 'axios';
 
-// 🔥 Detectamos si estamos en producción (Vercel) para usar Render
+// Detectamos si estamos en producción (Vercel) para usar Render
 // Si estamos probando en local, usa localhost:4000
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const defaultBaseUrl = isLocalhost 
@@ -27,7 +27,7 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 🔥 NUEVO: Interceptor de Respuestas para manejar la expiración del token globalmente
+// Interceptor de Respuestas para manejar la expiración del token globalmente
 client.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -35,15 +35,14 @@ client.interceptors.response.use(
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       console.warn('⚠️ Sesión expirada o token inválido. Cerrando sesión automáticamente...');
       
-      // Limpiamos los rastros corruptos o expirados
+      // Limpiamos los rastros corruptos o expirados de inmediato
       localStorage.removeItem('lya_token');
       localStorage.removeItem('lya_user');
+      localStorage.removeItem('lya_pos_session');
       
-      // Evitamos un ciclo infinito si ya estamos en el login.
-      // Usamos .replace() en lugar de .href para forzar la salida y limpiar el historial
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login'); 
-      }
+      // 🔥 FIX: En lugar de forzar una recarga bruta del navegador que causaba el parpadeo en SPAs,
+      // lanzamos un evento global para que React (App.jsx) lo procese y vuelva a Login limpiamente.
+      window.dispatchEvent(new Event('auth_error'));
     }
     return Promise.reject(error);
   }
