@@ -57,3 +57,30 @@ export const updateConfig = async (req, res) => {
     res.status(500).json({ message: "Error al actualizar la configuración" });
   }
 };
+
+export const getQrStatus = async (req, res) => {
+    try {
+        const config = await BusinessConfig.findOne({ where: { key: 'qr_service_active' } });
+        // Si no existe, por defecto está activo (true)
+        res.json({ active: config ? config.value === 'true' : true });
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener estado del QR" });
+    }
+};
+
+export const setQrStatus = async (req, res) => {
+    try {
+        const { active } = req.body;
+        const [config, created] = await BusinessConfig.findOrCreate({
+            where: { key: 'qr_service_active' },
+            defaults: { value: String(active) }
+        });
+        if (!created) {
+            config.value = String(active);
+            await config.save();
+        }
+        res.json({ active: config.value === 'true' });
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar estado del QR" });
+    }
+};

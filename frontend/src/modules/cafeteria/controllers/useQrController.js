@@ -9,6 +9,10 @@ export const useQrController = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [removingId, setRemovingId] = useState(null);
+  
+  // 🔥 NUEVO: Estados para el Kill-Switch del QR
+  const [isQrActive, setIsQrActive] = useState(true);
+  const [isTogglingQr, setIsTogglingQr] = useState(false);
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -26,12 +30,41 @@ export const useQrController = () => {
     setToast({ show: true, message, type });
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
-    }, 3000);
+    }, 3500);
   };
 
   useEffect(() => {
-    fetchTables(true);
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchTables(false), fetchQrStatus()]);
+      setIsLoading(false);
+    };
+    fetchInitialData();
   }, []);
+
+  const fetchQrStatus = async () => {
+    try {
+      const res = await client.get('/settings/qr-status');
+      setIsQrActive(res.data.active);
+    } catch (error) {
+      console.error("Error al obtener estado QR:", error);
+    }
+  };
+
+  const toggleQrService = async (newStatus) => {
+    setIsTogglingQr(true);
+    try {
+      await client.post('/settings/qr-status', { active: newStatus });
+      setIsQrActive(newStatus);
+      showToast(newStatus ? 'Servicio QR Encendido' : 'Servicio QR Apagado', newStatus ? 'success' : 'warning');
+      return true;
+    } catch (error) {
+      showToast('Error al cambiar el estado', 'error');
+      return false;
+    } finally {
+      setIsTogglingQr(false);
+    }
+  };
 
   const fetchTables = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
@@ -39,7 +72,6 @@ export const useQrController = () => {
       const response = await client.get('/pos/tables');
       setMesas(response.data);
     } catch (error) {
-      console.error("Error al cargar mesas:", error);
       showToast('Error al sincronizar las mesas', 'error');
       setMesas([]);
     } finally {
@@ -51,10 +83,9 @@ export const useQrController = () => {
     setIsAdding(true);
     try {
       await client.post('/pos/tables', { zone: 'salon' });
-      await fetchTables(false); // Esperamos a que el servidor cree y devuelva los números
+      await fetchTables(false);
       showToast('Mesa agregada exitosamente');
     } catch (error) {
-      console.error("Error al crear la mesa:", error);
       showToast('No se pudo crear la mesa', 'error');
     } finally {
       setIsAdding(false);
@@ -65,32 +96,16 @@ export const useQrController = () => {
     setRemovingId(id);
     try {
       await client.delete(`/pos/tables/${id}`);
-      
       await fetchTables(false); 
       showToast('Mesa eliminada correctamente');
-      return true; // Éxito: avisamos a la vista para que cierre el modal
+      return true; 
     } catch (error) {
-      console.error("Error al eliminar:", error);
-      
-      // 🔥 AQUÍ ESTÁ LA MAGIA: Extraemos el mensaje de protección del backend 
-      // Si el backend mandó mensaje lo usamos, sino usamos uno genérico
       const errorMsg = error.response?.data?.message || 'Error al eliminar la mesa';
-      
-      // Mandamos llamar a la cápsula de error
       showToast(errorMsg, 'error');
-      
-      return false; // Fallo: la vista no cerrará el modal
+      return false; 
     } finally {
       setRemovingId(null);
     }
-  };
-
-  const generarQR = async (mesaId) => {
-    console.log(`Generando QR para mesa ${mesaId}`);
-  };
-
-  const revocarQR = async (mesaId) => {
-    console.log(`Revocando QR para mesa ${mesaId}`);
   };
 
   return { 
@@ -99,13 +114,14 @@ export const useQrController = () => {
     isAdding,
     removingId,
     toast,
-    generarQR, 
-    revocarQR,
     zonas,
     zonaActiva,
     setZonaActiva,
     qrParaLlevar,
     addMesa,
-    removeMesa
+    removeMesa,
+    isQrActive,
+    isTogglingQr,
+    toggleQrService
   };
 };

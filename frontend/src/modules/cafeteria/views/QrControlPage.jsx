@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, RefreshCw, Trash2, Smartphone, 
   Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine,
-  CheckCircle2, AlertCircle
+  CheckCircle2, AlertCircle, Power, PowerOff
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
@@ -13,17 +13,18 @@ export const QrControlPage = () => {
   const { 
     mesas, isLoading, isAdding, removingId, toast,
     zonas, zonaActiva, setZonaActiva, 
-    addMesa, removeMesa 
+    addMesa, removeMesa,
+    isQrActive, isTogglingQr, toggleQrService 
   } = useQrController();
 
   const [previewMesa, setPreviewMesa] = useState(null);
   const [mesaToDelete, setMesaToDelete] = useState(null); 
+  const [showToggleModal, setShowToggleModal] = useState(false); 
 
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
   
-  // 🔥 NUEVO: Obtenemos la URL actual dinámica (local, IP de red o producción)
   const baseUrl = window.location.origin;
-  const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); // Para mostrarlo bonito sin "http://"
+  const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); 
   
   // ==========================================
   // PANTALLA DE CARGA ANIMADA NEO-BENTO
@@ -38,10 +39,10 @@ export const QrControlPage = () => {
         >
           <ScanLine size={40} className="text-orange-500 lya:text-lya-primary" />
         </motion.div>
-        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight text-center">
           Cargando Control QR
         </h2>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2 justify-center">
           <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando accesos y zonas...
         </p>
       </div>
@@ -56,7 +57,7 @@ export const QrControlPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white"
     >
       
-      {/* NOTIFICACIÓN FLOTANTE */}
+      {/* NOTIFICACIÓN FLOTANTE NEO-BENTO */}
       <AnimatePresence>
         {toast?.show && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -64,20 +65,20 @@ export const QrControlPage = () => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
-                toast.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
+              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors text-center ${
+                toast.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 
+                toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' : 
+                'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
             >
               <div className={`p-1.5 rounded-full shrink-0 ${
-                toast.type === 'error' 
-                  ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
-                  : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
+                toast.type === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 
+                toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500' : 
+                'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
               }`}>
-                {toast.type === 'error' ? (
-                  <AlertCircle size={20} />
-                ) : (
-                  <CheckCircle2 size={20} />
-                )}
+                {toast.type === 'error' ? <AlertCircle size={20} /> : 
+                 toast.type === 'warning' ? <PowerOff size={20} /> : 
+                 <CheckCircle2 size={20} />}
               </div>
               <div className="flex flex-col">
                   <span className="text-sm">{toast.message}</span>
@@ -122,6 +123,26 @@ export const QrControlPage = () => {
             </p>
           </div>
         </div>
+
+        {/* 🔥 NUEVO: BOTÓN KILL SWITCH "PREMIUM PILL" CON INDICADOR LED */}
+        <motion.button 
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowToggleModal(true)}
+          className={`flex items-center gap-3 px-6 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md ${
+            isQrActive 
+              ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text' 
+              : 'bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/50 opacity-90'
+          }`}
+        >
+          <div className="relative flex items-center justify-center">
+            {/* El punto LED */}
+            <div className={`w-3 h-3 rounded-full ${isQrActive ? 'bg-green-500 dark:bg-green-400 lya:bg-lya-secondary' : 'bg-gray-400 dark:bg-gray-600 lya:bg-lya-text/30'}`}></div>
+            {/* El resplandor (latido) cuando está activo */}
+            {isQrActive && <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 lya:bg-lya-secondary animate-ping opacity-75"></div>}
+          </div>
+          <span className="tracking-wide text-sm">{isQrActive ? 'QR Activo' : 'QR Apagado'}</span>
+          {isQrActive ? <Power size={18} className="ml-1 opacity-50" /> : <PowerOff size={18} className="ml-1 opacity-50" />}
+        </motion.button>
       </header>
 
       <div className="no-print flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0 z-10">
@@ -133,7 +154,7 @@ export const QrControlPage = () => {
               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap active:scale-95 ${
                 zonaActiva === zona.id 
                   ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-orange-600 dark:text-orange-400 lya:text-lya-primary shadow-sm border border-gray-100 dark:border-gray-600 lya:border-lya-primary/30' 
-                  : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:text-gray-700 dark:hover:text-gray-200 lya:hover:text-lya-text border border-transparent'
+                  : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:text-gray-700 dark:md:hover:text-gray-200 lya:hover:text-lya-text border border-transparent'
               }`}
             >
               {zona.id === 'salon' ? <LayoutGrid size={18} /> : <ShoppingBag size={18} />}
@@ -146,7 +167,7 @@ export const QrControlPage = () => {
           <button 
             onClick={addMesa}
             disabled={isAdding}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:shadow-lya-primary/30 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
+            className="flex items-center gap-2 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:shadow-lya-primary/30 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
           >
             {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
             <span>{isAdding ? 'Procesando...' : 'Agregar Mesa'}</span>
@@ -173,7 +194,7 @@ export const QrControlPage = () => {
                     exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
                     whileHover={{ y: -4, scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full max-w-[320px] mx-auto md:mx-0 bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-[2rem] shadow-sm relative group overflow-hidden flex flex-col transition-all hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700 lya:hover:border-lya-border/50"
+                    className="w-full max-w-[320px] mx-auto md:mx-0 bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-[2rem] shadow-sm relative group overflow-hidden flex flex-col transition-all md:hover:shadow-md md:hover:border-gray-200 dark:md:hover:border-gray-700 lya:hover:border-lya-border/50"
                   >
                     <div className="flex justify-between items-start mb-6">
                       <div className="flex items-center gap-3">
@@ -185,39 +206,40 @@ export const QrControlPage = () => {
                       <button 
                         onClick={() => setMesaToDelete(mesa)}
                         disabled={removingId === mesa.id}
-                        className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-90"
+                        className="p-2.5 text-gray-400 md:hover:text-red-500 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-90"
                         title="Eliminar Mesa"
                       >
                         <Trash2 size={18} strokeWidth={2.5} />
                       </button>
                     </div>
                     
+                    {/* 🔥 EL QR SE VUELVE GRIS SI EL SERVICIO ESTÁ APAGADO */}
                     <div className="w-full bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-6 mb-5 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors shadow-inner">
                        <QRCodeSVG 
-                         value={`${baseUrl}/m/${mesa.number}`} // 🔥 Código dinámico
+                         value={`${baseUrl}/m/${mesa.number}`} 
                          size={120} 
                          bgColor="transparent" 
                          fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
                          level="Q"
-                         className="drop-shadow-sm opacity-90"
+                         className={`drop-shadow-sm transition-opacity duration-300 ${isQrActive ? 'opacity-90' : 'opacity-20 grayscale'}`}
                        />
                     </div>
                     
-                    <div className="bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-5 group-hover:border-orange-300 dark:group-hover:border-orange-700 lya:group-hover:border-lya-secondary/50 transition-colors shadow-inner">
+                    <div className="bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-5 md:group-hover:border-orange-300 dark:md:group-hover:border-orange-700 lya:group-hover:border-lya-secondary/50 transition-colors shadow-inner">
                       <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
                       <a 
-                        href={`${baseUrl}/m/${mesa.number}`} // 🔥 Enlace dinámico
+                        href={`${baseUrl}/m/${mesa.number}`} 
                         target="_blank" 
                         rel="noreferrer" 
-                        className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate hover:text-orange-600 dark:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors font-bold outline-none tracking-wide"
+                        className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors font-bold outline-none tracking-wide"
                       >
-                        {displayBaseUrl}/m/{mesa.number} {/* 🔥 Muestra la IP o el Dominio actual */}
+                        {displayBaseUrl}/m/{mesa.number} 
                       </a>
                     </div>
                     
                     <button 
                       onClick={() => setPreviewMesa(mesa)}
-                      className="w-full mt-auto py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-orange-50 dark:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 lya:text-lya-text/80 lya:hover:text-lya-primary rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 active:scale-95 border border-transparent hover:border-orange-200 dark:hover:border-orange-800/50 lya:hover:border-lya-primary/30"
+                      className="w-full mt-auto py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 md:hover:text-orange-600 dark:text-gray-400 dark:md:hover:text-orange-400 lya:text-lya-text/80 lya:hover:text-lya-primary rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 active:scale-95 border border-transparent md:hover:border-orange-200 dark:md:hover:border-orange-800/50 lya:hover:border-lya-primary/30"
                     >
                       <QrCode size={18} strokeWidth={2.5} /> Pantalla Completa
                     </button>
@@ -233,8 +255,8 @@ export const QrControlPage = () => {
                   <div className="bg-gray-100 dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-full mb-5 shadow-inner">
                     <LayoutGrid size={48} className="opacity-30" />
                   </div>
-                  <p className="font-black text-xl mb-1 text-gray-600 dark:text-gray-400 lya:text-lya-text/70">No hay mesas en el sistema</p>
-                  <button onClick={addMesa} disabled={isAdding} className="mt-2 text-orange-500 dark:text-orange-400 lya:text-lya-primary font-bold hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
+                  <p className="font-black text-xl mb-1 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 text-center">No hay mesas en el sistema</p>
+                  <button onClick={addMesa} disabled={isAdding} className="mt-2 text-orange-500 dark:text-orange-400 lya:text-lya-primary font-bold md:hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
                     {isAdding ? 'Agregando...' : 'Crear la primera Mesa'}
                   </button>
                 </motion.div>
@@ -258,33 +280,33 @@ export const QrControlPage = () => {
                   <Smartphone className="w-12 h-12 text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
                 </div>
                 
-                <h2 className="text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 print:text-black print:text-4xl print:mb-4 tracking-tighter">Mostrador 𝓛𝔂𝓪</h2>
+                <h2 className="text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 print:text-black print:text-4xl print:mb-4 tracking-tighter text-center">Mostrador 𝓛𝔂𝓪</h2>
                 
-                <p className="no-print text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-8 font-medium px-4">QR único para que los clientes en fila puedan escanear el menú.</p>
+                <p className="no-print text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-8 font-medium px-4 text-center">QR único para que los clientes en fila puedan escanear el menú.</p>
                 
-                <div className="hidden print:block mb-8 px-2">
+                <div className="hidden print:block mb-8 px-2 text-center">
                   <p className="text-xl font-bold italic print:text-black mb-2">"Evita la fila..."</p>
                   <p className="text-sm print:text-gray-800">Ordena desde tu celular.</p>
                 </div>
 
                 <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-10 mb-6 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 print:py-8 print:bg-white print:border-none shadow-inner">
                    <QRCodeSVG 
-                     value={`${baseUrl}/llevar`} // 🔥 Código Dinámico
+                     value={`${baseUrl}/llevar`} 
                      size={160} 
                      bgColor="transparent" 
                      fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
                      level="Q"
-                     className="drop-shadow-sm opacity-90"
+                     className={`drop-shadow-sm transition-opacity duration-300 ${isQrActive ? 'opacity-90' : 'opacity-20 grayscale'}`}
                    />
                 </div>
 
                 <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-4 w-full rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-8 print:bg-white print:border-none shadow-sm">
                   <LinkIcon className="no-print w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
                   <a 
-                    href={`${baseUrl}/llevar`} // 🔥 Enlace Dinámico
+                    href={`${baseUrl}/llevar`} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest hover:text-orange-600 dark:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors outline-none print:text-black print:text-xl print:pointer-events-none"
+                    className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors outline-none print:text-black print:text-xl print:pointer-events-none text-center"
                   >
                     {displayBaseUrl}/llevar
                   </a>
@@ -292,7 +314,7 @@ export const QrControlPage = () => {
 
                 <button 
                   onClick={() => setPreviewMesa({ isLlevar: true })}
-                  className="w-full mt-auto py-4 bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl text-sm font-black transition-all active:scale-95 flex items-center justify-center gap-2 no-print shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30"
+                  className="w-full mt-auto py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl text-sm font-black transition-all active:scale-95 flex items-center justify-center gap-2 no-print shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30"
                 >
                   <QrCode size={18} strokeWidth={2.5} /> Pantalla Completa
                 </button>
@@ -302,7 +324,9 @@ export const QrControlPage = () => {
         </AnimatePresence>
       </div>
 
+      {/* ========================================== */}
       {/* MODAL DE PANTALLA COMPLETA (PREVIEW) */}
+      {/* ========================================== */}
       <AnimatePresence>
         {previewMesa && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:p-0 print:bg-white">
@@ -320,24 +344,24 @@ export const QrControlPage = () => {
             >
               <button 
                 onClick={() => setPreviewMesa(null)} 
-                className="absolute top-6 right-6 text-gray-400 hover:text-gray-800 dark:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all hover:scale-110 active:scale-90 no-print"
+                className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 active:scale-90 no-print"
               >
                 <X size={20} strokeWidth={2.5} />
               </button>
               
-              <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 no-print border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30">
+              <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 no-print border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
                 Escanear para ordenar
               </div>
               
-              <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 print:text-black print:text-5xl print:mb-6 tracking-tighter">
+              <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 print:text-black print:text-5xl print:mb-6 tracking-tighter text-center">
                 {previewMesa.isLlevar ? 'Mostrador 𝓛𝔂𝓪' : `Mesa ${previewMesa.number}`}
               </h2>
               
-              <div className="hidden print:block mb-8 px-4">
+              <div className="hidden print:block mb-8 px-4 text-center">
                  <p className="text-2xl font-bold italic print:text-black mb-3">
                    {previewMesa.isLlevar ? '"Evita la fila..."' : '"Un dulce momento te espera..."'}
                  </p>
-                 <p className="text-base print:text-gray-800 font-medium">
+                 <p className="text-base print:text-gray-800 font-medium text-center">
                    {previewMesa.isLlevar 
                      ? 'Ordena desde tu celular para retirar en mostrador.' 
                      : 'Escanea el código con tu celular para ordenar a tu mesa.'}
@@ -346,26 +370,25 @@ export const QrControlPage = () => {
 
               <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full print:bg-white print:border-none print:shadow-none print:p-0">
                 <QRCodeSVG 
-                   value={previewMesa.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa.number}`} // 🔥 Códigos Dinámicos
+                   value={previewMesa.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa.number}`} 
                    size={220} 
                    bgColor="transparent" 
                    fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
                    level="Q"
-                   className="opacity-90"
+                   className={`transition-opacity duration-300 ${isQrActive ? 'opacity-90' : 'opacity-20 grayscale'}`}
                 />
               </div>
 
               <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-8 print:bg-white print:border-none shadow-sm">
                 <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0 no-print" />
-                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest print:text-black print:text-2xl">
-                  {/* 🔥 Textos dinámicos en pantalla completa */}
+                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest print:text-black print:text-2xl text-center">
                   {previewMesa.isLlevar ? `${displayBaseUrl}/llevar` : `${displayBaseUrl}/m/${previewMesa.number}`}
                 </span>
               </div>
 
               <button 
                 onClick={() => window.print()}
-                className="w-full bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 text-white lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface py-4 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 flex items-center justify-center gap-2 no-print"
+                className="w-full bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 text-white lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface py-4 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 flex items-center justify-center gap-2 no-print"
               >
                 <Printer size={20} strokeWidth={2.5} /> Imprimir QR
               </button>
@@ -374,7 +397,80 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE CONFIRMACIÓN CON ESTADOS DE CARGA (ELIMINAR MESA) */}
+      {/* ========================================== */}
+      {/* 🔥 NUEVO MODAL: CONFIRMAR KILL-SWITCH */}
+      {/* ========================================== */}
+      <AnimatePresence>
+        {showToggleModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isTogglingQr) setShowToggleModal(false);
+              }}
+              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+            >
+              <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm ${
+                isQrActive ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500' : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500'
+              }`}>
+                {isQrActive ? <PowerOff size={32} strokeWidth={2} className="text-red-500" /> : <Power size={32} strokeWidth={2} className="text-green-500 lya:text-lya-secondary" />}
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
+                {isQrActive ? '¿Suspender Servicio QR?' : '¿Reactivar Servicio QR?'}
+              </h3>
+              
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
+                {isQrActive 
+                  ? 'Al apagar el servicio, cualquier cliente que intente escanear los menús verá una pantalla de bloqueo indicando que los pedidos digitales están inactivos. Los clientes que ya confirmaron orden conservarán su ticket visual.'
+                  : 'Al activar el servicio, todos los códigos QR volverán a ser operativos y los clientes podrán comenzar a crear órdenes inmediatamente desde sus dispositivos.'
+                }
+              </p>
+              
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setShowToggleModal(false)}
+                  disabled={isTogglingQr}
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    const success = await toggleQrService(!isQrActive);
+                    if(success) setShowToggleModal(false);
+                  }} 
+                  disabled={isTogglingQr}
+                  className={`flex-[1.5] py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg ${
+                    isQrActive 
+                      ? 'bg-red-500 md:hover:bg-red-600 shadow-red-500/30' 
+                      : 'bg-gray-900 md:hover:bg-gray-800 dark:bg-gray-100 dark:md:hover:bg-white dark:text-gray-900 lya:bg-lya-text lya:text-lya-surface'
+                  }`}
+                >
+                  {isTogglingQr ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>{isQrActive ? 'Sí, Suspender' : 'Sí, Reactivar'}</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================== */}
+      {/* MODAL ORIGINAL: ELIMINAR MESA */}
+      {/* ========================================== */}
       <AnimatePresence>
         {mesaToDelete && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -390,22 +486,24 @@ export const QrControlPage = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
             >
               <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
                 <AlertCircle size={32} strokeWidth={1.5} />
               </div>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight text-center">
                 ¿Eliminar Mesa {mesaToDelete.number}?
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2">
+              
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
                 Esta acción no se puede deshacer. Las demás mesas se reordenarán automáticamente.
               </p>
+              
               <div className="flex gap-3 w-full">
                 <button 
                   onClick={() => setMesaToDelete(null)}
                   disabled={removingId === mesaToDelete.id}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
                 </button>
@@ -417,7 +515,7 @@ export const QrControlPage = () => {
                     }
                   }} 
                   disabled={removingId === mesaToDelete.id}
-                  className="flex-[1.5] py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500"
+                  className="flex-[1.5] py-4 bg-red-500 md:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500"
                 >
                   {removingId === mesaToDelete.id ? (
                     <>
