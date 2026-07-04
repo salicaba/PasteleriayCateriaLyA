@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { LogOut } from 'lucide-react';
 
-export const ClientLogoutModal = ({ isOpen, onClose, onLogout }) => {
+export default function ClientLogoutModal({ isOpen, show, onClose, onLogout, onConfirm }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Acepta los nombres de variables antiguos y nuevos para que no falle nada
+  const isVisible = isOpen || show;
+  const actionToExecute = onLogout || onConfirm;
 
   const handleConfirm = async () => {
     setIsLoggingOut(true);
     // Retardo para UX (Se ve el spinner y bloquea el botón)
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Llamamos a la función que viene desde ClientApp.jsx
-    onLogout();
+    if (actionToExecute) {
+      actionToExecute();
+    }
     setIsLoggingOut(false);
   };
 
-  if (!isOpen) return null;
+  if (!isVisible) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -62,4 +67,4 @@ export const ClientLogoutModal = ({ isOpen, onClose, onLogout }) => {
       </motion.div>
     </div>
   );
-};
+}
