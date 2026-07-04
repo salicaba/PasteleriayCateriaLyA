@@ -1,5 +1,5 @@
 // src/modules/client/views/ClientMenu.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
@@ -39,9 +39,15 @@ export default function ClientMenu({ clientData, type, tableId }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
-  // 🔥 ESTADOS DEL NEGOCIO (Kill-Switch y Caducidad)
+  // 🔥 NUEVO ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Estados del negocio (Kill-Switch y Caducidad)
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  
+  // 🔥 REFERENCIA DE TIEMPO REAL PARA MÓVILES
+  const lastActivityRef = useRef(Date.now());
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
@@ -59,41 +65,60 @@ export default function ClientMenu({ clientData, type, tableId }) {
         console.error("No se pudo verificar el estado del QR");
       }
     };
-    checkQrStatus(); // Chequeo inicial
+    checkQrStatus(); 
     const intervalId = setInterval(checkQrStatus, 15000); 
     return () => clearInterval(intervalId);
   }, []);
 
-  // 🔥 LÓGICA: Auto-cierre de sesión por inactividad (10 minutos)
+  // 🔥 LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos) - A prueba de teléfonos bloqueados
   useEffect(() => {
-    let timeoutId;
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
-      // Si ya confirmó un pedido, NO caducamos la sesión porque su ticket es su comprobante vivo
-      if (isConfirmed || isSubmitting) return; 
-      
-      // 10 Minutos = 600,000 milisegundos
-      timeoutId = setTimeout(() => {
-        setSessionExpired(true);
-      }, 600000); 
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
     };
-
+    
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
-    events.forEach(event => window.addEventListener(event, resetTimer, { passive: true }));
-    resetTimer();
+    events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
+
+    // Verificamos cada 30 segundos usando el reloj del sistema (Date.now())
+    const checkInterval = setInterval(() => {
+      if (isConfirmed || isSubmitting) return; 
+
+      const now = Date.now();
+      // 25 Minutos = 25 * 60 * 1000 = 1,500,000 milisegundos
+      if (now - lastActivityRef.current > 1500000) {
+        setSessionExpired(true);
+      }
+    }, 30000); 
 
     return () => {
-      clearTimeout(timeoutId);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
+      clearInterval(checkInterval);
+      events.forEach(event => window.removeEventListener(event, updateActivity));
     };
   }, [isConfirmed, isSubmitting]);
 
-  // LÓGICA: Cierre de Sesión Completo (Abandono de Mesa)
-  const handleLogout = () => {
-    localStorage.removeItem('lya_client_order_id');
-    localStorage.removeItem('lya_client_snapshot');
-    localStorage.removeItem('lya_client_data'); 
-    window.location.reload();
+  // 🔥 LÓGICA MEJORADA: Cierre de Sesión Completo (Abandono de Mesa)
+  const handleLogout = async () => {
+    return new Promise((resolve) => {
+      setIsLoggingOut(true);
+      
+      // Delay simulado de 800ms para que se vea el spinner de carga y de tiempo de limpar variables
+      setTimeout(() => {
+        // Limpieza Agresiva: Destruimos todos los posibles rastros de la sesión del cliente
+        const keysToRemove = [
+          'lya_client_order_id', 
+          'lya_client_snapshot', 
+          'lya_client_data', 
+          'lya_token', 
+          'lya_user',
+          'clientData'
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        // Reemplazamos la ruta actual forzando al navegador a ir a la raíz sin parpadear
+        window.location.replace(window.location.pathname);
+        resolve();
+      }, 800);
+    });
   };
 
   useEffect(() => {
@@ -324,11 +349,12 @@ export default function ClientMenu({ clientData, type, tableId }) {
              Si deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre en el sistema presionando el botón de abajo.
           </p>
           <motion.button 
-            whileTap={{ scale: 0.95 }} 
+            whileTap={isLoggingOut ? {} : { scale: 0.95 }} 
+            disabled={isLoggingOut}
             onClick={handleLogout} 
-            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 text-center"
+            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed"
           >
-             Volver a Iniciar Sesión
+            {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <span>Volver a Iniciar Sesión</span>}
           </motion.button>
         </motion.div>
       </div>
@@ -359,11 +385,12 @@ export default function ClientMenu({ clientData, type, tableId }) {
              <b className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90">¿Estamos abiertos? ¡Entra y pide sin miedo!</b> Acércate al mostrador o llama a nuestro personal, estarán encantados de tomar tu orden directamente.
           </p>
           <motion.button 
-            whileTap={{ scale: 0.95 }} 
+            whileTap={isLoggingOut ? {} : { scale: 0.95 }} 
+            disabled={isLoggingOut}
             onClick={handleLogout} 
-            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 text-center"
+            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed"
           >
-             Entendido, cerrar menú
+             {isLoggingOut ? <Loader2 size={20} className="animate-spin text-white dark:text-gray-900" /> : <span>Entendido, cerrar menú</span>}
           </motion.button>
         </motion.div>
       </div>
@@ -592,7 +619,7 @@ export default function ClientMenu({ clientData, type, tableId }) {
             cycleTheme={cycleTheme}
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
-            showLogout={!isConfirmed} // 🔥 Oculta salir si ya hay ticket confirmado
+            showLogout={!isConfirmed} 
             onLogoutClick={() => {
               setShowSettings(false);
               setShowLogoutConfirm(true);
