@@ -33,6 +33,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
     });
   };
 
+  // 🔥 SOLUCIÓN AL CRASH: Obligamos a que TODAS las sumas sean tratadas matemáticamente con Number()
   const calculateTotal = () => {
     let total = Number(product.precioBase || product.precio || 0);
     availableModifiers.forEach(mod => {
@@ -40,11 +41,11 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
       if (!selected) return;
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
-        if (opt) total += opt.price;
+        if (opt) total += Number(opt.price || 0);
       } else {
         selected.forEach(sId => {
           const opt = mod.options.find(o => o.id === sId);
-          if (opt) total += opt.price;
+          if (opt) total += Number(opt.price || 0);
         });
       }
     });
@@ -108,7 +109,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
             <h3 className="text-lg sm:text-xl font-black leading-tight text-gray-900 dark:text-white lya:text-lya-text line-clamp-2 mb-1.5">{product.nombre}</h3>
             <p className="font-bold text-base text-orange-600 dark:text-orange-400 lya:text-lya-secondary">${Number(product.precioBase || product.precio || 0).toFixed(2)} <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 ml-1 uppercase tracking-wider">Base</span></p>
           </div>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={onClose} disabled={isProcessing} className="shrink-0 bg-white dark:bg-gray-700 lya:bg-white md:hover:bg-gray-100 text-gray-500 dark:text-gray-300 lya:text-lya-text p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm mt-0.5"><X size={20} strokeWidth={2.5} /></motion.button>
+          <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={onClose} disabled={isProcessing} className="shrink-0 bg-white dark:bg-gray-700 lya:bg-white md:hover:bg-gray-100 text-gray-500 dark:text-gray-300 lya:text-lya-text p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm mt-0.5 outline-none"><X size={20} strokeWidth={2.5} /></motion.button>
         </div>
         
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
@@ -127,9 +128,9 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                   {mod.options.map(opt => {
                     const isSelected = mod.type === 'single' ? selections[mod.id] === opt.id : selections[mod.id]?.includes(opt.id);
                     return (
-                      <motion.button whileTap={{ scale: 0.95 }} key={opt.id} onClick={() => handleToggle(mod.id, opt.id, mod.type)} className={clsx("px-4 py-3 rounded-2xl border text-sm font-bold transition-all flex items-center justify-between gap-3 flex-grow sm:flex-grow-0", isSelected ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface" : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 lya:bg-white/80 lya:border-lya-border/40 lya:text-lya-text")}>
+                      <motion.button type="button" whileTap={{ scale: 0.95 }} key={opt.id} onClick={() => handleToggle(mod.id, opt.id, mod.type)} className={clsx("px-4 py-3 rounded-2xl border text-sm font-bold transition-all flex items-center justify-between gap-3 flex-grow sm:flex-grow-0 outline-none", isSelected ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface" : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 lya:bg-white/80 lya:border-lya-border/40 lya:text-lya-text")}>
                         <span className="flex items-center gap-2">{isSelected && <Check size={16} strokeWidth={4} />}{opt.label}</span>
-                        {opt.price > 0 && <span className={clsx("text-xs px-2 py-1 rounded-lg ml-auto whitespace-nowrap", isSelected ? "bg-white/25 text-white lya:bg-white/30" : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary lya:bg-lya-primary/10")}>+${Number(opt.price).toFixed(2)}</span>}
+                        {Number(opt.price) > 0 && <span className={clsx("text-xs px-2 py-1 rounded-lg ml-auto whitespace-nowrap", isSelected ? "bg-white/25 text-white lya:bg-white/30" : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary lya:bg-lya-primary/10")}>+${Number(opt.price).toFixed(2)}</span>}
                       </motion.button>
                     );
                   })}
@@ -149,7 +150,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
         </div>
         
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface shrink-0">
-          <motion.button whileTap={isAgotado || isProcessing ? {} : { scale: 0.95 }} disabled={isAgotado || isProcessing} onClick={handleConfirmAction} className={clsx("w-full py-4 rounded-[1.5rem] font-black text-lg flex justify-between px-6 items-center transition-all lya:border-2", isAgotado ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none lya:bg-lya-bg lya:border-lya-border/30" : "bg-green-500 md:hover:bg-green-600 text-white shadow-lg shadow-green-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30")}>
+          <motion.button type="button" whileTap={isAgotado || isProcessing ? {} : { scale: 0.95 }} disabled={isAgotado || isProcessing} onClick={handleConfirmAction} className={clsx("w-full py-4 rounded-[1.5rem] font-black text-lg flex justify-between px-6 items-center transition-all lya:border-2 outline-none", isAgotado ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none lya:bg-lya-bg lya:border-lya-border/30" : "bg-green-500 md:hover:bg-green-600 text-white shadow-lg shadow-green-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30")}>
             <span className="flex items-center gap-2">
               {isProcessing && <Loader2 className="animate-spin" size={20} />}
               {isAgotado ? 'Agotado' : 'Añadir a la orden'}
