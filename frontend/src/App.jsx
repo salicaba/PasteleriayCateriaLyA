@@ -28,7 +28,7 @@ const getInitials = (name) => {
   const cleanName = name.trim();
   const words = cleanName.split(/\s+/);
   if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase();
+    return (words[0][1] ? words[0][0] + words[1][0] : words[0].substring(0, 2)).toUpperCase();
   }
   return cleanName.substring(0, 2).toUpperCase();
 };
@@ -79,6 +79,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
+  // Estados: Modal de confirmación y carga de cierre de sesión
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
@@ -110,32 +111,6 @@ function App() {
     if (uiSize === 'small') root.style.fontSize = '12px';  
   }, [uiSize]);
 
-  // Cierre de sesión por INACTIVIDAD REAL (25 minutos sin tocar el sistema)
-  useEffect(() => {
-    if (!user) return;
-
-    let inactivityTimer;
-    const resetTimer = () => {
-      clearTimeout(inactivityTimer);
-      // 25 minutos = 25 * 60 * 1000 = 1500000 ms
-      inactivityTimer = setTimeout(() => {
-        // En inactividad, mostramos un mensaje antes de recargar
-        alert("Sesión cerrada por 25 minutos de inactividad.");
-        handleLogout();
-      }, 1500000);
-    };
-
-    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-    events.forEach(e => window.addEventListener(e, resetTimer));
-    
-    resetTimer(); // Iniciar cuenta regresiva al cargar
-
-    return () => {
-      events.forEach(e => window.removeEventListener(e, resetTimer));
-      clearTimeout(inactivityTimer);
-    };
-  }, [user]);
-
   // Cierre automático al llegar la medianoche (Cierre de Turno)
   useEffect(() => {
     if (!user) return;
@@ -144,8 +119,11 @@ function App() {
       if (savedSession) {
         const { expiresAt } = JSON.parse(savedSession);
         if (new Date().getTime() >= expiresAt) {
-          alert("El turno ha finalizado (12:00 AM). El sistema se reiniciará para el nuevo día.");
-          handleLogout(); 
+          handleLogout();
+          toast("El turno ha finalizado (12:00 AM). Inicia sesión para el nuevo día.", {
+            icon: '🌙',
+            duration: 6000
+          });
         }
       } else {
         handleLogout(); 
@@ -154,12 +132,12 @@ function App() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // Escuchar evento de error 401 desde el Axios Client (client.js)
+  // Escuchar evento de error 401 desde el Axios Client para evitar recargas completas (Flicker)
   useEffect(() => {
     const handleAuthError = () => {
       if (user) {
-        alert("Tu sesión ha expirado por seguridad. Vuelve a ingresar.");
         handleLogout();
+        toast.error("Tu sesión ha expirado por seguridad. Vuelve a ingresar.");
       }
     };
     window.addEventListener('auth_error', handleAuthError);
@@ -182,17 +160,16 @@ function App() {
     localStorage.setItem('lya_active_tab', initialTab);
   };
 
-  // 🔥 MAGIA DE RECARGA APLICADA AQUÍ: 
   const handleLogout = () => {
-    // 1. Limpiamos por completo toda la basura del navegador
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
     localStorage.removeItem('lya_user'); 
     localStorage.removeItem('lya_active_tab'); 
     localStorage.removeItem('lya_expanded_groups'); 
-    
-    // 2. Ejecutamos tu idea: Recargamos el navegador como debe ser en el sistema
-    window.location.reload(); 
+    setUser(null);
+    setActiveTab('caja'); 
+    setExpandedGroups([]); 
+    setShowLogoutModal(false); 
   };
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
@@ -422,6 +399,7 @@ function App() {
               </nav>
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
+                {/* BOTÓN PARA ABRIR MODAL DE LOGOUT */}
                 <button 
                   onClick={() => setShowLogoutModal(true)}
                   className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold active:scale-95 outline-none"
@@ -566,9 +544,10 @@ function App() {
                       <button
                         onClick={async () => {
                           setIsLoggingOut(true);
-                          // Breve retardo para que se vea la animación
-                          await new Promise(r => setTimeout(r, 600)); 
+                          // Breve retardo para UX (Se ve el spinner y evita doble clic)
+                          await new Promise(r => setTimeout(r, 800)); 
                           handleLogout();
+                          setIsLoggingOut(false);
                         }}
                         disabled={isLoggingOut}
                         className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed"
