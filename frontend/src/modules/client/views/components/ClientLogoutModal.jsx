@@ -1,23 +1,19 @@
+// src/modules/client/views/components/ClientLogoutModal.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { LogOut } from 'lucide-react';
 
 export default function ClientLogoutModal({ isOpen, show, onClose, onLogout, onConfirm }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  // Acepta los nombres de variables antiguos y nuevos para que no falle nada
   const isVisible = isOpen || show;
   const actionToExecute = onLogout || onConfirm;
 
   const handleConfirm = async () => {
     setIsLoggingOut(true);
-    // Retardo para UX (Se ve el spinner y bloquea el botón)
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
+    // Ejecuta la salida inmediatamente para que el menú tome el control y ponga su pantalla de carga
     if (actionToExecute) {
-      actionToExecute();
+      await actionToExecute();
     }
-    setIsLoggingOut(false);
   };
 
   if (!isVisible) return null;

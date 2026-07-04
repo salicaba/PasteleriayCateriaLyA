@@ -73,7 +73,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos) - A prueba de teléfonos bloqueados
+  // LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -82,12 +82,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
-    // Verificamos cada 30 segundos usando el reloj del sistema (Date.now())
     const checkInterval = setInterval(() => {
       if (isConfirmed || isSubmitting) return; 
 
       const now = Date.now();
-      // 25 Minutos = 25 * 60 * 1000 = 1,500,000 milisegundos
       if (now - lastActivityRef.current > 1500000) {
         setSessionExpired(true);
       }
@@ -99,34 +97,34 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting]);
 
-  // 🔥 LÓGICA A PRUEBA DE BALAS: Cierre de Sesión Completo
+  // 🔥 LÓGICA DE SALIDA PERFECTA: Sin parpadeos y con pantalla de carga de 𝓛𝔂𝓪
   const handleLogout = async () => {
+    // 1. Ocultamos el modal y los ajustes instantáneamente
+    setShowLogoutConfirm(false);
+    setShowSettings(false);
     setIsLoggingOut(true);
+
+    // 2. Activamos la pantalla de carga global
+    setIsLoading(true);
+
+    // 3. Esperamos 1.5 segundos para la transición fluida
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Delay simulado de 800ms para UX
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Limpieza Agresiva
+    // 4. Limpiamos únicamente la memoria del cliente
     const keysToRemove = [
       'lya_client_order_id', 
       'lya_client_snapshot', 
       'lya_client_data', 
-      'lya_client_session', 
-      'lya_token', 
-      'lya_user',
-      'clientData'
+      'lya_client_session'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
-    // 1. Intentamos de la forma limpia (Notificando a ClientApp)
+    // 5. Mandamos al usuario al Login sin recargar la página (evita el parpadeo blanco)
     if (typeof onLogout === 'function') {
       onLogout();
-    }
-    
-    // 2. BACKUP RÚSTICO: Si pasados 500ms React no te ha mandado al login, recargamos a la fuerza.
-    setTimeout(() => {
+    } else {
       window.location.reload();
-    }, 500);
+    }
   };
 
   useEffect(() => {
@@ -319,10 +317,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return cat ? cat.name : 'Delicia';
   };
 
-  // 🔥 NUEVA PANTALLA DE CARGA ELEGANTE 𝓛𝔂𝓪
+  // 🔥 PANTALLA DE CARGA GLOBAL (SE USA TANTO AL ENTRAR COMO AL SALIR DE LA SESIÓN)
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md">
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md transition-opacity duration-300">
          <div className="relative w-28 h-28 mb-6">
             <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-lya-border/40" />
             <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-400 lya:border-lya-primary border-t-transparent animate-spin" />
@@ -337,7 +335,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             transition={{ delay: 0.2 }}
             className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse"
          >
-            Preparando tu mesa...
+            {isLoggingOut ? "Cerrando sesión..." : "Preparando tu mesa..."}
          </motion.h2>
          <motion.p 
             initial={{ y: 10, opacity: 0 }} 
@@ -345,8 +343,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             transition={{ delay: 0.4 }}
             className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm flex items-center gap-2"
          >
-            <CheckCircle2 size={16} className="text-green-500" />
-            Cargando el menú más fresco
+            {isLoggingOut ? (
+               <Loader2 size={16} className="text-orange-500 animate-spin" />
+            ) : (
+               <CheckCircle2 size={16} className="text-green-500" />
+            )}
+            {isLoggingOut ? "Liberando la mesa" : "Cargando el menú más fresco"}
          </motion.p>
       </div>
     );
@@ -373,12 +375,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              Si deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre en el sistema presionando el botón de abajo.
           </p>
           <motion.button 
-            whileTap={isLoggingOut ? {} : { scale: 0.95 }} 
-            disabled={isLoggingOut}
+            whileTap={{ scale: 0.95 }} 
             onClick={handleLogout} 
-            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed outline-none"
+            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 outline-none"
           >
-            {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <span>Volver a Iniciar Sesión</span>}
+            <span>Volver a Iniciar Sesión</span>
           </motion.button>
         </motion.div>
       </div>
@@ -406,12 +407,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              <b className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90">¿Estamos abiertos? ¡Entra y pide sin miedo!</b> Acércate al mostrador o llama a nuestro personal, estarán encantados de tomar tu orden directamente.
           </p>
           <motion.button 
-            whileTap={isLoggingOut ? {} : { scale: 0.95 }} 
-            disabled={isLoggingOut}
+            whileTap={{ scale: 0.95 }} 
             onClick={handleLogout} 
-            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:shadow-none disabled:cursor-not-allowed outline-none"
+            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 outline-none"
           >
-             {isLoggingOut ? <Loader2 size={20} className="animate-spin text-white dark:text-gray-900 lya:text-lya-surface" /> : <span>Entendido, cerrar menú</span>}
+             <span>Entendido, cerrar menú</span>
           </motion.button>
         </motion.div>
       </div>
@@ -633,7 +633,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
             showLogout={!isConfirmed} 
-            // 🔥 SOLUCIÓN AQUÍ: Inyectamos todas las combinaciones posibles que pudiera tener tu archivo original
             onLogout={() => {
               setShowSettings(false);
               setShowLogoutConfirm(true);
@@ -650,10 +649,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         {showLogoutConfirm && (
           <ClientLogoutModal 
             isOpen={showLogoutConfirm}
-            show={showLogoutConfirm} // 🔥 Por si usa 'show'
+            show={showLogoutConfirm}
             onClose={() => setShowLogoutConfirm(false)}
             onLogout={handleLogout}
-            onConfirm={handleLogout} // 🔥 Por si usa 'onConfirm'
+            onConfirm={handleLogout}
           />
         )}
       </AnimatePresence>
