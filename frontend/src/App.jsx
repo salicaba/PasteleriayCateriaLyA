@@ -1,5 +1,6 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -267,16 +268,18 @@ function App() {
   const renderMenuItem = (item, isNested = false) => {
     const isActive = activeTab === item.id;
     return (
-      <button
+      <motion.button
+        whileTap={{ scale: 0.95 }}
         key={item.id}
         onClick={() => {
           setActiveTab(item.id);
           if (window.innerWidth < 768) setIsSidebarOpen(false);
         }}
+        // 🔥 Pilar 2: Reemplazo de hover por md:hover
         className={`flex items-center gap-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none w-full ${isNested ? 'px-3 pl-11' : 'px-3'} ${
           isActive
             ? 'bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-secondary/20 text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold'
-            : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:bg-gray-100 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg hover:text-gray-800 dark:hover:text-gray-200 lya:hover:text-lya-text'
+            : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:bg-gray-100 dark:md:hover:bg-gray-700/50 lya:md:hover:bg-lya-bg md:hover:text-gray-800 dark:md:hover:text-gray-200 lya:md:hover:text-lya-text'
         }`}
       >
         <div className="shrink-0 flex items-center justify-center w-6">
@@ -289,32 +292,46 @@ function App() {
             className="absolute left-0 top-0 bottom-0 my-auto w-1 h-[70%] bg-orange-500 lya:bg-lya-secondary rounded-r-full"
           />
         )}
-      </button>
+      </motion.button>
     );
   };
 
   return (
     <>
+      {/* 🔥 Pilar 5: Cápsulas Neo-Bento configuradas globalmente */}
       <Toaster 
         position="top-center"
+        containerStyle={{
+          top: 32, 
+        }}
         toastOptions={{
           duration: 4000,
+          className: 'shadow-2xl',
           style: {
-            background: theme === 'dark' ? '#1f2937' : theme === 'lya' ? '#FDF8F5' : '#ffffff',
+            background: theme === 'dark' ? 'rgba(31, 41, 55, 0.95)' : theme === 'lya' ? 'rgba(253, 248, 245, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(16px)',
             color: theme === 'dark' ? '#f3f4f6' : theme === 'lya' ? '#4A2B29' : '#1f2937',
-            borderRadius: '1rem',
-            border: theme === 'dark' ? '1px solid #374151' : theme === 'lya' ? '1px solid #E6CCB2' : '1px solid #f3f4f6',
+            borderRadius: '9999px', // Forma de píldora
+            border: '1px solid',
+            borderColor: theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : theme === 'lya' ? 'rgba(230, 204, 178, 0.5)' : 'rgba(229, 231, 235, 0.5)',
             fontWeight: 'bold',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-            padding: '14px 20px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            padding: '12px 24px',
+            textAlign: 'center',
           },
           success: {
+            style: {
+              borderColor: theme === 'lya' ? 'rgba(212, 163, 115, 0.4)' : 'rgba(16, 185, 129, 0.4)',
+            },
             iconTheme: { 
-              primary: theme === 'lya' ? '#10b981' : '#10b981', 
+              primary: theme === 'lya' ? '#D4A373' : '#10b981', 
               secondary: theme === 'dark' ? '#1f2937' : '#ffffff' 
             },
           },
           error: {
+            style: {
+              borderColor: 'rgba(239, 68, 68, 0.4)',
+            },
             iconTheme: { 
               primary: '#ef4444', 
               secondary: theme === 'dark' ? '#1f2937' : '#ffffff' 
@@ -326,7 +343,8 @@ function App() {
       {!user ? (
         <LoginScreen onLogin={handleLogin} />
       ) : (
-        <div className="h-screen flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300">
+        // 🔥 Pilar 1: Responsividad Estricta (h-[100dvh] w-full flex overflow-hidden)
+        <div className="h-[100dvh] w-full flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300">
           
           <motion.aside
             initial={false}
@@ -354,12 +372,14 @@ function App() {
 
                     return (
                       <div key={item.id} className="flex flex-col w-full">
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => toggleGroup(item.id)}
+                          // 🔥 Pilar 2: md:hover
                           className={`flex items-center justify-between px-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none w-full ${
                             hasActiveChild && !isExpanded
                               ? 'text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-secondary/10'
-                              : 'text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold hover:bg-gray-100 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg'
+                              : 'text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold md:hover:bg-gray-100 dark:md:hover:bg-gray-700/50 lya:md:hover:bg-lya-bg'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -374,7 +394,7 @@ function App() {
                           >
                             <ChevronDown size={16} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/60" />
                           </motion.div>
-                        </button>
+                        </motion.button>
                         
                         <AnimatePresence initial={false}>
                           {isExpanded && (
@@ -399,19 +419,19 @@ function App() {
               </nav>
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
-                {/* BOTÓN PARA ABRIR MODAL DE LOGOUT */}
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowLogoutModal(true)}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-sm font-bold active:scale-95 outline-none"
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-red-200 text-red-500 md:hover:bg-red-50 dark:md:hover:bg-red-900/10 transition-colors text-sm font-bold outline-none"
                 >
                   <LogOut size={16} />
                   Cerrar Sesión
-                </button>
+                </motion.button>
               </div>
             </div>
           </motion.aside>
 
-          <div className={`flex flex-col relative min-w-0 w-full shrink-0 md:w-auto md:flex-1 md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full'}`}>
+          <div className={`flex flex-col relative min-w-0 w-full shrink-0 md:w-auto md:flex-1 md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full flex-1 overflow-hidden'}`}>
             
             <AnimatePresence>
               {isSidebarOpen && (
@@ -427,12 +447,13 @@ function App() {
 
             <header className={`h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors duration-300 relative ${globalScroll ? 'z-10' : 'z-10 sticky top-0'}`}>
               <div className="flex items-center gap-2 sm:gap-4">
-                 <button
+                 <motion.button
+                   whileTap={{ scale: 0.95 }}
                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                   className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-100 dark:hover:bg-gray-700 lya:hover:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-lg transition-colors shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 outline-none active:scale-95"
+                   className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-100 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-lg transition-colors shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 outline-none"
                  >
                    <Menu size={20} />
-                 </button>
+                 </motion.button>
 
                  <div className="flex items-center ml-1">
                    <span 
@@ -463,7 +484,7 @@ function App() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-3 bg-white dark:bg-gray-700/50 lya:bg-lya-bg px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 shadow-sm transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 lya:hover:opacity-80">
+                <motion.div whileTap={{ scale: 0.98 }} className="flex items-center gap-3 bg-white dark:bg-gray-700/50 lya:bg-lya-bg px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 shadow-sm transition-colors cursor-pointer md:hover:bg-gray-50 dark:md:hover:bg-gray-600 lya:md:hover:opacity-80">
                   <div className="text-right hidden sm:block">
                     <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-none">
                       {user?.fullName ? user.fullName.split(' ')[0] : (user?.username || 'Admin')}
@@ -480,8 +501,7 @@ function App() {
                   }`}>
                     {getInitials(user?.fullName || user?.username)}
                   </div>
-
-                </div>
+                </motion.div>
               </div>
             </header>
 
@@ -514,7 +534,7 @@ function App() {
               {activeTab === 'reportes' && <ReportsPage />}
             </main>
 
-            {/* MODAL DE CERRAR SESIÓN */}
+            {/* 🔥 Pilar 4 y 3: Modal de Cerrar Sesión con Geometría Premium (2.5rem) y Anti-Doble Clic */}
             <AnimatePresence>
               {showLogoutModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -522,45 +542,49 @@ function App() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 text-center"
+                    className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 text-center flex flex-col items-center"
                   >
-                    <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-4">
                       <LogOut size={32} strokeWidth={2.5} />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">
                       ¿Cerrar Sesión?
                     </h3>
-                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm">
+                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm text-center px-2">
                       Tendrás que volver a ingresar tus credenciales para acceder al sistema POS.
                     </p>
                     <div className="flex gap-3 w-full">
-                      <button
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => !isLoggingOut && setShowLogoutModal(false)}
                         disabled={isLoggingOut}
-                        className="flex-1 py-3 rounded-2xl font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                        className="flex-1 py-3 rounded-2xl font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors disabled:opacity-50 outline-none"
                       >
                         Cancelar
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
+                        whileTap={!isLoggingOut ? { scale: 0.95 } : {}}
                         onClick={async () => {
                           setIsLoggingOut(true);
-                          // Breve retardo para UX (Se ve el spinner y evita doble clic)
-                          await new Promise(r => setTimeout(r, 800)); 
-                          handleLogout();
-                          setIsLoggingOut(false);
+                          try {
+                            await new Promise(r => setTimeout(r, 800)); 
+                            handleLogout();
+                          } finally {
+                            setIsLoggingOut(false);
+                          }
                         }}
                         disabled={isLoggingOut}
-                        className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed"
+                        className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 md:hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
                       >
                         {isLoggingOut ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <Loader2 size={20} className="animate-spin" />
                             <span>Saliendo...</span>
                           </>
                         ) : (
                           'Sí, salir'
                         )}
-                      </button>
+                      </motion.button>
                     </div>
                   </motion.div>
                 </div>

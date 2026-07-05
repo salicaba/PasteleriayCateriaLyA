@@ -1,8 +1,7 @@
 // src/modules/auth/views/LoginScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-// 🔥 Añadimos Eye y EyeOff
-import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff } from 'lucide-react';
+import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import logoLyA from '../../../assets/logo.jpeg'; 
 import client from '../../../api/client'; 
@@ -13,7 +12,6 @@ const motivationalPhrases = [
   "La magia dulce está por comenzar...",
   "Alistando todo para un turno excelente...",
   "Un buen café, una sonrisa y a triunfar...",
-
   "Cada taza cuenta una historia...",
   "Transformando granos en momentos especiales...",
   "Hoy es un buen día para crear sonrisas...",
@@ -45,12 +43,19 @@ const motivationalPhrases = [
 export const LoginScreen = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  // 🔥 Nuevo estado para controlar la visibilidad
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotMode, setShowForgotMode] = useState(false);
   const [bootState, setBootState] = useState('booting'); 
   const [phrase, setPhrase] = useState('');
+  
+  // 🔥 Nuevo estado para Cápsulas Neo-Bento de notificación local
+  const [notification, setNotification] = useState(null);
+
+  const triggerNotification = (msg, type = 'success') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
 
   const runSystemCheck = async () => {
     setBootState('booting');
@@ -77,10 +82,18 @@ export const LoginScreen = ({ onLogin }) => {
     runSystemCheck();
   }, []);
 
+  // 🔥 SOLUCIÓN: Empuje del teclado en móviles
+  const handleFocus = (e) => {
+    const target = e.target;
+    setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username || !password) {
-      return toast.error("Ingresa tus credenciales completas");
+      return triggerNotification("Ingresa tus credenciales completas", 'warning');
     }
 
     setIsLoading(true);
@@ -94,6 +107,7 @@ export const LoginScreen = ({ onLogin }) => {
         const loggedUser = response.data.user;
         const firstName = loggedUser.fullName ? loggedUser.fullName.split(' ')[0] : loggedUser.username;
         
+        // Usamos toast global para éxito porque el componente se destruirá inmediatamente al cambiar de vista
         if (loggedUser.role === 'Administrador') {
           toast.success(`¡Bienvenido de vuelta, ${firstName}!`);
         } else {
@@ -105,17 +119,49 @@ export const LoginScreen = ({ onLogin }) => {
     } catch (error) {
       console.error("Error en inicio de sesión:", error);
       const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
-      toast.error(errorMsg);
+      // Usamos la Cápsula Neo-Bento para los errores
+      triggerNotification(errorMsg, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
+    // 🔥 Pilar 1: min-h-[100dvh], pb-32 y overflow-y-auto para el Anti-Ghost Scroll y teclado móvil
+    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-300">
       
-      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-orange-500/20 lya:bg-lya-primary/20 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/20 lya:bg-lya-secondary/20 rounded-full blur-[100px] pointer-events-none" />
+      {/* NOTIFICACIONES CÁPSULA NEO-BENTO (Pilar 5) */}
+      <AnimatePresence>
+        {notification && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
+                notification.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
+                notification.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
+                'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
+              }`}
+            >
+              <div className={`p-1.5 rounded-full shrink-0 ${
+                notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
+                notification.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
+                'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
+              }`}>
+                {notification.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : 
+                 notification.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : 
+                 <AlertCircle size={20} strokeWidth={2.5} />}
+              </div>
+              <span className="text-sm tracking-wide text-center">{notification.msg}</span>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Fondos Decorativos */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-orange-500/20 lya:bg-lya-primary/20 rounded-full blur-[100px] pointer-events-none z-0" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/20 lya:bg-lya-secondary/20 rounded-full blur-[100px] pointer-events-none z-0" />
 
       <AnimatePresence mode="wait">
         
@@ -126,7 +172,7 @@ export const LoginScreen = ({ onLogin }) => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="flex flex-col items-center justify-center relative z-10"
+            className="flex flex-col items-center justify-center relative z-10 my-auto"
           >
             <motion.div 
               animate={{ scale: [1, 1.05, 1], boxShadow: ["0px 0px 0px rgba(0,0,0,0)", "0px 20px 40px rgba(212,163,115,0.3)", "0px 0px 0px rgba(0,0,0,0)"] }}
@@ -159,21 +205,23 @@ export const LoginScreen = ({ onLogin }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-sm bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 p-8 sm:p-10 text-center relative z-10"
+            className="w-full max-w-sm bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 p-8 sm:p-10 text-center relative z-10 my-auto shrink-0"
           >
             <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
               <WifiOff size={36} strokeWidth={2.5} />
             </div>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-3">Sin Conexión</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-3 text-center">Sin Conexión</h2>
+            {/* 🔥 Pilar 4: Tipografía (Textos descriptivos justificados) */}
+            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed text-justify px-2">
               El sistema de 𝓛𝔂𝓪 no puede comunicarse con el servidor. Revisa tu internet o asegúrate de que el equipo central esté encendido.
             </p>
-            <button 
+            <motion.button 
+              whileTap={{ scale: 0.95 }}
               onClick={runSystemCheck}
-              className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black rounded-2xl shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gray-900 md:hover:bg-black dark:bg-orange-500 dark:md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white font-black rounded-[1.5rem] shadow-xl transition-all flex items-center justify-center gap-2 outline-none"
             >
               <RefreshCw size={18} /> Reintentar Conexión
-            </button>
+            </motion.button>
           </motion.div>
         )}
 
@@ -182,7 +230,7 @@ export const LoginScreen = ({ onLogin }) => {
             key="login"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10"
+            className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10 my-auto shrink-0"
           >
             <div className="p-8 sm:p-10">
               
@@ -190,10 +238,10 @@ export const LoginScreen = ({ onLogin }) => {
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-xl mb-6">
                   <img src={logoLyA} alt="Pastelería 𝓛𝔂𝓪" className="w-full h-full object-cover" />
                 </div>
-                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2" style={{ letterSpacing: '-0.05em' }}>
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 text-center" style={{ letterSpacing: '-0.05em' }}>
                   𝓛𝔂𝓪
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium uppercase tracking-widest">
+                <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium uppercase tracking-widest text-center">
                   Punto de Venta
                 </p>
               </div>
@@ -211,9 +259,15 @@ export const LoginScreen = ({ onLogin }) => {
                         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                           <User size={18} className="text-gray-400 dark:text-gray-500" />
                         </div>
+                        {/* 🔥 Pilar 4: Geometry Premium y handleFocus para el teclado */}
                         <input 
-                          type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Usuario o Correo Electrónico" 
-                          className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
+                          type="text" 
+                          value={username} 
+                          onChange={(e) => setUsername(e.target.value)} 
+                          onFocus={handleFocus}
+                          placeholder="Usuario o Correo Electrónico" 
+                          disabled={isLoading}
+                          className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-[1.5rem] border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
                         />
                       </div>
 
@@ -221,16 +275,19 @@ export const LoginScreen = ({ onLogin }) => {
                         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                           <Lock size={18} className="text-gray-400 dark:text-gray-500" />
                         </div>
-                        {/* 🔥 Ajustamos el type, el pr-12 para dar espacio al ícono y añadimos el botón */}
                         <input 
                           type={showPassword ? "text" : "password"} 
-                          value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" 
-                          className="w-full pl-12 pr-12 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-orange-500 lya:focus:ring-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-medium"
+                          value={password} 
+                          onChange={(e) => setPassword(e.target.value)} 
+                          onFocus={handleFocus}
+                          placeholder="Contraseña" 
+                          disabled={isLoading}
+                          className="w-full pl-12 pr-12 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-[1.5rem] border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 lya:hover:text-lya-primary transition-colors focus:outline-none"
+                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-200 lya:md:hover:text-lya-primary transition-colors focus:outline-none"
                         >
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
@@ -238,17 +295,35 @@ export const LoginScreen = ({ onLogin }) => {
                     </div>
 
                     <div className="flex items-center justify-end pt-1">
-                      <button type="button" onClick={() => setShowForgotMode(true)} className="text-[11px] font-bold text-gray-500 hover:text-orange-500 lya:hover:text-lya-primary transition-colors outline-none">
+                      <motion.button 
+                        whileTap={{ scale: 0.95 }}
+                        type="button" 
+                        onClick={() => setShowForgotMode(true)} 
+                        className="text-[11px] font-bold text-gray-500 md:hover:text-orange-500 lya:md:hover:text-lya-primary transition-colors outline-none"
+                      >
                         ¿Olvidaste tus datos?
-                      </button>
+                      </motion.button>
                     </div>
 
-                    <button 
-                      type="submit" disabled={isLoading}
-                      className="w-full py-4 bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black rounded-2xl shadow-xl shadow-gray-900/20 dark:shadow-orange-500/20 lya:shadow-lya-primary/20 transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2"
+                    {/* 🔥 Pilar 3: Prevención Anti-Doble Clic (Loader2 y bloqueo) */}
+                    <motion.button 
+                      whileTap={!isLoading ? { scale: 0.95 } : {}}
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-full py-4 bg-gray-900 md:hover:bg-black dark:bg-orange-500 dark:md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white font-black rounded-[1.5rem] shadow-xl shadow-gray-900/20 dark:shadow-orange-500/20 lya:shadow-lya-primary/20 transition-all disabled:opacity-70 disabled:shadow-none flex items-center justify-center gap-2 outline-none"
                     >
-                      {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogIn size={18} /> Iniciar Turno</>}
-                    </button>
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" />
+                          <span>Iniciando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <LogIn size={18} /> 
+                          <span>Iniciar Turno</span>
+                        </>
+                      )}
+                    </motion.button>
                   </motion.form>
                 ) : (
                   <motion.div 
@@ -261,17 +336,22 @@ export const LoginScreen = ({ onLogin }) => {
                     </div>
                     
                     <div>
-                      <h3 className="text-lg font-black text-gray-900 dark:text-white lya:text-lya-text mb-2">Acceso Restringido</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed px-4">
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">Acceso Restringido</h3>
+                      {/* 🔥 Pilar 4: Tipografía (Textos descriptivos justificados) */}
+                      <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed px-4 text-justify">
                         Por protocolos de seguridad, los empleados no pueden modificar sus credenciales de manera externa.
                         <br /><br />
-                        Por favor, contacta al <b className="text-gray-800 dark:text-gray-200">Administrador de la sucursal</b> para que reestablezca tu contraseña desde el panel de control.
+                        Por favor, contacta al <b className="text-gray-800 dark:text-gray-200 lya:text-lya-text font-black">Administrador de la sucursal</b> para que reestablezca tu contraseña desde el panel de control.
                       </p>
                     </div>
 
-                    <button onClick={() => setShowForgotMode(false)} className="w-full py-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-bg lya:hover:opacity-80 text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4">
+                    <motion.button 
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowForgotMode(false)} 
+                      className="w-full py-4 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg lya:md:hover:opacity-80 text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-[1.5rem] transition-all flex items-center justify-center gap-2 mt-4 outline-none"
+                    >
                       <ArrowLeft size={16} /> Volver al Inicio
-                    </button>
+                    </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
