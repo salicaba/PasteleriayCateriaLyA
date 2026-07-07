@@ -8,7 +8,10 @@ import { getProductModifiers } from '../utils/clientMenuUtils';
 export default function ClientProductModal({ product, onClose, onConfirm }) {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // ESTADOS DE PROCESAMIENTO
+  const [isProcessing, setIsProcessing] = useState(false); // Para cuando se envía la orden
+  const [isCalculatingTotal, setIsCalculatingTotal] = useState(false); // Para el feedback visual de la suma
 
   const isAgotado = product.controlarStock === true && product.stock <= 0;
   const availableModifiers = useMemo(() => getProductModifiers(product), [product]);
@@ -23,35 +26,60 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
     setSelections(initial);
   }, [availableModifiers]);
 
+  // 🔥 FUNCIÓN DE BLINDAJE MATEMÁTICO: Limpia cualquier error de escritura del administrador
+  const cleanNumber = (val) => {
+    if (!val) return 0;
+    // Convierte comas a puntos (ej. "15,50" -> "15.50")
+    let stringVal = String(val).replace(',', '.');
+    // Elimina todo lo que no sea número, punto o signo negativo (ej. "$15.50 MXN" -> "15.50")
+    const cleaned = stringVal.replace(/[^0-9.-]+/g, "");
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
   const handleToggle = (modId, optId, type) => {
-    setSelections(prev => {
-      const current = prev[modId];
-      if (type === 'single') {
-        if (current === optId) return prev; 
-        return { ...prev, [modId]: optId };
-      }
+    // Si ya está calculando, bloqueamos el doble clic táctil rápido
+    if (isCalculatingTotal) return;
+    
+    setIsCalculatingTotal(true);
+
+    // Micro-retraso de 200ms para dar la sensación visual de que el sistema está 
+    // "pensando" y sumando el dinero de forma segura en el botón principal.
+    setTimeout(() => {
+      setSelections(prev => {
+        const current = prev[modId];
+        if (type === 'single') {
+          if (current === optId) return prev; 
+          return { ...prev, [modId]: optId };
+        }
+        
+        const currentArray = Array.isArray(current) ? current : [];
+        if (currentArray.includes(optId)) {
+          return { ...prev, [modId]: currentArray.filter(id => id !== optId) };
+        }
+        return { ...prev, [modId]: [...currentArray, optId] };
+      });
       
-      const currentArray = Array.isArray(current) ? current : [];
-      if (currentArray.includes(optId)) {
-        return { ...prev, [modId]: currentArray.filter(id => id !== optId) };
-      }
-      return { ...prev, [modId]: [...currentArray, optId] };
-    });
+      setIsCalculatingTotal(false);
+    }, 200);
   };
 
   const calculateTotal = () => {
-    let total = Number(product.precioBase || product.precio || 0);
+    // Aplicamos el cleanNumber para garantizar que nunca resulte en "NaN"
+    let total = cleanNumber(product.precioBase || product.precio);
+    
     availableModifiers.forEach(mod => {
       const selected = selections[mod.id];
       if (!selected) return;
+      
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
-        if (opt) total += Number(opt.price || 0);
+        if (opt) total += cleanNumber(opt.price);
       } else {
         const currentArray = Array.isArray(selected) ? selected : [];
         currentArray.forEach(sId => {
           const opt = mod.options.find(o => o.id === sId);
-          if (opt) total += Number(opt.price || 0);
+          if (opt) total += cleanNumber(opt.price);
         });
       }
     });
@@ -59,13 +87,11 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
   };
 
   const handleConfirmAction = async () => {
-    if (isAgotado || isProcessing) return;
+    if (isAgotado || isProcessing || isCalculatingTotal) return;
     setIsProcessing(true);
     
     try {
-      // 🔥 FIX DEL CRASH: Micro-retraso de 250ms. 
-      // Esto asegura que el dedo del usuario ya se levantó de la pantalla
-      // y Framer Motion terminó su cálculo táctil antes de cerrar el modal bruscamente.
+      // Micro-retraso de seguridad táctil (Framer Motion Fix)
       await new Promise(resolve => setTimeout(resolve, 250));
 
       let tamanoStr = 'Estándar';
@@ -104,7 +130,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
         isTakeaway
       });
     } finally {
-      // Solo en caso de que haya un error y no se desmonte, restauramos el estado
       setIsProcessing(false);
     }
   };
@@ -141,7 +166,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
           <div className="flex-1 min-w-0 pt-1">
             <h3 className="text-lg sm:text-xl font-black leading-tight text-gray-900 dark:text-white lya:text-lya-text line-clamp-2 mb-1.5">{product.nombre}</h3>
             <p className="font-bold text-base text-orange-600 dark:text-orange-400 lya:text-lya-secondary">
-              ${Number(product.precioBase || product.precio || 0).toFixed(2)} 
+              ${cleanNumber(product.precioBase || product.precio).toFixed(2)} 
               <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 ml-1 uppercase tracking-wider">Base</span>
             </p>
           </div>
@@ -178,6 +203,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                         type="button" 
                         whileTap={{ scale: 0.95 }} 
                         key={opt.id} 
+                        disabled={isCalculatingTotal}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -187,7 +213,8 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                           "px-4 py-3 rounded-[1.25rem] border text-sm font-bold transition-all flex items-center justify-between gap-3 flex-grow sm:flex-grow-0 outline-none select-none touch-manipulation", 
                           isSelected 
                             ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface" 
-                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 lya:bg-white/80 lya:border-lya-border/40 lya:text-lya-text"
+                            : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 lya:bg-white/80 lya:border-lya-border/40 lya:text-lya-text",
+                          isCalculatingTotal && "opacity-80 cursor-wait"
                         )}
                       >
                         <span className="flex items-center pointer-events-none">
@@ -200,14 +227,14 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                           <span className="text-left">{opt.label}</span>
                         </span>
                         
-                        {Number(opt.price) > 0 && (
+                        {cleanNumber(opt.price) > 0 && (
                           <span className={clsx(
                             "text-xs px-2 py-1 rounded-[0.75rem] ml-auto whitespace-nowrap pointer-events-none", 
                             isSelected 
                               ? "bg-white/25 text-white lya:bg-white/30" 
                               : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary lya:bg-lya-primary/10"
                           )}>
-                            +${Number(opt.price).toFixed(2)}
+                            +${cleanNumber(opt.price).toFixed(2)}
                           </span>
                         )}
                       </motion.button>
@@ -248,8 +275,8 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface shrink-0 z-20">
           <motion.button 
             type="button" 
-            whileTap={isAgotado || isProcessing ? {} : { scale: 0.95 }} 
-            disabled={isAgotado || isProcessing} 
+            whileTap={isAgotado || isProcessing || isCalculatingTotal ? {} : { scale: 0.95 }} 
+            disabled={isAgotado || isProcessing || isCalculatingTotal} 
             onClick={(e) => {
               e.preventDefault();
               handleConfirmAction();
@@ -261,7 +288,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                 : "bg-green-500 md:hover:bg-green-600 text-white shadow-lg shadow-green-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30"
             )}
           >
-            {/* 🔥 FIX DEL CULPABLE: Ahora el Loader SIEMPRE está montado, solo lo ocultamos con CSS (w-0, opacity-0) */}
             <span className="flex items-center pointer-events-none">
               <span className={clsx(
                 "transition-all duration-300 flex items-center justify-center overflow-hidden",
@@ -274,8 +300,13 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
               </span>
             </span>
 
-            <span className="bg-black/20 px-3 py-1 rounded-[1rem] pointer-events-none">
-              ${calculateTotal().toFixed(2)}
+            {/* 🔥 FEEDBACK VISUAL PREMIUM: El área del precio se vuelve un mini-spinner cuando calcula */}
+            <span className="bg-black/20 px-3 py-1 rounded-[1rem] pointer-events-none flex items-center justify-center min-w-[4.5rem]">
+              {isCalculatingTotal ? (
+                <Loader2 className="animate-spin" size={16} strokeWidth={3} />
+              ) : (
+                `$${calculateTotal().toFixed(2)}`
+              )}
             </span>
           </motion.button>
         </div>
