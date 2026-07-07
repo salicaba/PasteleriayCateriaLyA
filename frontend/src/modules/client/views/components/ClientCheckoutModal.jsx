@@ -1,11 +1,65 @@
 // src/modules/client/views/components/ClientCheckoutModal.jsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Component } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import clsx from 'clsx';
 
-export default function ClientCheckoutModal({
-  cart = [], // Seguro por si llega undefined
+// ==========================================
+// 🕷️ TRAMPA DE ERRORES (ERROR BOUNDARY)
+// ==========================================
+class CrashDetector extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorMsg: '', errorStack: '' };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMsg: error.toString() };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorStack: errorInfo.componentStack });
+    // Alert nativo para móviles por si la pantalla roja no alcanza a renderizar
+    alert(`CRASH DETECTADO:\n\n${error.message}\n\nRevisa la pantalla roja para más detalles.`);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 bg-red-600 z-[99999] p-6 flex flex-col items-center justify-center text-white overflow-y-auto">
+          <AlertTriangle size={64} className="mb-4 text-white animate-bounce" />
+          <h2 className="text-2xl font-black mb-2 text-center">¡App Crasheada!</h2>
+          <p className="text-center mb-6 text-sm font-medium">Tómale captura a esto y envíamelo:</p>
+          
+          <div className="bg-black/40 p-4 rounded-2xl w-full break-words shadow-inner mb-4">
+            <p className="font-bold text-red-200 mb-1">Error:</p>
+            <p className="font-mono text-xs">{this.state.errorMsg}</p>
+          </div>
+
+          <div className="bg-black/40 p-4 rounded-2xl w-full break-words shadow-inner overflow-y-auto max-h-48">
+            <p className="font-bold text-red-200 mb-1">Stack (Dónde falló):</p>
+            <p className="font-mono text-[10px] leading-relaxed">{this.state.errorStack}</p>
+          </div>
+
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-8 bg-white text-red-600 px-8 py-4 rounded-[2rem] font-black shadow-xl active:scale-95 transition-transform"
+          >
+            Recargar App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
+// ==========================================
+// COMPONENTE PRINCIPAL (INTERNO)
+// ==========================================
+function CheckoutModalContent({
+  cart = [], 
   totalCart = 0,
   isSubmitting,
   onClose,
@@ -15,11 +69,9 @@ export default function ClientCheckoutModal({
 }) {
   const [actionLoading, setActionLoading] = useState(null);
   
-  // 🔥 CANDADO SÍNCRONO SILENCIOSO: Mata el Ghost Click de los móviles
   const isProcessingRef = useRef(false);
   const isMounted = useRef(true);
 
-  // Evitar actualizaciones de estado si el componente se desmonta
   useEffect(() => {
     return () => {
       isMounted.current = false;
@@ -27,30 +79,33 @@ export default function ClientCheckoutModal({
   }, []);
 
   const handleAction = async (e, cartItemId, actionType) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Si ya estamos procesando, ignoramos el toque silenciosamente sin deshabilitar el botón HTML
-    if (isProcessingRef.current) return;
-    
-    isProcessingRef.current = true;
-    if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
-    
     try {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (isProcessingRef.current) return;
+      
+      isProcessingRef.current = true;
+      if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
+      
       if (actionType === 'increment') {
-        // Ejecutamos la acción original sin delay artificial que confunda a React
         incrementInCart(cartItemId);
       } else {
         removeFromCart(cartItemId);
       }
-    } finally {
-      // Retrasamos la liberación del candado 300ms para absorber cualquier clic fantasma del móvil
+
+      // Delay para estabilizar los toques móviles
       setTimeout(() => {
         if (isMounted.current) {
           setActionLoading(null);
           isProcessingRef.current = false;
         }
       }, 300);
+
+    } catch (err) {
+      alert("Error en la función del botón: " + err.message);
+      isProcessingRef.current = false;
+      setActionLoading(null);
     }
   };
 
@@ -58,6 +113,7 @@ export default function ClientCheckoutModal({
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex flex-col justify-end p-4">
       <div className="absolute inset-0" onClick={() => !isSubmitting && !actionLoading && onClose()} />
       <motion.div initial={{ y: '100%', scale: 0.95, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: '100%', scale: 0.95, opacity: 0 }} transition={{ type: 'spring', damping: 26, stiffness: 220 }} className="relative bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-[2.5rem] p-6 pb-8 space-y-5 shadow-2xl max-w-md mx-auto w-full border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 flex flex-col max-h-[85vh]">
+        
         <div className="flex items-center justify-between shrink-0">
           <h3 className="text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">Tu Orden</h3>
           <motion.button 
@@ -71,11 +127,9 @@ export default function ClientCheckoutModal({
 
         <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1">
           {cart?.map(item => {
-            // Verificación de seguridad en caso de renderizado fantasma
             if (!item) return null;
             
             const isThisItemLoading = actionLoading?.id === item.cartItemId;
-            // Matemáticas seguras con fallback a 0
             const precioUnitario = item.precioUnitario || 0;
             const qty = item.qty || 0;
             const precioTotalItem = precioUnitario * qty;
@@ -83,7 +137,7 @@ export default function ClientCheckoutModal({
             return (
               <div key={item.cartItemId} className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-3xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-colors">
                 <div className="min-w-0 flex-1 pr-3">
-                  <h4 className="font-bold text-gray-900 dark:text-white lya:text-lya-text text-sm truncate">{item.nombre}</h4>
+                  <h4 className="font-bold text-gray-900 dark:text-white lya:text-lya-text text-sm truncate">{item.nombre || 'Producto'}</h4>
                   {item.detalles && (
                     <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 leading-tight">
                       {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
@@ -93,7 +147,6 @@ export default function ClientCheckoutModal({
                     </div>
                   )}
                   
-                  {/* PRECIO CON ESTADO DE CARGA */}
                   <div className="mt-1.5 flex items-baseline gap-2 h-5">
                     {isThisItemLoading ? (
                       <span className="flex items-center gap-1.5 text-xs font-black text-orange-500 dark:text-orange-400 lya:text-lya-secondary">
@@ -111,18 +164,18 @@ export default function ClientCheckoutModal({
                 <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-[1.25rem] p-1.5 shrink-0">
                   <button 
                     onClick={(e) => handleAction(e, item.cartItemId, 'decrement')} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 dark:md:hover:text-red-500 dark:md:hover:bg-red-900/20 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 md:hover:text-red-500 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-200 transition-all"
                   >
-                    {isThisItemLoading && actionLoading.action === 'decrement' ? <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> : <Minus size={16} strokeWidth={3} />}
+                    {isThisItemLoading && actionLoading?.action === 'decrement' ? <Loader2 size={16} className="animate-spin text-orange-500" /> : <Minus size={16} strokeWidth={3} />}
                   </button>
                   
                   <span className="font-black w-4 text-center text-sm text-gray-900 dark:text-white lya:text-lya-text">{qty}</span>
                   
                   <button 
                     onClick={(e) => handleAction(e, item.cartItemId, 'increment')} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold outline-none select-none touch-manipulation active:scale-90 transition-all"
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold outline-none select-none touch-manipulation active:scale-90 active:bg-gray-700 transition-all"
                   >
-                    {isThisItemLoading && actionLoading.action === 'increment' ? <Loader2 size={16} className="animate-spin text-white dark:text-gray-900" /> : <Plus size={16} strokeWidth={3} />}
+                    {isThisItemLoading && actionLoading?.action === 'increment' ? <Loader2 size={16} className="animate-spin text-white dark:text-gray-900" /> : <Plus size={16} strokeWidth={3} />}
                   </button>
                 </div>
               </div>
@@ -170,5 +223,14 @@ export default function ClientCheckoutModal({
         </motion.button>
       </motion.div>
     </motion.div>
+  );
+}
+
+// Exportamos el componente envuelto en el detector de errores
+export default function ClientCheckoutModal(props) {
+  return (
+    <CrashDetector>
+      <CheckoutModalContent {...props} />
+    </CrashDetector>
   );
 }
