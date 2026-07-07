@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, RefreshCw, Trash2, Smartphone, 
   Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine,
-  CheckCircle2, AlertCircle, Power, PowerOff
+  CheckCircle2, AlertCircle, Power, PowerOff, ShieldAlert
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
@@ -20,12 +20,30 @@ export const QrControlPage = () => {
   const [previewMesa, setPreviewMesa] = useState(null);
   const [mesaToDelete, setMesaToDelete] = useState(null); 
   const [showToggleModal, setShowToggleModal] = useState(false); 
+  
+  // 🔥 NUEVOS ESTADOS PARA LA REGENERACIÓN DE QRs (SEGURIDAD)
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [isRegeneratingLocal, setIsRegeneratingLocal] = useState(false);
 
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
   
   const baseUrl = window.location.origin;
   const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); 
   
+  // 🔥 FUNCIÓN SIMULADA (Aquí conectarás tu endpoint del backend)
+  const handleRegenerateTokens = async () => {
+    if (isRegeneratingLocal) return;
+    setIsRegeneratingLocal(true);
+    try {
+      // AQUÍ VA TU LLAMADA A LA API: await api.put('/pos/tables/regenerate-qr-tokens');
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulación de carga
+      setShowRegenerateModal(false);
+      // Nota: Si puedes exponer la función para mostrar tu toast desde el hook, úsala aquí.
+    } finally {
+      setIsRegeneratingLocal(false);
+    }
+  };
+
   // ==========================================
   // PANTALLA DE CARGA ANIMADA NEO-BENTO
   // ==========================================
@@ -124,41 +142,56 @@ export const QrControlPage = () => {
           </div>
         </div>
 
-        {/* 🔥 NUEVO: BOTÓN KILL SWITCH "PREMIUM PILL" CON INDICADOR LED */}
-        <motion.button 
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowToggleModal(true)}
-          className={`flex items-center gap-3 px-6 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md ${
-            isQrActive 
-              ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text' 
-              : 'bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/50 opacity-90'
-          }`}
-        >
-          <div className="relative flex items-center justify-center">
-            {/* El punto LED */}
-            <div className={`w-3 h-3 rounded-full ${isQrActive ? 'bg-green-500 dark:bg-green-400 lya:bg-lya-secondary' : 'bg-gray-400 dark:bg-gray-600 lya:bg-lya-text/30'}`}></div>
-            {/* El resplandor (latido) cuando está activo */}
-            {isQrActive && <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 lya:bg-lya-secondary animate-ping opacity-75"></div>}
-          </div>
-          <span className="tracking-wide text-sm">{isQrActive ? 'QR Activo' : 'QR Apagado'}</span>
-          {isQrActive ? <Power size={18} className="ml-1 opacity-50" /> : <PowerOff size={18} className="ml-1 opacity-50" />}
-        </motion.button>
+        {/* CONTENEDOR DE BOTONES DE ACCIÓN (TOGGLE Y REGENERAR) */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
+          
+          {/* 🔥 NUEVO: BOTÓN DE REGENERAR QRs (AHORA CON ESTÉTICA PREMIUM PILL IDÉNTICA) */}
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowRegenerateModal(true)}
+            className="flex flex-1 md:flex-none justify-center items-center gap-3 px-6 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text select-none touch-manipulation outline-none"
+          >
+            <div className="relative flex items-center justify-center pointer-events-none">
+               <RefreshCw size={18} className="text-orange-500 lya:text-lya-primary" />
+            </div>
+            <span className="tracking-wide text-sm pointer-events-none">Regenerar QRs</span>
+          </motion.button>
+
+          {/* BOTÓN KILL SWITCH ORIGINAL "PREMIUM PILL" */}
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowToggleModal(true)}
+            className={`flex flex-1 md:flex-none justify-center items-center gap-3 px-6 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md select-none touch-manipulation outline-none ${
+              isQrActive 
+                ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text' 
+                : 'bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/50 opacity-90'
+            }`}
+          >
+            <div className="relative flex items-center justify-center pointer-events-none">
+              <div className={`w-3 h-3 rounded-full ${isQrActive ? 'bg-green-500 dark:bg-green-400 lya:bg-lya-secondary' : 'bg-gray-400 dark:bg-gray-600 lya:bg-lya-text/30'}`}></div>
+              {isQrActive && <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 lya:bg-lya-secondary animate-ping opacity-75"></div>}
+            </div>
+            <span className="tracking-wide text-sm pointer-events-none">{isQrActive ? 'QR Activo' : 'QR Apagado'}</span>
+            {isQrActive ? <Power size={18} className="ml-1 opacity-50 pointer-events-none" /> : <PowerOff size={18} className="ml-1 opacity-50 pointer-events-none" />}
+          </motion.button>
+
+        </div>
       </header>
 
       <div className="no-print flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0 z-10">
-        <div className="flex gap-2 bg-gray-200/50 dark:bg-gray-800/80 lya:bg-lya-border/20 p-1.5 rounded-[1.25rem] overflow-x-auto shadow-inner border border-gray-200 dark:border-gray-700 lya:border-lya-border/30">
+        <div className="flex gap-2 bg-gray-200/50 dark:bg-gray-800/80 lya:bg-lya-border/20 p-1.5 rounded-[1.25rem] overflow-x-auto shadow-inner border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 custom-scrollbar">
           {zonas.map(zona => (
             <button
               key={zona.id}
               onClick={() => setZonaActiva(zona.id)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap active:scale-95 ${
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap active:scale-95 touch-manipulation select-none outline-none ${
                 zonaActiva === zona.id 
                   ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-orange-600 dark:text-orange-400 lya:text-lya-primary shadow-sm border border-gray-100 dark:border-gray-600 lya:border-lya-primary/30' 
                   : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:text-gray-700 dark:md:hover:text-gray-200 lya:hover:text-lya-text border border-transparent'
               }`}
             >
-              {zona.id === 'salon' ? <LayoutGrid size={18} /> : <ShoppingBag size={18} />}
-              {zona.label}
+              {zona.id === 'salon' ? <LayoutGrid size={18} className="pointer-events-none" /> : <ShoppingBag size={18} className="pointer-events-none" />}
+              <span className="pointer-events-none">{zona.label}</span>
             </button>
           ))}
         </div>
@@ -167,10 +200,10 @@ export const QrControlPage = () => {
           <button 
             onClick={addMesa}
             disabled={isAdding}
-            className="flex items-center gap-2 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:shadow-lya-primary/30 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
+            className="flex items-center gap-2 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:shadow-lya-primary/30 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none touch-manipulation select-none outline-none"
           >
-            {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
-            <span>{isAdding ? 'Procesando...' : 'Agregar Mesa'}</span>
+            {isAdding ? <Loader2 size={20} className="animate-spin pointer-events-none" /> : <Plus size={20} className="pointer-events-none" />}
+            <span className="pointer-events-none">{isAdding ? 'Procesando...' : 'Agregar Mesa'}</span>
           </button>
         )}
       </div>
@@ -206,14 +239,13 @@ export const QrControlPage = () => {
                       <button 
                         onClick={() => setMesaToDelete(mesa)}
                         disabled={removingId === mesa.id}
-                        className="p-2.5 text-gray-400 md:hover:text-red-500 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-90"
+                        className="p-2.5 text-gray-400 md:hover:text-red-500 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-90 outline-none touch-manipulation select-none"
                         title="Eliminar Mesa"
                       >
-                        <Trash2 size={18} strokeWidth={2.5} />
+                        <Trash2 size={18} strokeWidth={2.5} className="pointer-events-none" />
                       </button>
                     </div>
                     
-                    {/* 🔥 EL QR SE VUELVE GRIS SI EL SERVICIO ESTÁ APAGADO */}
                     <div className="w-full bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-6 mb-5 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors shadow-inner">
                        <QRCodeSVG 
                          value={`${baseUrl}/m/${mesa.number}`} 
@@ -239,9 +271,10 @@ export const QrControlPage = () => {
                     
                     <button 
                       onClick={() => setPreviewMesa(mesa)}
-                      className="w-full mt-auto py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 md:hover:text-orange-600 dark:text-gray-400 dark:md:hover:text-orange-400 lya:text-lya-text/80 lya:hover:text-lya-primary rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 active:scale-95 border border-transparent md:hover:border-orange-200 dark:md:hover:border-orange-800/50 lya:hover:border-lya-primary/30"
+                      className="w-full mt-auto py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 md:hover:text-orange-600 dark:text-gray-400 dark:md:hover:text-orange-400 lya:text-lya-text/80 lya:hover:text-lya-primary rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 active:scale-95 border border-transparent md:hover:border-orange-200 dark:md:hover:border-orange-800/50 lya:hover:border-lya-primary/30 outline-none touch-manipulation select-none"
                     >
-                      <QrCode size={18} strokeWidth={2.5} /> Pantalla Completa
+                      <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 
+                      <span className="pointer-events-none">Pantalla Completa</span>
                     </button>
                   </motion.div>
                 ))}
@@ -256,7 +289,7 @@ export const QrControlPage = () => {
                     <LayoutGrid size={48} className="opacity-30" />
                   </div>
                   <p className="font-black text-xl mb-1 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 text-center">No hay mesas en el sistema</p>
-                  <button onClick={addMesa} disabled={isAdding} className="mt-2 text-orange-500 dark:text-orange-400 lya:text-lya-primary font-bold md:hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
+                  <button onClick={addMesa} disabled={isAdding} className="mt-2 text-orange-500 dark:text-orange-400 lya:text-lya-primary font-bold md:hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed outline-none touch-manipulation select-none">
                     {isAdding ? 'Agregando...' : 'Crear la primera Mesa'}
                   </button>
                 </motion.div>
@@ -314,9 +347,10 @@ export const QrControlPage = () => {
 
                 <button 
                   onClick={() => setPreviewMesa({ isLlevar: true })}
-                  className="w-full mt-auto py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl text-sm font-black transition-all active:scale-95 flex items-center justify-center gap-2 no-print shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30"
+                  className="w-full mt-auto py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl text-sm font-black transition-all active:scale-95 flex items-center justify-center gap-2 no-print shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none touch-manipulation select-none"
                 >
-                  <QrCode size={18} strokeWidth={2.5} /> Pantalla Completa
+                  <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 
+                  <span className="pointer-events-none">Pantalla Completa</span>
                 </button>
               </motion.div>
             </motion.div>
@@ -344,9 +378,9 @@ export const QrControlPage = () => {
             >
               <button 
                 onClick={() => setPreviewMesa(null)} 
-                className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 active:scale-90 no-print"
+                className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 active:scale-90 no-print outline-none touch-manipulation select-none"
               >
-                <X size={20} strokeWidth={2.5} />
+                <X size={20} strokeWidth={2.5} className="pointer-events-none" />
               </button>
               
               <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 no-print border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
@@ -388,9 +422,10 @@ export const QrControlPage = () => {
 
               <button 
                 onClick={() => window.print()}
-                className="w-full bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 text-white lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface py-4 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 flex items-center justify-center gap-2 no-print"
+                className="w-full bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 text-white lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface py-4 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 flex items-center justify-center gap-2 no-print outline-none touch-manipulation select-none"
               >
-                <Printer size={20} strokeWidth={2.5} /> Imprimir QR
+                <Printer size={20} strokeWidth={2.5} className="pointer-events-none" /> 
+                <span className="pointer-events-none">Imprimir QR</span>
               </button>
             </motion.div>
           </div>
@@ -398,7 +433,7 @@ export const QrControlPage = () => {
       </AnimatePresence>
 
       {/* ========================================== */}
-      {/* 🔥 NUEVO MODAL: CONFIRMAR KILL-SWITCH */}
+      {/* MODAL ORIGINAL: CONFIRMAR KILL-SWITCH */}
       {/* ========================================== */}
       <AnimatePresence>
         {showToggleModal && (
@@ -437,7 +472,7 @@ export const QrControlPage = () => {
                 <button 
                   onClick={() => setShowToggleModal(false)}
                   disabled={isTogglingQr}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed outline-none touch-manipulation select-none"
                 >
                   Cancelar
                 </button>
@@ -447,7 +482,7 @@ export const QrControlPage = () => {
                     if(success) setShowToggleModal(false);
                   }} 
                   disabled={isTogglingQr}
-                  className={`flex-[1.5] py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg ${
+                  className={`flex-[1.5] py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg outline-none touch-manipulation select-none ${
                     isQrActive 
                       ? 'bg-red-500 md:hover:bg-red-600 shadow-red-500/30' 
                       : 'bg-gray-900 md:hover:bg-gray-800 dark:bg-gray-100 dark:md:hover:bg-white dark:text-gray-900 lya:bg-lya-text lya:text-lya-surface'
@@ -455,11 +490,70 @@ export const QrControlPage = () => {
                 >
                   {isTogglingQr ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
-                      <span>Guardando...</span>
+                      <Loader2 size={18} className="animate-spin pointer-events-none" />
+                      <span className="pointer-events-none">Guardando...</span>
                     </>
                   ) : (
-                    <span>{isQrActive ? 'Sí, Suspender' : 'Sí, Reactivar'}</span>
+                    <span className="pointer-events-none">{isQrActive ? 'Sí, Suspender' : 'Sí, Reactivar'}</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================== */}
+      {/* 🔥 NUEVO MODAL: CONFIRMAR REGENERACIÓN QRS */}
+      {/* ========================================== */}
+      <AnimatePresence>
+        {showRegenerateModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isRegeneratingLocal) setShowRegenerateModal(false);
+              }}
+              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-orange-200 dark:border-orange-800/30 lya:border-lya-border/40 transition-colors"
+            >
+              <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm bg-orange-100 dark:bg-orange-900/40 lya:bg-lya-secondary/10">
+                <ShieldAlert size={32} strokeWidth={2} className="text-orange-500 lya:text-lya-secondary" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
+                ¿Regenerar Llaves QR?
+              </h3>
+              
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
+                Esta es una <b>acción de seguridad estricta</b>. Todos los enlaces antiguos serán revocados inmediatamente y se expulsará a quienes los estén usando. Deberás imprimir y colocar los <b>nuevos QRs físicos</b> en cada mesa de la pastelería o mostrarlos desde tu pantalla.
+              </p>
+              
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setShowRegenerateModal(false)}
+                  disabled={isRegeneratingLocal}
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed outline-none touch-manipulation select-none"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleRegenerateTokens} 
+                  disabled={isRegeneratingLocal}
+                  className="flex-[1.5] py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg bg-orange-500 md:hover:bg-orange-600 shadow-orange-500/30 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 outline-none touch-manipulation select-none"
+                >
+                  {isRegeneratingLocal ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin pointer-events-none" />
+                      <span className="pointer-events-none">Procesando...</span>
+                    </>
+                  ) : (
+                    <span className="pointer-events-none">Sí, Regenerar</span>
                   )}
                 </button>
               </div>
@@ -503,7 +597,7 @@ export const QrControlPage = () => {
                 <button 
                   onClick={() => setMesaToDelete(null)}
                   disabled={removingId === mesaToDelete.id}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed outline-none touch-manipulation select-none"
                 >
                   Cancelar
                 </button>
@@ -515,15 +609,15 @@ export const QrControlPage = () => {
                     }
                   }} 
                   disabled={removingId === mesaToDelete.id}
-                  className="flex-[1.5] py-4 bg-red-500 md:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500"
+                  className="flex-[1.5] py-4 bg-red-500 md:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500 outline-none touch-manipulation select-none"
                 >
                   {removingId === mesaToDelete.id ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
-                      <span>Eliminando...</span>
+                      <Loader2 size={18} className="animate-spin pointer-events-none" />
+                      <span className="pointer-events-none">Eliminando...</span>
                     </>
                   ) : (
-                    <span>Eliminar Mesa</span>
+                    <span className="pointer-events-none">Eliminar Mesa</span>
                   )}
                 </button>
               </div>
