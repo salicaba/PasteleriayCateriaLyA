@@ -7,8 +7,12 @@ import clsx from 'clsx';
 export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(isVitrina || isLlevar || false);
-  const [isConfirming, setIsConfirming] = useState(false); // 🔥 Estado anti-doble clic final
-  const [isCalculatingTotal, setIsCalculatingTotal] = useState(false); // 🔥 Feedback visual de la suma
+  const [isConfirming, setIsConfirming] = useState(false); 
+  
+  // 🔥 NUEVO ESTADO: Rastrea exactamente el ID de la opción que el usuario tocó
+  const [calculatingOptId, setCalculatingOptId] = useState(null); 
+  // Derivamos si hay algún cálculo activo para el total
+  const isCalculatingTotal = calculatingOptId !== null;
 
   if (!product) return null;
 
@@ -23,7 +27,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     return isNaN(num) ? 0 : num;
   };
 
-  // 1. Desempaquetamos de forma segura las opciones (incluyendo los defaults)
+  // 1. Desempaquetamos de forma segura las opciones
   const parsedOptions = useMemo(() => {
     let ops = product.opciones;
     if (typeof ops === 'string') {
@@ -65,7 +69,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     return mods;
   }, [parsedOptions]);
 
-  // 3. Efecto para leer 'defaults' desde el Gestor de Menú
+  // 3. Efecto para leer 'defaults'
   useEffect(() => {
     const initial = {};
     const defaults = parsedOptions.defaults || {};
@@ -83,10 +87,12 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     setSelections(initial);
   }, [availableModifiers, parsedOptions]);
 
-  // 🔥 MANEJADOR CON FEEDBACK Y ANTI-SPAM TÁCTIL
+  // 🔥 MANEJADOR CON FEEDBACK INDIVIDUAL Y ANTI-SPAM
   const handleToggle = (modId, optId, type) => {
     if (isCalculatingTotal) return;
-    setIsCalculatingTotal(true);
+    
+    // Guardamos qué botón exacto se presionó para mostrarle el spinner
+    setCalculatingOptId(optId);
 
     setTimeout(() => {
       setSelections(prev => {
@@ -99,8 +105,9 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         }
         return { ...prev, [modId]: [...currentArray, optId] };
       });
-      setIsCalculatingTotal(false);
-    }, 200);
+      // Apagamos el spinner individual
+      setCalculatingOptId(null);
+    }, 250);
   };
 
   const calculateTotal = () => {
@@ -121,13 +128,11 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     return Math.max(0, total);
   };
 
-  // 🔥 FIX CRÍTICO: Función asíncrona blindada
   const handleConfirm = async () => {
     if (isAgotado || isConfirming || isCalculatingTotal) return;
     setIsConfirming(true);
 
     try {
-      // Retraso de seguridad para que los motores táctiles asimilen la orden antes de destruir el modal
       await new Promise(resolve => setTimeout(resolve, 250));
 
       let tamanoStr = 'Estándar';
@@ -159,7 +164,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         }
       });
 
-      // Await para esperar a que el controlador superior procese el carrito
       await onConfirm({
         ...product,
         precioFinal: calculateTotal(),
@@ -179,7 +183,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center pointer-events-none overflow-hidden">
-      {/* Fondo con blur */}
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
@@ -188,7 +191,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm pointer-events-auto transition-colors" 
       />
 
-      {/* Modal tipo Neo-Bento Bottom Sheet */}
       <motion.div 
         initial={{ y: "100%" }} 
         animate={{ y: 0 }} 
@@ -238,9 +240,13 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                 </h4>
                 <div className="flex flex-wrap gap-3">
                   {mod.options.map(opt => {
+                    // Verificamos si esta opción exacta está seleccionada
                     const isSelected = mod.type === 'single' 
                       ? selections[mod.id] === opt.id
                       : selections[mod.id]?.includes(opt.id);
+                      
+                    // 🔥 NUEVO: Verificamos si ESTA tarjeta específica es la que está cargando
+                    const isThisCalculating = calculatingOptId === opt.id;
 
                     return (
                       <button
@@ -252,16 +258,21 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                           isSelected 
                             ? "border-orange-500 bg-orange-500 dark:bg-orange-600 dark:border-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30" 
                             : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 dark:md:hover:border-gray-600 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text lya:hover:border-lya-secondary/50",
-                          isCalculatingTotal && "opacity-80 cursor-wait"
+                          // Efecto opcional: si está calculando ESTA opción, le damos un destello visual
+                          isThisCalculating && "opacity-90 scale-95"
                         )}
                       >
                         <span className="flex items-center gap-2 pointer-events-none">
-                          {/* 🔥 FIX: Checkbox CSS puro en lugar de montar/desmontar nodos */}
+                          {/* 🔥 FIX: Renderizamos el Spinner o el Check dependiendo del estado INDIVIDUAL */}
                           <span className={clsx(
                             "transition-all duration-300 flex items-center justify-center overflow-hidden",
-                            isSelected ? "w-5 opacity-100" : "w-0 opacity-0"
+                            (isSelected || isThisCalculating) ? "w-5 opacity-100" : "w-0 opacity-0"
                           )}>
-                            <Check size={16} strokeWidth={4} />
+                            {isThisCalculating ? (
+                              <Loader2 size={16} strokeWidth={4} className="animate-spin" />
+                            ) : (
+                              <Check size={16} strokeWidth={4} />
+                            )}
                           </span>
                           {opt.label}
                         </span>
@@ -286,7 +297,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
             ))
           )}
 
-          {/* 🔥 FIX NEO-BENTO: Toggle para Llevar transformado de label/input a motion.div */}
+          {/* Toggle para Llevar */}
           {!isVitrina && !isLlevar && (
             <div className="mt-8 mb-2">
               <motion.div 
@@ -332,7 +343,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                 : "bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 dark:shadow-emerald-900/30 active:scale-95 lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface lya:shadow-lya-primary/30"
             )}
           >
-            {/* 🔥 FIX: El Loader SIEMPRE está ahí, pero se oculta vía CSS */}
             <span className="flex items-center pointer-events-none">
               <span className={clsx(
                 "transition-all duration-300 flex items-center justify-center overflow-hidden",
@@ -345,7 +355,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
               </span>
             </span>
 
-            {/* 🔥 FEEDBACK VISUAL PREMIUM: El precio cambia a spinner cuando se calcula */}
             <span className="bg-black/20 dark:bg-black/30 px-3 py-1 rounded-xl tracking-wide pointer-events-none flex items-center justify-center min-w-[4.5rem]">
               {isCalculatingTotal ? (
                 <Loader2 className="animate-spin" size={16} strokeWidth={3} />
