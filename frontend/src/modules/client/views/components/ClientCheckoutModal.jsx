@@ -1,64 +1,10 @@
 // src/modules/client/views/components/ClientCheckoutModal.jsx
-import React, { useState, useRef, useEffect, Component } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import clsx from 'clsx';
 
-// ==========================================
-// 🕷️ TRAMPA DE ERRORES (ERROR BOUNDARY)
-// ==========================================
-class CrashDetector extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, errorMsg: '', errorStack: '' };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, errorMsg: error.toString() };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    this.setState({ errorStack: errorInfo.componentStack });
-    // Alert nativo para móviles por si la pantalla roja no alcanza a renderizar
-    alert(`CRASH DETECTADO:\n\n${error.message}\n\nRevisa la pantalla roja para más detalles.`);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="fixed inset-0 bg-red-600 z-[99999] p-6 flex flex-col items-center justify-center text-white overflow-y-auto">
-          <AlertTriangle size={64} className="mb-4 text-white animate-bounce" />
-          <h2 className="text-2xl font-black mb-2 text-center">¡App Crasheada!</h2>
-          <p className="text-center mb-6 text-sm font-medium">Tómale captura a esto y envíamelo:</p>
-          
-          <div className="bg-black/40 p-4 rounded-2xl w-full break-words shadow-inner mb-4">
-            <p className="font-bold text-red-200 mb-1">Error:</p>
-            <p className="font-mono text-xs">{this.state.errorMsg}</p>
-          </div>
-
-          <div className="bg-black/40 p-4 rounded-2xl w-full break-words shadow-inner overflow-y-auto max-h-48">
-            <p className="font-bold text-red-200 mb-1">Stack (Dónde falló):</p>
-            <p className="font-mono text-[10px] leading-relaxed">{this.state.errorStack}</p>
-          </div>
-
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-8 bg-white text-red-600 px-8 py-4 rounded-[2rem] font-black shadow-xl active:scale-95 transition-transform"
-          >
-            Recargar App
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-
-// ==========================================
-// COMPONENTE PRINCIPAL (INTERNO)
-// ==========================================
-function CheckoutModalContent({
+export default function ClientCheckoutModal({
   cart = [], 
   totalCart = 0,
   isSubmitting,
@@ -94,7 +40,6 @@ function CheckoutModalContent({
         removeFromCart(cartItemId);
       }
 
-      // Delay para estabilizar los toques móviles
       setTimeout(() => {
         if (isMounted.current) {
           setActionLoading(null);
@@ -103,7 +48,7 @@ function CheckoutModalContent({
       }, 300);
 
     } catch (err) {
-      alert("Error en la función del botón: " + err.message);
+      console.error(err);
       isProcessingRef.current = false;
       setActionLoading(null);
     }
@@ -147,35 +92,53 @@ function CheckoutModalContent({
                     </div>
                   )}
                   
-                  <div className="mt-1.5 flex items-baseline gap-2 h-5">
-                    {isThisItemLoading ? (
-                      <span className="flex items-center gap-1.5 text-xs font-black text-orange-500 dark:text-orange-400 lya:text-lya-secondary">
-                        <Loader2 size={12} className="animate-spin" /> Cargando...
-                      </span>
-                    ) : (
-                      <>
-                        <span className="text-sm font-black text-gray-700 dark:text-gray-300 lya:text-lya-text/80">${precioTotalItem.toFixed(2)}</span>
-                        {qty > 1 && <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase">Unit: ${precioUnitario.toFixed(2)}</span>}
-                      </>
+                  {/* 🔥 FIX: NODO ESTABLE PARA EL PRECIO */}
+                  <div className="mt-1.5 flex items-baseline gap-2 h-5 relative overflow-hidden">
+                    {/* Capa de carga que se superpone sin destruir los precios de abajo */}
+                    {isThisItemLoading && (
+                      <div className="absolute inset-0 bg-white dark:bg-gray-800 lya:bg-lya-surface z-10 flex items-center gap-1.5">
+                        <Loader2 size={12} className="animate-spin text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
+                        <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-lya-secondary">Cargando...</span>
+                      </div>
                     )}
+                    
+                    {/* Nodos de precio que nunca se desmontan */}
+                    <span className="text-sm font-black text-gray-700 dark:text-gray-300 lya:text-lya-text/80">
+                      ${precioTotalItem.toFixed(2)}
+                    </span>
+                    
+                    <span className={clsx(
+                      "text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase transition-opacity",
+                      qty > 1 ? "opacity-100" : "opacity-0 select-none pointer-events-none"
+                    )}>
+                      Unit: ${precioUnitario.toFixed(2)}
+                    </span>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-[1.25rem] p-1.5 shrink-0">
                   <button 
                     onClick={(e) => handleAction(e, item.cartItemId, 'decrement')} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 md:hover:text-red-500 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-200 transition-all"
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 md:hover:text-red-500 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-200 transition-all relative overflow-hidden"
                   >
-                    {isThisItemLoading && actionLoading?.action === 'decrement' ? <Loader2 size={16} className="animate-spin text-orange-500" /> : <Minus size={16} strokeWidth={3} />}
+                    {isThisItemLoading && actionLoading?.action === 'decrement' ? (
+                      <Loader2 size={16} className="animate-spin text-orange-500 absolute" />
+                    ) : (
+                      <Minus size={16} strokeWidth={3} className="absolute" />
+                    )}
                   </button>
                   
                   <span className="font-black w-4 text-center text-sm text-gray-900 dark:text-white lya:text-lya-text">{qty}</span>
                   
                   <button 
                     onClick={(e) => handleAction(e, item.cartItemId, 'increment')} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold outline-none select-none touch-manipulation active:scale-90 active:bg-gray-700 transition-all"
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold outline-none select-none touch-manipulation active:scale-90 active:bg-gray-700 transition-all relative overflow-hidden"
                   >
-                    {isThisItemLoading && actionLoading?.action === 'increment' ? <Loader2 size={16} className="animate-spin text-white dark:text-gray-900" /> : <Plus size={16} strokeWidth={3} />}
+                    {isThisItemLoading && actionLoading?.action === 'increment' ? (
+                      <Loader2 size={16} className="animate-spin text-white dark:text-gray-900 absolute" />
+                    ) : (
+                      <Plus size={16} strokeWidth={3} className="absolute" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -183,15 +146,16 @@ function CheckoutModalContent({
           })}
         </div>
 
-        <div className="flex justify-between items-center py-4 border-y border-gray-200 dark:border-gray-800 lya:border-lya-border/40 text-gray-900 dark:text-white lya:text-lya-text shrink-0">
-          <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60">Total Bruto</span>
-          {actionLoading ? (
-            <div className="flex items-center text-orange-500 lya:text-lya-secondary">
-              <Loader2 size={24} className="animate-spin" />
-            </div>
-          ) : (
-            <span className="text-3xl font-black tracking-tight">${(totalCart || 0).toFixed(2)}</span>
-          )}
+        <div className="flex justify-between items-center py-4 border-y border-gray-200 dark:border-gray-800 lya:border-lya-border/40 text-gray-900 dark:text-white lya:text-lya-text shrink-0 relative overflow-hidden h-16">
+          <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60 z-10">Total Bruto</span>
+          
+          <div className="flex items-center justify-end z-10">
+            {actionLoading ? (
+              <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-secondary" />
+            ) : (
+              <span className="text-3xl font-black tracking-tight">${(totalCart || 0).toFixed(2)}</span>
+            )}
+          </div>
         </div>
 
         <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-[1.5rem] p-5 flex gap-4 text-red-600 dark:text-red-400 shrink-0">
@@ -207,7 +171,7 @@ function CheckoutModalContent({
           disabled={isSubmitting || actionLoading !== null} 
           onClick={onConfirmOrder} 
           className={clsx(
-            "w-full py-5 rounded-[2rem] font-black text-lg shadow-xl md:hover:brightness-105 transition-colors flex items-center justify-center gap-3 shrink-0 outline-none select-none touch-manipulation", 
+            "w-full py-5 rounded-[2rem] font-black text-lg shadow-xl md:hover:brightness-105 transition-colors flex items-center justify-center gap-3 shrink-0 outline-none select-none touch-manipulation relative overflow-hidden", 
             isSubmitting || actionLoading 
               ? "bg-gray-400 dark:bg-gray-700 lya:bg-lya-border text-white/70 cursor-not-allowed shadow-none" 
               : "bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30"
@@ -223,14 +187,5 @@ function CheckoutModalContent({
         </motion.button>
       </motion.div>
     </motion.div>
-  );
-}
-
-// Exportamos el componente envuelto en el detector de errores
-export default function ClientCheckoutModal(props) {
-  return (
-    <CrashDetector>
-      <CheckoutModalContent {...props} />
-    </CrashDetector>
   );
 }
