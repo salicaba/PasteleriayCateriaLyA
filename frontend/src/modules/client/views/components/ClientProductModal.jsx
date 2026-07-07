@@ -27,7 +27,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
     setSelections(prev => {
       const current = prev[modId];
       if (type === 'single') {
-        // Optimización: Evita re-render si el usuario toca la opción ya seleccionada
         if (current === optId) return prev; 
         return { ...prev, [modId]: optId };
       }
@@ -56,7 +55,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
         });
       }
     });
-    return Math.max(0, total); // Seguridad adicional para no retornar negativos
+    return Math.max(0, total); 
   };
 
   const handleConfirmAction = async () => {
@@ -64,6 +63,11 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
     setIsProcessing(true);
     
     try {
+      // 🔥 FIX DEL CRASH: Micro-retraso de 250ms. 
+      // Esto asegura que el dedo del usuario ya se levantó de la pantalla
+      // y Framer Motion terminó su cálculo táctil antes de cerrar el modal bruscamente.
+      await new Promise(resolve => setTimeout(resolve, 250));
+
       let tamanoStr = 'Estándar';
       let lecheStr = null;
       let extrasArr = [];
@@ -100,6 +104,7 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
         isTakeaway
       });
     } finally {
+      // Solo en caso de que haya un error y no se desmonte, restauramos el estado
       setIsProcessing(false);
     }
   };
@@ -108,7 +113,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
   const hasImage = product.imagen && !product.imagen.includes('default-product');
 
   return (
-    // PILAR 1: h-[100dvh] en el wrapper padre para bloquear comportamiento de scroll del navegador móvil
     <div className="fixed inset-0 z-[70] flex items-end justify-center pointer-events-none p-4 sm:p-6 h-[100dvh] w-full overflow-hidden">
       <motion.div 
         initial={{ opacity: 0 }} 
@@ -148,7 +152,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
             disabled={isProcessing} 
             className="shrink-0 bg-white dark:bg-gray-700 lya:bg-white md:hover:bg-gray-100 text-gray-500 dark:text-gray-300 lya:text-lya-text p-2 rounded-full transition-colors border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm mt-0.5 outline-none select-none touch-manipulation"
           >
-            {/* PILAR 2: pointer-events-none en el icono para que el target del touch sea SIEMPRE el botón */}
             <X size={20} strokeWidth={2.5} className="pointer-events-none" />
           </motion.button>
         </div>
@@ -188,7 +191,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                         )}
                       >
                         <span className="flex items-center pointer-events-none">
-                          {/* EL FIX DEL CRASH: El nodo <Check> nunca se desmonta, solo controlamos el layout vía Tailwind */}
                           <span className={clsx(
                             "transition-all duration-300 flex items-center justify-center overflow-hidden",
                             isSelected ? "w-5 opacity-100 mr-1" : "w-0 opacity-0 mr-0"
@@ -216,7 +218,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
             ))
           )}
 
-          {/* FIX DEL LABEL CHECKBOX - Convirtiendo el Label + Input a un componente Motion puro */}
           <div className="mt-8 mb-2">
             <motion.div 
               whileTap={{ scale: 0.98 }} 
@@ -229,7 +230,6 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                   ? "bg-orange-500 border-orange-500 text-white lya:bg-lya-primary lya:border-lya-primary" 
                   : "bg-white border-orange-300"
               )}>
-                {/* Aquí sí es seguro desmontar porque el DIV principal no cambia de estructura conflictiva */}
                 {isTakeaway && <Check size={14} strokeWidth={4} />}
               </div>
               <div className="flex flex-col pointer-events-none">
@@ -261,10 +261,19 @@ export default function ClientProductModal({ product, onClose, onConfirm }) {
                 : "bg-green-500 md:hover:bg-green-600 text-white shadow-lg shadow-green-500/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30"
             )}
           >
-            <span className="flex items-center gap-2 pointer-events-none">
-              {isProcessing && <Loader2 className="animate-spin" size={20} />}
-              {isAgotado ? 'Agotado' : 'Añadir a la orden'}
+            {/* 🔥 FIX DEL CULPABLE: Ahora el Loader SIEMPRE está montado, solo lo ocultamos con CSS (w-0, opacity-0) */}
+            <span className="flex items-center pointer-events-none">
+              <span className={clsx(
+                "transition-all duration-300 flex items-center justify-center overflow-hidden",
+                isProcessing ? "w-6 opacity-100 mr-2" : "w-0 opacity-0 mr-0"
+              )}>
+                <Loader2 className="animate-spin" size={20} />
+              </span>
+              <span>
+                {isAgotado ? 'Agotado' : isProcessing ? 'Procesando...' : 'Añadir a la orden'}
+              </span>
             </span>
+
             <span className="bg-black/20 px-3 py-1 rounded-[1rem] pointer-events-none">
               ${calculateTotal().toFixed(2)}
             </span>
