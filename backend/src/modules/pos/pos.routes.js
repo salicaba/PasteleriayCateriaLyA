@@ -40,20 +40,22 @@ import {
 const router = Router();
 
 // 🟢 RUTAS PÚBLICAS (No necesitan token, van antes del middleware)
-// Esta es la nueva ruta más corta para los clientes
+// Esta es la ruta más corta para los clientes
 router.get('/ticket/:orderId', shareOrderTicket); 
 // Mantenemos la anterior temporalmente por si hay tickets viejos dando vueltas
 router.get('/orders/:orderId/share', shareOrderTicket); 
 
-// 🔴 APLICAMOS EL MIDDLEWARE: Todo lo de abajo requerirá usuario logueado
+// 🔥 FIX: MOVIMOS ESTAS DOS RUTAS AQUÍ ARRIBA PARA QUE EL QR PÚBLICO PUEDA CONFIRMAR ÓRDENES
+router.post('/orders', createOrder);
+router.post('/orders/:orderId/items', addItemsToOrder);
+
+// 🔴 APLICAMOS EL MIDDLEWARE: Todo lo de abajo requerirá usuario logueado (Cajero/Admin)
 router.use(verifyToken);
 router.get('/orders/daily-summary', getDailySummary);
 
 // Rutas PROTEGIDAS (Ya tendrán req.user disponible)
 router.get('/orders/active', getActiveOrders);
 router.get('/orders/table/:tableId', getActiveOrderByTable); 
-router.post('/orders', createOrder);
-router.post('/orders/:orderId/items', addItemsToOrder);
 router.put('/orders/:orderId/pay', payOrder); 
 router.put('/orders/:orderId/close', closeOrder); 
 router.post('/orders/:orderId/print', printOrderTicket);

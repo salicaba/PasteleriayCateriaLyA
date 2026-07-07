@@ -42,6 +42,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
+  // 🔥 ESTADO DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED
+  const [diagnosticError, setDiagnosticError] = useState(null);
+  
   // ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -52,7 +55,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   // REFERENCIA DE TIEMPO REAL PARA MÓVILES
   const lastActivityRef = useRef(Date.now());
   
-  // 🔥 CANDADO SÍNCRONO: Mata el Ghost Click en la lista de productos
+  // CANDADO SÍNCRONO: Mata el Ghost Click en la lista de productos
   const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -192,21 +195,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🔥 LÓGICA DE AGREGADO BLINDADA Y CENTRALIZADA
   const handleAddDirectly = async (product, customizations = null, e = null) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     
-    // Si ya estamos procesando un clic, ignoramos los siguientes
     if (isProcessingRef.current) return;
     
     isProcessingRef.current = true;
     setAddingToCartId(product.id);
 
     try {
-      // Delay sutil para feedback visual y matar el ghost click (150ms)
       await new Promise(resolve => setTimeout(resolve, 150));
       
       setCart(prev => {
@@ -235,7 +235,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   const removeFromCart = (cartItemId) => setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
-      if (!existing) return prev; // Seguro adicional
+      if (!existing) return prev; 
       if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
       return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
   });
@@ -255,6 +255,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
       const createNewOrder = async () => {
         const orderPayload = { orderType: dbOrderType, tableId: dbOrderType === 'SALON' ? tableId : null, ticketId: clientData.name };
+        // Aquí es donde falla si el endpoint exige token
         const orderRes = await client.post('/pos/orders', orderPayload);
         const newId = orderRes.data.order.id;
         setActiveOrderId(newId);
@@ -323,13 +324,24 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       console.error("Error al enviar la orden al servidor:", error);
       
       let backendError = "Error al procesar la orden en el servidor.";
+      let statusCode = error.response?.status || "Sin status";
+      let endpoint = error.config?.url || "Ruta desconocida";
+
       if (error.response && error.response.data && error.response.data.message) {
         backendError = error.response.data.message;
       } else if (error.message) {
         backendError = error.message;
       }
       
-      triggerNotification(`Ups! ${backendError}`, 'error');
+      // 🔥 ACTIVACIÓN DEL MODAL DE DIAGNÓSTICO NEO-BENTO
+      setDiagnosticError({
+        endpoint: endpoint,
+        statusCode: statusCode,
+        message: backendError
+      });
+
+      // Notificación libre del "Ups!" para evadir el autocorrector
+      triggerNotification(`Atención: ${backendError.substring(0, 25)}...`, 'warning');
     } finally {
       setIsSubmitting(false);
     }
@@ -340,7 +352,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return cat ? cat.name : 'Delicia';
   };
 
-  // 🔥 ANIMACIONES DE CASCADA PARA LOS PRODUCTOS
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -357,11 +368,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       opacity: 1, 
       y: 0, 
       scale: 1, 
-      transition: { 
-        type: "spring", 
-        stiffness: 300, 
-        damping: 24 
-      } 
+      transition: { type: "spring", stiffness: 300, damping: 24 } 
     }
   };
 
@@ -488,6 +495,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
       
+      {/* NOTIFICACIONES TIPO CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -593,7 +601,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   <div className="flex items-end justify-between mt-auto">
                     <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block text-left">${product.precio}</span>
                     
-                    {/* 🔥 BOTÓN NATIVO BLINDADO ANTI GHOST-CLICK */}
                     <button 
                       disabled={isAdding || addingToCartId !== null}
                       onClick={(e) => { 
@@ -632,7 +639,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      {/* 🔥 BARRA FLOTANTE CON FEEDBACK DE CARGA */}
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
@@ -707,6 +713,50 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             onLogout={handleLogout}
             onConfirm={handleLogout} 
           />
+        )}
+      </AnimatePresence>
+
+      {/* 🔥 MODAL DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED */}
+      <AnimatePresence>
+        {diagnosticError && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setDiagnosticError(null)}
+              className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-red-100 dark:border-red-900/40"
+            >
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
+                <AlertCircle size={32} strokeWidth={2} />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-6 text-center tracking-tight">Falla de Conexión</h3>
+              
+              <div className="w-full bg-gray-50 dark:bg-gray-800 p-5 rounded-[1.5rem] mb-6 font-mono text-xs text-gray-700 dark:text-gray-300 overflow-hidden break-words text-left space-y-3 border border-gray-200 dark:border-gray-700 shadow-inner">
+                <p><strong className="text-red-500 dark:text-red-400">🌐 Endpoint:</strong> <br/>{diagnosticError.endpoint}</p>
+                <p><strong className="text-red-500 dark:text-red-400">📡 Status:</strong> {diagnosticError.statusCode}</p>
+                <p><strong className="text-red-500 dark:text-red-400">🛑 Motivo:</strong> <br/>{diagnosticError.message}</p>
+              </div>
+
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-[1.5rem] mb-8 text-xs font-medium text-orange-800 dark:text-orange-200 text-justify border border-orange-100 dark:border-orange-800/30">
+                <strong className="block mb-2 font-black uppercase tracking-wider text-[10px]">💡 Diagnóstico Neo-Bento:</strong>
+                Si el error es "Token no proporcionado" en <b>/pos/orders</b>, el Backend está bloqueando tu petición. Debes decirle a la API que acepte órdenes de clientes públicos quitándole el middleware de Auth a esa ruta o creando una nueva ruta pública en el servidor.
+              </div>
+
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setDiagnosticError(null)}
+                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-[1.5rem] font-black shadow-lg shadow-gray-900/20 dark:shadow-white/10 outline-none select-none"
+              >
+                Entendido, lo revisaré
+              </motion.button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
