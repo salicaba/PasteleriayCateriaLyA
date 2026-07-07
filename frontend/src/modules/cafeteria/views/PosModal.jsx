@@ -83,6 +83,13 @@ export const PosModal = ({
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
+  // 🔥 LÓGICA DE BLOQUEO: Verificamos si la cuenta seleccionada ya está cobrada, 
+  // o si el ticket entero (Para llevar/Mostrador) ya se cerró.
+  const isAccountLocked = 
+    orderStatus === 'PAID' || 
+    orderStatus === 'CLOSED' || 
+    (cuentaActiva && paidAccounts && paidAccounts.includes(cuentaActiva));
+
   useEffect(() => {
     if (isOpen) {
       setIsRendering(true);
@@ -345,6 +352,7 @@ export const PosModal = ({
                   <ProductCard 
                     key={product.id} 
                     product={product} 
+                    isLocked={isAccountLocked} /* 🔥 CANDADO INYECTADO AQUÍ */
                     onClick={setSelectedProduct} 
                     onQuickAdd={(p) => {
                       let ops = p.opciones;
@@ -496,6 +504,7 @@ export const PosModal = ({
                   
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
                   
+                  {/* Pasa isLocked al Modal de Opciones para que tampoco puedan burlar el bloqueo */}
                   {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
                   
                   {showCheckout && (
