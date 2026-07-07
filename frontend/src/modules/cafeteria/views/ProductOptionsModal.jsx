@@ -7,11 +7,21 @@ import clsx from 'clsx';
 export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onConfirm }) => {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(isVitrina || isLlevar || false);
-  const [isConfirming, setIsConfirming] = useState(false); // 🔥 Estado anti-doble clic
+  const [isConfirming, setIsConfirming] = useState(false); // 🔥 Estado anti-doble clic final
+  const [isCalculatingTotal, setIsCalculatingTotal] = useState(false); // 🔥 Feedback visual de la suma
 
   if (!product) return null;
 
   const isAgotado = product.controlarStock === true && product.stock <= 0;
+
+  // 🔥 FUNCIÓN DE BLINDAJE MATEMÁTICO
+  const cleanNumber = (val) => {
+    if (!val) return 0;
+    let stringVal = String(val).replace(',', '.');
+    const cleaned = stringVal.replace(/[^0-9.-]+/g, "");
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
 
   // 1. Desempaquetamos de forma segura las opciones (incluyendo los defaults)
   const parsedOptions = useMemo(() => {
@@ -34,7 +44,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         return { 
             id: opt.nombre || 'Opción', 
             label: opt.nombre || 'Opción', 
-            price: Number(opt.precioAdicional || 0) 
+            price: cleanNumber(opt.precioAdicional) 
         };
     };
 
@@ -73,42 +83,53 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
     setSelections(initial);
   }, [availableModifiers, parsedOptions]);
 
+  // 🔥 MANEJADOR CON FEEDBACK Y ANTI-SPAM TÁCTIL
   const handleToggle = (modId, optId, type) => {
-    setSelections(prev => {
-      const current = prev[modId];
-      if (type === 'single') return { ...prev, [modId]: optId };
-      const currentArray = Array.isArray(current) ? current : [];
-      if (currentArray.includes(optId)) {
-        return { ...prev, [modId]: currentArray.filter(id => id !== optId) };
-      }
-      return { ...prev, [modId]: [...currentArray, optId] };
-    });
+    if (isCalculatingTotal) return;
+    setIsCalculatingTotal(true);
+
+    setTimeout(() => {
+      setSelections(prev => {
+        const current = prev[modId];
+        if (type === 'single') return { ...prev, [modId]: optId };
+        
+        const currentArray = Array.isArray(current) ? current : [];
+        if (currentArray.includes(optId)) {
+          return { ...prev, [modId]: currentArray.filter(id => id !== optId) };
+        }
+        return { ...prev, [modId]: [...currentArray, optId] };
+      });
+      setIsCalculatingTotal(false);
+    }, 200);
   };
 
   const calculateTotal = () => {
-    let total = Number(product.precioBase || product.precio || 0);
+    let total = cleanNumber(product.precioBase || product.precio);
     availableModifiers.forEach(mod => {
       const selected = selections[mod.id];
       if (!selected) return;
       if (mod.type === 'single') {
         const opt = mod.options.find(o => o.id === selected);
-        if (opt) total += opt.price;
+        if (opt) total += cleanNumber(opt.price);
       } else {
         selected.forEach(sId => {
           const opt = mod.options.find(o => o.id === sId);
-          if (opt) total += opt.price;
+          if (opt) total += cleanNumber(opt.price);
         });
       }
     });
-    return total;
+    return Math.max(0, total);
   };
 
-  // 🔥 FIX CRÍTICO: Función asíncrona para que el Loader2 funcione con la promesa superior
+  // 🔥 FIX CRÍTICO: Función asíncrona blindada
   const handleConfirm = async () => {
-    if (isAgotado || isConfirming) return;
-    setIsConfirming(true); // Bloqueamos el botón y disparamos loader
+    if (isAgotado || isConfirming || isCalculatingTotal) return;
+    setIsConfirming(true);
 
     try {
+      // Retraso de seguridad para que los motores táctiles asimilen la orden antes de destruir el modal
+      await new Promise(resolve => setTimeout(resolve, 250));
+
       let tamanoStr = 'Estándar';
       let lecheStr = null;
       let extrasArr = [];
@@ -152,7 +173,6 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
       });
 
     } finally {
-      // Si el modal no se desmonta (ej. error), liberamos el botón
       setIsConfirming(false); 
     }
   };
@@ -177,7 +197,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         className="relative z-10 bg-white dark:bg-gray-900 lya:bg-lya-surface w-full md:w-[500px] md:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[90dvh] md:max-h-[85vh] transition-colors md:border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
       >
         
-        {/* Cabecera con Imagen (Mantenida exactamente igual) */}
+        {/* Cabecera con Imagen */}
         <div className="relative h-48 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg shrink-0 p-2 border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/30 transition-colors">
           {product.image || product.imagen ? (
             <img src={product.image || product.imagen} className="w-full h-full object-contain drop-shadow-md opacity-90" alt={product.nombre} />
@@ -187,14 +207,14 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
           <div className="absolute bottom-5 left-6 text-white pr-12">
             <h3 className="text-2xl md:text-3xl font-black leading-tight tracking-tight drop-shadow-md">{product.nombre}</h3>
-            <p className="opacity-90 font-bold mt-1 text-orange-400 lya:text-lya-primary">${Number(product.precioBase || product.precio || 0).toFixed(2)} Base</p>
+            <p className="opacity-90 font-bold mt-1 text-orange-400 lya:text-lya-primary">${cleanNumber(product.precioBase || product.precio).toFixed(2)} Base</p>
           </div>
           <button 
             onClick={() => !isConfirming && onClose()} 
             disabled={isConfirming}
-            className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-2.5 rounded-full backdrop-blur-md transition-all active:scale-90 disabled:opacity-50"
+            className="absolute top-4 right-4 bg-black/20 md:hover:bg-black/40 text-white p-2.5 rounded-full backdrop-blur-md transition-all active:scale-90 disabled:opacity-50 touch-manipulation outline-none select-none"
           >
-            <X size={20} />
+            <X size={20} className="pointer-events-none" />
           </button>
         </div>
 
@@ -202,16 +222,16 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
           {availableModifiers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center space-y-3">
-              <span className="text-5xl opacity-50">🍽️</span>
-              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium">Este producto no tiene opciones adicionales configuradas.</p>
+              <span className="text-5xl opacity-50 pointer-events-none">🍽️</span>
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium pointer-events-none">Este producto no tiene opciones adicionales configuradas.</p>
             </div>
           ) : (
             availableModifiers.map(mod => (
               <div key={mod.id}>
                 <h4 className="font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex justify-between items-center pb-2">
-                  <span className="tracking-tight text-lg">{mod.title}</span>
+                  <span className="tracking-tight text-lg pointer-events-none">{mod.title}</span>
                   {mod.type === 'multiple' && (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-500/20 lya:text-lya-secondary lya:bg-lya-secondary/10 px-2.5 py-1 rounded-lg">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-500/20 lya:text-lya-secondary lya:bg-lya-secondary/10 px-2.5 py-1 rounded-lg pointer-events-none">
                       Elige varios
                     </span>
                   )}
@@ -225,30 +245,37 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                     return (
                       <button
                         key={opt.id}
-                        disabled={isConfirming}
+                        disabled={isConfirming || isCalculatingTotal}
                         onClick={() => handleToggle(mod.id, opt.id, mod.type)}
                         className={clsx(
-                          "px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all flex items-center justify-between gap-3 active:scale-95 flex-grow sm:flex-grow-0 disabled:opacity-70",
+                          "px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all flex items-center justify-between gap-3 active:scale-95 flex-grow sm:flex-grow-0 disabled:opacity-70 outline-none touch-manipulation select-none",
                           isSelected 
                             ? "border-orange-500 bg-orange-500 dark:bg-orange-600 dark:border-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-900/30 lya:bg-lya-primary lya:border-lya-primary lya:text-lya-surface lya:shadow-lya-primary/30" 
-                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text lya:hover:border-lya-secondary/50"
+                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 dark:md:hover:border-gray-600 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:bg-lya-surface lya:border-lya-border/40 lya:text-lya-text lya:hover:border-lya-secondary/50",
+                          isCalculatingTotal && "opacity-80 cursor-wait"
                         )}
                       >
-                        <span className="flex items-center gap-2">
-                          {isSelected && <Check size={16} strokeWidth={4} />}
+                        <span className="flex items-center gap-2 pointer-events-none">
+                          {/* 🔥 FIX: Checkbox CSS puro en lugar de montar/desmontar nodos */}
+                          <span className={clsx(
+                            "transition-all duration-300 flex items-center justify-center overflow-hidden",
+                            isSelected ? "w-5 opacity-100" : "w-0 opacity-0"
+                          )}>
+                            <Check size={16} strokeWidth={4} />
+                          </span>
                           {opt.label}
                         </span>
                         
-                        {opt.price > 0 && (
+                        {cleanNumber(opt.price) > 0 && (
                           <span 
                             className={clsx(
-                              "text-xs px-2 py-1 rounded-lg ml-auto whitespace-nowrap",
+                              "text-xs px-2 py-1 rounded-lg ml-auto whitespace-nowrap pointer-events-none",
                               isSelected 
                                 ? "bg-white/25 text-white lya:bg-white/30" 
                                 : "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-primary/10 lya:text-lya-primary"
                             )}
                           >
-                            +${Number(opt.price).toFixed(2)}
+                            +${cleanNumber(opt.price).toFixed(2)}
                           </span>
                         )}
                       </button>
@@ -259,27 +286,36 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
             ))
           )}
 
-          {/* Toggle para Llevar (Texto Justificado aplicado) */}
+          {/* 🔥 FIX NEO-BENTO: Toggle para Llevar transformado de label/input a motion.div */}
           {!isVitrina && !isLlevar && (
             <div className="mt-8 mb-2">
-              <label className={`flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-900/50 lya:border-lya-secondary/30 bg-orange-50 dark:bg-orange-900/10 lya:bg-lya-secondary/5 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform ${isConfirming ? 'opacity-70 pointer-events-none' : ''}`}>
-                <input 
-                  type="checkbox" 
-                  checked={isTakeaway}
-                  disabled={isConfirming}
-                  onChange={(e) => setIsTakeaway(e.target.checked)}
-                  className="w-6 h-6 text-orange-500 dark:text-orange-600 lya:text-lya-secondary bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 dark:focus:ring-orange-600 lya:focus:ring-lya-secondary dark:ring-offset-gray-900 focus:ring-2 cursor-pointer transition-colors"
-                />
-                <div className="flex flex-col">
+              <motion.div 
+                whileTap={isConfirming ? {} : { scale: 0.98 }} 
+                onClick={() => {
+                  if (!isConfirming) setIsTakeaway(!isTakeaway);
+                }}
+                className={clsx(
+                  "flex items-center gap-4 p-4 border-2 border-orange-200 dark:border-orange-900/50 lya:border-lya-secondary/30 bg-orange-50 dark:bg-orange-900/10 lya:bg-lya-secondary/5 rounded-2xl cursor-pointer transition-transform select-none touch-manipulation outline-none",
+                  isConfirming && "opacity-70 pointer-events-none"
+                )}
+              >
+                <div className={clsx(
+                  "w-6 h-6 flex-shrink-0 flex items-center justify-center border-2 rounded-lg transition-colors pointer-events-none",
+                  isTakeaway 
+                    ? "bg-orange-500 border-orange-500 text-white lya:bg-lya-primary lya:border-lya-primary" 
+                    : "bg-white border-orange-300 dark:bg-gray-800 dark:border-orange-800/50"
+                )}>
+                  {isTakeaway && <Check size={14} strokeWidth={4} />}
+                </div>
+                <div className="flex flex-col pointer-events-none">
                   <span className="font-black text-orange-900 dark:text-orange-100 lya:text-lya-text text-sm flex items-center gap-2">
                     <ShoppingBag size={16} /> Empaquetar para Llevar
                   </span>
-                  {/* Regla tipográfica aplicada aquí */}
                   <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 lya:text-lya-text/60 mt-0.5 text-justify leading-tight">
                     Se enviará a cocina con indicación de empaque desechable.
                   </span>
                 </div>
-              </label>
+              </motion.div>
             </div>
           )}
         </div>
@@ -287,26 +323,36 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         {/* Footer / Confirmar */}
         <div className="p-5 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 transition-colors rounded-b-[2.5rem]">
           <button 
-            disabled={isAgotado || isConfirming}
+            disabled={isAgotado || isConfirming || isCalculatingTotal}
             onClick={handleConfirm}
             className={clsx(
-              "w-full py-4 rounded-2xl font-black text-lg flex justify-between px-6 items-center transition-all",
+              "w-full py-4 rounded-2xl font-black text-lg flex justify-between px-6 items-center transition-all outline-none select-none touch-manipulation",
               isAgotado 
                 ? "bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed lya:bg-lya-bg lya:text-lya-text/40 border border-transparent dark:border-gray-700"
-                : isConfirming
-                  ? "bg-emerald-400 dark:bg-emerald-500 text-white cursor-wait lya:bg-lya-primary/70"
-                  : "bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 dark:shadow-emerald-900/30 active:scale-95 lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface lya:shadow-lya-primary/30"
+                : "bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 dark:shadow-emerald-900/30 active:scale-95 lya:bg-lya-primary lya:hover:bg-lya-primary/90 lya:text-lya-surface lya:shadow-lya-primary/30"
             )}
           >
-            {isConfirming ? (
-              <div className="flex items-center gap-2">
-                <Loader2 size={20} className="animate-spin" />
-                <span>Añadiendo...</span>
-              </div>
-            ) : (
-              <span>{isAgotado ? 'Agotado' : 'Añadir a la cuenta'}</span>
-            )}
-            <span className="bg-black/20 dark:bg-black/30 px-3 py-1 rounded-xl tracking-wide">${calculateTotal().toFixed(2)}</span>
+            {/* 🔥 FIX: El Loader SIEMPRE está ahí, pero se oculta vía CSS */}
+            <span className="flex items-center pointer-events-none">
+              <span className={clsx(
+                "transition-all duration-300 flex items-center justify-center overflow-hidden",
+                isConfirming ? "w-6 opacity-100 mr-2" : "w-0 opacity-0 mr-0"
+              )}>
+                <Loader2 className="animate-spin" size={20} />
+              </span>
+              <span>
+                {isAgotado ? 'Agotado' : isConfirming ? 'Añadiendo...' : 'Añadir a la cuenta'}
+              </span>
+            </span>
+
+            {/* 🔥 FEEDBACK VISUAL PREMIUM: El precio cambia a spinner cuando se calcula */}
+            <span className="bg-black/20 dark:bg-black/30 px-3 py-1 rounded-xl tracking-wide pointer-events-none flex items-center justify-center min-w-[4.5rem]">
+              {isCalculatingTotal ? (
+                <Loader2 className="animate-spin" size={16} strokeWidth={3} />
+              ) : (
+                `$${calculateTotal().toFixed(2)}`
+              )}
+            </span>
           </button>
         </div>
 
