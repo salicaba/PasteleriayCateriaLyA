@@ -51,6 +51,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   
   // REFERENCIA DE TIEMPO REAL PARA MÓVILES
   const lastActivityRef = useRef(Date.now());
+  
+  // 🔥 CANDADO SÍNCRONO: Mata el Ghost Click en la lista de productos
+  const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
@@ -189,41 +192,58 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  const handleAddDirectly = async (product, customizations = null) => {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        setCart(prev => {
-          let newItem = { ...product, qty: 1, precioUnitario: product.precio };
-          let uniqueCartId = product.id.toString();
+  // 🔥 LÓGICA DE AGREGADO BLINDADA Y CENTRALIZADA
+  const handleAddDirectly = async (product, customizations = null, e = null) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    // Si ya estamos procesando un clic, ignoramos los siguientes
+    if (isProcessingRef.current) return;
+    
+    isProcessingRef.current = true;
+    setAddingToCartId(product.id);
 
-          if (customizations) {
-            newItem = { ...newItem, precioUnitario: customizations.precioFinal, detalles: customizations.detalles, isTakeaway: customizations.isTakeaway };
-            const detailStr = JSON.stringify(customizations.detalles) + (customizations.isTakeaway ? '-llevar' : '');
-            uniqueCartId = `${product.id}-${detailStr}`;
-          }
+    try {
+      // Delay sutil para feedback visual y matar el ghost click (150ms)
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      setCart(prev => {
+        let newItem = { ...product, qty: 1, precioUnitario: product.precio };
+        let uniqueCartId = product.id.toString();
 
-          newItem.cartItemId = uniqueCartId;
-          const existing = prev.find(item => item.cartItemId === uniqueCartId);
-          if (existing) return prev.map(item => item.cartItemId === uniqueCartId ? { ...item, qty: item.qty + 1 } : item);
-          return [...prev, newItem];
-        });
-        setSelectedProduct(null);
-        triggerNotification(`¡${product.nombre} agregado!`, 'success');
-        resolve();
-      }, 300);
-    });
+        if (customizations) {
+          newItem = { ...newItem, precioUnitario: customizations.precioFinal, detalles: customizations.detalles, isTakeaway: customizations.isTakeaway };
+          const detailStr = JSON.stringify(customizations.detalles) + (customizations.isTakeaway ? '-llevar' : '');
+          uniqueCartId = `${product.id}-${detailStr}`;
+        }
+
+        newItem.cartItemId = uniqueCartId;
+        const existing = prev.find(item => item.cartItemId === uniqueCartId);
+        if (existing) return prev.map(item => item.cartItemId === uniqueCartId ? { ...item, qty: item.qty + 1 } : item);
+        return [...prev, newItem];
+      });
+      
+      setSelectedProduct(null);
+      triggerNotification(`¡${product.nombre} agregado!`, 'success');
+    } finally {
+      setAddingToCartId(null);
+      isProcessingRef.current = false;
+    }
   };
 
   const removeFromCart = (cartItemId) => setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
+      if (!existing) return prev; // Seguro adicional
       if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
       return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
   });
   
   const incrementInCart = (cartItemId) => setCart(prev => prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + 1 } : item));
 
-  const totalCart = cart.reduce((acc, item) => acc + (item.precioUnitario * item.qty), 0);
-  const totalItems = cart.reduce((acc, item) => acc + item.qty, 0);
+  const totalCart = cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0);
+  const totalItems = cart.reduce((acc, item) => acc + (item.qty || 0), 0);
 
   const handleConfirmOrder = async () => {
     if (cart.length === 0) return;
@@ -302,7 +322,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     } catch (error) {
       console.error("Error al enviar la orden al servidor:", error);
       
-      // 🔥 FIX DE SEGURIDAD: Ahora extraemos el error REAL del servidor para que sepas qué está fallando.
       let backendError = "Error al procesar la orden en el servidor.";
       if (error.response && error.response.data && error.response.data.message) {
         backendError = error.response.data.message;
@@ -327,7 +346,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.08, // Velocidad a la que entra cada tarjeta (0.08s)
+        staggerChildren: 0.08, 
       }
     }
   };
@@ -574,26 +593,17 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   <div className="flex items-end justify-between mt-auto">
                     <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block text-left">${product.precio}</span>
                     
-                    <motion.button 
-                      whileTap={{ scale: 0.95 }}
-                      disabled={isAdding}
-                      onClick={async (e) => { 
-                        e.stopPropagation(); 
-                        
-                        // 🔥 FIX: AHORA ESTE BOTÓN '+' SIEMPRE AGREGA DIRECTO EL PRODUCTO
-                        // Saltándose el modal de personalización y usando los defaults.
-                        setAddingToCartId(product.id);
-                        try {
-                          const defaultMods = getDefaultCustomizations(product);
-                          await handleAddDirectly(product, defaultMods); 
-                        } finally {
-                          setAddingToCartId(null);
-                        }
+                    {/* 🔥 BOTÓN NATIVO BLINDADO ANTI GHOST-CLICK */}
+                    <button 
+                      disabled={isAdding || addingToCartId !== null}
+                      onClick={(e) => { 
+                        const defaultMods = getDefaultCustomizations(product);
+                        handleAddDirectly(product, defaultMods, e); 
                       }} 
-                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow transition-transform md:hover:scale-110 shrink-0 outline-none"
+                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow shrink-0 outline-none touch-manipulation active:scale-90 transition-all disabled:opacity-50"
                     >
                       {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
-                    </motion.button>
+                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -611,7 +621,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")}
             style={{ width: 'calc(100% - 3rem)' }}
           >
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-200/50 dark:border-gray-700/50 lya:border-lya-border/50 transition-colors text-gray-800 dark:text-gray-200 lya:text-lya-text text-center outline-none">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-200/50 dark:border-gray-700/50 lya:border-lya-border/50 transition-colors text-gray-800 dark:text-gray-200 lya:text-lya-text text-center outline-none touch-manipulation">
               <div className="relative">
                 <ReceiptText size={20} className="text-orange-500 lya:text-lya-secondary" />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border border-white dark:border-gray-800 lya:border-lya-surface animate-pulse"></span>
@@ -622,15 +632,21 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
+      {/* 🔥 BARRA FLOTANTE CON FEEDBACK DE CARGA */}
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center outline-none">
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center outline-none touch-manipulation">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 lya:bg-white/25 flex items-center justify-center font-black text-sm">{totalItems}</div>
                 <span className="text-base tracking-wide font-black">Revisar Pedido</span>
               </div>
-              <span className="font-black text-xl">${totalCart.toFixed(2)}</span>
+              
+              {addingToCartId !== null ? (
+                <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-secondary" />
+              ) : (
+                <span className="font-black text-xl">${(totalCart || 0).toFixed(2)}</span>
+              )}
             </motion.button>
           </motion.div>
         )}

@@ -1,12 +1,12 @@
 // src/modules/client/views/components/ClientCheckoutModal.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
-  cart,
-  totalCart,
+  cart = [], // Seguro por si llega undefined
+  totalCart = 0,
   isSubmitting,
   onClose,
   onConfirmOrder,
@@ -15,41 +15,42 @@ export default function ClientCheckoutModal({
 }) {
   const [actionLoading, setActionLoading] = useState(null);
   
-  // 🔥 CANDADO SÍNCRONO: Aniquila los "clics fantasmas" de los móviles en el milisegundo cero
+  // 🔥 CANDADO SÍNCRONO SILENCIOSO: Mata el Ghost Click de los móviles
   const isProcessingRef = useRef(false);
+  const isMounted = useRef(true);
 
-  const handleIncrement = async (e, cartItemId) => {
-    // Evitamos el comportamiento nativo de doble toque/zoom en móviles
+  // Evitar actualizaciones de estado si el componente se desmonta
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const handleAction = async (e, cartItemId, actionType) => {
     e.preventDefault();
     e.stopPropagation();
     
+    // Si ya estamos procesando, ignoramos el toque silenciosamente sin deshabilitar el botón HTML
     if (isProcessingRef.current) return;
-    isProcessingRef.current = true;
     
-    setActionLoading({ id: cartItemId, action: 'increment' });
-    try {
-      await new Promise(resolve => setTimeout(resolve, 150)); // Delay sutil de 150ms para UX
-      incrementInCart(cartItemId);
-    } finally {
-      setActionLoading(null);
-      isProcessingRef.current = false;
-    }
-  };
-
-  const handleDecrement = async (e, cartItemId) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (isProcessingRef.current) return;
     isProcessingRef.current = true;
-
-    setActionLoading({ id: cartItemId, action: 'decrement' });
+    if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      removeFromCart(cartItemId);
+      if (actionType === 'increment') {
+        // Ejecutamos la acción original sin delay artificial que confunda a React
+        incrementInCart(cartItemId);
+      } else {
+        removeFromCart(cartItemId);
+      }
     } finally {
-      setActionLoading(null);
-      isProcessingRef.current = false;
+      // Retrasamos la liberación del candado 300ms para absorber cualquier clic fantasma del móvil
+      setTimeout(() => {
+        if (isMounted.current) {
+          setActionLoading(null);
+          isProcessingRef.current = false;
+        }
+      }, 300);
     }
   };
 
@@ -61,17 +62,23 @@ export default function ClientCheckoutModal({
           <h3 className="text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">Tu Orden</h3>
           <motion.button 
             whileTap={{ scale: 0.95 }} 
-            disabled={isSubmitting || actionLoading !== null} 
             onClick={onClose} 
-            className="p-2 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors text-gray-500 dark:text-gray-300 lya:text-lya-text disabled:opacity-50 outline-none select-none touch-manipulation"
+            className="p-2 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors text-gray-500 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 outline-none select-none touch-manipulation"
           >
             <ChevronLeft size={22} strokeWidth={2.5} />
           </motion.button>
         </div>
 
         <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1">
-          {cart.map(item => {
+          {cart?.map(item => {
+            // Verificación de seguridad en caso de renderizado fantasma
+            if (!item) return null;
+            
             const isThisItemLoading = actionLoading?.id === item.cartItemId;
+            // Matemáticas seguras con fallback a 0
+            const precioUnitario = item.precioUnitario || 0;
+            const qty = item.qty || 0;
+            const precioTotalItem = precioUnitario * qty;
 
             return (
               <div key={item.cartItemId} className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-3xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-colors">
@@ -94,29 +101,26 @@ export default function ClientCheckoutModal({
                       </span>
                     ) : (
                       <>
-                        <span className="text-sm font-black text-gray-700 dark:text-gray-300 lya:text-lya-text/80">${(item.precioUnitario * item.qty).toFixed(2)}</span>
-                        {item.qty > 1 && <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase">Unit: ${item.precioUnitario.toFixed(2)}</span>}
+                        <span className="text-sm font-black text-gray-700 dark:text-gray-300 lya:text-lya-text/80">${precioTotalItem.toFixed(2)}</span>
+                        {qty > 1 && <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase">Unit: ${precioUnitario.toFixed(2)}</span>}
                       </>
                     )}
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-[1.25rem] p-1.5 shrink-0">
-                  {/* 🔥 SE USA <button> NATIVO CON active:scale-90 PARA PREVENIR CRASHEOS DE FRAMER MOTION */}
                   <button 
-                    disabled={isSubmitting || actionLoading !== null} 
-                    onClick={(e) => handleDecrement(e, item.cartItemId)} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 dark:md:hover:text-red-500 dark:md:hover:bg-red-900/20 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 disabled:opacity-50 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
+                    onClick={(e) => handleAction(e, item.cartItemId, 'decrement')} 
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 dark:md:hover:text-red-500 dark:md:hover:bg-red-900/20 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-100 dark:active:bg-gray-700 transition-all"
                   >
                     {isThisItemLoading && actionLoading.action === 'decrement' ? <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> : <Minus size={16} strokeWidth={3} />}
                   </button>
                   
-                  <span className="font-black w-4 text-center text-sm text-gray-900 dark:text-white lya:text-lya-text">{item.qty}</span>
+                  <span className="font-black w-4 text-center text-sm text-gray-900 dark:text-white lya:text-lya-text">{qty}</span>
                   
                   <button 
-                    disabled={isSubmitting || actionLoading !== null} 
-                    onClick={(e) => handleIncrement(e, item.cartItemId)} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold disabled:opacity-50 disabled:bg-gray-400 outline-none select-none touch-manipulation active:scale-90 transition-all"
+                    onClick={(e) => handleAction(e, item.cartItemId, 'increment')} 
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold outline-none select-none touch-manipulation active:scale-90 transition-all"
                   >
                     {isThisItemLoading && actionLoading.action === 'increment' ? <Loader2 size={16} className="animate-spin text-white dark:text-gray-900" /> : <Plus size={16} strokeWidth={3} />}
                   </button>
@@ -133,7 +137,7 @@ export default function ClientCheckoutModal({
               <Loader2 size={24} className="animate-spin" />
             </div>
           ) : (
-            <span className="text-3xl font-black tracking-tight">${totalCart.toFixed(2)}</span>
+            <span className="text-3xl font-black tracking-tight">${(totalCart || 0).toFixed(2)}</span>
           )}
         </div>
 
