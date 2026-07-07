@@ -11,7 +11,7 @@ import ClientMenu from './views/ClientMenu';
 import ClientConnectionShield from './views/components/ClientConnectionShield';
 
 // 🔥 IMPORTACIÓN CLAVE: Tu instancia de WebSockets para comunicación en tiempo real
-import socket from '../api/socket'; 
+import socket from '../../api/socket'; 
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 
