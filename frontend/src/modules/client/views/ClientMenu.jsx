@@ -300,8 +300,17 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       setShowCheckout(false);
 
     } catch (error) {
-      console.error("Error:", error);
-      triggerNotification("Error de conexión. Intenta de nuevo.", 'error');
+      console.error("Error al enviar la orden al servidor:", error);
+      
+      // 🔥 FIX DE SEGURIDAD: Ahora extraemos el error REAL del servidor para que sepas qué está fallando.
+      let backendError = "Error al procesar la orden en el servidor.";
+      if (error.response && error.response.data && error.response.data.message) {
+        backendError = error.response.data.message;
+      } else if (error.message) {
+        backendError = error.message;
+      }
+      
+      triggerNotification(`Ups! ${backendError}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -525,9 +534,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         </div>
       </header>
 
-      {/* 🔥 LISTA DE PRODUCTOS CON ANIMACIÓN EN CASCADA */}
       <motion.div 
-        key={activeCategory} // Este key hace que la animación se repita al cambiar de categoría
+        key={activeCategory} 
         variants={containerVariants}
         initial="hidden" 
         animate="show" 
@@ -547,7 +555,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               <motion.div 
                 key={product.id} 
                 layout 
-                variants={itemVariants} // Le aplicamos la variante individual a cada tarjeta
+                variants={itemVariants}
                 whileTap={isCustomizable ? { scale: 0.98 } : {}} 
                 onClick={() => isCustomizable && setSelectedProduct(product)} 
                 className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''}`}
@@ -571,10 +579,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                       disabled={isAdding}
                       onClick={async (e) => { 
                         e.stopPropagation(); 
-                        if (isCustomizable) {
-                           setSelectedProduct(product);
-                           return;
-                        }
+                        
+                        // 🔥 FIX: AHORA ESTE BOTÓN '+' SIEMPRE AGREGA DIRECTO EL PRODUCTO
+                        // Saltándose el modal de personalización y usando los defaults.
                         setAddingToCartId(product.id);
                         try {
                           const defaultMods = getDefaultCustomizations(product);
