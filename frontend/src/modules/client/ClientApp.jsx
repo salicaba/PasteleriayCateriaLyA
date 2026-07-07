@@ -10,6 +10,9 @@ import ClientMenu from './views/ClientMenu';
 // Importación del escudo de conexión previamente desarrollado
 import ClientConnectionShield from './views/components/ClientConnectionShield';
 
+// 🔥 IMPORTACIÓN CLAVE: Tu instancia de WebSockets para comunicación en tiempo real
+import socket from '../api/socket'; 
+
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 
 // Función para auto-detectar el tema preferido
@@ -47,27 +50,43 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // 🔥 VALIDACIÓN DE SEGURIDAD DEL QR (Evita peticiones con enlaces viejos)
+  // 🔥 VALIDACIÓN DE SEGURIDAD DEL QR Y ESCUCHA EN TIEMPO REAL
   useEffect(() => {
+    // 1. Verificación inicial pasiva/HTTP
     const verifyQrTokenValidity = async () => {
       if (!tableId) return;
       
       try {
         // AQUÍ HARÁ LA PETICIÓN AL BACKEND PARA VALIDAR EL TOKEN
         // const response = await api.get(`/client/verify-table/${tableId}?token=${qrTokenUrl}`);
-        // if (!response.data.valid) { setIsQrValid(false); handleClientLogout(); }
+        // if (!response.data.valid) { setIsQrValid(false); handleClientLogout(); return; }
         
-        // Simulación de escucha o verificación pasiva:
+        // Simulación de validación exitosa (remplaza esto con tu llamada real)
         setIsQrValid(true); 
       } catch (error) {
-        // Si el servidor responde que ya no coincide el token, revocamos el acceso de inmediato
         setIsQrValid(false);
         handleClientLogout();
       }
     };
 
     verifyQrTokenValidity();
-  }, [tableId, qrTokenUrl]);
+
+    // 2. EL PUENTE MÁGICO: Escucha activa de WebSockets para la expulsión en vivo
+    const handleSecurityUpdate = () => {
+      // Cuando el admin presiona "Regenerar QRs", el servidor emite 'qr_security_update'
+      // Este bloque se ejecuta al instante en todos los celulares conectados.
+      setIsQrValid(false);
+      handleClientLogout();
+    };
+
+    // Nos suscribimos al evento de seguridad del socket
+    socket.on('qr_security_update', handleSecurityUpdate);
+
+    // Limpieza estricta: nos desuscribimos si el cliente cierra la pestaña o sale
+    return () => {
+      socket.off('qr_security_update', handleSecurityUpdate);
+    };
+  }, [tableId, qrTokenUrl]); // Las dependencias aseguran que si cambia de mesa, se re-suscriba
 
   // 🔥 FUNCIÓN CLAVE: Borra la sesión local y resetea la pantalla
   const handleClientLogout = () => {

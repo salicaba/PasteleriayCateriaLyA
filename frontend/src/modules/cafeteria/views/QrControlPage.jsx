@@ -4,14 +4,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, RefreshCw, Trash2, Smartphone, 
   Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine,
-  CheckCircle2, AlertCircle, Power, PowerOff, ShieldAlert
+  AlertCircle, Power, PowerOff, ShieldAlert
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 
+// 🔥 IMPORTAMOS TU NUEVO COMPONENTE DE NOTIFICACIONES NEO-BENTO
+import { ToastNotification } from './components/ToastNotification';
+
 export const QrControlPage = () => {
   const { 
-    mesas, isLoading, isAdding, removingId, toast,
+    mesas, isLoading, isAdding, removingId, toast, // 'toast' viene del hook
     zonas, zonaActiva, setZonaActiva, 
     addMesa, removeMesa,
     isQrActive, isTogglingQr, toggleQrService 
@@ -21,28 +24,46 @@ export const QrControlPage = () => {
   const [mesaToDelete, setMesaToDelete] = useState(null); 
   const [showToggleModal, setShowToggleModal] = useState(false); 
   
-  // 🔥 NUEVOS ESTADOS PARA LA REGENERACIÓN DE QRs (SEGURIDAD)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [isRegeneratingLocal, setIsRegeneratingLocal] = useState(false);
 
+  // 🔥 NUEVO: ESTADO PARA MANEJAR LAS NOTIFICACIONES DE ACCIONES LOCALES
+  const [localToast, setLocalToast] = useState({ message: '', type: '' });
+
+  // Función auxiliar para lanzar notificaciones limpias
+  const showLocalToast = (message, type = 'success') => {
+    setLocalToast({ message, type });
+    // Se oculta automáticamente después de 4 segundos
+    setTimeout(() => setLocalToast({ message: '', type: '' }), 4000);
+  };
+
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
-  
   const baseUrl = window.location.origin;
   const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); 
   
-  // 🔥 FUNCIÓN SIMULADA (Aquí conectarás tu endpoint del backend)
+  // 🔥 FUNCIÓN: REGENERAR TOKENS CON NOTIFICACIÓN DE ÉXITO O ERROR
   const handleRegenerateTokens = async () => {
     if (isRegeneratingLocal) return;
     setIsRegeneratingLocal(true);
     try {
       // AQUÍ VA TU LLAMADA A LA API: await api.put('/pos/tables/regenerate-qr-tokens');
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulación de carga
+      
+      // Opcional: Si implementas los sockets, aquí emitirías el bloqueo
+      // socket.emit('qr_security_update'); 
+
       setShowRegenerateModal(false);
-      // Nota: Si puedes exponer la función para mostrar tu toast desde el hook, úsala aquí.
+      showLocalToast('Códigos QR regenerados con éxito. Sesiones antiguas revocadas.', 'success');
+    } catch (error) {
+      showLocalToast('Error de red al intentar regenerar los códigos.', 'error');
     } finally {
       setIsRegeneratingLocal(false);
     }
   };
+
+  // 🔥 LÓGICA PARA UNIFICAR MENSAJES DEL HOOK (toast) Y LOCALES (localToast)
+  const activeMessage = localToast.message || (toast?.show ? toast.message : '');
+  const activeType = localToast.message ? localToast.type : (toast?.show ? toast.type : '');
 
   // ==========================================
   // PANTALLA DE CARGA ANIMADA NEO-BENTO
@@ -75,36 +96,8 @@ export const QrControlPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:bg-white"
     >
       
-      {/* NOTIFICACIÓN FLOTANTE NEO-BENTO */}
-      <AnimatePresence>
-        {toast?.show && (
-          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div 
-              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
-              animate={{ opacity: 1, y: 0, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors text-center ${
-                toast.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 
-                toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' : 
-                'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
-              }`}
-            >
-              <div className={`p-1.5 rounded-full shrink-0 ${
-                toast.type === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 
-                toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500' : 
-                'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
-              }`}>
-                {toast.type === 'error' ? <AlertCircle size={20} /> : 
-                 toast.type === 'warning' ? <PowerOff size={20} /> : 
-                 <CheckCircle2 size={20} />}
-              </div>
-              <div className="flex flex-col">
-                  <span className="text-sm">{toast.message}</span>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* 🔥 PILAR 5: SE MANDA A LLAMAR TU COMPONENTE TOAST DE MANERA LIMPIA */}
+      <ToastNotification message={activeMessage} type={activeType} />
 
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
@@ -142,10 +135,7 @@ export const QrControlPage = () => {
           </div>
         </div>
 
-        {/* CONTENEDOR DE BOTONES DE ACCIÓN (TOGGLE Y REGENERAR) */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
-          
-          {/* 🔥 NUEVO: BOTÓN DE REGENERAR QRs (AHORA CON ESTÉTICA PREMIUM PILL IDÉNTICA) */}
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowRegenerateModal(true)}
@@ -157,7 +147,6 @@ export const QrControlPage = () => {
             <span className="tracking-wide text-sm pointer-events-none">Regenerar QRs</span>
           </motion.button>
 
-          {/* BOTÓN KILL SWITCH ORIGINAL "PREMIUM PILL" */}
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowToggleModal(true)}
@@ -477,9 +466,22 @@ export const QrControlPage = () => {
                   Cancelar
                 </button>
                 <button 
+                  // 🔥 FUNCIÓN: CAMBIAR ESTADO DE QR CON NOTIFICACIÓN
                   onClick={async () => {
-                    const success = await toggleQrService(!isQrActive);
-                    if(success) setShowToggleModal(false);
+                    try {
+                      const success = await toggleQrService(!isQrActive);
+                      if(success) {
+                        setShowToggleModal(false);
+                        showLocalToast(
+                          isQrActive ? 'Servicio QR Suspendido por seguridad.' : 'Servicio QR Reactivado con éxito.',
+                          'success'
+                        );
+                      } else {
+                        showLocalToast('No se pudo actualizar el estado del servicio QR.', 'error');
+                      }
+                    } catch(err) {
+                      showLocalToast('Error de conexión al modificar el estado QR.', 'error');
+                    }
                   }} 
                   disabled={isTogglingQr}
                   className={`flex-[1.5] py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg outline-none touch-manipulation select-none ${
