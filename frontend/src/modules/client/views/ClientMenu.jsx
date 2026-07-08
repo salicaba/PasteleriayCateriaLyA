@@ -318,23 +318,26 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     } catch (error) {
       console.error("Error al enviar la orden al servidor:", error);
       
-      let backendError = "Error al procesar la orden en el servidor.";
-      let statusCode = error.response?.status || "Sin status";
-      let endpoint = error.config?.url || "Ruta desconocida";
+      let backendError = "No se pudo conectar con el servidor.";
+      let statusCode = error.response?.status || "Error de Red";
+      let endpoint = error.config?.url || "/pos/orders";
 
       if (error.response && error.response.data && error.response.data.message) {
         backendError = error.response.data.message;
-      } else if (error.message) {
+      } else if (error.message && error.message !== "Network Error") {
         backendError = error.message;
       }
       
+      // 🔥 FIX: Encendemos el Modal Neo-Bento
       setDiagnosticError({
         endpoint: endpoint,
         statusCode: statusCode,
         message: backendError
       });
 
-      triggerNotification(`Atención: ${backendError.substring(0, 25)}...`, 'warning');
+      // 🔥 FIX: Eliminamos el triggerNotification() aquí para que no salgan 2 alertas al mismo tiempo.
+      // Toda la atención del usuario irá al Modal de Diagnóstico.
+      
     } finally {
       setIsSubmitting(false);
     }
