@@ -42,7 +42,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
-  // 🔥 ESTADO DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED
+  // ESTADO DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED
   const [diagnosticError, setDiagnosticError] = useState(null);
   
   // ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
@@ -255,7 +255,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
       const createNewOrder = async () => {
         const orderPayload = { orderType: dbOrderType, tableId: dbOrderType === 'SALON' ? tableId : null, ticketId: clientData.name };
-        // Aquí es donde falla si el endpoint exige token
         const orderRes = await client.post('/pos/orders', orderPayload);
         const newId = orderRes.data.order.id;
         setActiveOrderId(newId);
@@ -333,14 +332,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         backendError = error.message;
       }
       
-      // 🔥 ACTIVACIÓN DEL MODAL DE DIAGNÓSTICO NEO-BENTO
       setDiagnosticError({
         endpoint: endpoint,
         statusCode: statusCode,
         message: backendError
       });
 
-      // Notificación libre del "Ups!" para evadir el autocorrector
       triggerNotification(`Atención: ${backendError.substring(0, 25)}...`, 'warning');
     } finally {
       setIsSubmitting(false);
@@ -472,23 +469,62 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
+  // ==========================================
+  // 🔥 FIX: PANTALLA DE ÉXITO CON MODALES ACTIVADOS
+  // ==========================================
   if (isConfirmed) {
     return (
-      <ClientOrderSuccess 
-        cart={confirmedSnapshot.items} 
-        totalCart={confirmedSnapshot.total}
-        clientData={clientData}
-        type={type}
-        tableId={tableId}
-        products={products}
-        categories={categories}
-        getCategoryName={getCategoryName}
-        isQrActive={isQrActive} 
-        onReset={() => {
-          if (isQrActive) setIsConfirmed(false); 
-        }}
-        onOpenSettings={() => setShowSettings(true)}
-      />
+      <>
+        <ClientOrderSuccess 
+          cart={confirmedSnapshot.items} 
+          totalCart={confirmedSnapshot.total}
+          clientData={clientData}
+          type={type}
+          tableId={tableId}
+          products={products}
+          categories={categories}
+          getCategoryName={getCategoryName}
+          isQrActive={isQrActive} 
+          onReset={() => {
+            if (isQrActive) setIsConfirmed(false); 
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+        
+        {/* Renderizamos los modales aquí para que no sean "invisibles" */}
+        <AnimatePresence>
+          {showSettings && (
+            <ClientSettingsModal 
+              themeIndex={themeIndex}
+              sizeIndex={sizeIndex}
+              cycleTheme={cycleTheme}
+              cycleSize={cycleSize}
+              onClose={() => setShowSettings(false)}
+              showLogout={!isConfirmed} // Evita que cierre sesión y abandone la cuenta después de pedir
+              onLogout={() => {
+                setShowSettings(false);
+                setShowLogoutConfirm(true);
+              }}
+              onLogoutClick={() => {
+                setShowSettings(false);
+                setShowLogoutConfirm(true);
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showLogoutConfirm && (
+            <ClientLogoutModal 
+              isOpen={showLogoutConfirm}
+              show={showLogoutConfirm}
+              onClose={() => setShowLogoutConfirm(false)}
+              onLogout={handleLogout}
+              onConfirm={handleLogout} 
+            />
+          )}
+        </AnimatePresence>
+      </>
     );
   }
 
@@ -716,7 +752,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      {/* 🔥 MODAL DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED */}
+      {/* MODAL DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED */}
       <AnimatePresence>
         {diagnosticError && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
