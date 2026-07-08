@@ -22,7 +22,9 @@ export const createOrder = async (req, res) => {
       if (existingOrder) return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrder });
     }
 
-    let finalTicketId = null;
+    // 🔥 FIX 1: Preservar el nombre/celular del cliente en las órdenes de Mesa
+    let finalTicketId = ticketId || null;
+
     if (orderType === 'LLEVAR') {
       if (ticketId === 'VITRINA-EXPRESS' || ticketId === 'MOSTRADOR') {
         const randomNum = Math.floor(100 + Math.random() * 900);
@@ -50,6 +52,11 @@ export const createOrder = async (req, res) => {
       totalAmount: 0 
     });
     
+    // 🔥 FIX 2: Marcar la mesa como ocupada visualmente en el mapa del POS
+    if (orderType === 'SALON' && finalTableId) {
+      await Table.update({ status: 'occupied' }, { where: { id: finalTableId } });
+    }
+
     getIO().emit('pos:update');
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
   } catch (error) { 
@@ -88,7 +95,10 @@ export const addItemsToOrder = async (req, res) => {
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
 
+    // 🔥 FIX 3: Sincronización Total. Despierta al POS y al KDS (Cocina) al mismo tiempo
     getIO().emit('pos:update');
+    getIO().emit('kitchen:update'); 
+    
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems });
   } catch (error) { 
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
