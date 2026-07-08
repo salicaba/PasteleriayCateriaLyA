@@ -15,21 +15,25 @@ export const createOrder = async (req, res) => {
     const employeeId = req.user?.id || null; 
     const finalTableId = orderType === 'SALON' ? tableId : null;
 
-    // 🔥 PROTOCOLO ANTI-ZOMBIES: Revisar antigüedad de la orden
+    // 🔥 PURGA MASIVA: Matamos TODOS los zombies de esta mesa antes de crear una orden
     if (orderType === 'SALON' && finalTableId) {
-      const existingOrder = await Order.findOne({ 
+      const existingOrders = await Order.findAll({ 
         where: { tableId: finalTableId, status: ['OPEN', 'PAID'] } 
       });
       
-      if (existingOrder) {
-        const hoursOld = (Date.now() - new Date(existingOrder.createdAt).getTime()) / (1000 * 60 * 60);
+      let validExistingOrder = null;
+
+      for (const ord of existingOrders) {
+        const hoursOld = (Date.now() - new Date(ord.createdAt).getTime()) / (1000 * 60 * 60);
         if (hoursOld > 12) {
-          // Si tiene más de 12 hrs, es un zombie olvidado por caja. Lo cerramos y seguimos.
-          await existingOrder.update({ status: 'CLOSED' });
+          await ord.update({ status: 'CLOSED' }); // Asesinato silencioso del zombie
         } else {
-          // Si es reciente, la recuperamos normalmente
-          return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrder });
+          validExistingOrder = ord; // Rescatamos la orden si es de hoy
         }
+      }
+
+      if (validExistingOrder) {
+        return res.status(200).json({ message: 'Orden activa recuperada', order: validExistingOrder });
       }
     }
 
@@ -62,7 +66,6 @@ export const createOrder = async (req, res) => {
       totalAmount: 0 
     });
     
-    // Encender la mesa en el POS
     if (orderType === 'SALON' && finalTableId) {
       await Table.update({ status: 'occupied' }, { where: { id: finalTableId } });
     }
@@ -87,14 +90,12 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
 
-    // 🔥 PROTOCOLO ANTI-ZOMBIES: Evitar que localStorage reviva órdenes muertas
     const hoursOld = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
     if (hoursOld > 12) {
       await order.update({ status: 'CLOSED' });
       if (order.tableId) {
         await Table.update({ status: 'active' }, { where: { id: order.tableId } });
       }
-      // Mandamos status 400 para que React (ClientMenu.jsx) sepa que debe crear una orden nueva y reintentar
       return res.status(400).json({ message: 'Orden caducada por inactividad.' });
     }
 
@@ -131,7 +132,7 @@ export const addItemsToOrder = async (req, res) => {
 export const getActiveOrderByTable = async (req, res) => {
   try {
     const { tableId } = req.params;
-    const order = await Order.findOne({
+    const orders = await Order.findAll({
       where: { tableId, status: ['OPEN', 'PAID'] },
       include: [
         { 
@@ -143,7 +144,23 @@ export const getActiveOrderByTable = async (req, res) => {
         }
       ]
     });
-    res.json({ order });
+
+    // 🔥 PURGA: Evitamos que el POS lea zombies
+    let validOrder = null;
+    for (const ord of orders) {
+      const hoursOld = (Date.now() - new Date(ord.createdAt).getTime()) / (1000 * 60 * 60);
+      if (hoursOld > 12) {
+        await ord.update({ status: 'CLOSED' });
+      } else {
+        validOrder = ord;
+      }
+    }
+    
+    if (!validOrder) {
+      await Table.update({ status: 'active' }, { where: { id: tableId } });
+    }
+
+    res.json({ order: validOrder });
   } catch (error) { 
     res.status(500).json({ message: 'Error al recuperar comanda', error: error.message }); 
   }
@@ -189,7 +206,30 @@ export const getActiveOrders = async (req, res) => {
         } 
       ]
     });
-    res.json(activeOrders);
+
+    // 🔥 PURGA: Evitamos que la Cocina reciba basura
+    const now = Date.now();
+    const validOrders = [];
+    let zombiesFound = false;
+
+    for (const order of activeOrders) {
+      const hoursOld = (now - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
+      if (hoursOld > 12) {
+        await order.update({ status: 'CLOSED' });
+        if (order.tableId) {
+          await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+        }
+        zombiesFound = true;
+      } else {
+        validOrders.push(order);
+      }
+    }
+
+    if (zombiesFound) {
+      getIO().emit('pos:update'); 
+    }
+
+    res.json(validOrders);
   } catch (error) { 
     res.status(500).json({ message: 'Error al listar órdenes', error: error.message }); 
   }

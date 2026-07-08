@@ -42,20 +42,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
-  // ESTADO DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED
   const [diagnosticError, setDiagnosticError] = useState(null);
-  
-  // ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Estados del negocio (Kill-Switch y Caducidad)
+  // Estados del negocio
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   
-  // REFERENCIA DE TIEMPO REAL PARA MÓVILES
   const lastActivityRef = useRef(Date.now());
-  
-  // CANDADO SÍNCRONO: Mata el Ghost Click en la lista de productos
   const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -64,7 +58,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // POLLING PARA VERIFICAR SI APAGARON EL QR DESDE CAJA (Cada 15 segundos)
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -79,7 +72,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos)
+  // 🔥 LÓGICA ROBUSTA: Destrucción de sesión por inactividad (25 min)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -89,10 +82,15 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInterval = setInterval(() => {
+      // 🔥 Mantenemos la regla: Si ya ordenaron algo, NUNCA los sacamos
       if (isConfirmed || isSubmitting) return; 
 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) {
+      if (now - lastActivityRef.current > 1500000) { // 25 Minutos
+        // DESTRUCCIÓN FÍSICA DE LA SESIÓN EN EL NAVEGADOR
+        const keysToRemove = ['lya_client_order_id', 'lya_client_snapshot', 'lya_client_data', 'lya_client_session'];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
         setSessionExpired(true);
       }
     }, 30000); 
@@ -103,12 +101,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting]);
 
-  // LÓGICA DE SALIDA PERFECTA: Sin parpadeos y con pantalla de carga de 𝓛𝔂𝓪
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
     setIsLoggingOut(true);
-
     setIsLoading(true);
 
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -423,14 +419,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify px-2">
              Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente, ya que no detectamos ninguna orden confirmada. 
              <br/><br/>
-             Si deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre en el sistema presionando el botón de abajo.
+             Si deseas ordenar nuevamente, por favor vuelve a escanear el código QR e ingresar tu nombre.
           </p>
           <motion.button 
             whileTap={{ scale: 0.95 }} 
             onClick={handleLogout} 
             className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 outline-none"
           >
-            <span>Volver a Iniciar Sesión</span>
+            <span>Entendido</span>
           </motion.button>
         </motion.div>
       </div>
@@ -469,9 +465,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // ==========================================
-  // 🔥 FIX: PANTALLA DE ÉXITO CON MODALES ACTIVADOS
-  // ==========================================
   if (isConfirmed) {
     return (
       <>
@@ -491,7 +484,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           onOpenSettings={() => setShowSettings(true)}
         />
         
-        {/* Renderizamos los modales aquí para que no sean "invisibles" */}
         <AnimatePresence>
           {showSettings && (
             <ClientSettingsModal 
@@ -500,7 +492,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               cycleTheme={cycleTheme}
               cycleSize={cycleSize}
               onClose={() => setShowSettings(false)}
-              showLogout={!isConfirmed} // Evita que cierre sesión y abandone la cuenta después de pedir
+              showLogout={!isConfirmed} 
               onLogout={() => {
                 setShowSettings(false);
                 setShowLogoutConfirm(true);
@@ -531,7 +523,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
       
-      {/* NOTIFICACIONES TIPO CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
