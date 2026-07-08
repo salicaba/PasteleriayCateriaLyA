@@ -42,14 +42,20 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
+  // ESTADO DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED
   const [diagnosticError, setDiagnosticError] = useState(null);
+  
+  // ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Estados del negocio
+  // Estados del negocio (Kill-Switch y Caducidad)
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   
+  // REFERENCIA DE TIEMPO REAL PARA MÓVILES
   const lastActivityRef = useRef(Date.now());
+  
+  // CANDADO SÍNCRONO: Mata el Ghost Click en la lista de productos
   const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -58,6 +64,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
+  // POLLING PARA VERIFICAR SI APAGARON EL QR DESDE CAJA (Cada 15 segundos)
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -72,7 +79,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // 🔥 LÓGICA ROBUSTA: Destrucción de sesión por inactividad (25 min)
+  // LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -82,15 +89,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInterval = setInterval(() => {
-      // 🔥 Mantenemos la regla: Si ya ordenaron algo, NUNCA los sacamos
       if (isConfirmed || isSubmitting) return; 
 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) { // 25 Minutos
-        // DESTRUCCIÓN FÍSICA DE LA SESIÓN EN EL NAVEGADOR
-        const keysToRemove = ['lya_client_order_id', 'lya_client_snapshot', 'lya_client_data', 'lya_client_session'];
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        
+      if (now - lastActivityRef.current > 1500000) {
         setSessionExpired(true);
       }
     }, 30000); 
@@ -101,10 +103,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting]);
 
+  // LÓGICA DE SALIDA PERFECTA: Sin parpadeos y con pantalla de carga de 𝓛𝔂𝓪
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
     setIsLoggingOut(true);
+
     setIsLoading(true);
 
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -328,16 +332,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         backendError = error.message;
       }
       
-      // 🔥 FIX: Encendemos el Modal Neo-Bento
       setDiagnosticError({
         endpoint: endpoint,
         statusCode: statusCode,
         message: backendError
       });
 
-      // 🔥 FIX: Eliminamos el triggerNotification() aquí para que no salgan 2 alertas al mismo tiempo.
-      // Toda la atención del usuario irá al Modal de Diagnóstico.
-      
     } finally {
       setIsSubmitting(false);
     }
@@ -495,7 +495,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               cycleTheme={cycleTheme}
               cycleSize={cycleSize}
               onClose={() => setShowSettings(false)}
-              showLogout={!isConfirmed} 
+              showLogout={confirmedSnapshot.items.length === 0} // 🔥 FIX: Oculta el botón si ya hay historial de pedido
               onLogout={() => {
                 setShowSettings(false);
                 setShowLogoutConfirm(true);
@@ -721,7 +721,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             cycleTheme={cycleTheme}
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
-            showLogout={!isConfirmed} 
+            showLogout={confirmedSnapshot.items.length === 0} // 🔥 FIX: Oculta el botón si ya hay historial de pedido
             onLogout={() => {
               setShowSettings(false);
               setShowLogoutConfirm(true);
