@@ -15,14 +15,24 @@ export const createOrder = async (req, res) => {
     const employeeId = req.user?.id || null; 
     const finalTableId = orderType === 'SALON' ? tableId : null;
 
+    // 🔥 PROTOCOLO ANTI-ZOMBIES: Revisar antigüedad de la orden
     if (orderType === 'SALON' && finalTableId) {
       const existingOrder = await Order.findOne({ 
         where: { tableId: finalTableId, status: ['OPEN', 'PAID'] } 
       });
-      if (existingOrder) return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrder });
+      
+      if (existingOrder) {
+        const hoursOld = (Date.now() - new Date(existingOrder.createdAt).getTime()) / (1000 * 60 * 60);
+        if (hoursOld > 12) {
+          // Si tiene más de 12 hrs, es un zombie olvidado por caja. Lo cerramos y seguimos.
+          await existingOrder.update({ status: 'CLOSED' });
+        } else {
+          // Si es reciente, la recuperamos normalmente
+          return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrder });
+        }
+      }
     }
 
-    // 🔥 FIX 1: Preservar el nombre/celular del cliente en las órdenes de Mesa
     let finalTicketId = ticketId || null;
 
     if (orderType === 'LLEVAR') {
@@ -52,7 +62,7 @@ export const createOrder = async (req, res) => {
       totalAmount: 0 
     });
     
-    // 🔥 FIX 2: Marcar la mesa como ocupada visualmente en el mapa del POS
+    // Encender la mesa en el POS
     if (orderType === 'SALON' && finalTableId) {
       await Table.update({ status: 'occupied' }, { where: { id: finalTableId } });
     }
@@ -77,6 +87,17 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
 
+    // 🔥 PROTOCOLO ANTI-ZOMBIES: Evitar que localStorage reviva órdenes muertas
+    const hoursOld = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
+    if (hoursOld > 12) {
+      await order.update({ status: 'CLOSED' });
+      if (order.tableId) {
+        await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+      }
+      // Mandamos status 400 para que React (ClientMenu.jsx) sepa que debe crear una orden nueva y reintentar
+      return res.status(400).json({ message: 'Orden caducada por inactividad.' });
+    }
+
     const itemsToInsert = items.map(item => ({ 
       ...item, 
       orderId, 
@@ -95,7 +116,6 @@ export const addItemsToOrder = async (req, res) => {
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
 
-    // 🔥 FIX 3: Sincronización Total. Despierta al POS y al KDS (Cocina) al mismo tiempo
     getIO().emit('pos:update');
     getIO().emit('kitchen:update'); 
     
