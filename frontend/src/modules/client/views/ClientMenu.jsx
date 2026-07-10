@@ -190,8 +190,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
   const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 
-  const triggerNotification = (msg, type = 'success') => {
-    setNotification({ msg, type });
+  const triggerNotification = (msg, notifType = 'success') => {
+    setNotification({ msg, type: notifType });
     setTimeout(() => setNotification(null), 3500);
   };
 
@@ -375,7 +375,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-lya-border/40" />
             <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-400 lya:border-lya-primary border-t-transparent animate-spin" />
             <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
-              <img src={logoLyA} alt="Logo Lya" className="w-full h-full object-cover animate-pulse" />
+              <img src={logoLyA} alt="Logo 𝓛𝔂𝓪" className="w-full h-full object-cover animate-pulse" />
             </div>
          </div>
          
@@ -383,9 +383,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             initial={{ y: 10, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             transition={{ delay: 0.2 }}
-            className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse"
+            className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse text-center"
          >
-            {isLoggingOut ? "Cerrando sesión..." : "Preparando tu mesa..."}
+            {isLoggingOut 
+              ? "Cerrando sesión..." 
+              : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
          </motion.h2>
          <motion.p 
             initial={{ y: 10, opacity: 0 }} 
@@ -398,7 +400,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             ) : (
                <CheckCircle2 size={16} className="text-green-500" />
             )}
-            {isLoggingOut ? "Liberando la mesa" : "Cargando el menú más fresco"}
+            {isLoggingOut 
+              ? (type === 'llevar' ? "Cerrando orden" : "Liberando la mesa") 
+              : "Cargando el menú más fresco"}
          </motion.p>
       </div>
     );
@@ -420,9 +424,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              Sesión Expirada
           </h2>
           <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify px-2">
-             Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente, ya que no detectamos ninguna orden confirmada. 
-             <br/><br/>
-             Si deseas ordenar nuevamente, por favor vuelve a escanear el código QR e ingresar tu nombre.
+             {type === 'llevar' 
+               ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada. \n\nSi deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre."
+               : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente, ya que no detectamos ninguna orden confirmada. \n\nSi deseas ordenar nuevamente, por favor vuelve a escanear el código QR e ingresar tu nombre."
+             }
           </p>
           <motion.button 
             whileTap={{ scale: 0.95 }} 
@@ -495,7 +500,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               cycleTheme={cycleTheme}
               cycleSize={cycleSize}
               onClose={() => setShowSettings(false)}
-              showLogout={confirmedSnapshot.items.length === 0} // 🔥 FIX: Oculta el botón si ya hay historial de pedido
+              showLogout={confirmedSnapshot.items.length === 0} 
               onLogout={() => {
                 setShowSettings(false);
                 setShowLogoutConfirm(true);
@@ -721,7 +726,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             cycleTheme={cycleTheme}
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
-            showLogout={confirmedSnapshot.items.length === 0} // 🔥 FIX: Oculta el botón si ya hay historial de pedido
+            showLogout={confirmedSnapshot.items.length === 0} 
             onLogout={() => {
               setShowSettings(false);
               setShowLogoutConfirm(true);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { QrCode, ShieldAlert, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,6 +28,7 @@ const getInitialTheme = () => {
 export default function ClientApp({ type }) {
   const { tableId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   // Extraemos el token de seguridad de la URL actual (ejemplo: ?token=abc123xyz)
   const qrTokenUrl = searchParams.get('token') || '';
@@ -49,6 +50,31 @@ export default function ClientApp({ type }) {
     const saved = localStorage.getItem('lya_client_session');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // 🔥 VALIDACIÓN DE CONTAMINACIÓN CRUZADA (Redirección Inteligente)
+  useEffect(() => {
+    if (clientData) {
+      const { type: sessionType, tableId: sessionTableId } = clientData;
+      
+      let needsRedirect = false;
+      let targetPath = '';
+
+      // Si el tipo es diferente (ej. pasó de 'mesa' a 'llevar')
+      if (sessionType && sessionType !== type) {
+        needsRedirect = true;
+        targetPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
+      } 
+      // Si ambos son mesa, pero es una mesa distinta
+      else if (sessionType === 'mesa' && type === 'mesa' && sessionTableId && sessionTableId !== tableId) {
+        needsRedirect = true;
+        targetPath = `/m/${sessionTableId}`;
+      }
+
+      if (needsRedirect && targetPath) {
+        navigate(targetPath, { replace: true });
+      }
+    }
+  }, [clientData, type, tableId, navigate]);
 
   // 🔥 VALIDACIÓN DE SEGURIDAD DEL QR Y ESCUCHA EN TIEMPO REAL
   useEffect(() => {
@@ -105,8 +131,10 @@ export default function ClientApp({ type }) {
           {!clientData ? (
             <ClientLogin 
               onLogin={(data) => {
-                setClientData(data);
-                localStorage.setItem('lya_client_session', JSON.stringify(data));
+                // Inyectamos el contexto de la mesa/llevar a la sesión para evitar contaminación cruzada
+                const sessionData = { ...data, type, tableId };
+                setClientData(sessionData);
+                localStorage.setItem('lya_client_session', JSON.stringify(sessionData));
               }} 
               type={type} 
               tableId={tableId} 
@@ -160,7 +188,7 @@ export default function ClientApp({ type }) {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-black text-gray-900 dark:text-white lya:text-lya-text uppercase tracking-wider mb-0.5">¿Qué debes hacer?</h4>
                     <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify leading-snug">
-                      Por favor, solicita al personal de 𝓛𝔂ὰ que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
+                      Por favor, solicita al personal de 𝓛𝔂𝓪 que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
                     </p>
                   </div>
                 </div>
