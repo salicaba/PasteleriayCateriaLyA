@@ -1,6 +1,7 @@
 // src/modules/cafeteria/views/components/ticket/TicketBottomBar.jsx
 import React from 'react';
-import { ChefHat, CreditCard, CheckCheck, Printer, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
+// 🔥 AQUÍ ESTÁ EL FIX: Agregamos Trash2 a la importación
+import { ChefHat, CreditCard, CheckCheck, Printer, XCircle, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
 export const TicketBottomBar = ({

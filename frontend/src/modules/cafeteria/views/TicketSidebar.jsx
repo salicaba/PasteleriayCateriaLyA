@@ -63,13 +63,17 @@ export const TicketSidebar = ({
       }
   }
 
+  // 🔥 ESTA ES LA FUNCIÓN QUE DEBES REEMPLAZAR EN TicketSidebar.jsx 🔥
   const handleAddCuenta = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    
+    // Ya no hacemos la validación aquí porque TicketAccountForm se encarga de todo.
     const name = newCuentaName.trim();
     if (name && addNewCuenta) {
       addNewCuenta(name, newCuentaPhone);
       toast(`Cuenta "${name}" creada exitosamente`, 'success');
     }
+    
     setNewCuentaName('');
     setNewCuentaPhone('');
   };
