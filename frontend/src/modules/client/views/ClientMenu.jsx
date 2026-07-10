@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  AlertCircle, PowerOff, Clock, FileText, LogOut, Timer
+  AlertCircle, PowerOff, Clock, FileText, LogOut, Timer, XCircle
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -48,16 +48,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  // 🔥 ESTADOS DE FINALIZACIÓN ABSOLUTA
-  const [sessionFinalized, setSessionFinalized] = useState(() => {
-    const finalizedAt = localStorage.getItem('lya_client_finalized_at');
-    if (finalizedAt) {
-       const elapsed = Math.floor((Date.now() - parseInt(finalizedAt)) / 1000);
-       return elapsed < 60; // Solo lo restauramos si aún no pasa el minuto
-    }
-    return false;
-  });
+  // 🔥 NUEVOS ESTADOS: Control de Finalización Automática (Verde o Rojo)
+  const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
+  const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
   const [timeLeft, setTimeLeft] = useState(60);
+
+  // 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA SE FINALIZÓ
+  const isReadOnly = !!finalizedStatus;
   
   const lastActivityRef = useRef(Date.now());
   const isProcessingRef = useRef(false);
@@ -67,17 +64,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     const saved = localStorage.getItem('lya_client_snapshot');
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
-
-  // EXPULSIÓN INSTANTÁNEA SI PASÓ MÁS DE UN MINUTO MIENTRAS ESTABA CERRADA
-  useEffect(() => {
-    const finalizedAt = localStorage.getItem('lya_client_finalized_at');
-    if (finalizedAt) {
-        const elapsed = Math.floor((Date.now() - parseInt(finalizedAt)) / 1000);
-        if (elapsed >= 60) {
-            handleLogout();
-        }
-    }
-  }, []);
 
   // 1. POLLING DE QR ACTIVO
   useEffect(() => {
@@ -94,87 +80,97 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // 2. AUTO-CIERRE POR INACTIVIDAD (Antes de confirmar pedido)
+  // 2. AUTO-CIERRE POR INACTIVIDAD (Si no han confirmado)
   useEffect(() => {
-    const updateActivity = () => { lastActivityRef.current = Date.now(); };
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+    
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInterval = setInterval(() => {
-      if (isConfirmed || isSubmitting || sessionFinalized) return; 
-      if (Date.now() - lastActivityRef.current > 1500000) setSessionExpired(true);
+      if (isConfirmed || isSubmitting || finalizedStatus) return; 
+
+      const now = Date.now();
+      if (now - lastActivityRef.current > 1500000) {
+        setSessionExpired(true);
+      }
     }, 30000); 
 
     return () => {
       clearInterval(checkInterval);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
-  }, [isConfirmed, isSubmitting, sessionFinalized]);
+  }, [isConfirmed, isSubmitting, finalizedStatus]);
 
-  // 🔥 3. VIGILANCIA IMPLACABLE: Detectar cobros y cancelaciones de la mesa
+  // 🔥 3. VIGILANCIA DE ESTADO ESPECÍFICO (¿Es Verde o Rojo?)
   useEffect(() => {
-    if (!activeOrderId || !isConfirmed || sessionFinalized) return;
+    // Si no han pedido nada o ya está finalizada, no hacemos polling
+    if (!activeOrderId || finalizedStatus) return;
 
-    const checkOrderStatus = async () => {
+    const checkStatus = async () => {
       try {
-        const res = await client.get('/pos/orders'); 
-        const activeOrders = res.data || [];
-        const stillActive = activeOrders.some(o => String(o.id) === String(activeOrderId));
+        const res = await client.get(`/pos/orders/${activeOrderId}/status`);
+        const status = res.data.status;
         
-        if (!stillActive) triggerFinalized();
-      } catch (error) {
-        if (error.response?.status === 401 || error.response?.status === 403) {
-           console.error("🚨 ALERTA: Tu celular no puede vigilar la orden. Quítale el middleware de Auth a la ruta GET /pos/orders en el Backend.");
+        // Si el cajero cerró/pagó la mesa (VERDE)
+        if (status === 'CLOSED' || status === 'PAID') {
+           triggerFinalized('PAID');
+        } 
+        // Si el cajero canceló la orden (ROJO)
+        else if (status === 'CANCELLED' || status === 'DELETED') {
+           triggerFinalized('CANCELLED');
         }
+      } catch (error) {
+        // Fallo silencioso si hay problemas de red temporales
       }
     };
 
-    const interval = setInterval(checkOrderStatus, 10000);
-    socket.on('pos:update', checkOrderStatus);
-    checkOrderStatus(); // Verificamos al instante
+    // Revisamos periódicamente y también reaccionamos a los sockets del POS
+    const interval = setInterval(checkStatus, 5000);
+    socket.on('pos:update', checkStatus);
+    checkStatus(); // Validar inmediatamente al montar
 
     return () => {
        clearInterval(interval);
-       socket.off('pos:update', checkOrderStatus);
+       socket.off('pos:update', checkStatus);
     };
-  }, [activeOrderId, isConfirmed, sessionFinalized]);
+  }, [activeOrderId, finalizedStatus]);
 
-  // 🔥 4. DISPARADOR DEL RELOJ EN LOCALSTORAGE
-  const triggerFinalized = () => {
-    let finalizedAt = localStorage.getItem('lya_client_finalized_at');
-    if (!finalizedAt) {
-       finalizedAt = Date.now();
-       localStorage.setItem('lya_client_finalized_at', finalizedAt);
+  // 🔥 4. ACTIVADOR DE LA CUENTA REGRESIVA ABSOLUTA
+  const triggerFinalized = (status) => {
+    if (!localStorage.getItem('lya_client_finalized_at')) {
+       localStorage.setItem('lya_client_finalized_at', Date.now().toString());
+       localStorage.setItem('lya_client_finalized_status', status);
     }
-    setSessionFinalized(true);
+    setFinalizedStatus(status);
+    setShowFinalizedOverlay(true);
   };
 
-  // 🔥 5. BUCLE DEL RELOJ ABSOLUTO
+  // 🔥 5. BUCLE DEL RELOJ EN TIEMPO REAL
   useEffect(() => {
-    if (!sessionFinalized) return;
+    if (!finalizedStatus) return;
     
-    const timer = setInterval(() => {
+    const updateTimer = () => {
        const finalizedAt = parseInt(localStorage.getItem('lya_client_finalized_at') || Date.now());
        const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
        const remaining = 60 - elapsedSeconds;
        
        if (remaining <= 0) {
-          clearInterval(timer);
-          handleLogout(); 
+          handleLogout(); // EXPULSIÓN AUTOMÁTICA
        } else {
           setTimeLeft(remaining);
        }
-    }, 1000);
+    };
     
-    // Setup inicial visual
-    const fAt = parseInt(localStorage.getItem('lya_client_finalized_at') || Date.now());
-    const eSec = Math.floor((Date.now() - fAt) / 1000);
-    if (60 - eSec <= 0) handleLogout(); else setTimeLeft(60 - eSec);
+    updateTimer(); // Actualizar de inmediato al iniciar
+    const timer = setInterval(updateTimer, 1000);
     
     return () => clearInterval(timer);
-  }, [sessionFinalized]);
+  }, [finalizedStatus]);
 
-  // LÓGICA DE SALIDA
+  // LÓGICA DE SALIDA PERFECTA
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
@@ -188,7 +184,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_snapshot', 
       'lya_client_data', 
       'lya_client_session',
-      'lya_client_finalized_at'
+      'lya_client_finalized_at', // 🔥 Limpiamos el reloj
+      'lya_client_finalized_status' // 🔥 Limpiamos el estado
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -342,7 +339,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         return newId;
       };
 
-      if (!targetOrderId) targetOrderId = await createNewOrder();
+      if (!targetOrderId) {
+        targetOrderId = await createNewOrder();
+      }
 
       const itemsPayload = {
         items: cart.map(item => ({
@@ -399,6 +398,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     } catch (error) {
       console.error("Error al enviar la orden al servidor:", error);
+      
       let backendError = "No se pudo conectar con el servidor.";
       let statusCode = error.response?.status || "Error de Red";
       let endpoint = error.config?.url || "/pos/orders";
@@ -408,7 +408,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       } else if (error.message && error.message !== "Network Error") {
         backendError = error.message;
       }
-      setDiagnosticError({ endpoint, statusCode, message: backendError });
+      
+      setDiagnosticError({
+        endpoint: endpoint,
+        statusCode: statusCode,
+        message: backendError
+      });
+
     } finally {
       setIsSubmitting(false);
     }
@@ -429,7 +435,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
-  // 🔥 VISTA 1: CARGA DE SALIDA O ENTRADA
+  // ===============================================
+  // VISTAS DE ESTADOS ESPECIALES
+  // ===============================================
+
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md transition-opacity duration-300">
@@ -442,58 +451,87 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
          </div>
          
          <motion.h2 
-            initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
+            initial={{ y: 10, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            transition={{ delay: 0.2 }}
             className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse text-center"
          >
-            {isLoggingOut ? "Cerrando sesión..." : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
+            {isLoggingOut 
+              ? "Cerrando sesión..." 
+              : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
          </motion.h2>
          <motion.p 
-            initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}
+            initial={{ y: 10, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            transition={{ delay: 0.4 }}
             className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm flex items-center gap-2"
          >
-            {isLoggingOut ? <Loader2 size={16} className="text-orange-500 animate-spin" /> : <CheckCircle2 size={16} className="text-green-500" />}
-            {isLoggingOut ? (type === 'llevar' ? "Cerrando orden" : "Liberando la mesa") : "Cargando el menú más fresco"}
+            {isLoggingOut ? (
+               <Loader2 size={16} className="text-orange-500 animate-spin" />
+            ) : (
+               <CheckCircle2 size={16} className="text-green-500" />
+            )}
+            {isLoggingOut 
+              ? (type === 'llevar' ? "Cerrando orden" : "Liberando la mesa") 
+              : "Cargando el menú más fresco"}
          </motion.p>
       </div>
     );
   }
 
-  // 🔥 VISTA 2: PANTALLA DE SALIDA NEO-BENTO (Pagada o Cancelada)
-  if (sessionFinalized) {
+  // 🔥 PANTALLA NEO-BENTO DE FINALIZACIÓN (VERDE O ROJO)
+  if (finalizedStatus && showFinalizedOverlay) {
+    const isPaid = finalizedStatus === 'PAID';
+    const bgColor = isPaid ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
+    const TitleIcon = isPaid ? CheckCircle2 : XCircle;
+
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
+      <div className={`h-full w-full flex-1 flex flex-col items-center justify-center ${bgColor} p-6 overflow-hidden text-white relative`}>
         <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ type: 'spring', damping: 25 }} 
-          className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center relative overflow-hidden"
+          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          className="max-w-[400px] w-full flex flex-col items-center text-center relative z-10"
         >
-          {/* Badge del Reloj */}
-          <div className="absolute top-4 right-4 bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-secondary/20 text-orange-600 dark:text-orange-400 lya:text-lya-secondary px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-bold shadow-sm">
-            <Timer size={14} className="animate-pulse" />
+          {/* Icono Principal */}
+          <TitleIcon size={64} className="mb-4 shadow-sm rounded-full bg-white/20 p-2" />
+          
+          <h2 className="text-3xl font-black tracking-tight mb-2">
+             {isPaid ? '¡Cuenta Pagada!' : 'Pedido Cancelado'}
+          </h2>
+          <p className="font-medium text-sm mb-6 opacity-90">
+             {isPaid ? 'Tu mesa ha sido liberada exitosamente.' : 'La orden ha sido cancelada desde caja.'}
+          </p>
+
+          {/* Reloj Grande Central */}
+          <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
+            <Timer size={36} className="animate-pulse" />
             00:{timeLeft.toString().padStart(2, '0')}
           </div>
 
-          <div className="w-20 h-20 bg-green-50 dark:bg-green-500/10 lya:bg-green-500/10 rounded-full flex items-center justify-center mb-6 shadow-inner text-green-500 dark:text-green-400 mt-4">
-             <CheckCircle2 size={40} strokeWidth={2.5} />
-          </div>
-          
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">Sesión Finalizada</h2>
-          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2">
-             Tu cuenta ha sido procesada correctamente (pagada o cancelada) en caja. ¡Esperamos que hayas disfrutado tu experiencia en 𝓛𝔂𝓪!
-          </p>
-
           <div className="w-full space-y-3">
+            <div className="flex gap-3 w-full">
+              <motion.button 
+                whileTap={{ scale: 0.95 }} 
+                onClick={() => setShowFinalizedOverlay(false)} 
+                className="flex-1 py-4 bg-white/20 hover:bg-white/30 rounded-2xl font-bold transition-colors"
+              >
+                Ver Menú
+              </motion.button>
+              <motion.button 
+                whileTap={{ scale: 0.95 }} 
+                onClick={handleDownloadTicket} 
+                className={`flex-1 py-4 bg-white ${isPaid ? 'text-emerald-600' : 'text-red-600'} rounded-2xl font-black shadow-xl`}
+              >
+                Bajar Ticket
+              </motion.button>
+            </div>
+            
             <motion.button 
-              whileTap={{ scale: 0.95 }} onClick={handleDownloadTicket} 
-              className="w-full py-4 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg text-gray-900 dark:text-white lya:text-lya-text rounded-2xl font-black transition-colors flex items-center justify-center gap-2 outline-none border border-gray-200 dark:border-gray-700 lya:border-lya-border/40"
+              whileTap={{ scale: 0.95 }} 
+              onClick={handleLogout} 
+              className="w-full py-4 text-white/70 hover:text-white underline font-bold rounded-2xl transition-all outline-none"
             >
-              <FileText size={18} /><span>Ver mi Ticket Digital</span>
-            </motion.button>
-
-            <motion.button 
-              whileTap={{ scale: 0.95 }} onClick={handleLogout} 
-              className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 outline-none"
-            >
-              <LogOut size={18} /><span>Cerrar Pantalla</span>
+              Salir de la mesa ahora
             </motion.button>
           </div>
         </motion.div>
@@ -501,18 +539,21 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // 🔥 VISTA 3: EXPIRACIÓN POR INACTIVIDAD (Sin haber pedido nada)
   if (sessionExpired) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
         <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ type: 'spring', damping: 25 }} 
+          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          transition={{ type: 'spring', damping: 25 }} 
           className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
         >
           <div className="w-20 h-20 bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-lya-secondary">
              <Clock size={40} strokeWidth={2} />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">Sesión Expirada</h2>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
+             Sesión Expirada
+          </h2>
           <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify px-2">
              {type === 'llevar' 
                ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada. \n\nSi deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre."
@@ -520,7 +561,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              }
           </p>
           <motion.button 
-            whileTap={{ scale: 0.95 }} onClick={handleLogout} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={handleLogout} 
             className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 outline-none"
           >
             <span>Entendido</span>
@@ -530,24 +572,29 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // 🔥 VISTA 4: BOTÓN DE APAGADO MAESTRO DESDE CAJA
   if (!isQrActive && !isConfirmed) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
         <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ type: 'spring', damping: 25 }} 
+          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          transition={{ type: 'spring', damping: 25 }} 
           className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
         >
           <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full flex items-center justify-center mb-6 shadow-inner">
              <PowerOff size={40} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40" />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">Servicio Suspendido</h2>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
+             Servicio Suspendido
+          </h2>
           <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify">
              El servicio de pedidos digitales por código QR se encuentra temporalmente deshabilitado. Esto ocurre cuando cerramos cocina o pausamos los pedidos web. 
-             <br/><br/><b className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90">¿Estamos abiertos? ¡Entra y pide sin miedo!</b> Acércate al mostrador o llama a nuestro personal, estarán encantados de tomar tu orden directamente.
+             <br/><br/>
+             <b className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90">¿Estamos abiertos? ¡Entra y pide sin miedo!</b> Acércate al mostrador o llama a nuestro personal, estarán encantados de tomar tu orden directamente.
           </p>
           <motion.button 
-            whileTap={{ scale: 0.95 }} onClick={handleLogout} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={handleLogout} 
             className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 outline-none"
           >
              <span>Entendido, cerrar menú</span>
@@ -557,7 +604,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  if (isConfirmed) {
+  // SI LA ORDEN ESTÁ CONFIRMADA Y NO ESTAMOS EN MODO SOLO LECTURA
+  if (isConfirmed && !isReadOnly) {
     return (
       <>
         <ClientOrderSuccess 
@@ -570,19 +618,29 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           categories={categories}
           getCategoryName={getCategoryName}
           isQrActive={isQrActive} 
-          onReset={() => { if (isQrActive) setIsConfirmed(false); }}
+          onReset={() => {
+            if (isQrActive) setIsConfirmed(false); 
+          }}
           onOpenSettings={() => setShowSettings(true)}
         />
         
         <AnimatePresence>
           {showSettings && (
             <ClientSettingsModal 
-              themeIndex={themeIndex} sizeIndex={sizeIndex}
-              cycleTheme={cycleTheme} cycleSize={cycleSize}
+              themeIndex={themeIndex}
+              sizeIndex={sizeIndex}
+              cycleTheme={cycleTheme}
+              cycleSize={cycleSize}
               onClose={() => setShowSettings(false)}
               showLogout={confirmedSnapshot.items.length === 0} 
-              onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }}
-              onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }}
+              onLogout={() => {
+                setShowSettings(false);
+                setShowLogoutConfirm(true);
+              }}
+              onLogoutClick={() => {
+                setShowSettings(false);
+                setShowLogoutConfirm(true);
+              }}
             />
           )}
         </AnimatePresence>
@@ -590,9 +648,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         <AnimatePresence>
           {showLogoutConfirm && (
             <ClientLogoutModal 
-              isOpen={showLogoutConfirm} show={showLogoutConfirm}
+              isOpen={showLogoutConfirm}
+              show={showLogoutConfirm}
               onClose={() => setShowLogoutConfirm(false)}
-              onLogout={handleLogout} onConfirm={handleLogout} 
+              onLogout={handleLogout}
+              onConfirm={handleLogout} 
             />
           )}
         </AnimatePresence>
@@ -600,9 +660,37 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
+  // ===============================================
+  // VISTA PRINCIPAL DEL MENÚ (NORMAL O SOLO LECTURA)
+  // ===============================================
+
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
       
+      {/* 🔥 BANNER FLOTANTE DE MODO SOLO LECTURA */}
+      <AnimatePresence>
+        {isReadOnly && !showFinalizedOverlay && (
+          <motion.div 
+            initial={{ y: -100 }} 
+            animate={{ y: 0 }} 
+            className={`fixed top-0 left-0 right-0 z-[100] ${finalizedStatus === 'PAID' ? 'bg-emerald-500 lya:bg-[#03543F]' : 'bg-red-500 lya:bg-[#9B1C1C]'} text-white px-4 py-3 shadow-lg flex items-center justify-between`}
+          >
+             <div className="flex flex-col">
+                <span className="font-black text-sm">{finalizedStatus === 'PAID' ? 'Mesa Liberada' : 'Orden Cancelada'}</span>
+                <span className="text-[10px] font-medium opacity-90 uppercase tracking-widest">Modo Solo Lectura</span>
+             </div>
+             <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 font-bold text-sm bg-black/20 px-2 py-1 rounded-lg">
+                  <Timer size={14}/> 00:{timeLeft.toString().padStart(2, '0')}
+                </span>
+                <button onClick={handleLogout} className="bg-white text-gray-900 px-3 py-1.5 rounded-xl font-black text-xs active:scale-95 transition-transform shadow-sm">
+                   Salir
+                </button>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -631,7 +719,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors">
+      {/* Si es ReadOnly, empujamos el header para que no lo tape el banner flotante */}
+      <header className={`px-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors ${isReadOnly ? 'pt-20' : 'pt-6'}`}>
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/40 uppercase tracking-wider text-left">Menú Digital</p>
@@ -644,9 +733,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
             
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
-              <Settings size={18} strokeWidth={2.5} />
-            </motion.button>
+            {/* Si es Solo Lectura, ocultamos la tuerquita de ajustes para evitar que cambien cosas */}
+            {!isReadOnly && (
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
+                <Settings size={18} strokeWidth={2.5} />
+              </motion.button>
+            )}
           </div>
         </div>
         
@@ -668,7 +760,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         </div>
       </header>
 
-      <motion.div key={activeCategory} variants={containerVariants} initial="hidden" animate="show" className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar">
+      <motion.div 
+        key={activeCategory} 
+        variants={containerVariants}
+        initial="hidden" 
+        animate="show" 
+        className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar"
+      >
         {visibleProducts.length === 0 ? (
           <motion.div variants={itemVariants} className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-lya-text/40 font-medium text-sm">
             No se encontraron productos en esta categoría.
@@ -681,10 +779,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
             return (
               <motion.div 
-                key={product.id} layout variants={itemVariants}
-                whileTap={isCustomizable ? { scale: 0.98 } : {}} 
-                onClick={() => isCustomizable && setSelectedProduct(product)} 
-                className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''}`}
+                key={product.id} 
+                layout 
+                variants={itemVariants}
+                // Si es solo lectura, bloqueamos el tap
+                whileTap={(isCustomizable && !isReadOnly) ? { scale: 0.98 } : {}} 
+                onClick={() => (isCustomizable && !isReadOnly) && setSelectedProduct(product)} 
+                // Agregamos un efecto grisáceo si está en solo lectura
+                className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${(isCustomizable && !isReadOnly) ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''} ${isReadOnly ? 'opacity-80 grayscale-[20%]' : ''}`}
               >
                 <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center shadow-inner pointer-events-none">
                   {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-lya-text/20" size={28} />}
@@ -699,13 +801,22 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   
                   <div className="flex items-end justify-between mt-auto">
                     <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block text-left">${product.precio}</span>
-                    <button 
-                      disabled={isAdding || addingToCartId !== null}
-                      onClick={(e) => { const defaultMods = getDefaultCustomizations(product); handleAddDirectly(product, defaultMods, e); }} 
-                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow shrink-0 outline-none touch-manipulation active:scale-90 transition-all disabled:opacity-50"
-                    >
-                      {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
-                    </button>
+                    
+                    {/* 🔥 SI ESTÁ EN SOLO LECTURA, REEMPLAZAMOS EL BOTÓN "+" POR UN BADGE DE "Solo Vista" */}
+                    {isReadOnly ? (
+                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg">Solo Vista</span>
+                    ) : (
+                      <button 
+                        disabled={isAdding || addingToCartId !== null}
+                        onClick={(e) => { 
+                          const defaultMods = getDefaultCustomizations(product);
+                          handleAddDirectly(product, defaultMods, e); 
+                        }} 
+                        className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow shrink-0 outline-none touch-manipulation active:scale-90 transition-all disabled:opacity-50"
+                      >
+                        {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -714,10 +825,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </motion.div>
 
+      {/* Si NO es read-only, mostramos los botones flotantes de Checkout */}
       <AnimatePresence>
-        {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
+        {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && !isReadOnly && (
           <motion.div 
-            initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} 
+            initial={{ scale: 0, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }} 
+            exit={{ scale: 0, opacity: 0 }} 
             className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")}
             style={{ width: 'calc(100% - 3rem)' }}
           >
@@ -733,30 +847,45 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {cart.length > 0 && !showCheckout && !selectedProduct && (
+        {cart.length > 0 && !showCheckout && !selectedProduct && !isReadOnly && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
             <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center outline-none touch-manipulation">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 lya:bg-white/25 flex items-center justify-center font-black text-sm">{totalItems}</div>
                 <span className="text-base tracking-wide font-black">Revisar Pedido</span>
               </div>
-              {addingToCartId !== null ? <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-secondary" /> : <span className="font-black text-xl">${(totalCart || 0).toFixed(2)}</span>}
+              
+              {addingToCartId !== null ? (
+                <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-secondary" />
+              ) : (
+                <span className="font-black text-xl">${(totalCart || 0).toFixed(2)}</span>
+              )}
             </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* RENDERIZADO DE MODALES EXTERNOS */}
       <AnimatePresence>
-        {selectedProduct && (
-          <ClientProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={async (customizations) => await handleAddDirectly(selectedProduct, customizations)} />
+        {selectedProduct && !isReadOnly && (
+          <ClientProductModal 
+            product={selectedProduct} 
+            onClose={() => setSelectedProduct(null)} 
+            onConfirm={async (customizations) => await handleAddDirectly(selectedProduct, customizations)} 
+          />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showCheckout && (
+        {showCheckout && !isReadOnly && (
           <ClientCheckoutModal 
-            cart={cart} totalCart={totalCart} isSubmitting={isSubmitting}
-            onClose={() => setShowCheckout(false)} onConfirmOrder={handleConfirmOrder} removeFromCart={removeFromCart} incrementInCart={incrementInCart}
+            cart={cart}
+            totalCart={totalCart}
+            isSubmitting={isSubmitting}
+            onClose={() => setShowCheckout(false)}
+            onConfirmOrder={handleConfirmOrder}
+            removeFromCart={removeFromCart}
+            incrementInCart={incrementInCart}
           />
         )}
       </AnimatePresence>
@@ -764,48 +893,80 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {showSettings && (
           <ClientSettingsModal 
-            themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize}
-            onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} 
-            onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }}
-            onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }}
+            themeIndex={themeIndex}
+            sizeIndex={sizeIndex}
+            cycleTheme={cycleTheme}
+            cycleSize={cycleSize}
+            onClose={() => setShowSettings(false)}
+            showLogout={confirmedSnapshot.items.length === 0} 
+            onLogout={() => {
+              setShowSettings(false);
+              setShowLogoutConfirm(true);
+            }}
+            onLogoutClick={() => {
+              setShowSettings(false);
+              setShowLogoutConfirm(true);
+            }}
           />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showLogoutConfirm && (
-          <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />
+          <ClientLogoutModal 
+            isOpen={showLogoutConfirm}
+            show={showLogoutConfirm}
+            onClose={() => setShowLogoutConfirm(false)}
+            onLogout={handleLogout}
+            onConfirm={handleLogout} 
+          />
         )}
       </AnimatePresence>
 
+      {/* MODAL DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED */}
       <AnimatePresence>
         {diagnosticError && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDiagnosticError(null)} className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm" />
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setDiagnosticError(null)}
+              className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-red-100 dark:border-red-900/40"
             >
               <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
                 <AlertCircle size={32} strokeWidth={2} />
               </div>
               <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-6 text-center tracking-tight">Falla de Conexión</h3>
+              
               <div className="w-full bg-gray-50 dark:bg-gray-800 p-5 rounded-[1.5rem] mb-6 font-mono text-xs text-gray-700 dark:text-gray-300 overflow-hidden break-words text-left space-y-3 border border-gray-200 dark:border-gray-700 shadow-inner">
                 <p><strong className="text-red-500 dark:text-red-400">🌐 Endpoint:</strong> <br/>{diagnosticError.endpoint}</p>
                 <p><strong className="text-red-500 dark:text-red-400">📡 Status:</strong> {diagnosticError.statusCode}</p>
                 <p><strong className="text-red-500 dark:text-red-400">🛑 Motivo:</strong> <br/>{diagnosticError.message}</p>
               </div>
+
               <div className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-[1.5rem] mb-8 text-xs font-medium text-orange-800 dark:text-orange-200 text-justify border border-orange-100 dark:border-orange-800/30">
                 <strong className="block mb-2 font-black uppercase tracking-wider text-[10px]">💡 Diagnóstico Neo-Bento:</strong>
                 Si el error es "Token no proporcionado" en <b>/pos/orders</b>, el Backend está bloqueando tu petición. Debes decirle a la API que acepte órdenes de clientes públicos quitándole el middleware de Auth a esa ruta o creando una nueva ruta pública en el servidor.
               </div>
-              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setDiagnosticError(null)} className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-[1.5rem] font-black shadow-lg shadow-gray-900/20 dark:shadow-white/10 outline-none select-none">
+
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setDiagnosticError(null)}
+                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-[1.5rem] font-black shadow-lg shadow-gray-900/20 dark:shadow-white/10 outline-none select-none"
+              >
                 Entendido, lo revisaré
               </motion.button>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

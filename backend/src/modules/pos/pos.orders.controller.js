@@ -384,3 +384,23 @@ export const deliverAllItems = async (req, res) => {
     res.status(500).json({ message: 'Error al marcar todo como entregado' });
   }
 };
+
+// ==========================================
+// 🔍 ESTADO EN VIVO PARA CLIENTES (QR Público)
+// ==========================================
+export const checkOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findByPk(orderId, { attributes: ['status'] });
+    
+    // Si la orden ya no existe en la BD
+    if (!order) {
+       return res.json({ status: 'DELETED' });
+    }
+    
+    // Retornamos si está OPEN, PAID, CLOSED o CANCELLED
+    res.json({ status: order.status });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al verificar estado', error: error.message });
+  }
+};
