@@ -9,7 +9,6 @@ import client from '../../../api/client';
 import ClientOrderSuccess from './ClientOrderSuccess';
 import clsx from 'clsx';
 
-// Importación de componentes divididos
 import ClientProductModal from './components/ClientProductModal';
 import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
@@ -19,7 +18,6 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
-// Importamos el logo de 𝓛𝔂𝓪 para la pantalla de carga
 import logoLyA from '../../../assets/logo.jpeg'; 
 
 export default function ClientMenu({ clientData, type, tableId, onLogout }) {
@@ -33,7 +31,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // Estados de interfaz y retroalimentación
   const [showSettings, setShowSettings] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [themeIndex, setThemeIndex] = useState(getInitialTheme);
@@ -42,20 +39,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState(null);
   
-  // ESTADO DE DIAGNÓSTICO NEO-BENTO PARA ERRORES DE RED
   const [diagnosticError, setDiagnosticError] = useState(null);
-  
-  // ESTADO PARA EL BOTÓN DE CARGA DE LOGOUT
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Estados del negocio (Kill-Switch y Caducidad)
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   
-  // REFERENCIA DE TIEMPO REAL PARA MÓVILES
   const lastActivityRef = useRef(Date.now());
-  
-  // CANDADO SÍNCRONO: Mata el Ghost Click en la lista de productos
   const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -64,7 +54,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // POLLING PARA VERIFICAR SI APAGARON EL QR DESDE CAJA (Cada 15 segundos)
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -79,7 +68,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // LÓGICA ROBUSTA: Auto-cierre de sesión por inactividad (25 minutos)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -103,12 +91,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting]);
 
-  // LÓGICA DE SALIDA PERFECTA: Sin parpadeos y con pantalla de carga de 𝓛𝔂𝓪
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
     setIsLoggingOut(true);
-
     setIsLoading(true);
 
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -500,6 +486,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               cycleTheme={cycleTheme}
               cycleSize={cycleSize}
               onClose={() => setShowSettings(false)}
+              // 🔥 RESTRICCIÓN DE NEGOCIO RESTAURADA: ¡Nadie abandona la mesa con comida pidiendo!
               showLogout={confirmedSnapshot.items.length === 0} 
               onLogout={() => {
                 setShowSettings(false);
@@ -726,6 +713,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             cycleTheme={cycleTheme}
             cycleSize={cycleSize}
             onClose={() => setShowSettings(false)}
+            // 🔥 RESTRICCIÓN DE NEGOCIO RESTAURADA: ¡Nadie abandona la mesa con comida pidiendo!
             showLogout={confirmedSnapshot.items.length === 0} 
             onLogout={() => {
               setShowSettings(false);

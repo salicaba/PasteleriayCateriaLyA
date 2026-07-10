@@ -7,15 +7,12 @@ import clsx from 'clsx';
 
 import ClientLogin from './views/ClientLogin';
 import ClientMenu from './views/ClientMenu';
-// Importación del escudo de conexión previamente desarrollado
 import ClientConnectionShield from './views/components/ClientConnectionShield';
 
-// 🔥 IMPORTACIÓN CLAVE: Tu instancia de WebSockets para comunicación en tiempo real
 import { socket } from '../../api/socket'; 
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 
-// Función para auto-detectar el tema preferido
 const getInitialTheme = () => {
   const saved = localStorage.getItem('lya_client_theme');
   if (saved !== null) return Number(saved);
@@ -30,13 +27,11 @@ export default function ClientApp({ type }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  // Extraemos el token de seguridad de la URL actual (ejemplo: ?token=abc123xyz)
   const qrTokenUrl = searchParams.get('token') || '';
 
   const [themeIndex] = useState(getInitialTheme);
-  const [isQrValid, setIsQrValid] = useState(true); // Estado de validación del QR escaneado
+  const [isQrValid, setIsQrValid] = useState(true);
 
-  // Inyecta el tema al cargar la app
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark', 'theme-lya');
@@ -59,12 +54,10 @@ export default function ClientApp({ type }) {
       let needsRedirect = false;
       let targetPath = '';
 
-      // Si el tipo es diferente (ej. pasó de 'mesa' a 'llevar')
       if (sessionType && sessionType !== type) {
         needsRedirect = true;
         targetPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
       } 
-      // Si ambos son mesa, pero es una mesa distinta
       else if (sessionType === 'mesa' && type === 'mesa' && sessionTableId && sessionTableId !== tableId) {
         needsRedirect = true;
         targetPath = `/m/${sessionTableId}`;
@@ -76,18 +69,10 @@ export default function ClientApp({ type }) {
     }
   }, [clientData, type, tableId, navigate]);
 
-  // 🔥 VALIDACIÓN DE SEGURIDAD DEL QR Y ESCUCHA EN TIEMPO REAL
   useEffect(() => {
-    // 1. Verificación inicial pasiva/HTTP
     const verifyQrTokenValidity = async () => {
       if (!tableId) return;
-      
       try {
-        // AQUÍ HARÁ LA PETICIÓN AL BACKEND PARA VALIDAR EL TOKEN
-        // const response = await api.get(`/client/verify-table/${tableId}?token=${qrTokenUrl}`);
-        // if (!response.data.valid) { setIsQrValid(false); handleClientLogout(); return; }
-        
-        // Simulación de validación exitosa (remplaza esto con tu llamada real)
         setIsQrValid(true); 
       } catch (error) {
         setIsQrValid(false);
@@ -97,31 +82,24 @@ export default function ClientApp({ type }) {
 
     verifyQrTokenValidity();
 
-    // 2. EL PUENTE MÁGICO: Escucha activa de WebSockets para la expulsión en vivo
     const handleSecurityUpdate = () => {
-      // Cuando el admin presiona "Regenerar QRs", el servidor emite 'qr_security_update'
-      // Este bloque se ejecuta al instante en todos los celulares conectados.
       setIsQrValid(false);
       handleClientLogout();
     };
 
-    // Nos suscribimos al evento de seguridad del socket
     socket.on('qr_security_update', handleSecurityUpdate);
 
-    // Limpieza estricta: nos desuscribimos si el cliente cierra la pestaña o sale
     return () => {
       socket.off('qr_security_update', handleSecurityUpdate);
     };
-  }, [tableId, qrTokenUrl]); // Las dependencias aseguran que si cambia de mesa, se re-suscriba
+  }, [tableId, qrTokenUrl]);
 
-  // 🔥 FUNCIÓN CLAVE: Borra la sesión local y resetea la pantalla
   const handleClientLogout = () => {
     localStorage.removeItem('lya_client_session');
     setClientData(null);
   };
 
   return (
-    // PILAR 1: h-[100dvh] para blindar el Viewport Móvil contra barras de navegación reactivas
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       
       <ClientConnectionShield>
@@ -131,7 +109,6 @@ export default function ClientApp({ type }) {
           {!clientData ? (
             <ClientLogin 
               onLogin={(data) => {
-                // Inyectamos el contexto de la mesa/llevar a la sesión para evitar contaminación cruzada
                 const sessionData = { ...data, type, tableId };
                 setClientData(sessionData);
                 localStorage.setItem('lya_client_session', JSON.stringify(sessionData));
@@ -142,14 +119,14 @@ export default function ClientApp({ type }) {
           ) : (
             <ClientMenu 
               clientData={clientData} 
-              type={type} 
-              tableId={tableId} 
+              // 🔥 ESCUDO DE INTERFAZ: Si ya hay una sesión, la UI SIEMPRE muestra la mesa real guardada
+              type={clientData.type || type} 
+              tableId={clientData.tableId || tableId} 
               onLogout={handleClientLogout}
             />
           )}
         </main>
 
-        {/* PILAR 5: Bloqueo de Interfaz con Animación Fluida Neo-Bento en lugar de alerts */}
         <AnimatePresence>
           {!isQrValid && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
@@ -160,7 +137,6 @@ export default function ClientApp({ type }) {
                 transition={{ type: 'spring', damping: 25, stiffness: 230 }}
                 className="bg-white dark:bg-gray-800 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 flex flex-col items-center text-center overflow-hidden"
               >
-                {/* Iconografía Premium */}
                 <div className="relative mb-5 flex items-center justify-center">
                   <div className="w-20 h-20 bg-red-100 dark:bg-red-500/10 rounded-[1.75rem] flex items-center justify-center border border-red-200 dark:border-red-500/20 shadow-inner">
                     <QrCode size={38} className="text-red-500" />
@@ -170,17 +146,14 @@ export default function ClientApp({ type }) {
                   </div>
                 </div>
 
-                {/* Textos Informativos */}
                 <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text leading-tight mb-3">
                   Código QR Expirado
                 </h3>
                 
-                {/* PILAR 4: Texto Justificado */}
                 <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-justify leading-relaxed mb-6 px-1">
                   El enlace del menú digital que has escaneado ya no es válido debido a una actualización de seguridad del establecimiento. Esto evita que personas externas interfieran con las órdenes de las mesas.
                 </p>
 
-                {/* Caja de Ayuda Bento */}
                 <div className="w-full bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg p-4 rounded-[1.5rem] border border-gray-100 dark:border-gray-700/60 lya:border-lya-border/30 flex items-start gap-3 text-left">
                   <div className="p-2 bg-white dark:bg-gray-800 lya:bg-white rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm shrink-0">
                     <UserCheck size={18} className="text-orange-500 lya:text-lya-primary" />
@@ -192,14 +165,11 @@ export default function ClientApp({ type }) {
                     </p>
                   </div>
                 </div>
-
               </motion.div>
             </div>
           )}
         </AnimatePresence>
-
       </ClientConnectionShield>
-      
     </div>
   );
 }
