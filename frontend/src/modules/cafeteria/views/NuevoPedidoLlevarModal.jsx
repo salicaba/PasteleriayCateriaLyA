@@ -44,6 +44,9 @@ export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
       setIsSubmitting(true);
       setErrorMessage('');
       try {
+        // 🔥 FIX: Ya no concatenamos manualmente aquí. 
+        // Enviamos el nombre y el teléfono limpios y dejamos que tu controlador 
+        // los junte nativamente, evitando así la duplicación.
         await onSubmit(nombreCliente.trim(), telefono.trim());
         onClose(); 
       } catch (error) {
@@ -60,7 +63,7 @@ export const NuevoPedidoLlevarModal = ({ isOpen, onClose, onSubmit }) => {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors">
           
-          {/* CÁPSULA NEO-BENTO ÁMBAR IDÉNTICA AL LOGIN */}
+          {/* CÁPSULA NEO-BENTO ÁMBAR */}
           <AnimatePresence>
             {errorMessage && (
               <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">

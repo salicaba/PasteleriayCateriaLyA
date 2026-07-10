@@ -63,11 +63,8 @@ export const TicketSidebar = ({
       }
   }
 
-  // 🔥 ESTA ES LA FUNCIÓN QUE DEBES REEMPLAZAR EN TicketSidebar.jsx 🔥
   const handleAddCuenta = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    
-    // Ya no hacemos la validación aquí porque TicketAccountForm se encarga de todo.
     const name = newCuentaName.trim();
     if (name && addNewCuenta) {
       addNewCuenta(name, newCuentaPhone);
@@ -386,10 +383,12 @@ export const TicketSidebar = ({
       )}
 
       <div ref={scrollContainerRef} onDragOver={handleContainerDragOver} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar relative z-10">
-        {activeCart.length === 0 && availableAccs.length === 1 ? (
+        
+        {/* 🔥 FIX: Excepción añadida para !isLlevar. Si es Para Llevar, mostrará la tarjeta directamente en lugar del mensaje de "Orden Vacía" */}
+        {activeCart.length === 0 && availableAccs.length === 1 && !isLlevar ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 lya:text-lya-text/40 opacity-70">
             <ShoppingBag size={48} strokeWidth={1.5} className="mb-3" />
-            <p className="text-xs font-black uppercase tracking-widest">{isVitrina ? 'Mostrador Libre' : (isLlevar ? 'Orden vacía' : 'Mesa vacía')}</p>
+            <p className="text-xs font-black uppercase tracking-widest">{isVitrina ? 'Mostrador Libre' : 'Mesa vacía'}</p>
             <p className="text-[10px] font-medium mt-1">Añade productos del menú</p>
           </div>
         ) : (

@@ -99,8 +99,8 @@ export const PosModal = ({
   }, [isOpen, categoriaActiva]); 
 
   // 🔥 ESCUDO NEO-BENTO: Validación Estricta Anti-Contaminación de Zonas
-  const rawNumero = String(mesa?.numero || mesa?.id || '').trim();
-  const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumero);
+  const rawNumeroStr = String(mesa?.numero || mesa?.id || '').trim();
+  const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumeroStr);
 
   const isLlevar = (mesa?.zona === 'llevar' || mesa?.orderType === 'LLEVAR') && !esMesaFisica;
   const isVitrina = mesa?.zona === 'vitrina' || mesa?.id === 'VITRINA-EXPRESS';
@@ -207,41 +207,33 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
-  const partesNumero = (mesa.numero || '').toString().split(' - ');
-  let numeroReal = partesNumero[0] || 'Pedido'; 
+  // 🔥 NUEVA LÓGICA DE EXTRACCIÓN LIMPIA 🔥
+  let numeroReal = 'Pedido';
+  let nombreParaSidebar = '';
+
+  if (rawNumeroStr.includes(' - ')) {
+     const partes = rawNumeroStr.split(' - ');
+     numeroReal = partes[0].trim();
+     // Agrupamos el resto para mandarlo al Sidebar (Nombre y Teléfono si existe)
+     nombreParaSidebar = partes.slice(1).join(' - ').trim();
+  } else {
+     numeroReal = rawNumeroStr.trim();
+  }
 
   if (!isLlevar && !isVitrina) {
     numeroReal = numeroReal.replace(/#/g, '').trim();
   }
 
-  const nombreCliente = partesNumero[1];
-  const telCliente = partesNumero[2];
-
   const HeaderTitle = () => {
     if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
     
     if (isLlevar) {
-      const folio = partesNumero[0]; 
+      // 🔥 Ahora solo devolvemos el Folio limpio (Ej: Llevar #5). 
+      // El nombre y teléfono se renderizan nativamente abajo en el TicketCartGroup
       return (
-        <div className="flex flex-col gap-2">
-          <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">
-            {folio}
-          </h3>
-          {(nombreCliente || telCliente) && (
-            <div className="flex flex-wrap items-center gap-2">
-              {nombreCliente && (
-                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text bg-white dark:bg-gray-800 lya:bg-lya-bg px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm">
-                  <User size={14} className="text-orange-500 lya:text-lya-secondary" /> {nombreCliente}
-                </span>
-              )}
-              {telCliente && (
-                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 lya:text-lya-text/70 bg-white dark:bg-gray-800 lya:bg-lya-bg px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm">
-                  <Phone size={12} className="text-orange-500 lya:text-lya-secondary" /> {telCliente}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">
+          {numeroReal}
+        </h3>
       );
     }
     
@@ -301,7 +293,8 @@ export const PosModal = ({
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
-    nombreCliente: isLlevar ? nombreCliente : null,
+    // 🔥 Le pasamos el nombre extraído a la Sidebar para que lo pinte en la caja de abajo
+    nombreCliente: isLlevar ? nombreParaSidebar : null,
     showToast 
   };
 
@@ -346,7 +339,6 @@ export const PosModal = ({
             ) : (
               <motion.div
                 key="product-grid"
-                // 🔥 ANIMACIÓN ESTRICTA
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
@@ -356,7 +348,7 @@ export const PosModal = ({
                   <ProductCard 
                     key={product.id} 
                     product={product} 
-                    isLocked={isAccountLocked} /* 🔥 CANDADO INYECTADO AQUÍ */
+                    isLocked={isAccountLocked} 
                     onClick={setSelectedProduct} 
                     onQuickAdd={(p) => {
                       let ops = p.opciones;
@@ -382,7 +374,6 @@ export const PosModal = ({
         <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors shrink-0">
            <div>
               <HeaderTitle />
-              {/* 🔥 ETIQUETA MULTI-ESTADO */}
               <p className="text-xs text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-1 font-bold tracking-wide uppercase">
                 {isVitrina ? 'Cobro Inmediato' : (isLlevar ? 'Venta para Llevar' : 'Consumo en Salón')}
               </p>
@@ -427,7 +418,6 @@ export const PosModal = ({
             <div className="p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg flex items-center justify-between border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm z-10 shrink-0">
               <div>
                 <HeaderTitle />
-                {/* 🔥 ETIQUETA MULTI-ESTADO (MÓVIL) */}
                 <p className="text-[10px] text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-0.5 font-bold tracking-wider uppercase">
                   {isVitrina ? 'Cobro Inmediato' : (isLlevar ? 'Venta para Llevar' : 'Consumo en Salón')}
                 </p>
@@ -478,7 +468,7 @@ export const PosModal = ({
                 />
 
                 <AnimatePresence>
-                  {/* CÁPSULA NEO-BENTO DE FALLBACK LOCAL (Texto Centrado) */}
+                  {/* CÁPSULA NEO-BENTO DE FALLBACK LOCAL */}
                   {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
                       <motion.div 
@@ -510,7 +500,6 @@ export const PosModal = ({
                   
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
                   
-                  {/* Pasa isLocked al Modal de Opciones para que tampoco puedan burlar el bloqueo */}
                   {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
                   
                   {showCheckout && (

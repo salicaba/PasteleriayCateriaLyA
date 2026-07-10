@@ -37,6 +37,16 @@ export const TicketCartGroup = ({
       }
   }
 
+  // 🔥 ESCUDO ANTI-DUPLICADOS: Limpia el teléfono si el backend lo guardó repetido (ej. "435... - 435...")
+  if (finalDisplayPhone) {
+      const strPhone = String(finalDisplayPhone);
+      if (strPhone.includes(' - ')) {
+          finalDisplayPhone = strPhone.split(' - ')[0].trim();
+      } else if (strPhone.includes(' | ')) {
+          finalDisplayPhone = strPhone.split(' | ')[0].trim();
+      }
+  }
+
   return (
     <motion.div 
       layout 

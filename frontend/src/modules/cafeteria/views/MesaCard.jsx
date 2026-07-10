@@ -13,7 +13,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
   
   const isLlevar = (mesa.zona === 'llevar' || mesa.orderType === 'LLEVAR') && !esMesaFisica;
 
-  // Se actualizó para detectar también los "listos" (READY)
   const { pendientes, listos, totalItems } = useMemo(() => {
     if (!mesa.items || mesa.items.length === 0) return { pendientes: 0, listos: 0, totalItems: 0 };
     
@@ -29,36 +28,95 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
 
   const hasReadyItems = listos > 0;
 
+  // 🔥 MAGIA DE PARSEO: Separamos quirúrgicamente el Número de Orden del Nombre y el Teléfono
   const { idPrincipal, nombreCliente, telefonoCliente } = useMemo(() => {
+    
+    // 1. Lógica para MESAS DE SALÓN
     if (!isLlevar) {
-       // 🔥 MEJORA UX: Rescatamos el nombre del cliente de la orden QR (ticketId) para que aparezca en el Salón
        let nombreQR = '';
        if (mesa.ticketId && mesa.ticketId !== rawNumero && !String(mesa.ticketId).includes('MOSTRADOR')) {
            nombreQR = mesa.ticketId;
        } else if (mesa.nombreCliente) {
            nombreQR = mesa.nombreCliente;
        }
-       return { idPrincipal: rawNumero, nombreCliente: nombreQR, telefonoCliente: '' };
+
+       let nom = nombreQR;
+       let tel = '';
+       if (nom.includes(' | ')) {
+           const pts = nom.split(' | ');
+           nom = pts[0].trim();
+           if(pts[1]) tel = pts[1].trim();
+       } else if (nom.includes(' - ')) {
+           const pts = nom.split(' - ');
+           const posTel = pts[pts.length - 1].trim();
+           if (posTel.replace(/\D/g, '').length === 10) {
+               tel = posTel;
+               nom = pts.slice(0, -1).join(' - ').trim();
+           }
+       }
+       return { idPrincipal: rawNumero, nombreCliente: nom, telefonoCliente: tel };
     }
 
-    const partes = rawNumero.split(' - ');
-    
-    let id = partes[0] || 'Pedido';
-    id = id.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim(); 
-    
-    if (partes.length < 3) {
-       return { idPrincipal: id, nombreCliente: partes[1] || 'Mostrador', telefonoCliente: '' };
+    // 2. Lógica para PARA LLEVAR O MOSTRADOR
+    if (rawNumero.includes('MOSTRADOR') || rawNumero.includes('VITRINA')) {
+        return { idPrincipal: 'Mostrador', nombreCliente: '', telefonoCliente: '' };
     }
 
-    const rawTel = partes[partes.length - 1];
-    const telLimpio = rawTel.replace(/\D/g, ''); 
-    
-    if (telLimpio.length >= 10) {
-      const nombre = partes.slice(1, -1).join(' - ');
-      return { idPrincipal: id, nombreCliente: nombre, telefonoCliente: rawTel };
+    let id = 'Pedido';
+    let nombre = '';
+    let telefono = '';
+
+    // Patrón: "Llevar #5 - Juan - 9611234567" o "Llevar #5 - Emmanuel | 961..."
+    const match = rawNumero.match(/Llevar\s*#?\s*(\d+)\s*-\s*(.*)/i);
+
+    if (match) {
+        id = match[1]; // Extraemos solo el "5"
+        let resto = match[2]; // Extraemos el resto de la cadena
+
+        if (resto.includes(' | ')) {
+            const pts = resto.split(' | ');
+            nombre = pts[0].trim();
+            telefono = pts[1].trim();
+        } else if (resto.includes(' - ')) {
+            const pts = resto.split(' - ');
+            const posTel = pts[pts.length - 1].trim();
+            // Validamos que sea un teléfono válido de 10 dígitos
+            if (posTel.replace(/\D/g, '').length === 10) {
+                telefono = posTel;
+                nombre = pts.slice(0, -1).join(' - ').trim();
+            } else {
+                nombre = resto.trim();
+            }
+        } else {
+            nombre = resto.trim();
+        }
+    } else {
+        // Fallback si el nombre viene estructurado diferente
+        let cleanRaw = rawNumero.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim();
+        
+        if (cleanRaw.includes(' | ')) {
+            const pts = cleanRaw.split(' | ');
+            nombre = pts[0].trim();
+            telefono = pts[1].trim();
+        } else if (cleanRaw.includes(' - ')) {
+            const pts = cleanRaw.split(' - ');
+            id = pts[0].trim(); 
+            const posTel = pts[pts.length - 1].trim();
+            if (posTel.replace(/\D/g, '').length === 10) {
+                telefono = posTel;
+                nombre = pts.slice(1, -1).join(' - ').trim();
+            } else {
+                nombre = pts.slice(1).join(' - ').trim();
+            }
+        } else {
+            id = cleanRaw;
+        }
     }
 
-    return { idPrincipal: id, nombreCliente: partes.slice(1).join(' - '), telefonoCliente: '' };
+    // Limpieza estética: Si dice "Cliente" y no tiene teléfono, lo ocultamos para que no estorbe
+    if (nombre.toLowerCase() === 'cliente' && !telefono) nombre = '';
+
+    return { idPrincipal: id, nombreCliente: nombre, telefonoCliente: telefono };
   }, [mesa.numero, mesa.ticketId, mesa.nombreCliente, isLlevar, rawNumero]);
 
   return (
@@ -105,7 +163,8 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
               isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
             }`}>
-              #{idPrincipal}
+              {/* Aquí usamos nuestro id limpio (Ej: #1 en vez de #1 - Emmanuel) */}
+              {idPrincipal === 'Mostrador' ? 'Express' : `#${idPrincipal}`}
             </h3>
           </div>
           
@@ -143,6 +202,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
                 ${Number(mesa.total || 0).toFixed(2)}
               </span>
               
+              {/* 🔥 AQUÍ CAE EL NOMBRE Y TELÉFONO PERFECTAMENTE AISLADOS 🔥 */}
               {nombreCliente && nombreCliente !== 'Mostrador' && (
                 <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
                   <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1.5">
