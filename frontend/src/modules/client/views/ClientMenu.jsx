@@ -53,7 +53,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  // 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA SE FINALIZÓ
+  // 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA FUE PAGADA, CERRADA O CANCELADA
   const isReadOnly = !!finalizedStatus;
   
   const lastActivityRef = useRef(Date.now());
@@ -80,7 +80,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // 2. AUTO-CIERRE POR INACTIVIDAD (Si no han confirmado)
+  // 2. AUTO-CIERRE POR INACTIVIDAD (Si no han confirmado y no está finalizada)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -104,31 +104,29 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting, finalizedStatus]);
 
-  // 🔥 3. VIGILANCIA DE ESTADO ESPECÍFICO (¿Es Verde o Rojo?)
+  // 🔥 3. VIGILANCIA IMPLACABLE DE ESTADO ESPECÍFICO (¿Es Pagada, Cerrada o Cancelada?)
   useEffect(() => {
-    // Si no han pedido nada o ya está finalizada, no hacemos polling
-    if (!activeOrderId || finalizedStatus) return;
+    // Detenemos el polling solo si ya está 100% liberada o cancelada
+    if (!activeOrderId || finalizedStatus === 'CLOSED' || finalizedStatus === 'CANCELLED') return;
 
     const checkStatus = async () => {
       try {
         const res = await client.get(`/pos/orders/${activeOrderId}/status`);
         const status = res.data.status;
         
-        // Si el cajero cerró/pagó la mesa (VERDE)
-        if (status === 'CLOSED' || status === 'PAID') {
-           triggerFinalized('PAID');
-        } 
-        // Si el cajero canceló la orden (ROJO)
-        else if (status === 'CANCELLED' || status === 'DELETED') {
-           triggerFinalized('CANCELLED');
+        if (status === 'CLOSED') {
+           triggerFinalized('CLOSED'); // Verde - Mesa Liberada
+        } else if (status === 'PAID') {
+           triggerFinalized('PAID'); // Verde - Cuenta Pagada (pero mesa aún ocupada en caja)
+        } else if (status === 'CANCELLED' || status === 'DELETED') {
+           triggerFinalized('CANCELLED'); // Rojo - Cancelada
         }
       } catch (error) {
         // Fallo silencioso si hay problemas de red temporales
       }
     };
 
-    // Revisamos periódicamente y también reaccionamos a los sockets del POS
-    const interval = setInterval(checkStatus, 5000);
+    const interval = setInterval(checkStatus, 5000); // Checa cada 5 segundos
     socket.on('pos:update', checkStatus);
     checkStatus(); // Validar inmediatamente al montar
 
@@ -138,17 +136,19 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [activeOrderId, finalizedStatus]);
 
-  // 🔥 4. ACTIVADOR DE LA CUENTA REGRESIVA ABSOLUTA
+  // 🔥 4. DISPARADOR DEL MODO FINALIZADO Y RELOJ
   const triggerFinalized = (status) => {
+    // Solo guardamos la hora inicial la primera vez que se dispara (ej. cuando pasa a PAID)
     if (!localStorage.getItem('lya_client_finalized_at')) {
        localStorage.setItem('lya_client_finalized_at', Date.now().toString());
-       localStorage.setItem('lya_client_finalized_status', status);
     }
+    // Siempre actualizamos el estado para que la pantalla pase de "Pagada" a "Liberada" si cambia
+    localStorage.setItem('lya_client_finalized_status', status);
     setFinalizedStatus(status);
     setShowFinalizedOverlay(true);
   };
 
-  // 🔥 5. BUCLE DEL RELOJ EN TIEMPO REAL
+  // 🔥 5. BUCLE DEL RELOJ EN TIEMPO REAL ABSOLUTO (Sobrevive cierres de pestaña)
   useEffect(() => {
     if (!finalizedStatus) return;
     
@@ -160,7 +160,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
        if (remaining <= 0) {
           handleLogout(); // EXPULSIÓN AUTOMÁTICA
        } else {
-          setTimeLeft(remaining);
+          setTimeLeft(remaining); // Actualiza la UI cada segundo
        }
     };
     
@@ -184,8 +184,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_snapshot', 
       'lya_client_data', 
       'lya_client_session',
-      'lya_client_finalized_at', // 🔥 Limpiamos el reloj
-      'lya_client_finalized_status' // 🔥 Limpiamos el estado
+      'lya_client_finalized_at', // Limpiamos el reloj
+      'lya_client_finalized_status' // Limpiamos el estado
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -278,7 +278,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       e.stopPropagation();
     }
     
-    if (isProcessingRef.current) return;
+    if (isProcessingRef.current || isReadOnly) return;
     
     isProcessingRef.current = true;
     setAddingToCartId(product.id);
@@ -323,7 +323,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const totalItems = cart.reduce((acc, item) => acc + (item.qty || 0), 0);
 
   const handleConfirmOrder = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isReadOnly) return;
     setIsSubmitting(true);
     
     try {
@@ -436,7 +436,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   };
 
   // ===============================================
-  // VISTAS DE ESTADOS ESPECIALES
+  // VISTAS ESPECIALES DE CARGA Y ESTADO
   // ===============================================
 
   if (isLoading) {
@@ -481,9 +481,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   // 🔥 PANTALLA NEO-BENTO DE FINALIZACIÓN (VERDE O ROJO)
   if (finalizedStatus && showFinalizedOverlay) {
-    const isPaid = finalizedStatus === 'PAID';
-    const bgColor = isPaid ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
-    const TitleIcon = isPaid ? CheckCircle2 : XCircle;
+    const isPaidOrClosed = finalizedStatus === 'PAID' || finalizedStatus === 'CLOSED';
+    const bgColor = isPaidOrClosed ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
+    const TitleIcon = isPaidOrClosed ? CheckCircle2 : XCircle;
+
+    const overlayTitle = finalizedStatus === 'CLOSED' ? '¡Mesa Liberada!' : (finalizedStatus === 'PAID' ? '¡Cuenta Pagada!' : 'Pedido Cancelado');
+    const overlaySubtitle = finalizedStatus === 'CLOSED' 
+        ? 'Tu mesa ha sido liberada exitosamente.' 
+        : (finalizedStatus === 'PAID' ? 'Tu cuenta ha sido cobrada exitosamente.' : 'La orden ha sido cancelada desde caja.');
 
     return (
       <div className={`h-full w-full flex-1 flex flex-col items-center justify-center ${bgColor} p-6 overflow-hidden text-white relative`}>
@@ -496,13 +501,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           <TitleIcon size={64} className="mb-4 shadow-sm rounded-full bg-white/20 p-2" />
           
           <h2 className="text-3xl font-black tracking-tight mb-2">
-             {isPaid ? '¡Cuenta Pagada!' : 'Pedido Cancelado'}
+             {overlayTitle}
           </h2>
           <p className="font-medium text-sm mb-6 opacity-90">
-             {isPaid ? 'Tu mesa ha sido liberada exitosamente.' : 'La orden ha sido cancelada desde caja.'}
+             {overlaySubtitle}
           </p>
 
-          {/* Reloj Grande Central */}
+          {/* Reloj Grande Central Dinámico */}
           <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
             <Timer size={36} className="animate-pulse" />
             00:{timeLeft.toString().padStart(2, '0')}
@@ -520,7 +525,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               <motion.button 
                 whileTap={{ scale: 0.95 }} 
                 onClick={handleDownloadTicket} 
-                className={`flex-1 py-4 bg-white ${isPaid ? 'text-emerald-600' : 'text-red-600'} rounded-2xl font-black shadow-xl`}
+                className={`flex-1 py-4 bg-white ${isPaidOrClosed ? 'text-emerald-600' : 'text-red-600'} rounded-2xl font-black shadow-xl`}
               >
                 Bajar Ticket
               </motion.button>
@@ -605,6 +610,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }
 
   // SI LA ORDEN ESTÁ CONFIRMADA Y NO ESTAMOS EN MODO SOLO LECTURA
+  // (Si está en Solo Lectura, no mostraremos esta pantalla de Success, los forzaremos a ver el menú bloqueado)
   if (isConfirmed && !isReadOnly) {
     return (
       <>
@@ -673,10 +679,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           <motion.div 
             initial={{ y: -100 }} 
             animate={{ y: 0 }} 
-            className={`fixed top-0 left-0 right-0 z-[100] ${finalizedStatus === 'PAID' ? 'bg-emerald-500 lya:bg-[#03543F]' : 'bg-red-500 lya:bg-[#9B1C1C]'} text-white px-4 py-3 shadow-lg flex items-center justify-between`}
+            className={`fixed top-0 left-0 right-0 z-[100] ${finalizedStatus === 'PAID' || finalizedStatus === 'CLOSED' ? 'bg-emerald-500 lya:bg-[#03543F]' : 'bg-red-500 lya:bg-[#9B1C1C]'} text-white px-4 py-3 shadow-lg flex items-center justify-between`}
           >
              <div className="flex flex-col">
-                <span className="font-black text-sm">{finalizedStatus === 'PAID' ? 'Mesa Liberada' : 'Orden Cancelada'}</span>
+                <span className="font-black text-sm">
+                  {finalizedStatus === 'CLOSED' ? 'Mesa Liberada' : (finalizedStatus === 'PAID' ? 'Cuenta Pagada' : 'Orden Cancelada')}
+                </span>
                 <span className="text-[10px] font-medium opacity-90 uppercase tracking-widest">Modo Solo Lectura</span>
              </div>
              <div className="flex items-center gap-3">
@@ -719,7 +727,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      {/* Si es ReadOnly, empujamos el header para que no lo tape el banner flotante */}
+      {/* Si es Solo Lectura, empujamos el header para que no lo tape el banner flotante */}
       <header className={`px-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors ${isReadOnly ? 'pt-20' : 'pt-6'}`}>
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
@@ -733,7 +741,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
             
-            {/* Si es Solo Lectura, ocultamos la tuerquita de ajustes para evitar que cambien cosas */}
+            {/* Si es Solo Lectura, ocultamos la tuerquita para evitar que modifiquen ajustes */}
             {!isReadOnly && (
               <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
                 <Settings size={18} strokeWidth={2.5} />
@@ -782,10 +790,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                 key={product.id} 
                 layout 
                 variants={itemVariants}
-                // Si es solo lectura, bloqueamos el tap
+                // Si es solo lectura, bloqueamos el clic
                 whileTap={(isCustomizable && !isReadOnly) ? { scale: 0.98 } : {}} 
                 onClick={() => (isCustomizable && !isReadOnly) && setSelectedProduct(product)} 
-                // Agregamos un efecto grisáceo si está en solo lectura
+                // Efecto grisáceo si está en solo lectura
                 className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${(isCustomizable && !isReadOnly) ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''} ${isReadOnly ? 'opacity-80 grayscale-[20%]' : ''}`}
               >
                 <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center shadow-inner pointer-events-none">
@@ -802,9 +810,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   <div className="flex items-end justify-between mt-auto">
                     <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block text-left">${product.precio}</span>
                     
-                    {/* 🔥 SI ESTÁ EN SOLO LECTURA, REEMPLAZAMOS EL BOTÓN "+" POR UN BADGE DE "Solo Vista" */}
+                    {/* 🔥 SI ES SOLO LECTURA, REEMPLAZAMOS EL BOTÓN "+" POR UN BADGE DE "Solo Vista" */}
                     {isReadOnly ? (
-                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg">Solo Vista</span>
+                      <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30">Solo Vista</span>
                     ) : (
                       <button 
                         disabled={isAdding || addingToCartId !== null}
@@ -825,7 +833,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </motion.div>
 
-      {/* Si NO es read-only, mostramos los botones flotantes de Checkout */}
+      {/* Si NO es read-only, mostramos los botones de Checkout */}
       <AnimatePresence>
         {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && !isReadOnly && (
           <motion.div 
