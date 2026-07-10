@@ -55,8 +55,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [timeLeft, setTimeLeft] = useState(60);
 
   // 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA SE FINALIZÓ (Cerrada o Cancelada)
-  const isReadOnly = !!finalizedStatus;
-  
+// 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA SE FINALIZÓ O SE PAGÓ
+  const isReadOnly = !!finalizedStatus || isOrderPaid;
+
   const lastActivityRef = useRef(Date.now());
   const isProcessingRef = useRef(false);
 
@@ -112,7 +113,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     const checkStatus = async () => {
       try {
-        const res = await client.get(`/pos/orders/${activeOrderId}/status`);
+        // AQUÍ EL FIX: Le enviamos la cuenta al backend como query param
+        const res = await client.get(`/pos/orders/${activeOrderId}/status`, {
+          params: { cuenta: clientData.name }
+        });
+        
         const status = res.data.status;
         
         // Estado 1: PAGADA (Ticket se bloquea con marca de agua, no hay expulsión aún)
@@ -135,7 +140,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       }
     };
 
-    // Revisamos periódicamente y también reaccionamos a los sockets del POS
     const interval = setInterval(checkStatus, 5000);
     socket.on('pos:update', checkStatus);
     checkStatus(); // Validar inmediatamente al montar
@@ -144,7 +148,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
        clearInterval(interval);
        socket.off('pos:update', checkStatus);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid]);
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData.name]); // Agregamos clientData.name a las dependencias
 
   // 🔥 4. ACTIVADOR DE LA CUENTA REGRESIVA ABSOLUTA
   const triggerFinalized = (status) => {

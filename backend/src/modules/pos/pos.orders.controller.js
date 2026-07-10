@@ -391,14 +391,46 @@ export const deliverAllItems = async (req, res) => {
 export const checkOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const order = await Order.findByPk(orderId, { attributes: ['status'] });
+    const { cuenta } = req.query; // Interceptamos la cuenta enviada desde el ClientMenu.jsx
+
+    // 1. Buscamos la orden incluyendo sus items para revisar cobros por separado
+    const order = await Order.findByPk(orderId, {
+      include: [{
+        model: OrderItem,
+        as: 'items',
+        where: { status: 'ACTIVE' },
+        required: false // LEFT JOIN para que traiga la orden aunque no tenga items activos
+      }]
+    });
     
     // Si la orden ya no existe en la BD
     if (!order) {
        return res.json({ status: 'DELETED' });
     }
+
+    // 2. REGLA SUPREMA: Si la mesa entera ya se cerró o canceló, esto domina todo.
+    if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) {
+      return res.json({ status: order.status });
+    }
+
+    // 3. MAGIA MULTI-CUENTA: Si el cliente nos pregunta específicamente por SU cuenta
+    if (cuenta && order.items && order.items.length > 0) {
+      // Filtramos solo lo que pidió este cliente en específico
+      const itemsCuenta = order.items.filter(item => item.cuenta === cuenta);
+      
+      if (itemsCuenta.length > 0) {
+        // Verificamos si TODOS los items activos de ESTA cuenta ya fueron cobrados en caja
+        // Asumimos que los pagos actualizan el flag "isPaid" a true en el OrderItem
+        const allItemsPaid = itemsCuenta.every(item => item.isPaid === true);
+        
+        if (allItemsPaid) {
+          // Engañamos positivamente al frontend diciéndole que su entorno (cuenta) está pagado
+          return res.json({ status: 'PAID' });
+        }
+      }
+    }
     
-    // Retornamos si está OPEN, PAID, CLOSED o CANCELLED
+    // 4. Por defecto, si la cuenta no está completamente pagada, devolvemos el estado general de la mesa
     res.json({ status: order.status });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });
