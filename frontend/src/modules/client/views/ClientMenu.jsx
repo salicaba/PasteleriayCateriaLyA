@@ -3,12 +3,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
-  Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, AlertCircle, PowerOff, Clock
+  Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
+  AlertCircle, PowerOff, Clock, FileText, LogOut, Timer
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
 import clsx from 'clsx';
 
+// Importación de componentes divididos
 import ClientProductModal from './components/ClientProductModal';
 import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
@@ -18,6 +20,7 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
+import { socket } from '../../../api/socket';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
 export default function ClientMenu({ clientData, type, tableId, onLogout }) {
@@ -44,6 +47,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+
+  // 🔥 NUEVOS ESTADOS: Control de Finalización Automática
+  const [sessionFinalized, setSessionFinalized] = useState(() => {
+    return !!localStorage.getItem('lya_client_finalized_at');
+  });
+  const [timeLeft, setTimeLeft] = useState(60);
   
   const lastActivityRef = useRef(Date.now());
   const isProcessingRef = useRef(false);
@@ -54,6 +63,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
+  // 1. POLLING DE QR ACTIVO
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -68,6 +78,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
+  // 2. AUTO-CIERRE POR INACTIVIDAD (Si no han confirmado)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -77,7 +88,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInterval = setInterval(() => {
-      if (isConfirmed || isSubmitting) return; 
+      if (isConfirmed || isSubmitting || sessionFinalized) return; 
 
       const now = Date.now();
       if (now - lastActivityRef.current > 1500000) {
@@ -89,8 +100,71 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       clearInterval(checkInterval);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
-  }, [isConfirmed, isSubmitting]);
+  }, [isConfirmed, isSubmitting, sessionFinalized]);
 
+  // 🔥 3. VIGILANCIA DE ÓRDENES CERRADAS/PAGADAS DESDE CAJA
+  useEffect(() => {
+    // Si no han pedido nada o ya está finalizada, no hacemos nada
+    if (!activeOrderId || !isConfirmed || sessionFinalized) return;
+
+    const checkOrderStatus = async () => {
+      try {
+        // Pedimos la lista de órdenes activas
+        const res = await client.get('/pos/orders'); 
+        const activeOrders = res.data || [];
+        
+        // Buscamos si nuestra orden sigue viva en la base de datos
+        const stillActive = activeOrders.some(o => o.id === activeOrderId);
+        
+        if (!stillActive) {
+           triggerFinalized();
+        }
+      } catch (error) {
+        // Fallo silencioso si hay problemas de red temporales
+      }
+    };
+
+    // Revisamos periódicamente y también reaccionamos a los sockets del POS
+    const interval = setInterval(checkOrderStatus, 10000);
+    socket.on('pos:update', checkOrderStatus);
+
+    return () => {
+       clearInterval(interval);
+       socket.off('pos:update', checkOrderStatus);
+    };
+  }, [activeOrderId, isConfirmed, sessionFinalized]);
+
+  // 🔥 4. ACTIVADOR DE LA CUENTA REGRESIVA ABSOLUTA
+  const triggerFinalized = () => {
+    let finalizedAt = localStorage.getItem('lya_client_finalized_at');
+    if (!finalizedAt) {
+       finalizedAt = Date.now();
+       localStorage.setItem('lya_client_finalized_at', finalizedAt);
+    }
+    setSessionFinalized(true);
+  };
+
+  // 🔥 5. BUCLE DEL RELOJ DE FINALIZACIÓN
+  useEffect(() => {
+    if (!sessionFinalized) return;
+    
+    const timer = setInterval(() => {
+       const finalizedAt = parseInt(localStorage.getItem('lya_client_finalized_at') || Date.now());
+       const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
+       const remaining = 60 - elapsedSeconds;
+       
+       if (remaining <= 0) {
+          clearInterval(timer);
+          handleLogout(); // EXPULSIÓN AUTOMÁTICA
+       } else {
+          setTimeLeft(remaining);
+       }
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [sessionFinalized]);
+
+  // LÓGICA DE SALIDA PERFECTA
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
@@ -103,7 +177,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_order_id', 
       'lya_client_snapshot', 
       'lya_client_data', 
-      'lya_client_session'
+      'lya_client_session',
+      'lya_client_finalized_at' // 🔥 Limpiamos el reloj
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -114,6 +189,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     }
   };
 
+  const handleDownloadTicket = () => {
+    if (!activeOrderId) return;
+    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
+    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
+      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
+    }
+    const shortId = activeOrderId.split('-')[0];
+    const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(clientData.name)}`;
+    window.open(url, '_blank');
+  };
+
+  // CARGA INICIAL DEL MENÚ
   useEffect(() => {
     const loadMenuData = async () => {
       try {
@@ -156,10 +243,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   const activeCatObj = categories.find(c => c.id === activeCategory);
   const isTodasCategory = activeCatObj && activeCatObj.name.trim().toLowerCase() === 'todas';
-  
-  const visibleProducts = isTodasCategory 
-    ? products 
-    : products.filter(p => p.categoria === activeCategory);
+  const visibleProducts = isTodasCategory ? products : products.filter(p => p.categoria === activeCategory);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -336,22 +420,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.08, 
-      }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.08 } }
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
-    show: { 
-      opacity: 1, 
-      y: 0, 
-      scale: 1, 
-      transition: { type: "spring", stiffness: 300, damping: 24 } 
-    }
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
   if (isLoading) {
@@ -390,6 +464,60 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               ? (type === 'llevar' ? "Cerrando orden" : "Liberando la mesa") 
               : "Cargando el menú más fresco"}
          </motion.p>
+      </div>
+    );
+  }
+
+  // 🔥 PANTALLA DE SESIÓN FINALIZADA (Pagada o Cancelada)
+  if (sessionFinalized) {
+    return (
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          transition={{ type: 'spring', damping: 25 }} 
+          className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center relative overflow-hidden"
+        >
+          {/* Badge del Timer */}
+          <div className="absolute top-4 right-4 bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-secondary/20 text-orange-600 dark:text-orange-400 lya:text-lya-secondary px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-bold shadow-sm">
+            <Timer size={14} className="animate-pulse" />
+            00:{timeLeft.toString().padStart(2, '0')}
+          </div>
+
+          <div className="w-20 h-20 bg-green-50 dark:bg-green-500/10 lya:bg-green-500/10 rounded-full flex items-center justify-center mb-6 shadow-inner text-green-500 dark:text-green-400 lya:text-green-400 mt-4">
+             <CheckCircle2 size={40} strokeWidth={2.5} />
+          </div>
+          
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">
+             Sesión Finalizada
+          </h2>
+          
+          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2">
+             Tu cuenta ha sido procesada correctamente (pagada o cancelada) en caja. ¡Esperamos que hayas disfrutado tu experiencia en 𝓛𝔂𝓪!
+          </p>
+
+          <div className="w-full space-y-3">
+            {/* Botón para ver/descargar el ticket directamente sin WhatsApp */}
+            <motion.button 
+              whileTap={{ scale: 0.95 }} 
+              onClick={handleDownloadTicket} 
+              className="w-full py-4 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-border/50 text-gray-900 dark:text-white lya:text-lya-text rounded-2xl font-black transition-colors flex items-center justify-center gap-2 outline-none border border-gray-200 dark:border-gray-700 lya:border-lya-border/40"
+            >
+              <FileText size={18} />
+              <span>Ver mi Ticket Digital</span>
+            </motion.button>
+
+            {/* Botón de cierre manual */}
+            <motion.button 
+              whileTap={{ scale: 0.95 }} 
+              onClick={handleLogout} 
+              className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 outline-none"
+            >
+              <LogOut size={18} />
+              <span>Cerrar Pantalla</span>
+            </motion.button>
+          </div>
+        </motion.div>
       </div>
     );
   }
@@ -486,7 +614,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               cycleTheme={cycleTheme}
               cycleSize={cycleSize}
               onClose={() => setShowSettings(false)}
-              // 🔥 RESTRICCIÓN DE NEGOCIO RESTAURADA: ¡Nadie abandona la mesa con comida pidiendo!
+              // 🔥 RESTRICCIÓN DE NEGOCIO: ¡Nadie abandona la mesa con comida pidiendo!
               showLogout={confirmedSnapshot.items.length === 0} 
               onLogout={() => {
                 setShowSettings(false);
