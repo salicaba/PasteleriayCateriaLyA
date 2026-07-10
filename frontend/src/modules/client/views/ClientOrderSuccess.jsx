@@ -242,7 +242,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       <div className="w-full space-y-4 shrink-0 pt-1 relative z-30">
         <AnimatePresence mode="wait">
           {isOrderPaid ? (
-            /* 🔥 BLOQUEO POR PAGO (Cápsula Neo-Bento) */
+            /* 🔥 BLOQUEO POR PAGO (Cápsula Neo-Bento con Botón de Lectura) */
             <motion.div 
               key="paid-message"
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -252,9 +252,21 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
               <p className="flex items-center justify-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400 font-black text-sm uppercase tracking-widest">
                 <CheckCircle size={18} strokeWidth={2.5} /> Cuenta Pagada
               </p>
-              <p className="text-emerald-700/80 dark:text-emerald-300/80 text-[11.5px] font-bold leading-relaxed px-2 text-justify">
-                Tu cuenta ha sido saldada exitosamente y este ticket ha sido bloqueado para nuevas adiciones. En breve nuestro personal liberará la mesa digitalmente. ¡Gracias por elegir 𝓛𝔂𝓪!
+              <p className="text-emerald-700/80 dark:text-emerald-300/80 text-[11.5px] font-bold leading-relaxed px-2 text-justify mb-4">
+                Tu cuenta ha sido saldada exitosamente y este ticket ha sido bloqueado. En breve nuestro personal liberará la mesa digitalmente. ¡Gracias por elegir 𝓛𝔂𝓪!
               </p>
+              
+              {/* Línea divisoria y el botón de menú solo lectura recuperado */}
+              <div className="border-t border-emerald-200/60 dark:border-emerald-800/50 pt-4">
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowReadOnlyMenu(true)} 
+                  className="w-full py-3.5 rounded-[1rem] font-bold text-sm bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40 shadow-sm md:hover:bg-emerald-50 outline-none transition-all flex items-center justify-center gap-2"
+                >
+                  <Eye size={16} strokeWidth={2.5} />
+                  <span>Ojear menú (Solo Lectura)</span>
+                </motion.button>
+              </div>
             </motion.div>
           ) : (
             /* OPCIONES DE NAVEGACIÓN (Solo si NO está pagada) */

@@ -524,22 +524,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           </div>
 
           <div className="w-full space-y-3">
-            <div className="flex gap-3 w-full">
-              <motion.button 
-                whileTap={{ scale: 0.95 }} 
-                onClick={() => setShowFinalizedOverlay(false)} 
-                className="flex-1 py-4 bg-white/20 md:hover:bg-white/30 rounded-2xl font-bold transition-colors shadow-sm outline-none"
-              >
-                Ver Menú
-              </motion.button>
-              <motion.button 
-                whileTap={{ scale: 0.95 }} 
-                onClick={handleDownloadTicket} 
-                className={`flex-1 py-4 bg-white ${isClosed ? 'text-emerald-600' : 'text-red-600'} rounded-2xl font-black shadow-xl outline-none`}
-              >
-                Bajar Ticket
-              </motion.button>
-            </div>
+            <motion.button 
+              whileTap={{ scale: 0.95 }} 
+              onClick={handleDownloadTicket} 
+              className={`w-full py-4 bg-white ${isClosed ? 'text-emerald-600' : 'text-red-600'} rounded-2xl font-black shadow-xl outline-none flex items-center justify-center gap-2`}
+            >
+              <FileText size={20} />
+              Bajar Comprobante
+            </motion.button>
             
             <motion.button 
               whileTap={{ scale: 0.95 }} 
