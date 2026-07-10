@@ -385,7 +385,7 @@ export const TicketSidebar = ({
         {activeCart.length === 0 && availableAccs.length === 1 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 lya:text-lya-text/40 opacity-70">
             <ShoppingBag size={48} strokeWidth={1.5} className="mb-3" />
-            <p className="text-xs font-black uppercase tracking-widest">{isVitrina ? 'Mostrador Libre' : 'Orden vacía'}</p>
+            <p className="text-xs font-black uppercase tracking-widest">{isVitrina ? 'Mostrador Libre' : (isLlevar ? 'Orden vacía' : 'Mesa vacía')}</p>
             <p className="text-[10px] font-medium mt-1">Añade productos del menú</p>
           </div>
         ) : (

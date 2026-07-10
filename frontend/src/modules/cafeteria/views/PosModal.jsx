@@ -98,8 +98,12 @@ export const PosModal = ({
     }
   }, [isOpen, categoriaActiva]); 
 
-  const isLlevar = mesa?.zona === 'llevar';
-  const isVitrina = mesa?.zona === 'vitrina';
+  // 🔥 ESCUDO NEO-BENTO: Validación Estricta Anti-Contaminación de Zonas
+  const rawNumero = String(mesa?.numero || mesa?.id || '').trim();
+  const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumero);
+
+  const isLlevar = (mesa?.zona === 'llevar' || mesa?.orderType === 'LLEVAR') && !esMesaFisica;
+  const isVitrina = mesa?.zona === 'vitrina' || mesa?.id === 'VITRINA-EXPRESS';
 
   const handleConfirmOption = (productWithOptions) => { 
     addToCart(productWithOptions); 
@@ -378,8 +382,9 @@ export const PosModal = ({
         <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors shrink-0">
            <div>
               <HeaderTitle />
+              {/* 🔥 ETIQUETA MULTI-ESTADO */}
               <p className="text-xs text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-1 font-bold tracking-wide uppercase">
-                {isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}
+                {isVitrina ? 'Cobro Inmediato' : (isLlevar ? 'Venta para Llevar' : 'Consumo en Salón')}
               </p>
            </div>
         </div>
@@ -422,8 +427,9 @@ export const PosModal = ({
             <div className="p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg flex items-center justify-between border-b border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm z-10 shrink-0">
               <div>
                 <HeaderTitle />
+                {/* 🔥 ETIQUETA MULTI-ESTADO (MÓVIL) */}
                 <p className="text-[10px] text-orange-600 dark:text-orange-400 lya:text-lya-primary mt-0.5 font-bold tracking-wider uppercase">
-                  {isVitrina ? 'Cobro Inmediato' : 'Venta para Llevar'}
+                  {isVitrina ? 'Cobro Inmediato' : (isLlevar ? 'Venta para Llevar' : 'Consumo en Salón')}
                 </p>
               </div>
               <button

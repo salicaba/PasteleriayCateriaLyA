@@ -4,9 +4,16 @@ import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2, BellRing } from '
 
 export const MesaCard = ({ mesa, onClick, onCancel }) => {
   const isOcupada = mesa.estado === 'ocupada';
-  const isLlevar = mesa.zona === 'llevar';
+  
+  // 🔥 ESCUDO NEO-BENTO: Validación estricta anti-contaminación de zonas.
+  // Si el identificador de la mesa es puramente numérico (ej. "1", "12") o corto (ej. "T1"), 
+  // ES MESA FÍSICA y bloqueamos visualmente la etiqueta de "Para Llevar".
+  const rawNumero = String(mesa.numero || '').trim();
+  const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumero);
+  
+  const isLlevar = (mesa.zona === 'llevar' || mesa.orderType === 'LLEVAR') && !esMesaFisica;
 
-  // 🔥 Se actualizó para detectar también los "listos" (READY)
+  // Se actualizó para detectar también los "listos" (READY)
   const { pendientes, listos, totalItems } = useMemo(() => {
     if (!mesa.items || mesa.items.length === 0) return { pendientes: 0, listos: 0, totalItems: 0 };
     
@@ -23,9 +30,16 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
   const hasReadyItems = listos > 0;
 
   const { idPrincipal, nombreCliente, telefonoCliente } = useMemo(() => {
-    const rawNumero = String(mesa.numero || '');
-    
-    if (!isLlevar) return { idPrincipal: rawNumero, nombreCliente: '', telefonoCliente: '' };
+    if (!isLlevar) {
+       // 🔥 MEJORA UX: Rescatamos el nombre del cliente de la orden QR (ticketId) para que aparezca en el Salón
+       let nombreQR = '';
+       if (mesa.ticketId && mesa.ticketId !== rawNumero && !String(mesa.ticketId).includes('MOSTRADOR')) {
+           nombreQR = mesa.ticketId;
+       } else if (mesa.nombreCliente) {
+           nombreQR = mesa.nombreCliente;
+       }
+       return { idPrincipal: rawNumero, nombreCliente: nombreQR, telefonoCliente: '' };
+    }
 
     const partes = rawNumero.split(' - ');
     
@@ -45,12 +59,11 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
     }
 
     return { idPrincipal: id, nombreCliente: partes.slice(1).join(' - '), telefonoCliente: '' };
-  }, [mesa.numero, isLlevar]);
+  }, [mesa.numero, mesa.ticketId, mesa.nombreCliente, isLlevar, rawNumero]);
 
   return (
     <div 
       onClick={() => onClick(mesa)}
-      // 🔥 Borde azul y fondo adaptado a Claro, Oscuro y Lya
       className={`group relative rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-visible ${
         hasReadyItems 
           ? 'bg-blue-50 border-2 border-blue-500 shadow-blue-500/20 dark:bg-blue-900/20 dark:border-blue-400 dark:shadow-blue-400/10 lya:bg-blue-50/80 lya:border-blue-500 lya:shadow-blue-500/20'
@@ -59,7 +72,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
       }`}
     >
-      {/* 🔥 ETIQUETA FLOTANTE DE NOTIFICACIÓN MULTI-TEMA */}
+      {/* ETIQUETA FLOTANTE DE NOTIFICACIÓN MULTI-TEMA */}
       {hasReadyItems && (
         <div className="absolute -top-3 -right-2 bg-blue-600 dark:bg-blue-500 lya:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 dark:shadow-blue-900/60 lya:shadow-blue-600/30 animate-bounce z-50">
           <BellRing size={12} className="animate-pulse" />
@@ -130,13 +143,13 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
                 ${Number(mesa.total || 0).toFixed(2)}
               </span>
               
-              {isLlevar && nombreCliente && nombreCliente !== 'Mostrador' && (
+              {nombreCliente && nombreCliente !== 'Mostrador' && (
                 <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
-                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1">
+                  <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1.5">
                     👤 {nombreCliente}
                   </span>
                   {telefonoCliente && (
-                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 lya:text-lya-primary tracking-wide mt-0.5 whitespace-nowrap flex items-center gap-1">
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 lya:text-lya-primary tracking-wide mt-0.5 whitespace-nowrap flex items-center gap-1.5">
                       📞 {telefonoCliente}
                     </span>
                   )}
@@ -151,7 +164,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
         </div>
 
         {isOcupada && (
-          /* 🔥 LA SOLUCIÓN ESTÁ AQUÍ: Se agregó flex-wrap, gap-y-2 y gap-x-2 */
           <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-2 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70 shrink-0">
               <span className="w-5 h-5 rounded flex items-center justify-center font-bold text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 lya:bg-lya-primary/20 lya:text-lya-primary">
@@ -161,23 +173,19 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             </div>
 
             {totalItems > 0 && (
-              /* 🔥 Y AQUÍ: También agregué flex-wrap al contenedor de las insignias por si hay muchas */
               <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
-                {/* Indicador de cosas pendientes por cocinar */}
                 {pendientes > 0 && (
                   <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#FDE8E8] px-2 py-0.5 rounded-md shrink-0">
                     <ChefHat size={13} className="animate-pulse" />
                     {pendientes} cocina
                   </span>
                 )}
-                {/* 🔥 Indicador de cosas Listas para entregar (MULTI-TEMA) */}
                 {listos > 0 && (
                   <span className="flex items-center gap-1.5 text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40 lya:text-blue-700 lya:bg-blue-100 px-2 py-0.5 rounded-md shadow-sm shrink-0">
                     <BellRing size={13} className="animate-pulse" />
                     {listos} listos
                   </span>
                 )}
-                {/* Si no hay pendientes ni listos (TODO ENTREGADO) */}
                 {pendientes === 0 && listos === 0 && (
                   <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 lya:text-[#03543F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#DEF7EC] px-2 py-0.5 rounded-md shrink-0">
                     <Check size={13} strokeWidth={3} />
