@@ -73,7 +73,37 @@ export const createOrder = async (req, res) => {
     getIO().emit('pos:update');
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
   } catch (error) { 
-    res.status(500).json({ message: 'Error al crear orden', error: error.message }); 
+    console.error("🔥 Error crítico al crear orden:", error);
+
+    // 1. Error de Llave Foránea (Ej: El tableId cruzado ya no existe o es inválido)
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      return res.status(400).json({
+        success: false,
+        message: "La mesa que intentas usar no existe o tu sesión tiene datos cruzados. Por favor, limpia tu sesión y escanea el QR nuevamente."
+      });
+    }
+
+    // 2. Error de Restricción Única (Ej: La mesa ya tiene una orden activa en base de datos)
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        success: false,
+        message: "Esta mesa ya tiene un pedido activo en curso o hay un conflicto de sesión."
+      });
+    }
+
+    // 3. Error de Validación Interna (Ej: Faltan datos como orderType)
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: "Los datos enviados están incompletos o corruptos."
+      });
+    }
+
+    // 4. Fallback: Error 500 controlado que expone el mensaje real de la BD
+    return res.status(500).json({
+      success: false,
+      message: `Error interno de base de datos: ${error.message}`
+    });
   }
 };
 
