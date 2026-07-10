@@ -1,4 +1,3 @@
-// backend/src/modules/pos/pos.routes.js
 import { Router } from 'express';
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
@@ -39,22 +38,36 @@ import {
 
 const router = Router();
 
+// =========================================================================
 // 🟢 RUTAS PÚBLICAS (No necesitan token, van antes del middleware)
+// =========================================================================
+
 // Esta es la ruta más corta para los clientes
 router.get('/ticket/:orderId', shareOrderTicket); 
 // Mantenemos la anterior temporalmente por si hay tickets viejos dando vueltas
 router.get('/orders/:orderId/share', shareOrderTicket); 
 
-// 🔥 FIX: MOVIMOS ESTAS DOS RUTAS AQUÍ ARRIBA PARA QUE EL QR PÚBLICO PUEDA CONFIRMAR ÓRDENES
+// Creación y edición de órdenes desde el menú QR
 router.post('/orders', createOrder);
 router.post('/orders/:orderId/items', addItemsToOrder);
 
+// 🔥 LA SOLUCIÓN DEL RELOJ AUTOMÁTICO:
+// Movemos estas rutas arriba del muro de seguridad.
+// Ahora el celular del cliente puede consultar libremente el estado de 
+// todas las órdenes activas para activar su "Cuenta Regresiva" si ve
+// que la suya desapareció (porque ya fue pagada o cancelada en caja).
+router.get('/orders', getActiveOrders);
+router.get('/orders/active', getActiveOrders);
+
+
+// =========================================================================
 // 🔴 APLICAMOS EL MIDDLEWARE: Todo lo de abajo requerirá usuario logueado (Cajero/Admin)
+// =========================================================================
 router.use(verifyToken);
+
 router.get('/orders/daily-summary', getDailySummary);
 
 // Rutas PROTEGIDAS (Ya tendrán req.user disponible)
-router.get('/orders/active', getActiveOrders);
 router.get('/orders/table/:tableId', getActiveOrderByTable); 
 router.put('/orders/:orderId/pay', payOrder); 
 router.put('/orders/:orderId/close', closeOrder); 
