@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  AlertCircle, PowerOff, Clock, FileText, LogOut, Timer, XCircle
+  AlertCircle, PowerOff, Clock, FileText, LogOut, Timer, XCircle, Phone
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -47,25 +47,20 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [isQrActive, setIsQrActive] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  // 🔥 NUEVOS ESTADOS: Control de Finalización Automática y Pago
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  // 🔥 BLINDAJE CONTRA RECARGAS (F5): Persistencia del estado 'isConfirmed'
   const [isConfirmed, setIsConfirmed] = useState(() => {
-    // Si la orden ya está pagada, bloqueamos matemáticamente la posibilidad de estar en modo edición
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
   });
 
-  // Guardamos cada cambio de vista inmediatamente
   useEffect(() => {
     localStorage.setItem('lya_client_is_confirmed', isConfirmed);
   }, [isConfirmed]);
 
-  // Solo Lectura del Catálogo (Solo aplica cuando la mesa está cerrada/cancelada)
   const isReadOnly = !!finalizedStatus;
   
   const lastActivityRef = useRef(Date.now());
@@ -77,7 +72,20 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 1. POLLING DE QR ACTIVO
+  // 🔥 PARSER DEL NOMBRE Y TELÉFONO (Para que se vea bonito en el menú)
+  const parsedNameData = clientData?.name || 'Cliente';
+  let displayName = parsedNameData;
+  let displayPhone = null;
+
+  if (parsedNameData.includes(' | ')) {
+    [displayName, displayPhone] = parsedNameData.split(' | ');
+  } else if (parsedNameData.includes(' - ')) {
+    [displayName, displayPhone] = parsedNameData.split(' - ');
+  }
+  
+  displayName = displayName.trim();
+  if (displayPhone) displayPhone = displayPhone.trim();
+
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -92,7 +100,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // 2. AUTO-CIERRE POR INACTIVIDAD (Si no han confirmado)
   useEffect(() => {
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -116,7 +123,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [isConfirmed, isSubmitting, finalizedStatus]);
 
-  // 🔥 3. VIGILANCIA DE ESTADO ESPECÍFICO (Pendiente, Pagada, Liberada, Cancelada)
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -128,24 +134,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         
         const status = res.data.status;
         
-        // Estado 1: PAGADA (Ticket se bloquea con marca de agua, no hay expulsión aún)
         if (status === 'PAID') {
            if (!isOrderPaid) {
                setIsOrderPaid(true);
                localStorage.setItem('lya_client_order_paid', 'true');
-               setIsConfirmed(true); // Forzamos la vista del ticket
+               setIsConfirmed(true); 
            }
-        } 
-        // Estado 2: LIBERADA (Cajero cierra la mesa -> Pantalla Verde de expulsión)
-        else if (status === 'CLOSED') {
+        } else if (status === 'CLOSED') {
            triggerFinalized('CLOSED');
-        } 
-        // Estado 3: CANCELADA (Cajero anula pedido -> Pantalla Roja de expulsión)
-        else if (status === 'CANCELLED' || status === 'DELETED') {
+        } else if (status === 'CANCELLED' || status === 'DELETED') {
            triggerFinalized('CANCELLED');
         }
       } catch (error) {
-        // Fallo silencioso si hay problemas de red temporales
       }
     };
 
@@ -159,7 +159,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
   }, [activeOrderId, finalizedStatus, isOrderPaid, clientData.name]);
 
-  // 🔥 4. ACTIVADOR DE LA CUENTA REGRESIVA ABSOLUTA
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {
        localStorage.setItem('lya_client_finalized_at', Date.now().toString());
@@ -169,7 +168,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setShowFinalizedOverlay(true);
   };
 
-  // 🔥 5. BUCLE DEL RELOJ EN TIEMPO REAL
   useEffect(() => {
     if (!finalizedStatus) return;
     
@@ -182,9 +180,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
        const remaining = 60 - elapsedSeconds;
        
        if (remaining <= 0) {
-          handleLogout(); // EXPULSIÓN AUTOMÁTICA
+          handleLogout(); 
        } else {
-          setTimeLeft(remaining); // Forzamos el render cada segundo
+          setTimeLeft(remaining); 
        }
     };
     
@@ -194,7 +192,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return () => clearInterval(timerId); 
   }, [finalizedStatus]);
 
-  // LÓGICA DE SALIDA PERFECTA
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
@@ -233,7 +230,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     window.open(url, '_blank');
   };
 
-  // CARGA INICIAL DEL MENÚ
   useEffect(() => {
     const loadMenuData = async () => {
       try {
@@ -461,10 +457,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
-  // ===============================================
-  // VISTAS DE ESTADOS ESPECIALES
-  // ===============================================
-
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md transition-opacity duration-300">
@@ -505,8 +497,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // 🔥 PANTALLA GIGANTE NEO-BENTO DE FINALIZACIÓN (VERDE O ROJO)
-  // Esta vista tiene PRECEDENCIA sobre cualquier otra. Si se libera la mesa, corta lo que estés viendo.
   if (finalizedStatus && showFinalizedOverlay) {
     const isClosed = finalizedStatus === 'CLOSED';
     const bgColor = isClosed ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
@@ -519,7 +509,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           animate={{ scale: 1, opacity: 1, y: 0 }} 
           className="max-w-[400px] w-full flex flex-col items-center text-center relative z-10"
         >
-          {/* Icono Principal */}
           <TitleIcon size={64} className="mb-4 shadow-sm rounded-full bg-white/20 p-2" />
           
           <h2 className="text-3xl font-black tracking-tight mb-2 text-center">
@@ -529,7 +518,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              {isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita!' : 'La orden ha sido cancelada desde caja.'}
           </p>
 
-          {/* Reloj Grande Central con Formato Dinámico (60 => 01:00) */}
           <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
             <Timer size={36} className="animate-pulse" />
             {timeLeft === 60 ? '01:00' : `00:${timeLeft.toString().padStart(2, '0')}`}
@@ -623,7 +611,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // SI LA ORDEN ESTÁ CONFIRMADA (O PAGADA) Y NO ESTAMOS EN MODO EXPULSIÓN
   if (isConfirmed && !isReadOnly) {
     return (
       <>
@@ -680,10 +667,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // ===============================================
-  // VISTA PRINCIPAL DEL MENÚ
-  // ===============================================
-
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
       <AnimatePresence>
@@ -718,18 +701,26 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/40 uppercase tracking-wider text-left">Menú Digital</p>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text truncate text-left">Hola, {clientData.name}</h2>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text truncate text-left leading-tight">
+              Hola, {displayName}
+            </h2>
+            {/* 🔥 EL NUEVO BADGE VERDE PARA EL TELÉFONO 🔥 */}
+            {displayPhone && (
+              <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 lya:bg-emerald-500/10 rounded-md border border-emerald-200 dark:border-emerald-800/30 lya:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 lya:text-emerald-400">
+                <Phone size={12} strokeWidth={2.5} />
+                <span className="text-[11px] font-black tracking-widest">{displayPhone}</span>
+              </div>
+            )}
           </div>
           
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text shrink-0 text-center">
-              {type === 'mesa' ? <Utensils size={14} className="text-orange-500 lya:text-lya-secondary" /> : <ShoppingBag size={14} className="text-orange-500 lya:text-lya-secondary" />}
-              <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
-            </div>
-            
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors outline-none">
               <Settings size={18} strokeWidth={2.5} />
             </motion.button>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-[10px] font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text rounded-full text-center">
+              {type === 'mesa' ? <Utensils size={12} className="text-orange-500 lya:text-lya-secondary" /> : <ShoppingBag size={12} className="text-orange-500 lya:text-lya-secondary" />}
+              <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
+            </div>
           </div>
         </div>
         

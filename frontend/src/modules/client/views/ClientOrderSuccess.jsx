@@ -1,13 +1,27 @@
 // src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, HelpCircle, ReceiptText, Check, PowerOff, Settings } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, HelpCircle, ReceiptText, Check, PowerOff, Settings, Phone } from 'lucide-react';
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
+  // 🔥 PARSER DEL NOMBRE Y TELÉFONO PARA EL TICKET
+  const parsedNameData = clientData?.name || 'Cliente';
+  let displayName = parsedNameData;
+  let displayPhone = null;
+
+  if (parsedNameData.includes(' | ')) {
+    [displayName, displayPhone] = parsedNameData.split(' | ');
+  } else if (parsedNameData.includes(' - ')) {
+    [displayName, displayPhone] = parsedNameData.split(' - ');
+  }
+  
+  displayName = displayName.trim();
+  if (displayPhone) displayPhone = displayPhone.trim();
+
   // Obtenemos solo el primer nombre para un trato más cercano
-  const primerNombre = clientData?.name?.split(' ')[0] || 'Cliente';
+  const primerNombre = displayName.split(' ')[0] || 'Cliente';
 
   // --- VISTA: Menú Solo Lectura ---
   if (showReadOnlyMenu) {
@@ -139,7 +153,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         {/* Barra de color superior */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-lya-primary lya:to-lya-secondary" />
 
-        {/* 🔥 SELLO GIGANTE DE MARCA DE AGUA (Aparece cuando la orden es PAGADA) */}
+        {/* 🔥 SELLO GIGANTE DE MARCA DE AGUA */}
         <AnimatePresence>
           {isOrderPaid && (
             <motion.div 
@@ -156,18 +170,27 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         </AnimatePresence>
 
         {/* Encabezado del Recibo */}
-        <div className="flex justify-between items-end border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20 pb-4 mb-4 mt-2 relative z-10">
+        <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20 pb-4 mb-4 mt-2 relative z-10">
           <div className="text-left flex flex-col gap-1">
             <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-lya-text/40">
               Comprobante
             </span>
-            <span className="text-sm font-bold text-gray-900 dark:text-white lya:text-lya-text capitalize">
-              {clientData?.name}
-            </span>
+            <div className="flex flex-col">
+               <span className="text-sm font-bold text-gray-900 dark:text-white lya:text-lya-text capitalize">
+                 {displayName}
+               </span>
+               {displayPhone && (
+                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                   <Phone size={10} /> {displayPhone}
+                 </span>
+               )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text">
-            {type === 'mesa' ? <Utensils size={14} className="text-orange-500" /> : <ShoppingBag size={14} className="text-orange-500" />}
-            <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
+          <div className="flex flex-col gap-1.5 items-end">
+             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text">
+               {type === 'mesa' ? <Utensils size={14} className="text-orange-500" /> : <ShoppingBag size={14} className="text-orange-500" />}
+               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
+             </div>
           </div>
         </div>
 
@@ -235,7 +258,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       <div className="w-full space-y-4 shrink-0 pt-1 relative z-30">
         <AnimatePresence mode="wait">
           {isOrderPaid ? (
-            /* 🔥 BLOQUEO POR PAGO (Cápsula Neo-Bento con Botón de Lectura) */
+            /* 🔥 BLOQUEO POR PAGO */
             <motion.div 
               key="paid-message"
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -261,7 +284,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
               </div>
             </motion.div>
           ) : (
-            /* OPCIONES DE NAVEGACIÓN (Solo si NO está pagada) */
             <motion.div 
               key="action-buttons" 
               initial={{ opacity: 0 }} 

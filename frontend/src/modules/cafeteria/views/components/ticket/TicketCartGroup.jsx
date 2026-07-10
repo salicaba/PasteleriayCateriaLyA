@@ -15,6 +15,28 @@ export const TicketCartGroup = ({
   handleDeleteUnsent, handleCancelItem, toggleItemTakeaway, onCancelItem,
   onDragStart, onDragEnd
 }) => {
+
+  // 🔥 MAGIA DE PARSEO: Separamos el número si viene concatenado desde el QR del Cliente
+  let rawDisplayName = isVitrina ? 'Cuenta Express' : (isLlevar && nombreCliente ? nombreCliente : cuentaName);
+  let finalDisplayName = rawDisplayName;
+  let finalDisplayPhone = cuentasTelefonos?.[cuentaName] || null;
+
+  if (typeof rawDisplayName === 'string') {
+      if (rawDisplayName.includes(' | ')) {
+          const parts = rawDisplayName.split(' | ');
+          finalDisplayName = parts[0].trim();
+          if (!finalDisplayPhone && parts[1]) finalDisplayPhone = parts[1].trim();
+      } else if (rawDisplayName.includes(' - ')) {
+          const parts = rawDisplayName.split(' - ');
+          const lastPart = parts[parts.length - 1].trim();
+          // Validamos si la última parte es un número telefónico de 10 dígitos
+          if (lastPart.replace(/\D/g, '').length === 10) {
+              if (!finalDisplayPhone) finalDisplayPhone = lastPart;
+              finalDisplayName = parts.slice(0, -1).join(' - ').trim();
+          }
+      }
+  }
+
   return (
     <motion.div 
       layout 
@@ -71,11 +93,13 @@ export const TicketCartGroup = ({
                   isActive ? "text-orange-600 dark:text-orange-400 lya:text-lya-primary" : 
                   "text-gray-600 dark:text-gray-400 lya:text-lya-text/80"
               )}>
-                {isVitrina ? 'Cuenta Express' : (isLlevar && nombreCliente ? nombreCliente : cuentaName)}
+                {finalDisplayName}
               </h4>
-              {cuentasTelefonos?.[cuentaName] && (
+              
+              {/* 🔥 EL RECUADRO VERDE HERMOSO DEL TELÉFONO 🔥 */}
+              {finalDisplayPhone && (
                 <span className="flex items-center gap-1 text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 lya:bg-lya-primary/10 lya:text-lya-primary px-1.5 py-0.5 rounded-md font-bold tracking-wider shadow-sm shrink-0 border border-emerald-200 dark:border-emerald-800/50 lya:border-lya-primary/20">
-                  <Phone size={8} /> {cuentasTelefonos[cuentaName]}
+                  <Phone size={8} /> {finalDisplayPhone}
                 </span>
               )}
             </div>
