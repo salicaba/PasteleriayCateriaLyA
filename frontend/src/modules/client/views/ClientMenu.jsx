@@ -54,10 +54,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  // 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA SE FINALIZÓ (Cerrada o Cancelada)
-// 🔥 MODO SOLO LECTURA ACTIVO SI LA CUENTA SE FINALIZÓ O SE PAGÓ
-  const isReadOnly = !!finalizedStatus || isOrderPaid;
-
+  // 🔥 FIX 1: MODO SOLO LECTURA DEL CATÁLOGO ACTIVO ÚNICAMENTE SI SE CANCELA O LIBERA
+  // (Quitamos isOrderPaid de aquí para que no te expulse del Ticket)
+  const isReadOnly = !!finalizedStatus;
+  
   const lastActivityRef = useRef(Date.now());
   const isProcessingRef = useRef(false);
 
@@ -108,12 +108,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   // 🔥 3. VIGILANCIA DE ESTADO ESPECÍFICO (Pendiente, Pagada, Liberada, Cancelada)
   useEffect(() => {
-    // Si no han pedido nada o ya está finalizada (expulsión inminente), no hacemos polling
     if (!activeOrderId || finalizedStatus) return;
 
     const checkStatus = async () => {
       try {
-        // AQUÍ EL FIX: Le enviamos la cuenta al backend como query param
         const res = await client.get(`/pos/orders/${activeOrderId}/status`, {
           params: { cuenta: clientData.name }
         });
@@ -142,13 +140,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     const interval = setInterval(checkStatus, 5000);
     socket.on('pos:update', checkStatus);
-    checkStatus(); // Validar inmediatamente al montar
+    checkStatus(); 
 
     return () => {
        clearInterval(interval);
        socket.off('pos:update', checkStatus);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData.name]); // Agregamos clientData.name a las dependencias
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData.name]);
 
   // 🔥 4. ACTIVADOR DE LA CUENTA REGRESIVA ABSOLUTA
   const triggerFinalized = (status) => {
@@ -160,26 +158,30 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setShowFinalizedOverlay(true);
   };
 
-  // 🔥 5. BUCLE DEL RELOJ EN TIEMPO REAL
+  // 🔥 FIX 2: BUCLE DEL RELOJ CORREGIDO PARA ACTUALIZACIÓN EN TIEMPO REAL
   useEffect(() => {
     if (!finalizedStatus) return;
     
     const updateTimer = () => {
-       const finalizedAt = parseInt(localStorage.getItem('lya_client_finalized_at') || Date.now());
+       const storedTime = localStorage.getItem('lya_client_finalized_at');
+       if (!storedTime) return;
+       
+       // Parseamos a base 10 de forma estricta
+       const finalizedAt = parseInt(storedTime, 10);
        const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
        const remaining = 60 - elapsedSeconds;
        
        if (remaining <= 0) {
           handleLogout(); // EXPULSIÓN AUTOMÁTICA
        } else {
-          setTimeLeft(remaining);
+          setTimeLeft(remaining); // Esto forzará el re-render cada segundo
        }
     };
     
     updateTimer(); // Actualizar de inmediato al iniciar
-    const timer = setInterval(updateTimer, 1000);
+    const timerId = setInterval(updateTimer, 1000); // Guardamos la referencia
     
-    return () => clearInterval(timer);
+    return () => clearInterval(timerId); // Limpiamos el intervalo al desmontar
   }, [finalizedStatus]);
 
   // LÓGICA DE SALIDA PERFECTA
@@ -196,9 +198,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_snapshot', 
       'lya_client_data', 
       'lya_client_session',
-      'lya_client_finalized_at', // Limpiamos el reloj
-      'lya_client_finalized_status', // Limpiamos el estado
-      'lya_client_order_paid' // Limpiamos el estado de pagado
+      'lya_client_finalized_at', 
+      'lya_client_finalized_status', 
+      'lya_client_order_paid' 
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -515,7 +517,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              {isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita!' : 'La orden ha sido cancelada desde caja.'}
           </p>
 
-          {/* Reloj Grande Central */}
+          {/* Reloj Grande Central con Formato Dinámico (60 => 01:00) */}
           <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
             <Timer size={36} className="animate-pulse" />
             {timeLeft === 60 ? '01:00' : `00:${timeLeft.toString().padStart(2, '0')}`}
@@ -617,7 +619,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // SI LA ORDEN ESTÁ CONFIRMADA (Pagada o Pendiente) Y NO ESTAMOS EN MODO SOLO LECTURA
+  // SI LA ORDEN ESTÁ CONFIRMADA (Pagada o Pendiente) Y NO ESTAMOS EN MODO SOLO LECTURA GENERAL
+  // ¡Aquí es donde la corrección salva la vida del Ticket PAGADO!
   if (isConfirmed && !isReadOnly) {
     return (
       <>
@@ -631,7 +634,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           categories={categories}
           getCategoryName={getCategoryName}
           isQrActive={isQrActive}
-          isOrderPaid={isOrderPaid} // 🔥 PROP PARA MARCA DE AGUA
+          isOrderPaid={isOrderPaid} // 🔥 PROP PARA MARCA DE AGUA DEL TICKET
           onReset={() => {
             if (isQrActive && !isOrderPaid) setIsConfirmed(false); 
           }}
