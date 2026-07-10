@@ -31,7 +31,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [activeCategory, setActiveCategory] = useState(null);
   const [cart, setCart] = useState([]);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   const [showSettings, setShowSettings] = useState(false);
@@ -54,8 +53,19 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  // 🔥 FIX 1: MODO SOLO LECTURA DEL CATÁLOGO ACTIVO ÚNICAMENTE SI SE CANCELA O LIBERA
-  // (Quitamos isOrderPaid de aquí para que no te expulse del Ticket)
+  // 🔥 BLINDAJE CONTRA RECARGAS (F5): Persistencia del estado 'isConfirmed'
+  const [isConfirmed, setIsConfirmed] = useState(() => {
+    // Si la orden ya está pagada, bloqueamos matemáticamente la posibilidad de estar en modo edición
+    if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
+    return localStorage.getItem('lya_client_is_confirmed') === 'true';
+  });
+
+  // Guardamos cada cambio de vista inmediatamente
+  useEffect(() => {
+    localStorage.setItem('lya_client_is_confirmed', isConfirmed);
+  }, [isConfirmed]);
+
+  // Solo Lectura del Catálogo (Solo aplica cuando la mesa está cerrada/cancelada)
   const isReadOnly = !!finalizedStatus;
   
   const lastActivityRef = useRef(Date.now());
@@ -123,6 +133,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
            if (!isOrderPaid) {
                setIsOrderPaid(true);
                localStorage.setItem('lya_client_order_paid', 'true');
+               setIsConfirmed(true); // Forzamos la vista del ticket
            }
         } 
         // Estado 2: LIBERADA (Cajero cierra la mesa -> Pantalla Verde de expulsión)
@@ -158,7 +169,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setShowFinalizedOverlay(true);
   };
 
-  // 🔥 FIX 2: BUCLE DEL RELOJ CORREGIDO PARA ACTUALIZACIÓN EN TIEMPO REAL
+  // 🔥 5. BUCLE DEL RELOJ EN TIEMPO REAL
   useEffect(() => {
     if (!finalizedStatus) return;
     
@@ -166,7 +177,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
        const storedTime = localStorage.getItem('lya_client_finalized_at');
        if (!storedTime) return;
        
-       // Parseamos a base 10 de forma estricta
        const finalizedAt = parseInt(storedTime, 10);
        const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
        const remaining = 60 - elapsedSeconds;
@@ -174,14 +184,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
        if (remaining <= 0) {
           handleLogout(); // EXPULSIÓN AUTOMÁTICA
        } else {
-          setTimeLeft(remaining); // Esto forzará el re-render cada segundo
+          setTimeLeft(remaining); // Forzamos el render cada segundo
        }
     };
     
-    updateTimer(); // Actualizar de inmediato al iniciar
-    const timerId = setInterval(updateTimer, 1000); // Guardamos la referencia
+    updateTimer(); 
+    const timerId = setInterval(updateTimer, 1000); 
     
-    return () => clearInterval(timerId); // Limpiamos el intervalo al desmontar
+    return () => clearInterval(timerId); 
   }, [finalizedStatus]);
 
   // LÓGICA DE SALIDA PERFECTA
@@ -200,7 +210,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_session',
       'lya_client_finalized_at', 
       'lya_client_finalized_status', 
-      'lya_client_order_paid' 
+      'lya_client_order_paid',
+      'lya_client_is_confirmed'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -495,6 +506,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }
 
   // 🔥 PANTALLA GIGANTE NEO-BENTO DE FINALIZACIÓN (VERDE O ROJO)
+  // Esta vista tiene PRECEDENCIA sobre cualquier otra. Si se libera la mesa, corta lo que estés viendo.
   if (finalizedStatus && showFinalizedOverlay) {
     const isClosed = finalizedStatus === 'CLOSED';
     const bgColor = isClosed ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
@@ -513,7 +525,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           <h2 className="text-3xl font-black tracking-tight mb-2 text-center">
              {isClosed ? '¡Mesa Liberada!' : 'Pedido Cancelado'}
           </h2>
-          <p className="font-medium text-sm mb-6 opacity-90 text-center">
+          <p className="font-medium text-sm mb-6 opacity-90 text-center px-4">
              {isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita!' : 'La orden ha sido cancelada desde caja.'}
           </p>
 
@@ -611,8 +623,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     );
   }
 
-  // SI LA ORDEN ESTÁ CONFIRMADA (Pagada o Pendiente) Y NO ESTAMOS EN MODO SOLO LECTURA GENERAL
-  // ¡Aquí es donde la corrección salva la vida del Ticket PAGADO!
+  // SI LA ORDEN ESTÁ CONFIRMADA (O PAGADA) Y NO ESTAMOS EN MODO EXPULSIÓN
   if (isConfirmed && !isReadOnly) {
     return (
       <>
@@ -626,7 +637,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           categories={categories}
           getCategoryName={getCategoryName}
           isQrActive={isQrActive}
-          isOrderPaid={isOrderPaid} // 🔥 PROP PARA MARCA DE AGUA DEL TICKET
+          isOrderPaid={isOrderPaid} 
           onReset={() => {
             if (isQrActive && !isOrderPaid) setIsConfirmed(false); 
           }}
@@ -670,36 +681,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }
 
   // ===============================================
-  // VISTA PRINCIPAL DEL MENÚ (NORMAL O SOLO LECTURA)
+  // VISTA PRINCIPAL DEL MENÚ
   // ===============================================
 
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
-      
-      {/* 🔥 BANNER FLOTANTE DE MODO SOLO LECTURA */}
-      <AnimatePresence>
-        {isReadOnly && !showFinalizedOverlay && (
-          <motion.div 
-            initial={{ y: -100 }} 
-            animate={{ y: 0 }} 
-            className={`fixed top-0 left-0 right-0 z-[100] ${finalizedStatus === 'CLOSED' ? 'bg-emerald-500 lya:bg-[#03543F]' : 'bg-red-500 lya:bg-[#9B1C1C]'} text-white px-4 py-3 shadow-lg flex items-center justify-between`}
-          >
-             <div className="flex flex-col">
-                <span className="font-black text-sm">{finalizedStatus === 'CLOSED' ? 'Mesa Liberada' : 'Orden Cancelada'}</span>
-                <span className="text-[10px] font-medium opacity-90 uppercase tracking-widest">Modo Solo Lectura</span>
-             </div>
-             <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 font-bold text-sm bg-black/20 px-2 py-1 rounded-lg">
-                  <Timer size={14}/> {timeLeft === 60 ? '01:00' : `00:${timeLeft.toString().padStart(2, '0')}`}
-                </span>
-                <button onClick={handleLogout} className="bg-white md:hover:bg-gray-100 text-gray-900 px-3 py-1.5 rounded-xl font-black text-xs active:scale-95 transition-transform shadow-sm outline-none">
-                   Salir
-                </button>
-             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -728,7 +714,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      <header className={`px-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors ${isReadOnly ? 'pt-20' : 'pt-6'}`}>
+      <header className={`px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors`}>
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/40 uppercase tracking-wider text-left">Menú Digital</p>
@@ -741,11 +727,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
             
-            {!isReadOnly && (
-              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
-                <Settings size={18} strokeWidth={2.5} />
-              </motion.button>
-            )}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors shrink-0 outline-none">
+              <Settings size={18} strokeWidth={2.5} />
+            </motion.button>
           </div>
         </div>
         
@@ -789,9 +773,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                 key={product.id} 
                 layout 
                 variants={itemVariants}
-                whileTap={(isCustomizable && !isReadOnly) ? { scale: 0.98 } : {}} 
-                onClick={() => (isCustomizable && !isReadOnly) && setSelectedProduct(product)} 
-                className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${(isCustomizable && !isReadOnly) ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''} ${isReadOnly ? 'opacity-80 grayscale-[20%]' : ''}`}
+                whileTap={isCustomizable ? { scale: 0.98 } : {}} 
+                onClick={() => isCustomizable && setSelectedProduct(product)} 
+                className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''}`}
               >
                 <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center shadow-inner pointer-events-none">
                   {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-lya-text/20" size={28} />}
@@ -807,20 +791,16 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   <div className="flex items-end justify-between mt-auto">
                     <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block text-left">${product.precio}</span>
                     
-                    {isReadOnly ? (
-                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg">Solo Vista</span>
-                    ) : (
-                      <button 
-                        disabled={isAdding || addingToCartId !== null}
-                        onClick={(e) => { 
-                          const defaultMods = getDefaultCustomizations(product);
-                          handleAddDirectly(product, defaultMods, e); 
-                        }} 
-                        className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow shrink-0 outline-none touch-manipulation active:scale-90 transition-all disabled:opacity-50"
-                      >
-                        {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
-                      </button>
-                    )}
+                    <button 
+                      disabled={isAdding || addingToCartId !== null}
+                      onClick={(e) => { 
+                        const defaultMods = getDefaultCustomizations(product);
+                        handleAddDirectly(product, defaultMods, e); 
+                      }} 
+                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow shrink-0 outline-none touch-manipulation active:scale-90 transition-all disabled:opacity-50"
+                    >
+                      {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
+                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -830,7 +810,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       </motion.div>
 
       <AnimatePresence>
-        {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && !isReadOnly && (
+        {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div 
             initial={{ scale: 0, opacity: 0 }} 
             animate={{ scale: 1, opacity: 1 }} 
@@ -850,7 +830,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {cart.length > 0 && !showCheckout && !selectedProduct && !isReadOnly && (
+        {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
             <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center outline-none touch-manipulation">
               <div className="flex items-center gap-3">
@@ -869,7 +849,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {selectedProduct && !isReadOnly && (
+        {selectedProduct && (
           <ClientProductModal 
             product={selectedProduct} 
             onClose={() => setSelectedProduct(null)} 
@@ -879,7 +859,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showCheckout && !isReadOnly && (
+        {showCheckout && (
           <ClientCheckoutModal 
             cart={cart}
             totalCart={totalCart}

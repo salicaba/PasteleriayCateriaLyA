@@ -6,13 +6,6 @@ import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, HelpC
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
-  // Forzar retorno al ticket si la orden se paga mientras están viendo el menú de solo lectura
-  useEffect(() => {
-    if (isOrderPaid && showReadOnlyMenu) {
-      setShowReadOnlyMenu(false);
-    }
-  }, [isOrderPaid, showReadOnlyMenu]);
-
   // Obtenemos solo el primer nombre para un trato más cercano
   const primerNombre = clientData?.name?.split(' ')[0] || 'Cliente';
 
@@ -256,7 +249,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                 Tu cuenta ha sido saldada exitosamente y este ticket ha sido bloqueado. En breve nuestro personal liberará la mesa digitalmente. ¡Gracias por elegir 𝓛𝔂𝓪!
               </p>
               
-              {/* Línea divisoria y el botón de menú solo lectura recuperado */}
               <div className="border-t border-emerald-200/60 dark:border-emerald-800/50 pt-4">
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
