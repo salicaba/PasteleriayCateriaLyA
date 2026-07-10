@@ -518,7 +518,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           {/* Reloj Grande Central */}
           <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
             <Timer size={36} className="animate-pulse" />
-            00:{timeLeft.toString().padStart(2, '0')}
+            {timeLeft === 60 ? '01:00' : `00:${timeLeft.toString().padStart(2, '0')}`}
           </div>
 
           <div className="w-full space-y-3">
@@ -695,7 +695,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
              </div>
              <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1 font-bold text-sm bg-black/20 px-2 py-1 rounded-lg">
-                  <Timer size={14}/> 00:{timeLeft.toString().padStart(2, '0')}
+                  <Timer size={14}/> {timeLeft === 60 ? '01:00' : `00:${timeLeft.toString().padStart(2, '0')}`}
                 </span>
                 <button onClick={handleLogout} className="bg-white md:hover:bg-gray-100 text-gray-900 px-3 py-1.5 rounded-xl font-black text-xs active:scale-95 transition-transform shadow-sm outline-none">
                    Salir
