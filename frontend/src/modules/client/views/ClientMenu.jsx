@@ -46,7 +46,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [isQrActive, setIsQrActive] = useState(true);
-  const [sessionExpired, setSessionExpired] = useState(false);
+  
+  // 🔥 FIX: Persistencia absoluta del estado de "Expirado" para evitar que se salten el bloqueo refrescando
+  const [sessionExpired, setSessionExpired] = useState(() => localStorage.getItem('lya_client_session_expired') === 'true');
 
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
@@ -63,7 +65,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   const isReadOnly = !!finalizedStatus;
   
-  // 🔥 FIX: Persistencia de Inactividad en Disco Duro (localStorage)
   const initialActivity = parseInt(localStorage.getItem('lya_client_last_activity')) || Date.now();
   const lastActivityRef = useRef(initialActivity);
   const isProcessingRef = useRef(false);
@@ -87,7 +88,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // Inicialización segura del tracker de actividad
   useEffect(() => {
     if (!localStorage.getItem('lya_client_last_activity')) {
       localStorage.setItem('lya_client_last_activity', Date.now().toString());
@@ -110,6 +110,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   useEffect(() => {
     const updateActivity = () => {
+      // Si la sesión ya expiró, ignoramos cualquier actividad para no resetear el reloj fantasma
+      if (sessionExpired) return;
+
       const now = Date.now();
       lastActivityRef.current = now;
       localStorage.setItem('lya_client_last_activity', now.toString());
@@ -119,11 +122,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInactivity = () => {
-      if (isConfirmed || isSubmitting || finalizedStatus) return; 
+      if (isConfirmed || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
       // 🔥 MODO TESTING ACTIVADO: 30 segundos (30000 ms) para expirar la sesión
       if (now - lastActivityRef.current > 30000) {
+        localStorage.setItem('lya_client_session_expired', 'true'); // Sellamos el candado
         setSessionExpired(true);
       }
     };
@@ -137,7 +141,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Validación inmediata por si volvieron a abrir la app/pestaña habiendo pasado el tiempo
     checkInactivity();
 
     return () => {
@@ -145,7 +148,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
-  }, [isConfirmed, isSubmitting, finalizedStatus]);
+  }, [isConfirmed, isSubmitting, finalizedStatus, sessionExpired]);
 
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
@@ -200,7 +203,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // 🔥 Añadimos lya_client_last_activity a la purga de sesión
+    // 🔥 Añadimos lya_client_session_expired a la purga de sesión para liberar el candado
     const keysToRemove = [
       'lya_client_order_id', 
       'lya_client_snapshot', 
@@ -210,7 +213,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_finalized_status', 
       'lya_client_order_paid',
       'lya_client_is_confirmed',
-      'lya_client_last_activity'
+      'lya_client_last_activity',
+      'lya_client_session_expired'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -269,8 +273,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         setIsLoading(false);
       }
     };
-    loadMenuData();
-  }, []);
+    // Evitamos cargar datos innecesarios si la sesión ya expiró
+    if (!sessionExpired) {
+      loadMenuData();
+    } else {
+      setIsLoading(false);
+    }
+  }, [sessionExpired]);
 
   const activeCatObj = categories.find(c => c.id === activeCategory);
   const isTodasCategory = activeCatObj && activeCatObj.name.trim().toLowerCase() === 'todas';
