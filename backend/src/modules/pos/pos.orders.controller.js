@@ -13,10 +13,13 @@ export const createOrder = async (req, res) => {
     const { orderType, tableId } = req.body;
     let { ticketId } = req.body;
     const employeeId = req.user?.id || null; 
+    
+    // 🔥 FIX CRÍTICO: Prevenir "Ghost Orders". Si es SALON pero el tableId es nulo o inválido, lo forzamos a LLEVAR.
     const finalTableId = orderType === 'SALON' ? tableId : null;
+    const finalOrderType = (orderType === 'SALON' && !finalTableId) ? 'LLEVAR' : orderType;
 
     // 🔥 PURGA MASIVA: Matamos TODOS los zombies de esta mesa antes de crear una orden
-    if (orderType === 'SALON' && finalTableId) {
+    if (finalOrderType === 'SALON' && finalTableId) {
       const existingOrders = await Order.findAll({ 
         where: { tableId: finalTableId, status: ['OPEN', 'PAID'] } 
       });
@@ -39,7 +42,7 @@ export const createOrder = async (req, res) => {
 
     let finalTicketId = ticketId || null;
 
-    if (orderType === 'LLEVAR') {
+    if (finalOrderType === 'LLEVAR') {
       if (ticketId === 'VITRINA-EXPRESS' || ticketId === 'MOSTRADOR') {
         const randomNum = Math.floor(100 + Math.random() * 900);
         const timeCode = Date.now().toString().slice(-6);
@@ -58,7 +61,7 @@ export const createOrder = async (req, res) => {
     }
 
     const newOrder = await Order.create({ 
-      orderType, 
+      orderType: finalOrderType, 
       ticketId: finalTicketId, 
       tableId: finalTableId, 
       createdBy: employeeId, 
@@ -66,7 +69,7 @@ export const createOrder = async (req, res) => {
       totalAmount: 0 
     });
     
-    if (orderType === 'SALON' && finalTableId) {
+    if (finalOrderType === 'SALON' && finalTableId) {
       await Table.update({ status: 'occupied' }, { where: { id: finalTableId } });
     }
 
@@ -75,7 +78,6 @@ export const createOrder = async (req, res) => {
   } catch (error) { 
     console.error("🔥 Error crítico al crear orden:", error);
 
-    // 1. Error de Llave Foránea (Ej: El tableId cruzado ya no existe o es inválido)
     if (error.name === 'SequelizeForeignKeyConstraintError') {
       return res.status(400).json({
         success: false,
@@ -83,7 +85,6 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 2. Error de Restricción Única (Ej: La mesa ya tiene una orden activa en base de datos)
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({
         success: false,
@@ -91,7 +92,6 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 3. Error de Validación Interna (Ej: Faltan datos como orderType)
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         success: false,
@@ -99,7 +99,6 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 4. Fallback: Error 500 controlado que expone el mensaje real de la BD
     return res.status(500).json({
       success: false,
       message: `Error interno de base de datos: ${error.message}`
@@ -129,10 +128,11 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'Orden caducada por inactividad.' });
     }
 
+    // 🔥 REGLA DE NEGOCIO: Si es Para Llevar, forzamos Cuenta General en lugar de crear subcuentas por celular
     const itemsToInsert = items.map(item => ({ 
       ...item, 
       orderId, 
-      cuenta: item.cuenta || 'General', 
+      cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
       kitchenStatus: 'PENDING',
       isTakeaway: item.isTakeaway || false 
     }));
@@ -175,7 +175,6 @@ export const getActiveOrderByTable = async (req, res) => {
       ]
     });
 
-    // 🔥 PURGA: Evitamos que el POS lea zombies
     let validOrder = null;
     for (const ord of orders) {
       const hoursOld = (Date.now() - new Date(ord.createdAt).getTime()) / (1000 * 60 * 60);
@@ -237,7 +236,6 @@ export const getActiveOrders = async (req, res) => {
       ]
     });
 
-    // 🔥 PURGA: Evitamos que la Cocina reciba basura
     const now = Date.now();
     const validOrders = [];
     let zombiesFound = false;
@@ -251,6 +249,13 @@ export const getActiveOrders = async (req, res) => {
         }
         zombiesFound = true;
       } else {
+        // 🔥 FILTRO NEO-BENTO: Evitamos Tarjetas Vacías de Clientes Curiosos
+        // Si la orden es Para Llevar, NO tiene productos y NO fue creada por un empleado, la ocultamos.
+        if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
+           if (!order.createdBy) {
+              continue; 
+           }
+        }
         validOrders.push(order);
       }
     }
@@ -391,31 +396,24 @@ export const deliverAllItems = async (req, res) => {
 export const checkOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cuenta } = req.query; // Interceptamos la cuenta que envía el ClientMenu
+    const { cuenta } = req.query; 
 
-    // Ya no necesitamos traer todos los items, porque el pago se guarda en la Orden
     const order = await Order.findByPk(orderId);
     
-    // Si la orden ya no existe en la BD
     if (!order) {
        return res.json({ status: 'DELETED' });
     }
 
-    // 1. REGLA SUPREMA: Si la mesa entera ya se cerró o canceló, esto domina todo.
     if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) {
       return res.json({ status: order.status });
     }
 
-    // 2. MAGIA MULTI-CUENTA CORREGIDA: Leemos el arreglo paidAccounts
-    // Verificamos si la cuenta específica de este celular ya está en la lista de pagadas
     if (cuenta && order.paidAccounts && Array.isArray(order.paidAccounts)) {
       if (order.paidAccounts.includes(cuenta)) {
-        // ¡Bingo! Esta cuenta ya pasó por caja
         return res.json({ status: 'PAID' });
       }
     }
     
-    // 3. Por defecto, devolvemos el estado general de la mesa
     res.json({ status: order.status });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });

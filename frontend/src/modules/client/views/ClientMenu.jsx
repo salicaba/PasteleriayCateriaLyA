@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  AlertCircle, PowerOff, Clock, FileText, LogOut, Timer, XCircle, Phone
+  AlertCircle, PowerOff, Clock, FileText, Timer, XCircle, Phone
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -72,7 +72,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🔥 PARSER DEL NOMBRE Y TELÉFONO (Para que se vea bonito en el menú)
   const parsedNameData = clientData?.name || 'Cliente';
   let displayName = parsedNameData;
   let displayPhone = null;
@@ -349,11 +348,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setIsSubmitting(true);
     
     try {
-      const dbOrderType = type === 'mesa' ? 'SALON' : 'LLEVAR';
+      // 🔥 FIX CRÍTICO: Aseguramos que los pedidos se envíen al canal correcto y evitamos órdenes fantasma.
+      const isActuallySalon = type === 'mesa' && tableId;
+      const dbOrderType = isActuallySalon ? 'SALON' : 'LLEVAR';
+      
       let targetOrderId = activeOrderId;
 
       const createNewOrder = async () => {
-        const orderPayload = { orderType: dbOrderType, tableId: dbOrderType === 'SALON' ? tableId : null, ticketId: clientData.name };
+        const orderPayload = { 
+          orderType: dbOrderType, 
+          tableId: isActuallySalon ? tableId : null, 
+          ticketId: clientData.name 
+        };
         const orderRes = await client.post('/pos/orders', orderPayload);
         const newId = orderRes.data.order.id;
         setActiveOrderId(newId);
@@ -365,12 +371,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         targetOrderId = await createNewOrder();
       }
 
+      // 🔥 REGLA APLICADA: Si es Para Llevar, forzamos Cuenta General en lugar de crear cuentas con nombres
       const itemsPayload = {
         items: cart.map(item => ({
           productId: item.id,
           quantity: item.qty,
           subtotal: item.precioUnitario * item.qty,
-          cuenta: clientData.name, 
+          cuenta: dbOrderType === 'LLEVAR' ? 'General' : (clientData.name || 'General'), 
           notes: JSON.stringify(item.detalles ? [item.detalles] : []), 
           isTakeaway: item.isTakeaway || false
         }))
@@ -704,7 +711,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text truncate text-left leading-tight">
               Hola, {displayName}
             </h2>
-            {/* 🔥 EL NUEVO BADGE VERDE PARA EL TELÉFONO 🔥 */}
             {displayPhone && (
               <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 lya:bg-emerald-500/10 rounded-md border border-emerald-200 dark:border-emerald-800/30 lya:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 lya:text-emerald-400">
                 <Phone size={12} strokeWidth={2.5} />
