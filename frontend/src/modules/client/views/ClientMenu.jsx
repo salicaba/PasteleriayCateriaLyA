@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  AlertCircle, PowerOff, Clock, FileText, Timer, XCircle, Phone
+  AlertCircle, PowerOff, Clock, Phone
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -15,6 +15,7 @@ import ClientProductModal from './components/ClientProductModal';
 import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
 import ClientLogoutModal from './components/ClientLogoutModal';
+import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
 import { 
   THEME_CLASSES, SIZES, getInitialTheme, getInitialSize, 
   getProductModifiers, getDefaultCustomizations 
@@ -50,16 +51,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
-  
-  // 🔥 CRONÓMETRO REAL SEGURO SEGUNDO A SEGUNDO
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const storedTime = localStorage.getItem('lya_client_finalized_at');
-    if (storedTime) {
-      const elapsed = Math.floor((Date.now() - parseInt(storedTime, 10)) / 1000);
-      return Math.max(0, 60 - elapsed);
-    }
-    return 60;
-  });
 
   const [isConfirmed, setIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
@@ -71,7 +62,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }, [isConfirmed]);
 
   const isReadOnly = !!finalizedStatus;
-  
   const lastActivityRef = useRef(Date.now());
   const isProcessingRef = useRef(false);
 
@@ -176,43 +166,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setShowFinalizedOverlay(true);
   };
 
-  // 🔥 CRONÓMETRO CORREGIDO PARA PANTALLA VERDE Y ROJA SIMULTÁNEAMENTE
-  useEffect(() => {
-    if (!finalizedStatus) return;
-    
-    let storedTime = localStorage.getItem('lya_client_finalized_at');
-    if (!storedTime) {
-       storedTime = Date.now().toString();
-       localStorage.setItem('lya_client_finalized_at', storedTime);
-    }
-    
-    const finalizedAt = parseInt(storedTime, 10);
-
-    const tickTimer = () => {
-       const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
-       const remaining = Math.max(0, 60 - elapsedSeconds);
-       setTimeLeft(remaining);
-       return remaining;
-    };
-
-    const initialRemaining = tickTimer();
-    if (initialRemaining <= 0) {
-       handleLogout();
-       return;
-    }
-
-    const timerId = setInterval(() => {
-       const currentRemaining = tickTimer();
-       if (currentRemaining <= 0) {
-          clearInterval(timerId); 
-          handleLogout();
-       }
-    }, 1000);
-    
-    return () => clearInterval(timerId); 
-  }, [finalizedStatus]);
-
-  const handleLogout = async () => {
+  const handleLogout = React.useCallback(async () => {
     setShowLogoutConfirm(false);
     setShowSettings(false);
     setIsLoggingOut(true);
@@ -237,7 +191,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     } else {
       window.location.reload();
     }
-  };
+  }, [onLogout]);
 
   const handleDownloadTicket = () => {
     if (!activeOrderId) return;
@@ -321,7 +275,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     }
     
     if (isProcessingRef.current) return;
-    
     isProcessingRef.current = true;
     setAddingToCartId(product.id);
 
@@ -371,7 +324,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     try {
       const isActuallySalon = type === 'mesa' && tableId;
       const dbOrderType = isActuallySalon ? 'SALON' : 'LLEVAR';
-      
       let targetOrderId = activeOrderId;
 
       const createNewOrder = async () => {
@@ -446,23 +398,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     } catch (error) {
       console.error("Error al enviar la orden al servidor:", error);
-      
-      let backendError = "No se pudo conectar con el servidor.";
-      let statusCode = error.response?.status || "Error de Red";
-      let endpoint = error.config?.url || "/pos/orders";
-
-      if (error.response && error.response.data && error.response.data.message) {
-        backendError = error.response.data.message;
-      } else if (error.message && error.message !== "Network Error") {
-        backendError = error.message;
-      }
-      
       setDiagnosticError({
-        endpoint: endpoint,
-        statusCode: statusCode,
-        message: backendError
+        endpoint: error.config?.url || "/pos/orders",
+        statusCode: error.response?.status || "Error de Red",
+        message: error.response?.data?.message || error.message
       });
-
     } finally {
       setIsSubmitting(false);
     }
@@ -493,124 +433,41 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
               <img src={logoLyA} alt="Logo 𝓛𝔂α" className="w-full h-full object-cover animate-pulse" />
             </div>
          </div>
-         
-         <motion.h2 
-            initial={{ y: 10, opacity: 0 }} 
-            animate={{ y: 0, opacity: 1 }} 
-            transition={{ delay: 0.2 }}
-            className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse text-center"
-         >
-            {isLoggingOut 
-              ? "Cerrando sesión..." 
-              : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
-         </motion.h2>
-         <motion.p 
-            initial={{ y: 10, opacity: 0 }} 
-            animate={{ y: 0, opacity: 1 }} 
-            transition={{ delay: 0.4 }}
-            className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm flex items-center gap-2 justify-center"
-         >
-            {isLoggingOut ? (
-               <Loader2 size={16} className="text-orange-500 animate-spin" />
-            ) : (
-               <CheckCircle2 size={16} className="text-green-500" />
-            )}
-            {isLoggingOut 
-              ? (type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") 
-              : "Cargando el menú más fresco"}
-         </motion.p>
+         <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse text-center">
+            {isLoggingOut ? "Cerrando sesión..." : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
+         </h2>
+         <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm flex items-center gap-2 justify-center">
+            {isLoggingOut ? <Loader2 size={16} className="text-orange-500 animate-spin" /> : <CheckCircle2 size={16} className="text-green-500" />}
+            {isLoggingOut ? (type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") : "Cargando el menú más fresco"}
+         </p>
       </div>
     );
   }
 
-  // 🔥 INTERFAZ SEMÁNTICA PREMIUM CON CRONÓMETRO SEGUNDO A SEGUNDO ACTIVO
+  // 🔥 RENDERIZADO DEL OVERLAY DIVIDIDO MODULARMENTE CON SU CRONÓMETRO AUTÓNOMO
   if (finalizedStatus && showFinalizedOverlay) {
-    const isClosed = finalizedStatus === 'CLOSED';
-    const isTakeawayMode = type === 'llevar';
-    const bgColor = isClosed ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
-    const TitleIcon = isClosed ? CheckCircle2 : XCircle;
-
-    // Pilar 4: Determinación de Textos Dinámicos
-    let headerText = isClosed ? '¡Mesa Liberada!' : 'Pedido Cancelado';
-    let subText = isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita!' : 'La orden ha sido cancelada desde caja.';
-
-    if (isTakeawayMode) {
-      headerText = isClosed ? '¡Cuenta Archivada!' : 'Pedido Cancelado';
-      subText = isClosed ? 'Tu pedido para llevar ha sido completado y archivado. ¡Disfruta tus delicias!' : 'Esta cuenta para llevar ha sido cancelada por caja.';
-    }
-
     return (
-      <div className={`h-full w-full flex-1 flex flex-col items-center justify-center ${bgColor} p-6 overflow-hidden text-white relative`}>
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-          animate={{ scale: 1, opacity: 1, y: 0 }} 
-          className="max-w-[400px] w-full flex flex-col items-center text-center relative z-10"
-        >
-          <TitleIcon size={64} className="mb-4 shadow-sm rounded-full bg-white/20 p-2 animate-bounce" />
-          
-          <h2 className="text-3xl font-black tracking-tight mb-2 text-center">
-             {headerText}
-          </h2>
-          <p className="font-medium text-sm mb-6 opacity-90 text-center px-4 text-justify">
-             {subText}
-          </p>
-
-          <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
-            <Timer size={36} className="animate-pulse text-white" />
-            <span>00:{timeLeft.toString().padStart(2, '0')}</span>
-          </div>
-
-          <div className="w-full space-y-3">
-            <motion.button 
-              whileTap={{ scale: 0.95 }} 
-              onClick={handleDownloadTicket} 
-              className={`w-full py-4 bg-white ${isClosed ? 'text-emerald-600' : 'text-red-600'} rounded-2xl font-black shadow-xl outline-none flex items-center justify-center gap-2`}
-            >
-              <FileText size={20} />
-              Bajar Comprobante
-            </motion.button>
-            
-            <motion.button 
-              whileTap={{ scale: 0.95 }} 
-              onClick={handleLogout} 
-              className="w-full py-4 text-white/70 md:hover:text-white underline font-bold rounded-2xl transition-all outline-none text-center"
-            >
-              {isTakeawayMode ? 'Salir de la cuenta ahora' : 'Salir de la mesa ahora'}
-            </motion.button>
-          </div>
-        </motion.div>
-      </div>
+      <ClientFinalizedOverlay 
+        finalizedStatus={finalizedStatus}
+        type={type}
+        handleDownloadTicket={handleDownloadTicket}
+        handleLogout={handleLogout}
+      />
     );
   }
 
   if (sessionExpired) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-          animate={{ scale: 1, opacity: 1, y: 0 }} 
-          transition={{ type: 'spring', damping: 25 }} 
-          className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-        >
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
           <div className="w-20 h-20 bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-lya-secondary">
-             <Clock size={40} strokeWidth={2} />
+             <Clock size={40} />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
-             Sesión Expirada
-          </h2>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">Sesión Expirada</h2>
           <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify px-2">
-             {type === 'llevar' 
-               ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada. \n\nSi deseas ordenar nuevamente, por favor vuelve a ingresar tu nombre."
-               : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente, ya que no detectamos ninguna orden confirmada. \n\nSi deseas ordenar nuevamente, por favor vuelve a escanear el código QR e ingresar tu nombre."
-             }
+             {type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
           </p>
-          <motion.button 
-            whileTap={{ scale: 0.95 }} 
-            onClick={handleLogout} 
-            className="w-full py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface rounded-2xl font-black transition-all shadow-lg shadow-orange-500/30 active:scale-95 flex items-center justify-center gap-2 outline-none"
-          >
-            <span>Entendido</span>
-          </motion.button>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-orange-500 lya:bg-lya-primary text-white rounded-2xl font-black shadow-lg">Entendido</motion.button>
         </motion.div>
       </div>
     );
@@ -619,30 +476,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   if (!isQrActive && !isConfirmed) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-          animate={{ scale: 1, opacity: 1, y: 0 }} 
-          transition={{ type: 'spring', damping: 25 }} 
-          className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-        >
-          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full flex items-center justify-center mb-6 shadow-inner">
-             <PowerOff size={40} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40" />
-          </div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
-             Servicio Suspendido
-          </h2>
-          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify">
-             El servicio de pedidos digitales por código QR se encuentra temporalmente deshabilitado. Esto ocurre cuando cerramos cocina o pausamos los pedidos web. 
-             <br/><br/>
-             <b className="text-gray-700 dark:text-gray-300 lya:text-lya-text/90">¿Estamos abiertos? ¡Entra y pide sin miedo!</b> Acércate al mostrador o llama a nuestro personal, estarán encantados de tomar tu orden directamente.
-          </p>
-          <motion.button 
-            whileTap={{ scale: 0.95 }} 
-            onClick={handleLogout} 
-            className="w-full py-4 bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface rounded-2xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 outline-none"
-          >
-             <span>Entendido, cerrar menú</span>
-          </motion.button>
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
+          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full flex items-center justify-center mb-6 shadow-inner"><PowerOff size={40} className="text-gray-400" /></div>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">Servicio Suspendido</h2>
+          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify">El servicio de pedidos digitales por código QR se encuentra deshabilitado temporalmente.</p>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black shadow-xl">Entendido, cerrar menú</motion.button>
         </motion.div>
       </div>
     );
@@ -652,54 +490,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return (
       <>
         <ClientOrderSuccess 
-          cart={confirmedSnapshot.items} 
-          totalCart={confirmedSnapshot.total}
-          clientData={clientData}
-          type={type}
-          tableId={tableId}
-          products={products}
-          categories={categories}
-          getCategoryName={getCategoryName}
-          isQrActive={isQrActive}
-          isOrderPaid={isOrderPaid} 
-          onReset={() => {
-            if (isQrActive && !isOrderPaid) setIsConfirmed(false); 
-          }}
-          onOpenSettings={() => setShowSettings(true)}
+          cart={confirmedSnapshot.items} totalCart={confirmedSnapshot.total} clientData={clientData} type={type} tableId={tableId} products={products} categories={categories} getCategoryName={getCategoryName} isQrActive={isQrActive} isOrderPaid={isOrderPaid} onReset={() => { if (isQrActive && !isOrderPaid) setIsConfirmed(false); }} onOpenSettings={() => setShowSettings(true)}
         />
-        
-        <AnimatePresence>
-          {showSettings && (
-            <ClientSettingsModal 
-              themeIndex={themeIndex}
-              sizeIndex={sizeIndex}
-              cycleTheme={cycleTheme}
-              cycleSize={cycleSize}
-              onClose={() => setShowSettings(false)}
-              showLogout={confirmedSnapshot.items.length === 0} 
-              onLogout={() => {
-                setShowSettings(false);
-                setShowLogoutConfirm(true);
-              }}
-              onLogoutClick={() => {
-                setShowSettings(false);
-                setShowLogoutConfirm(true);
-              }}
-            />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {showLogoutConfirm && (
-            <ClientLogoutModal 
-              isOpen={showLogoutConfirm}
-              show={showLogoutConfirm}
-              onClose={() => setShowLogoutConfirm(false)}
-              onLogout={handleLogout}
-              onConfirm={handleLogout} 
-            />
-          )}
-        </AnimatePresence>
+        <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
+        <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
       </>
     );
   }
@@ -709,86 +503,42 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div 
-              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
-              animate={{ opacity: 1, y: 0, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
-                notification.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
-                notification.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
-                'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
-              }`}
-            >
-              <div className={`p-1.5 rounded-full shrink-0 ${
-                notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
-                notification.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
-                'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
-              }`}>
-                {notification.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : 
-                 notification.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : 
-                 <AlertCircle size={20} strokeWidth={2.5} />}
-              </div>
+            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200/50 text-gray-800 dark:text-white' : 'border-red-200/50 text-gray-800'}`}>
               <span className="text-sm tracking-wide text-center">{notification.msg}</span>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <header className={`px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors`}>
+      <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/40 uppercase tracking-wider text-left">Menú Digital</p>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text truncate text-left leading-tight">
-              Hola, {displayName}
-            </h2>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-left">Menú Digital</p>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text truncate text-left leading-tight">Hola, {displayName}</h2>
             {displayPhone && (
-              <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 lya:bg-emerald-500/10 rounded-md border border-emerald-200 dark:border-emerald-800/30 lya:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 lya:text-emerald-400">
-                <Phone size={12} strokeWidth={2.5} />
-                <span className="text-[11px] font-black tracking-widest">{displayPhone}</span>
+              <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-md border text-emerald-600 dark:text-emerald-400 text-[11px] font-black tracking-widest">
+                <Phone size={12} /><span>{displayPhone}</span>
               </div>
             )}
           </div>
-          
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors outline-none">
-              <Settings size={18} strokeWidth={2.5} />
-            </motion.button>
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-[10px] font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text rounded-full text-center">
-              {type === 'mesa' ? <Utensils size={12} className="text-orange-500 lya:text-lya-secondary" /> : <ShoppingBag size={12} className="text-orange-500 lya:text-lya-secondary" />}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 shadow-sm text-gray-600 dark:text-gray-300 transition-colors"><Settings size={18} /></motion.button>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm text-[10px] font-bold text-gray-700 dark:text-gray-200 rounded-full">
+              {type === 'mesa' ? <Utensils size={12} className="text-orange-500" /> : <ShoppingBag size={12} className="text-orange-500" />}
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
           </div>
         </div>
-        
         <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 pt-0.5 -mx-6 px-6">
           {categories.map(cat => (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors shadow-sm border text-center outline-none ${
-                activeCategory === cat.id 
-                  ? 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white border-transparent' 
-                  : 'bg-white dark:bg-gray-800 lya:bg-lya-surface border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-600 dark:text-gray-400 lya:text-lya-text/80'
-              }`}
-            >
-              {cat.name}
-            </motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors border ${activeCategory === cat.id ? 'bg-orange-500 lya:bg-lya-primary text-white border-transparent' : 'bg-white dark:bg-gray-800 border-gray-200 text-gray-600 dark:text-gray-400'}`}>{cat.name}</motion.button>
           ))}
         </div>
       </header>
 
-      <motion.div 
-        key={activeCategory} 
-        variants={containerVariants}
-        initial="hidden" 
-        animate="show" 
-        className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar"
-      >
+      <motion.div key={activeCategory} variants={containerVariants} initial="hidden" animate="show" className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar">
         {visibleProducts.length === 0 ? (
-          <motion.div variants={itemVariants} className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-lya-text/40 font-medium text-sm">
-            No se encontraron productos en esta categoría.
-          </motion.div>
+          <div className="text-center py-12 text-gray-400 font-medium text-sm">No se encontraron productos en esta categoría.</div>
         ) : (
           visibleProducts.map(product => {
             const hasImage = product.imagen && !product.imagen.includes('default-product');
@@ -796,36 +546,19 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             const isAdding = addingToCartId === product.id;
 
             return (
-              <motion.div 
-                key={product.id} 
-                layout 
-                variants={itemVariants}
-                whileTap={isCustomizable ? { scale: 0.98 } : {}} 
-                onClick={() => isCustomizable && setSelectedProduct(product)} 
-                className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:shadow-md md:hover:scale-[1.01]' : ''}`}
-              >
-                <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center shadow-inner pointer-events-none">
-                  {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-lya-text/20" size={28} />}
+              <motion.div key={product.id} layout variants={itemVariants} whileTap={isCustomizable ? { scale: 0.98 } : {}} onClick={() => isCustomizable && setSelectedProduct(product)} className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01]' : ''}`}>
+                <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 border flex items-center justify-center shadow-inner">
+                  {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300" size={28} />}
                 </div>
-                
                 <div className="flex-1 min-w-0 flex flex-col justify-between h-full min-h-[6rem] py-1">
                   <div className="min-w-0 mb-1">
-                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-lya-secondary block truncate mb-0.5 text-left">{getCategoryName(product.categoria)}</span>
-                    <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white lya:text-lya-text leading-tight line-clamp-2 text-left">{product.nombre}</h3>
-                    {isCustomizable && <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-orange-600 dark:text-orange-400 lya:text-lya-secondary bg-orange-100 dark:bg-orange-500/20 lya:bg-lya-secondary/10 px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-500/30 lya:border-lya-secondary/20 transition-colors text-center">✨ Personalizable</span>}
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 block truncate text-left">{getCategoryName(product.categoria)}</span>
+                    <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white truncate text-left">{product.nombre}</h3>
+                    {isCustomizable && <span className="inline-flex mt-1.5 text-[10px] font-bold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full">✨ Personalizable</span>}
                   </div>
-                  
                   <div className="flex items-end justify-between mt-auto">
-                    <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text tracking-tight block text-left">${product.precio}</span>
-                    
-                    <button 
-                      disabled={isAdding || addingToCartId !== null}
-                      onClick={(e) => { 
-                        const defaultMods = getDefaultCustomizations(product);
-                        handleAddDirectly(product, defaultMods, e); 
-                      }} 
-                      className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white flex items-center justify-center shadow shrink-0 outline-none touch-manipulation active:scale-90 transition-all disabled:opacity-50"
-                    >
+                    <span className="font-black text-lg text-gray-900 dark:text-white tracking-tight block text-left">${product.precio}</span>
+                    <button disabled={isAdding || addingToCartId !== null} onClick={(e) => { const defaultMods = getDefaultCustomizations(product); handleAddDirectly(product, defaultMods, e); }} className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center shadow transition-all disabled:opacity-50">
                       {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
                     </button>
                   </div>
@@ -838,20 +571,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
       <AnimatePresence>
         {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
-          <motion.div 
-            initial={{ scale: 0, opacity: 0 }} 
-            animate={{ scale: 1, opacity: 1 }} 
-            exit={{ scale: 0, opacity: 0 }} 
-            className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")}
-            style={{ width: 'calc(100% - 3rem)' }}
-          >
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-200/50 dark:border-gray-700/50 lya:border-lya-border/50 transition-colors text-gray-800 dark:text-gray-200 lya:text-lya-text text-center outline-none touch-manipulation">
-              <div className="relative">
-                <ReceiptText size={20} className="text-orange-500 lya:text-lya-secondary" />
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border border-white dark:border-gray-800 lya:border-lya-surface animate-pulse"></span>
-              </div>
-              <span className="font-black text-sm tracking-wide">Mi Nota</span>
-            </motion.button>
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")} style={{ width: 'calc(100% - 3rem)' }}>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 shadow-md border text-gray-800 dark:text-gray-200 font-black text-sm"><ReceiptText size={20} className="text-orange-500" /><span>Mi Nota</span></motion.button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -859,121 +580,21 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-colors font-bold text-center outline-none touch-manipulation">
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 lya:bg-white/25 flex items-center justify-center font-black text-sm">{totalItems}</div>
-                <span className="text-base tracking-wide font-black">Revisar Pedido</span>
+                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 flex items-center justify-center font-black text-sm">{totalItems}</div>
+                <span className="text-base font-black">Revisar Pedido</span>
               </div>
-              
-              {addingToCartId !== null ? (
-                <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-secondary" />
-              ) : (
-                <span className="font-black text-xl">${(totalCart || 0).toFixed(2)}</span>
-              )}
+              {addingToCartId !== null ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${totalCart.toFixed(2)}</span>}
             </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {selectedProduct && (
-          <ClientProductModal 
-            product={selectedProduct} 
-            onClose={() => setSelectedProduct(null)} 
-            onConfirm={async (customizations) => await handleAddDirectly(selectedProduct, customizations)} 
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showCheckout && (
-          <ClientCheckoutModal 
-            cart={cart}
-            totalCart={totalCart}
-            isSubmitting={isSubmitting}
-            onClose={() => setShowCheckout(false)}
-            onConfirmOrder={handleConfirmOrder}
-            removeFromCart={removeFromCart}
-            incrementInCart={incrementInCart}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showSettings && (
-          <ClientSettingsModal 
-            themeIndex={themeIndex}
-            sizeIndex={sizeIndex}
-            cycleTheme={cycleTheme}
-            cycleSize={cycleSize}
-            onClose={() => setShowSettings(false)}
-            showLogout={confirmedSnapshot.items.length === 0} 
-            onLogout={() => {
-              setShowSettings(false);
-              setShowLogoutConfirm(true);
-            }}
-            onLogoutClick={() => {
-              setShowSettings(false);
-              setShowLogoutConfirm(true);
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showLogoutConfirm && (
-          <ClientLogoutModal 
-            isOpen={showLogoutConfirm}
-            show={showLogoutConfirm}
-            onClose={() => setShowLogoutConfirm(false)}
-            onLogout={handleLogout}
-            onConfirm={handleLogout} 
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {diagnosticError && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setDiagnosticError(null)}
-              className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-red-100 dark:border-red-900/40"
-            >
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
-                <AlertCircle size={32} strokeWidth={2} />
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-6 text-center tracking-tight">Falla de Conexión</h3>
-              
-              <div className="w-full bg-gray-50 dark:bg-gray-800 p-5 rounded-[1.5rem] mb-6 font-mono text-xs text-gray-700 dark:text-gray-300 overflow-hidden break-words text-left space-y-3 border border-gray-200 dark:border-gray-700 shadow-inner">
-                <p><strong className="text-red-500 dark:text-red-400">🌐 Endpoint:</strong> <br/>{diagnosticError.endpoint}</p>
-                <p><strong className="text-red-500 dark:text-red-400">📡 Status:</strong> {diagnosticError.statusCode}</p>
-                <p><strong className="text-red-500 dark:text-red-400">🛑 Motivo:</strong> <br/>{diagnosticError.message}</p>
-              </div>
-
-              <div className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-[1.5rem] mb-8 text-xs font-medium text-orange-800 dark:text-orange-200 text-justify border border-orange-100 dark:border-orange-800/30">
-                <strong className="block mb-2 font-black uppercase tracking-wider text-[10px]">💡 Diagnóstico Neo-Bento:</strong>
-                Si el error es "Token no proporcionado" en <b>/pos/orders</b>, el Backend está bloqueando tu petición. Debes decirle a la API que acepte órdenes de clientes públicos quitándole el middleware de Auth a esa ruta.
-              </div>
-
-              <motion.button 
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setDiagnosticError(null)}
-                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-[1.5rem] font-black shadow-lg shadow-gray-900/20 dark:shadow-white/10 outline-none select-none"
-              >
-                Entendido, lo revisaré
-              </motion.button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <AnimatePresence>{selectedProduct && <ClientProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={async (customizations) => await handleAddDirectly(selectedProduct, customizations)} />}</AnimatePresence>
+      <AnimatePresence>{showCheckout && <ClientCheckoutModal cart={cart} totalCart={totalCart} isSubmitting={isSubmitting} onClose={() => setShowCheckout(false)} onConfirmOrder={handleConfirmOrder} removeFromCart={removeFromCart} incrementInCart={incrementInCart} />}</AnimatePresence>
+      <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
+      <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
     </div>
   );
 }
