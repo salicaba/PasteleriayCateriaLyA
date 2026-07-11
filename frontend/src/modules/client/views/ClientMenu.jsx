@@ -50,7 +50,16 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(60);
+  
+  // 🔥 CRONÓMETRO REAL SEGURO SEGUNDO A SEGUNDO
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const storedTime = localStorage.getItem('lya_client_finalized_at');
+    if (storedTime) {
+      const elapsed = Math.floor((Date.now() - parseInt(storedTime, 10)) / 1000);
+      return Math.max(0, 60 - elapsed);
+    }
+    return 60;
+  });
 
   const [isConfirmed, setIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
@@ -167,11 +176,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setShowFinalizedOverlay(true);
   };
 
-  // ✅ NUEVO CÓDIGO: Cronómetro Neo-Bento Blindado
+  // 🔥 CRONÓMETRO CORREGIDO PARA PANTALLA VERDE Y ROJA SIMULTÁNEAMENTE
   useEffect(() => {
     if (!finalizedStatus) return;
     
-    // 1. Aseguramos que exista el tiempo de inicio exacto
     let storedTime = localStorage.getItem('lya_client_finalized_at');
     if (!storedTime) {
        storedTime = Date.now().toString();
@@ -180,35 +188,28 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     
     const finalizedAt = parseInt(storedTime, 10);
 
-    // 2. Función de cálculo limpia y aislada
     const tickTimer = () => {
        const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
        const remaining = Math.max(0, 60 - elapsedSeconds);
-       
-       setTimeLeft(remaining); // Forzamos la actualización visual en tiempo real
+       setTimeLeft(remaining);
        return remaining;
     };
 
-    // 3. Ejecución inicial para evitar parpadeos o retrasos del primer segundo
     const initialRemaining = tickTimer();
-    
     if (initialRemaining <= 0) {
        handleLogout();
        return;
     }
 
-    // 4. Intervalo seguro que no se atasca en segundo plano
     const timerId = setInterval(() => {
        const currentRemaining = tickTimer();
        if (currentRemaining <= 0) {
-          clearInterval(timerId); // ¡Crucial! Matamos el intervalo exactamente en 0
+          clearInterval(timerId); 
           handleLogout();
        }
     }, 1000);
     
-    // 5. Cleanup nativo por si el cliente minimiza la app o cambia de vista
-    return () => clearInterval(timerId);
-    
+    return () => clearInterval(timerId); 
   }, [finalizedStatus]);
 
   const handleLogout = async () => {
@@ -368,7 +369,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setIsSubmitting(true);
     
     try {
-      // 🔥 FIX CRÍTICO: Aseguramos que los pedidos se envíen al canal correcto y evitamos órdenes fantasma.
       const isActuallySalon = type === 'mesa' && tableId;
       const dbOrderType = isActuallySalon ? 'SALON' : 'LLEVAR';
       
@@ -391,7 +391,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         targetOrderId = await createNewOrder();
       }
 
-      // 🔥 REGLA APLICADA: Si es Para Llevar, forzamos Cuenta General en lugar de crear cuentas con nombres
       const itemsPayload = {
         items: cart.map(item => ({
           productId: item.id,
@@ -491,7 +490,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-lya-border/40" />
             <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-400 lya:border-lya-primary border-t-transparent animate-spin" />
             <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
-              <img src={logoLyA} alt="Logo 𝓛𝔂𝓪" className="w-full h-full object-cover animate-pulse" />
+              <img src={logoLyA} alt="Logo 𝓛𝔂α" className="w-full h-full object-cover animate-pulse" />
             </div>
          </div>
          
@@ -517,17 +516,28 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                <CheckCircle2 size={16} className="text-green-500" />
             )}
             {isLoggingOut 
-              ? (type === 'llevar' ? "Cerrando orden" : "Liberando la mesa") 
+              ? (type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") 
               : "Cargando el menú más fresco"}
          </motion.p>
       </div>
     );
   }
 
+  // 🔥 INTERFAZ SEMÁNTICA PREMIUM CON CRONÓMETRO SEGUNDO A SEGUNDO ACTIVO
   if (finalizedStatus && showFinalizedOverlay) {
     const isClosed = finalizedStatus === 'CLOSED';
+    const isTakeawayMode = type === 'llevar';
     const bgColor = isClosed ? 'bg-emerald-500 dark:bg-emerald-600 lya:bg-[#03543F]' : 'bg-red-500 dark:bg-red-600 lya:bg-[#9B1C1C]';
     const TitleIcon = isClosed ? CheckCircle2 : XCircle;
+
+    // Pilar 4: Determinación de Textos Dinámicos
+    let headerText = isClosed ? '¡Mesa Liberada!' : 'Pedido Cancelado';
+    let subText = isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita!' : 'La orden ha sido cancelada desde caja.';
+
+    if (isTakeawayMode) {
+      headerText = isClosed ? '¡Cuenta Archivada!' : 'Pedido Cancelado';
+      subText = isClosed ? 'Tu pedido para llevar ha sido completado y archivado. ¡Disfruta tus delicias!' : 'Esta cuenta para llevar ha sido cancelada por caja.';
+    }
 
     return (
       <div className={`h-full w-full flex-1 flex flex-col items-center justify-center ${bgColor} p-6 overflow-hidden text-white relative`}>
@@ -536,18 +546,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           animate={{ scale: 1, opacity: 1, y: 0 }} 
           className="max-w-[400px] w-full flex flex-col items-center text-center relative z-10"
         >
-          <TitleIcon size={64} className="mb-4 shadow-sm rounded-full bg-white/20 p-2" />
+          <TitleIcon size={64} className="mb-4 shadow-sm rounded-full bg-white/20 p-2 animate-bounce" />
           
           <h2 className="text-3xl font-black tracking-tight mb-2 text-center">
-             {isClosed ? '¡Mesa Liberada!' : 'Pedido Cancelado'}
+             {headerText}
           </h2>
-          <p className="font-medium text-sm mb-6 opacity-90 text-center px-4">
-             {isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita!' : 'La orden ha sido cancelada desde caja.'}
+          <p className="font-medium text-sm mb-6 opacity-90 text-center px-4 text-justify">
+             {subText}
           </p>
 
           <div className="text-5xl font-black mb-8 flex items-center justify-center gap-3 drop-shadow-md">
-            <Timer size={36} className="animate-pulse" />
-            {timeLeft === 60 ? '01:00' : `00:${timeLeft.toString().padStart(2, '0')}`}
+            <Timer size={36} className="animate-pulse text-white" />
+            <span>00:{timeLeft.toString().padStart(2, '0')}</span>
           </div>
 
           <div className="w-full space-y-3">
@@ -563,9 +573,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             <motion.button 
               whileTap={{ scale: 0.95 }} 
               onClick={handleLogout} 
-              className="w-full py-4 text-white/70 md:hover:text-white underline font-bold rounded-2xl transition-all outline-none"
+              className="w-full py-4 text-white/70 md:hover:text-white underline font-bold rounded-2xl transition-all outline-none text-center"
             >
-              Salir de la mesa ahora
+              {isTakeawayMode ? 'Salir de la cuenta ahora' : 'Salir de la mesa ahora'}
             </motion.button>
           </div>
         </motion.div>
@@ -950,7 +960,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
               <div className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-[1.5rem] mb-8 text-xs font-medium text-orange-800 dark:text-orange-200 text-justify border border-orange-100 dark:border-orange-800/30">
                 <strong className="block mb-2 font-black uppercase tracking-wider text-[10px]">💡 Diagnóstico Neo-Bento:</strong>
-                Si el error es "Token no proporcionado" en <b>/pos/orders</b>, el Backend está bloqueando tu petición. Debes decirle a la API que acepte órdenes de clientes públicos quitándole el middleware de Auth a esa ruta o creando una nueva ruta pública en el servidor.
+                Si el error es "Token no proporcionado" en <b>/pos/orders</b>, el Backend está bloqueando tu petición. Debes decirle a la API que acepte órdenes de clientes públicos quitándole el middleware de Auth a esa ruta.
               </div>
 
               <motion.button 
