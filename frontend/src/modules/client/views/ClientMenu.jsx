@@ -62,7 +62,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }, [isConfirmed]);
 
   const isReadOnly = !!finalizedStatus;
-  const lastActivityRef = useRef(Date.now());
+  
+  // 🔥 FIX: Persistencia de Inactividad en Disco Duro (localStorage)
+  const initialActivity = parseInt(localStorage.getItem('lya_client_last_activity')) || Date.now();
+  const lastActivityRef = useRef(initialActivity);
   const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -84,6 +87,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
+  // Inicialización segura del tracker de actividad
+  useEffect(() => {
+    if (!localStorage.getItem('lya_client_last_activity')) {
+      localStorage.setItem('lya_client_last_activity', Date.now().toString());
+    }
+  }, []);
+
   useEffect(() => {
     const checkQrStatus = async () => {
       try {
@@ -100,7 +110,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   useEffect(() => {
     const updateActivity = () => {
-      lastActivityRef.current = Date.now();
+      const now = Date.now();
+      lastActivityRef.current = now;
+      localStorage.setItem('lya_client_last_activity', now.toString());
     };
     
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
@@ -118,13 +130,15 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     const checkInterval = setInterval(checkInactivity, 5000);
 
-    // 🔥 BLINDAJE: Detecta inmediatamente si regresó a la app después de inactividad
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkInactivity();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Validación inmediata por si volvieron a abrir la app/pestaña habiendo pasado el tiempo
+    checkInactivity();
 
     return () => {
       clearInterval(checkInterval);
@@ -186,6 +200,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     await new Promise(resolve => setTimeout(resolve, 1500));
     
+    // 🔥 Añadimos lya_client_last_activity a la purga de sesión
     const keysToRemove = [
       'lya_client_order_id', 
       'lya_client_snapshot', 
@@ -194,7 +209,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       'lya_client_finalized_at', 
       'lya_client_finalized_status', 
       'lya_client_order_paid',
-      'lya_client_is_confirmed'
+      'lya_client_is_confirmed',
+      'lya_client_last_activity'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
