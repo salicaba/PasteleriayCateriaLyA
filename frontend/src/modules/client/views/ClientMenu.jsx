@@ -425,26 +425,25 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg backdrop-blur-md transition-opacity duration-300">
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] backdrop-blur-md transition-opacity duration-300">
          <div className="relative w-28 h-28 mb-6">
-            <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-lya-border/40" />
-            <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-400 lya:border-lya-primary border-t-transparent animate-spin" />
+            <div className="absolute inset-0 rounded-full border-[6px] border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9]" />
+            <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-600 lya:border-[#78350F] border-t-transparent animate-spin" />
             <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
               <img src={logoLyA} alt="Logo 𝓛𝔂α" className="w-full h-full object-cover animate-pulse" />
             </div>
          </div>
-         <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-2 animate-pulse text-center">
+         <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] tracking-tight mb-2 animate-pulse text-center">
             {isLoggingOut ? "Cerrando sesión..." : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
          </h2>
-         <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm flex items-center gap-2 justify-center">
-            {isLoggingOut ? <Loader2 size={16} className="text-orange-500 animate-spin" /> : <CheckCircle2 size={16} className="text-green-500" />}
+         <p className="text-neutral-500 dark:text-neutral-400 lya:text-[#7A6353] font-medium text-sm flex items-center gap-2 justify-center">
+            {isLoggingOut ? <Loader2 size={16} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F] animate-spin" /> : <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400" />}
             {isLoggingOut ? (type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") : "Cargando el menú más fresco"}
          </p>
       </div>
     );
   }
 
-  // 🔥 RENDERIZADO DEL OVERLAY DIVIDIDO MODULARMENTE CON SU CRONÓMETRO AUTÓNOMO
   if (finalizedStatus && showFinalizedOverlay) {
     return (
       <ClientFinalizedOverlay 
@@ -458,16 +457,16 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   if (sessionExpired) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
-          <div className="w-20 h-20 bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-lya-secondary">
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] p-6 overflow-hidden">
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9]">
+          <div className="w-20 h-20 bg-orange-50 dark:bg-orange-900/20 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-[#78350F]">
              <Clock size={40} />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">Sesión Expirada</h2>
-          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify px-2">
+          <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] mb-4 tracking-tight text-center">Sesión Expirada</h2>
+          <p className="text-neutral-500 dark:text-neutral-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify px-2">
              {type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
           </p>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-orange-500 lya:bg-lya-primary text-white rounded-2xl font-black shadow-lg">Entendido</motion.button>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-lg">Entendido</motion.button>
         </motion.div>
       </div>
     );
@@ -475,12 +474,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   if (!isQrActive && !isConfirmed) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 overflow-hidden">
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
-          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full flex items-center justify-center mb-6 shadow-inner"><PowerOff size={40} className="text-gray-400" /></div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">Servicio Suspendido</h2>
-          <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed text-justify">El servicio de pedidos digitales por código QR se encuentra deshabilitado temporalmente.</p>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black shadow-xl">Entendido, cerrar menú</motion.button>
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] p-6 overflow-hidden">
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9]">
+          <div className="w-20 h-20 bg-neutral-100 dark:bg-neutral-800 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner"><PowerOff size={40} className="text-neutral-400 dark:text-neutral-500 lya:text-[#78350F]" /></div>
+          <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] mb-4 tracking-tight text-center">Servicio Suspendido</h2>
+          <p className="text-neutral-500 dark:text-neutral-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify">El servicio de pedidos digitales por código QR se encuentra deshabilitado temporalmente.</p>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-xl">Entendido, cerrar menú</motion.button>
         </motion.div>
       </div>
     );
@@ -499,46 +498,46 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }
 
   return (
-    <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg relative">
+    <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] relative">
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200/50 text-gray-800 dark:text-white' : 'border-red-200/50 text-gray-800'}`}>
+            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-neutral-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200 dark:border-emerald-900/50 lya:border-emerald-200/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]' : 'border-red-200 dark:border-red-900/50 lya:border-red-200/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]'}`}>
               <span className="text-sm tracking-wide text-center">{notification.msg}</span>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors">
+      <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] border-b border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] transition-colors">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-left">Menú Digital</p>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text truncate text-left leading-tight">Hola, {displayName}</h2>
+            <p className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 lya:text-[#7A6353] uppercase tracking-wider text-left">Menú Digital</p>
+            <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] truncate text-left leading-tight">Hola, {displayName}</h2>
             {displayPhone && (
-              <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-md border text-emerald-600 dark:text-emerald-400 text-[11px] font-black tracking-widest">
+              <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-50/50 rounded-md border border-emerald-100 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-black tracking-widest">
                 <Phone size={12} /><span>{displayPhone}</span>
               </div>
             )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 shadow-sm text-gray-600 dark:text-gray-300 transition-colors"><Settings size={18} /></motion.button>
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm text-[10px] font-bold text-gray-700 dark:text-gray-200 rounded-full">
-              {type === 'mesa' ? <Utensils size={12} className="text-orange-500" /> : <ShoppingBag size={12} className="text-orange-500" />}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353] transition-colors"><Settings size={18} /></motion.button>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-[10px] font-bold text-neutral-700 dark:text-neutral-300 lya:text-[#7A6353] rounded-full">
+              {type === 'mesa' ? <Utensils size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /> : <ShoppingBag size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" />}
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
           </div>
         </div>
         <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 pt-0.5 -mx-6 px-6">
           {categories.map(cat => (
-            <motion.button whileTap={{ scale: 0.95 }} key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors border ${activeCategory === cat.id ? 'bg-orange-500 lya:bg-lya-primary text-white border-transparent' : 'bg-white dark:bg-gray-800 border-gray-200 text-gray-600 dark:text-gray-400'}`}>{cat.name}</motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors border ${activeCategory === cat.id ? 'bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white border-transparent' : 'bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353]'}`}>{cat.name}</motion.button>
           ))}
         </div>
       </header>
 
       <motion.div key={activeCategory} variants={containerVariants} initial="hidden" animate="show" className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar">
         {visibleProducts.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 font-medium text-sm">No se encontraron productos en esta categoría.</div>
+          <div className="text-center py-12 text-neutral-400 dark:text-neutral-500 lya:text-[#7A6353] font-medium text-sm">No se encontraron productos en esta categoría.</div>
         ) : (
           visibleProducts.map(product => {
             const hasImage = product.imagen && !product.imagen.includes('default-product');
@@ -546,19 +545,19 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             const isAdding = addingToCartId === product.id;
 
             return (
-              <motion.div key={product.id} layout variants={itemVariants} whileTap={isCustomizable ? { scale: 0.98 } : {}} onClick={() => isCustomizable && setSelectedProduct(product)} className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01]' : ''}`}>
-                <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 border flex items-center justify-center shadow-inner">
-                  {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300" size={28} />}
+              <motion.div key={product.id} layout variants={itemVariants} whileTap={isCustomizable ? { scale: 0.98 } : {}} onClick={() => isCustomizable && setSelectedProduct(product)} className={`flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm transition-all ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] dark:md:hover:bg-neutral-800/80 lya:md:hover:bg-[#EADCC9]/30' : ''}`}>
+                <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-neutral-100 dark:bg-neutral-950 lya:bg-[#EADCC9] border border-neutral-100 dark:border-neutral-800 lya:border-[#D9C4A9] flex items-center justify-center shadow-inner">
+                  {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-neutral-300 dark:text-neutral-700 lya:text-[#C4B29A]" size={28} />}
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-between h-full min-h-[6rem] py-1">
                   <div className="min-w-0 mb-1">
-                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 block truncate text-left">{getCategoryName(product.categoria)}</span>
-                    <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white truncate text-left">{product.nombre}</h3>
-                    {isCustomizable && <span className="inline-flex mt-1.5 text-[10px] font-bold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full">✨ Personalizable</span>}
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
+                    <h3 className="font-extrabold text-[15px] sm:text-base text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] truncate text-left">{product.nombre}</h3>
+                    {isCustomizable && <span className="inline-flex mt-1.5 text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800/30 lya:border-transparent">✨ Personalizable</span>}
                   </div>
                   <div className="flex items-end justify-between mt-auto">
-                    <span className="font-black text-lg text-gray-900 dark:text-white tracking-tight block text-left">${product.precio}</span>
-                    <button disabled={isAdding || addingToCartId !== null} onClick={(e) => { const defaultMods = getDefaultCustomizations(product); handleAddDirectly(product, defaultMods, e); }} className="w-10 h-10 rounded-[1rem] bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center shadow transition-all disabled:opacity-50">
+                    <span className="font-black text-lg text-neutral-900 dark:text-neutral-100 lya:text-[#5D4037] tracking-tight block text-left">${product.precio}</span>
+                    <button disabled={isAdding || addingToCartId !== null} onClick={(e) => { const defaultMods = getDefaultCustomizations(product); handleAddDirectly(product, defaultMods, e); }} className="w-10 h-10 rounded-[1rem] bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white md:hover:bg-neutral-800 dark:md:hover:bg-neutral-700 lya:md:hover:bg-[#5C240A] flex items-center justify-center shadow transition-all disabled:opacity-50">
                       {isAdding ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} strokeWidth={3} />}
                     </button>
                   </div>
@@ -572,7 +571,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")} style={{ width: 'calc(100% - 3rem)' }}>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 shadow-md border text-gray-800 dark:text-gray-200 font-black text-sm"><ReceiptText size={20} className="text-orange-500" /><span>Mi Nota</span></motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] shadow-md border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] text-neutral-800 dark:text-neutral-200 lya:text-[#3E2723] font-black text-sm"><ReceiptText size={20} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /><span>Mi Nota</span></motion.button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -580,9 +579,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold">
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-neutral-800 dark:md:hover:bg-neutral-700 lya:md:hover:bg-[#5C240A] transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 flex items-center justify-center font-black text-sm">{totalItems}</div>
+                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/20 flex items-center justify-center font-black text-sm">{totalItems}</div>
                 <span className="text-base font-black">Revisar Pedido</span>
               </div>
               {addingToCartId !== null ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${totalCart.toFixed(2)}</span>}
