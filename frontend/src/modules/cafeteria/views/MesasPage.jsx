@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/MesasPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket'; 
@@ -148,7 +148,6 @@ export const MesasPage = ({ globalScroll }) => {
     }
   };
 
-  // 🔥 PANTALLA DE CARGA CORREGIDA: Eliminamos el min-h-[80vh] y aseguramos flex-1, h-full y w-full
   if (isLoading) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
@@ -172,7 +171,6 @@ export const MesasPage = ({ globalScroll }) => {
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
 
   return (
-    /* 🔥 CONTENEDOR PRINCIPAL: Aseguramos el flex-1 para que llene todo el espacio sin dejar huecos */
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -180,7 +178,7 @@ export const MesasPage = ({ globalScroll }) => {
       className={`flex flex-col flex-1 w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-full' : 'h-full overflow-hidden'}`}
     >
       
-      {/* NOTIFICACIONES NATIVAS NEO-BENTO */}
+      {/* NOTIFICACIONES NATIVAS NEO-BENTO CORREGIDAS (Añadido soporte a 'warning') */}
       <AnimatePresence>
         {toastMessage && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -189,15 +187,17 @@ export const MesasPage = ({ globalScroll }) => {
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto ${
-                toastType === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
+                toastType === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 
+                toastType === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
+                'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
             >
               <div className={`p-1.5 rounded-full shrink-0 ${
-                toastType === 'error' 
-                  ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
-                  : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
+                toastType === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 
+                toastType === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
+                'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
               }`}>
-                {toastType === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+                {toastType === 'error' ? <AlertCircle size={20} /> : toastType === 'warning' ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
               </div>
               <div className="flex flex-col items-center justify-center text-center w-full">
                   <span className="text-sm leading-tight text-center">{toastMessage}</span>
@@ -232,7 +232,6 @@ export const MesasPage = ({ globalScroll }) => {
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesas del Salón</h3>
               </div>
               
-              {/* ESTADO VACÍO PARA SALÓN */}
               {mesasSalon.length === 0 ? (
                 <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-400 shadow-sm mt-2">
                   <Store size={48} className="mb-3 opacity-50 text-gray-300 dark:text-gray-600 lya:text-lya-text/40" strokeWidth={1.5} />
@@ -263,7 +262,6 @@ export const MesasPage = ({ globalScroll }) => {
                 </button>
               </div>
 
-              {/* ESTADO VACÍO PARA LLEVAR */}
               {mesasLlevar.length === 0 ? (
                 <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-400 shadow-sm mt-2">
                   <ShoppingBag size={48} className="mb-3 opacity-50 text-gray-300 dark:text-gray-600 lya:text-lya-text/40" strokeWidth={1.5} />

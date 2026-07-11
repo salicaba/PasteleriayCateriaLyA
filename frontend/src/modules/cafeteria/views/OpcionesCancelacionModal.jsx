@@ -11,20 +11,29 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Detectamos si es una cuenta única (Como las de Para Llevar que internamente son "General")
+  const hasMultipleAccounts = cuentas?.length > 1;
+  const isTakeawayGeneral = !hasMultipleAccounts && cuentas?.[0] === 'General';
+
+  // 🔥 FIX: Se elimina 'cuentas' de las dependencias para evitar que los re-renders
+  // del POS reinicien la selección a 'mesa' mientras el modal está abierto.
   useEffect(() => {
     if (isOpen) {
-      if (cuentas && cuentas.length === 1) {
-        setTipoCancelacion('cuenta');
-        setCuentaSeleccionada(cuentas[0]);
-      } else {
-        setTipoCancelacion('mesa');
-        setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
-      }
-      setMotivo('Cancelación desde POS');
+      setTipoCancelacion('mesa'); 
+      setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
+      setMotivo(''); 
       setIsProcessing(false);
       setErrorMessage('');
     }
-  }, [isOpen, cuentas]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); 
+
+  // Mantiene sincronizada la cuenta si la lista cambia, pero sin reiniciar los radio buttons
+  useEffect(() => {
+    if (isOpen && cuentas?.length > 0 && !cuentaSeleccionada) {
+      setCuentaSeleccionada(cuentas[0]);
+    }
+  }, [cuentas, isOpen, cuentaSeleccionada]);
 
   const showError = (msg) => {
     setErrorMessage(msg);
@@ -35,7 +44,8 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
     setIsProcessing(true);
     setErrorMessage('');
     try {
-      await onConfirmar(tipoCancelacion, cuentaSeleccionada, motivo);
+      const finalMotivo = motivo.trim() || 'Cancelación desde POS';
+      await onConfirmar(tipoCancelacion, cuentaSeleccionada, finalMotivo);
     } catch (error) {
       console.error("Error al cancelar:", error);
       showError(error?.response?.data?.message || error.message || "Ocurrió un error al procesar la cancelación.");
@@ -49,7 +59,6 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
       {isOpen && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors">
           
-          {/* CÁPSULA DE NOTIFICACIÓN DE ERROR LOCAL */}
           <AnimatePresence>
             {errorMessage && (
               <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -57,12 +66,12 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                   initial={{ opacity: 0, y: -50, scale: 0.9 }} 
                   animate={{ opacity: 1, y: 0, scale: 1 }} 
                   exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                  className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-red-100 dark:border-red-900/30 lya:border-red-500/30 pointer-events-auto"
+                  className="bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border border-red-200 dark:border-red-900/50 lya:border-red-500/30 pointer-events-auto text-center"
                 >
                   <div className="bg-red-100 dark:bg-red-500/20 lya:bg-red-500/20 p-1.5 rounded-full shrink-0">
                     <AlertCircle size={20} className="text-red-500 lya:text-red-400" />
                   </div>
-                  <span className="text-sm">{errorMessage}</span>
+                  <span className="text-sm leading-tight text-center">{errorMessage}</span>
                 </motion.div>
               </div>
             )}
@@ -75,92 +84,99 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-6 sm:p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
           >
-            {/* Ícono superior */}
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-red-50 dark:bg-red-500/10 lya:bg-red-500/10 shadow-sm">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-red-50 dark:bg-red-900/20 lya:bg-red-500/10 shadow-sm">
               <AlertTriangle size={32} strokeWidth={1.5} className="text-red-500 lya:text-red-400" />
             </div>
             
             <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">
-              Opciones de Cancelación
+              {isTakeawayGeneral ? 'Cancelar Pedido' : (hasMultipleAccounts ? 'Opciones de Cancelación' : 'Cancelar Orden')}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 leading-relaxed font-medium">
-              Selecciona si deseas cancelar toda la orden o solo una cuenta específica.
+            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 leading-relaxed font-medium text-center px-2">
+              {isTakeawayGeneral 
+                ? 'Ingresa un motivo para cancelar este pedido para llevar.' 
+                : (hasMultipleAccounts 
+                    ? 'Selecciona si deseas cancelar toda la orden o solo una cuenta específica.' 
+                    : 'Ingresa un motivo para cancelar esta orden.')}
             </p>
 
-            <div className="w-full mb-8 space-y-4 text-left">
-              {/* Opciones de Radio Buttons */}
-              <div className="flex flex-col gap-3 mb-2">
-                {cuentas?.length > 1 && (
-                  <label className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                    isProcessing ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 lya:hover:bg-lya-bg/50'
-                  } ${
-                    tipoCancelacion === 'mesa' 
-                      ? 'border-red-200 dark:border-red-900/50 lya:border-red-500/30 bg-red-50/50 dark:bg-red-900/10 lya:bg-red-500/5' 
-                      : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40'
-                  }`}>
-                    <input 
-                      type="radio" 
-                      name="tipoCancelacion" 
-                      value="mesa"
-                      checked={tipoCancelacion === 'mesa'}
-                      onChange={(e) => setTipoCancelacion(e.target.value)}
-                      disabled={isProcessing}
-                      className="w-4 h-4 text-red-500 lya:text-red-400 focus:ring-red-500"
-                    />
-                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Toda la Orden (Mesa)</span>
-                  </label>
-                )}
-
-                <label className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                  isProcessing ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 lya:hover:bg-lya-bg/50'
-                } ${
-                  tipoCancelacion === 'cuenta' 
-                    ? 'border-red-200 dark:border-red-900/50 lya:border-red-500/30 bg-red-50/50 dark:bg-red-900/10 lya:bg-red-500/5' 
-                    : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40'
-                }`}>
-                  <input 
-                    type="radio" 
-                    name="tipoCancelacion" 
-                    value="cuenta"
-                    checked={tipoCancelacion === 'cuenta'}
-                    onChange={(e) => setTipoCancelacion(e.target.value)}
-                    disabled={isProcessing}
-                    className="w-4 h-4 text-red-500 lya:text-red-400 focus:ring-red-500"
-                  />
-                  <span className="text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Cuenta Específica</span>
-                </label>
-              </div>
-
-              {/* Selector de cuenta */}
-              <AnimatePresence>
-                {tipoCancelacion === 'cuenta' && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pt-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1.5 block">¿Qué cuenta eliminarás?</label>
-                      <select
-                        value={cuentaSeleccionada}
-                        onChange={(e) => setCuentaSeleccionada(e.target.value)}
+            <div className="w-full mb-8 text-left space-y-4">
+              
+              {hasMultipleAccounts && (
+                <>
+                  <div className="flex flex-col gap-3 mb-4">
+                    <label className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      isProcessing ? 'opacity-50 pointer-events-none' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/50 lya:md:hover:bg-lya-bg/50'
+                    } ${
+                      tipoCancelacion === 'mesa' 
+                        ? 'border-red-200 dark:border-red-900/50 lya:border-red-500/30 bg-red-50/50 dark:bg-red-900/10 lya:bg-red-500/5' 
+                        : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40'
+                    }`}>
+                      <input 
+                        type="radio" 
+                        name="tipoCancelacion" 
+                        value="mesa"
+                        checked={tipoCancelacion === 'mesa'}
+                        onChange={(e) => setTipoCancelacion(e.target.value)}
                         disabled={isProcessing}
-                        className="w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg text-gray-900 dark:text-white lya:text-lya-text text-sm rounded-2xl p-4 outline-none focus:ring-4 focus:ring-red-500/10 transition-all border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/40 focus:border-red-500 dark:focus:border-red-500 lya:focus:border-red-400 font-bold shadow-inner disabled:opacity-50 cursor-pointer"
-                      >
-                        {!cuentaSeleccionada && <option value="" disabled>Seleccione...</option>}
-                        {cuentas?.map(acc => (
-                          <option key={acc} value={acc}>Cuenta: {acc}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                        className="w-4 h-4 text-red-500 lya:text-red-400 focus:ring-red-500"
+                      />
+                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Toda la Orden (Mesa)</span>
+                    </label>
 
-              {/* Motivo */}
+                    <label className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      isProcessing ? 'opacity-50 pointer-events-none' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/50 lya:md:hover:bg-lya-bg/50'
+                    } ${
+                      tipoCancelacion === 'cuenta' 
+                        ? 'border-red-200 dark:border-red-900/50 lya:border-red-500/30 bg-red-50/50 dark:bg-red-900/10 lya:bg-red-500/5' 
+                        : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40'
+                    }`}>
+                      <input 
+                        type="radio" 
+                        name="tipoCancelacion" 
+                        value="cuenta"
+                        checked={tipoCancelacion === 'cuenta'}
+                        onChange={(e) => setTipoCancelacion(e.target.value)}
+                        disabled={isProcessing}
+                        className="w-4 h-4 text-red-500 lya:text-red-400 focus:ring-red-500"
+                      />
+                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Cuenta Específica</span>
+                    </label>
+                  </div>
+
+                  <AnimatePresence>
+                    {tipoCancelacion === 'cuenta' && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-2 mb-4">
+                          <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase tracking-widest ml-1 mb-1.5 block">
+                            ¿Qué cuenta eliminarás?
+                          </label>
+                          <select
+                            value={cuentaSeleccionada}
+                            onChange={(e) => setCuentaSeleccionada(e.target.value)}
+                            disabled={isProcessing}
+                            className="w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg text-gray-900 dark:text-white lya:text-lya-text text-sm rounded-2xl p-4 outline-none focus:ring-4 focus:ring-red-500/10 transition-all border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/40 focus:border-red-500 dark:focus:border-red-500 lya:focus:border-red-400 font-bold shadow-inner disabled:opacity-50 cursor-pointer"
+                          >
+                            {!cuentaSeleccionada && <option value="" disabled>Seleccione...</option>}
+                            {cuentas?.map(acc => (
+                              <option key={acc} value={acc}>Cuenta: {acc}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1.5 block">Motivo (Opcional)</label>
+                <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase tracking-widest ml-1 mb-1.5 block">
+                  Motivo (Opcional)
+                </label>
                 <input 
                   type="text" 
                   value={motivo}
@@ -173,20 +189,23 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
             </div>
 
             <div className="flex gap-3 w-full">
-              <button 
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
                 onClick={onClose} 
                 disabled={isProcessing}
-                className="flex-[1] bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 text-gray-600 dark:text-gray-300 lya:text-lya-text py-3.5 rounded-2xl font-bold text-sm transition-colors active:scale-95 disabled:opacity-50 border border-transparent dark:border-gray-700 lya:border-lya-border/30"
+                className="flex-[1] bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-300 lya:text-lya-text py-3.5 rounded-2xl font-bold text-sm transition-colors disabled:opacity-50 border border-transparent dark:border-gray-700 lya:border-lya-border/30 outline-none"
               >
                 Volver
-              </button>
-              <button 
+              </motion.button>
+              
+              <motion.button 
+                whileTap={(!isProcessing && (tipoCancelacion !== 'cuenta' || cuentaSeleccionada)) ? { scale: 0.95 } : {}}
                 onClick={handleConfirmar} 
                 disabled={(tipoCancelacion === 'cuenta' && !cuentaSeleccionada) || isProcessing}
-                className={`flex-[1.5] py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                className={`flex-[1.5] py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 outline-none ${
                   isProcessing || (tipoCancelacion === 'cuenta' && !cuentaSeleccionada)
                     ? 'bg-gray-300 dark:bg-gray-800 text-gray-500 dark:text-gray-600 cursor-not-allowed shadow-none border border-transparent dark:border-gray-700'
-                    : 'bg-red-500 hover:bg-red-600 text-white active:scale-95 shadow-lg shadow-red-500/30 dark:shadow-red-900/30 lya:shadow-red-500/20'
+                    : 'bg-red-500 md:hover:bg-red-600 text-white shadow-lg shadow-red-500/30 dark:shadow-red-900/30 lya:shadow-red-500/20'
                 }`}
               >
                 {isProcessing ? (
@@ -197,7 +216,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                 ) : (
                   'Confirmar'
                 )}
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         </div>
