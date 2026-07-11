@@ -110,11 +110,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       if (isConfirmed || isSubmitting || finalizedStatus) return; 
 
       const now = Date.now();
-      // 🔥 MODO TESTING ACTIVADO: 30 segundos (30000 ms) para expirar la sesión
-      if (now - lastActivityRef.current > 30000) {
+      // 🔥 MODO TESTING ACTIVADO: 25 minutos (1500000 ms) para expirar la sesión
+      if (now - lastActivityRef.current > 1500000) {
         setSessionExpired(true);
       }
-    }, 5000); // 🔥 Revisamos cada 5 segundos para que sea súper preciso
+    }, 3000); // 🔥 Revisamos cada 5 segundos para que sea súper preciso
 
     return () => {
       clearInterval(checkInterval);
