@@ -167,28 +167,48 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     setShowFinalizedOverlay(true);
   };
 
+  // ✅ NUEVO CÓDIGO: Cronómetro Neo-Bento Blindado
   useEffect(() => {
     if (!finalizedStatus) return;
     
-    const updateTimer = () => {
-       const storedTime = localStorage.getItem('lya_client_finalized_at');
-       if (!storedTime) return;
-       
-       const finalizedAt = parseInt(storedTime, 10);
+    // 1. Aseguramos que exista el tiempo de inicio exacto
+    let storedTime = localStorage.getItem('lya_client_finalized_at');
+    if (!storedTime) {
+       storedTime = Date.now().toString();
+       localStorage.setItem('lya_client_finalized_at', storedTime);
+    }
+    
+    const finalizedAt = parseInt(storedTime, 10);
+
+    // 2. Función de cálculo limpia y aislada
+    const tickTimer = () => {
        const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
-       const remaining = 60 - elapsedSeconds;
+       const remaining = Math.max(0, 60 - elapsedSeconds);
        
-       if (remaining <= 0) {
-          handleLogout(); 
-       } else {
-          setTimeLeft(remaining); 
-       }
+       setTimeLeft(remaining); // Forzamos la actualización visual en tiempo real
+       return remaining;
     };
+
+    // 3. Ejecución inicial para evitar parpadeos o retrasos del primer segundo
+    const initialRemaining = tickTimer();
     
-    updateTimer(); 
-    const timerId = setInterval(updateTimer, 1000); 
+    if (initialRemaining <= 0) {
+       handleLogout();
+       return;
+    }
+
+    // 4. Intervalo seguro que no se atasca en segundo plano
+    const timerId = setInterval(() => {
+       const currentRemaining = tickTimer();
+       if (currentRemaining <= 0) {
+          clearInterval(timerId); // ¡Crucial! Matamos el intervalo exactamente en 0
+          handleLogout();
+       }
+    }, 1000);
     
-    return () => clearInterval(timerId); 
+    // 5. Cleanup nativo por si el cliente minimiza la app o cambia de vista
+    return () => clearInterval(timerId);
+    
   }, [finalizedStatus]);
 
   const handleLogout = async () => {
