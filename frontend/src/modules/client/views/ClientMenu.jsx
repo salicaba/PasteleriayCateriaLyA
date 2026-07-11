@@ -106,18 +106,29 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
-    const checkInterval = setInterval(() => {
+    const checkInactivity = () => {
       if (isConfirmed || isSubmitting || finalizedStatus) return; 
 
       const now = Date.now();
-      // 🔥 MODO TESTING ACTIVADO: 25 minutos (1500000 ms) para expirar la sesión
-      if (now - lastActivityRef.current > 1500000) {
+      // 🔥 MODO TESTING ACTIVADO: 30 segundos (30000 ms) para expirar la sesión
+      if (now - lastActivityRef.current > 30000) {
         setSessionExpired(true);
       }
-    }, 3000); // 🔥 Revisamos cada 5 segundos para que sea súper preciso
+    };
+
+    const checkInterval = setInterval(checkInactivity, 5000);
+
+    // 🔥 BLINDAJE: Detecta inmediatamente si regresó a la app después de inactividad
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkInactivity();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(checkInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
   }, [isConfirmed, isSubmitting, finalizedStatus]);
