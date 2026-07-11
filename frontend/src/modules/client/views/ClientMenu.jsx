@@ -24,6 +24,9 @@ import {
 import { socket } from '../../../api/socket';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
+// 🔥 Tiempo oficial de expiración: 25 minutos (1,500,000 milisegundos)
+const INACTIVITY_LIMIT_MS = 1500000;
+
 export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -47,7 +50,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   const [isQrActive, setIsQrActive] = useState(true);
   
-  // 🔥 FIX: Persistencia absoluta del estado de "Expirado" para evitar que se salten el bloqueo refrescando
   const [sessionExpired, setSessionExpired] = useState(() => localStorage.getItem('lya_client_session_expired') === 'true');
 
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
@@ -68,6 +70,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const initialActivity = parseInt(localStorage.getItem('lya_client_last_activity')) || Date.now();
   const lastActivityRef = useRef(initialActivity);
   const isProcessingRef = useRef(false);
+
+  // 🔥 Estado reactivo para el cronómetro visual en la UI
+  const [timeLeft, setTimeLeft] = useState(INACTIVITY_LIMIT_MS);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
@@ -110,41 +115,54 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   useEffect(() => {
     const updateActivity = () => {
-      // Si la sesión ya expiró, ignoramos cualquier actividad para no resetear el reloj fantasma
-      if (sessionExpired) return;
+      if (sessionExpired || isConfirmed || finalizedStatus) return;
 
       const now = Date.now();
       lastActivityRef.current = now;
       localStorage.setItem('lya_client_last_activity', now.toString());
+      setTimeLeft(INACTIVITY_LIMIT_MS); // Resetea el reloj visual
     };
     
     const events = ['touchstart', 'click', 'mousemove', 'scroll', 'keypress'];
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
-    const checkInactivity = () => {
+    // 🔥 Temporizador principal (revisa cada segundo para actualizar la UI fluida)
+    const tickInterval = setInterval(() => {
       if (isConfirmed || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
-      // 🔥 MODO TESTING ACTIVADO: 30 segundos (30000 ms) para expirar la sesión
-      if (now - lastActivityRef.current > 30000) {
-        localStorage.setItem('lya_client_session_expired', 'true'); // Sellamos el candado
-        setSessionExpired(true);
-      }
-    };
+      const elapsed = now - lastActivityRef.current;
+      const remaining = INACTIVITY_LIMIT_MS - elapsed;
 
-    const checkInterval = setInterval(checkInactivity, 5000);
+      if (remaining <= 0) {
+        localStorage.setItem('lya_client_session_expired', 'true');
+        setSessionExpired(true);
+        setTimeLeft(0);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkInactivity();
+      if (document.visibilityState === 'visible' && !sessionExpired) {
+        const now = Date.now();
+        const elapsed = now - lastActivityRef.current;
+        if (elapsed >= INACTIVITY_LIMIT_MS) {
+          localStorage.setItem('lya_client_session_expired', 'true');
+          setSessionExpired(true);
+          setTimeLeft(0);
+        } else {
+          setTimeLeft(INACTIVITY_LIMIT_MS - elapsed);
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    checkInactivity();
+    // Validación inmediata inicial
+    handleVisibilityChange();
 
     return () => {
-      clearInterval(checkInterval);
+      clearInterval(tickInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
@@ -203,7 +221,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // 🔥 Añadimos lya_client_session_expired a la purga de sesión para liberar el candado
     const keysToRemove = [
       'lya_client_order_id', 
       'lya_client_snapshot', 
@@ -273,7 +290,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         setIsLoading(false);
       }
     };
-    // Evitamos cargar datos innecesarios si la sesión ya expiró
     if (!sessionExpired) {
       loadMenuData();
     } else {
@@ -450,6 +466,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return cat ? cat.name : 'Delicia';
   };
 
+  // Función para dar formato al cronómetro
+  const formatTime = (ms) => {
+    if (ms <= 0) return "00:00";
+    const totalSeconds = Math.floor(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const isTimeUrgent = timeLeft <= 60000; // Menos de 1 min
+  const isTimeWarning = timeLeft <= 300000; // Menos de 5 mins
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.08 } }
@@ -558,7 +586,26 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353] transition-colors"><Settings size={18} /></motion.button>
+            {/* Contenedor del Temporizador y Botón de Ajustes */}
+            <div className="flex items-center gap-2">
+              {/* Temporizador Visual Inteligente */}
+              {(!isConfirmed && !isReadOnly && timeLeft > 0) && (
+                <div className={clsx(
+                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border shadow-sm text-[10px] font-bold transition-colors select-none",
+                  isTimeUrgent ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30 text-red-600 dark:text-red-400" :
+                  isTimeWarning ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30 text-amber-600 dark:text-amber-400" :
+                  "bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353]"
+                )}>
+                  <Clock size={12} className={isTimeUrgent ? "animate-bounce" : ""} />
+                  <span className="tabular-nums tracking-widest">{formatTime(timeLeft)}</span>
+                </div>
+              )}
+              
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353] transition-colors">
+                <Settings size={18} />
+              </motion.button>
+            </div>
+
             <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-[10px] font-bold text-neutral-700 dark:text-neutral-300 lya:text-[#7A6353] rounded-full">
               {type === 'mesa' ? <Utensils size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /> : <ShoppingBag size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" />}
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
