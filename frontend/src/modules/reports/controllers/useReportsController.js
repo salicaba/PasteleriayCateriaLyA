@@ -15,7 +15,6 @@ export const useReportsController = () => {
     end: endOfMonth(new Date())
   });
   
-  // 🔥 Movimos el filtro aquí para que todo el módulo lo comparta
   const [productFilter, setProductFilter] = useState('5');
 
   const fetchReports = async () => {
@@ -95,13 +94,15 @@ export const useReportsController = () => {
     };
 
     return {
-      dailySales, incomeSource, opexData, paymentMethods, productSales: data.productSales,
+      dailySales, incomeSource, opexData, paymentMethods, 
+      productSales: data.productSales,
+      pasteleriaSales: data.pasteleriaSales, // Agregado
       kpis: { totalIncome, totalOpex, totalMermas, netProfit },
       trends
     };
   }, [data]);
 
-  // 🔥 Calculamos los productos procesados según el filtro directamente en el controlador
+  // Lista Procesada de Cafetería
   const processedProducts = useMemo(() => {
     if (!chartData.productSales) return [];
     
@@ -116,6 +117,22 @@ export const useReportsController = () => {
     
     return list;
   }, [chartData.productSales, productFilter]);
+
+  // Lista Procesada de Pastelería (Exclusiva para reportes combinados)
+  const processedPasteleriaProducts = useMemo(() => {
+    if (!chartData.pasteleriaSales) return [];
+    
+    let list = [...chartData.pasteleriaSales];
+    list.sort((a, b) => b.cantidad - a.cantidad);
+
+    if (productFilter === 'SOLD') {
+      list = list.filter(p => p.cantidad > 0);
+    } else if (productFilter !== 'ALL') {
+      list = list.slice(0, parseInt(productFilter));
+    }
+    
+    return list;
+  }, [chartData.pasteleriaSales, productFilter]);
 
   const exportToExcel = () => {
     if (!chartData.kpis) return;
@@ -146,7 +163,7 @@ export const useReportsController = () => {
       wsResumen['!cols'] = getAutoWidths(resumenData);
       XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen KPIs');
 
-      // 🔥 Usamos la lista filtrada de productos (processedProducts) en Excel
+      // Exportar Cafetería
       const productosData = processedProducts.map(p => ({
         Producto: p.name,
         Departamento: p.departamento,
@@ -157,7 +174,20 @@ export const useReportsController = () => {
       if (productosData.length > 0) {
         wsProductos['!cols'] = getAutoWidths(productosData, Object.keys(productosData[0]));
       }
-      XLSX.utils.book_append_sheet(wb, wsProductos, 'Rendimiento Productos');
+      XLSX.utils.book_append_sheet(wb, wsProductos, 'Rendimiento Cafetería');
+
+      // Exportar Pastelería
+      const pasteleriaData = processedPasteleriaProducts.map(p => ({
+        Categoría: p.name,
+        Departamento: p.departamento,
+        'Cantidad Entregada': p.cantidad,
+        'Ingreso Bruto ($)': p.ingreso
+      }));
+      const wsPasteleria = XLSX.utils.json_to_sheet(pasteleriaData);
+      if (pasteleriaData.length > 0) {
+        wsPasteleria['!cols'] = getAutoWidths(pasteleriaData, Object.keys(pasteleriaData[0]));
+      }
+      XLSX.utils.book_append_sheet(wb, wsPasteleria, 'Rendimiento Pastelería');
 
       const gastosData = chartData.opexData.map(g => ({
         Categoría: g.name,
@@ -203,17 +233,15 @@ export const useReportsController = () => {
         headStyles: { fillColor: [249, 115, 22] } 
       });
 
-      // 🔥 Usamos la lista filtrada directamente en el PDF
+      // Render Tabla Cafetería
       if (processedProducts.length > 0) {
         doc.setFontSize(14);
         doc.setTextColor(74, 43, 41);
         
-        const finalY = doc.lastAutoTable.finalY;
-        
-        // Adaptamos el título según el filtro seleccionado
-        const tituloTabla = productFilter === 'SOLD' ? 'Productos Vendidos' : 
-                            productFilter === 'ALL' ? 'Desglose del Catálogo Completo' : 
-                            `Top ${productFilter} Productos Más Vendidos`;
+        let finalY = doc.lastAutoTable.finalY;
+        const tituloTabla = productFilter === 'SOLD' ? 'Cafetería: Productos Vendidos' : 
+                            productFilter === 'ALL' ? 'Cafetería: Catálogo Completo' : 
+                            `Cafetería: Top ${productFilter} Vendidos`;
 
         doc.text(tituloTabla, 14, finalY + 15);
         
@@ -228,6 +256,37 @@ export const useReportsController = () => {
           ]),
           theme: 'striped',
           headStyles: { fillColor: [74, 43, 41] } 
+        });
+      }
+
+      // Render Tabla Pastelería
+      if (processedPasteleriaProducts.length > 0) {
+        let finalY = doc.lastAutoTable.finalY + 15;
+        if (finalY > 250) {
+            doc.addPage();
+            finalY = 20;
+        }
+
+        doc.setFontSize(14);
+        doc.setTextColor(74, 43, 41);
+        
+        const tituloPasteleria = productFilter === 'SOLD' ? 'Pastelería: Productos Entregados' : 
+                            productFilter === 'ALL' ? 'Pastelería: Histórico Completo' : 
+                            `Pastelería: Top ${productFilter} Entregados`;
+
+        doc.text(tituloPasteleria, 14, finalY);
+        
+        autoTable(doc, {
+          startY: finalY + 5,
+          head: [['Categoría', 'Depto', 'Entregados', 'Ingreso']],
+          body: processedPasteleriaProducts.map(p => [
+            p.name, 
+            p.departamento, 
+            p.cantidad, 
+            `$${p.ingreso.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] } 
         });
       }
 
@@ -246,8 +305,7 @@ export const useReportsController = () => {
     chartData,
     exportToExcel,
     exportToPDF,
-    productFilter, // Retornamos el estado para conectarlo a la UI
-    setProductFilter,
-    processedProducts // Retornamos la lista ya filtrada
+    productFilter, 
+    setProductFilter
   };
 };

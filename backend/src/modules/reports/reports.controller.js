@@ -5,6 +5,7 @@ import OrderItem from '../pos/OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import InventoryReconciliationDetail from '../inventory/InventoryReconciliationDetail.model.js';
 import InventoryReconciliation from '../inventory/InventoryReconciliation.model.js';
+import PasteleriaOrder from '../pasteleria/PasteleriaOrder.model.js';
 
 export const getDashboardData = async (req, res) => {
   try {
@@ -24,8 +25,6 @@ export const getDashboardData = async (req, res) => {
     const prevDateFilter = { createdAt: { [Op.between]: [prevStart, prevEnd] } };
 
     // 1. Tendencia de Ventas Diarias e Ingresos por Origen (Actual)
-    // 🔥 La lógica de mutar transacciones que implementaste funciona perfecto aquí, 
-    // ya que solo suma transacciones 'ACTIVE' con su monto real ajustado.
     const incomeTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [
@@ -48,7 +47,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 3. Ventas de TODOS los productos (🔥 CORREGIDO)
+    // 3. Ventas de Cafetería (TODOS los productos)
     const allProducts = await Product.findAll({
       attributes: ['id', 'name', 'departamento'],
       raw: true
@@ -57,7 +56,7 @@ export const getDashboardData = async (req, res) => {
     const soldItems = await OrderItem.findAll({
       where: { 
         createdAt: { [Op.between]: [start, end] },
-        status: 'ACTIVE' // 🔥 FIX CRÍTICO: Excluir productos cancelados parcialmente
+        status: 'ACTIVE' // Excluir productos cancelados parcialmente
       },
       include: [{
         model: Order,
@@ -86,7 +85,31 @@ export const getDashboardData = async (req, res) => {
       };
     }).sort((a, b) => b.cantidad - a.cantidad);
 
-    // 4. Mermas y Ajustes de Inventario (Actual)
+    // 4. Ventas/Rendimiento de Pastelería (Pedidos Entregados)
+    // LÓGICA CRÍTICA: Al exigir estado='entregado', cualquier anulación o cancelación ('cancelado') 
+    // se descuenta automáticamente del conteo y del ingreso bruto del reporte.
+    const pasteleriaSalesRaw = await PasteleriaOrder.findAll({
+      where: { 
+        createdAt: { [Op.between]: [start, end] },
+        estado: 'entregado'
+      },
+      attributes: [
+        ['categoria', 'name'],
+        [fn('COUNT', col('id')), 'cantidad'],
+        [fn('SUM', col('costoTotal')), 'ingreso']
+      ],
+      group: ['categoria'],
+      raw: true
+    });
+
+    const pasteleriaSales = pasteleriaSalesRaw.map(item => ({
+      name: item.name || 'Personalizado',
+      departamento: 'PASTELERÍA',
+      cantidad: parseInt(item.cantidad || 0, 10),
+      ingreso: parseFloat(item.ingreso || 0)
+    })).sort((a, b) => b.cantidad - a.cantidad);
+
+    // 5. Mermas y Ajustes de Inventario (Actual)
     const inventoryStats = await InventoryReconciliationDetail.findAll({
       where: { createdAt: { [Op.between]: [start, end] } },
       include: [{ 
@@ -102,13 +125,12 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 5. Métodos de Pago
+    // 6. Métodos de Pago
     const paymentMethods = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [
         [literal(`
           CASE 
-            WHEN description LIKE '%Tarjeta%' THEN 'Tarjeta'
             WHEN description LIKE '%Transferencia%' THEN 'Transferencia'
             ELSE 'Efectivo' 
           END
@@ -151,6 +173,7 @@ export const getDashboardData = async (req, res) => {
         incomeTransactions,
         opexTransactions,
         productSales,
+        pasteleriaSales,
         inventoryStats: inventoryStats[0] || { totalMermas: 0, totalSobrantes: 0 },
         paymentMethods,
         previousKpis: {
