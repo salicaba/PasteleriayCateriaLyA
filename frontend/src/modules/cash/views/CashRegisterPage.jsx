@@ -307,12 +307,18 @@ export const CashRegisterPage = ({ user }) => {
                                 <div className="flex flex-col gap-1 mt-0.5">
                                   {modificaciones.map((mod, i) => {
                                     const isRestaurado = mod.includes('📈');
+                                    const isMixto = mod.includes('🔗');
+                                    
+                                    let badgeClasses = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500';
+                                    
+                                    if (isRestaurado) {
+                                      badgeClasses = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500';
+                                    } else if (isMixto) {
+                                      badgeClasses = 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50 lya:bg-purple-500/10 lya:border-purple-500/20 lya:text-purple-500';
+                                    }
+
                                     return (
-                                      <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${
-                                        isRestaurado 
-                                          ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500' 
-                                          : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500'
-                                      }`}>
+                                      <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${badgeClasses}`}>
                                         {mod}
                                       </span>
                                     );
@@ -322,7 +328,7 @@ export const CashRegisterPage = ({ user }) => {
 
                               {modificaciones.length > 0 && !showModDetails && (
                                  <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold italic flex items-center gap-1">
-                                   <RotateCcw size={10}/> {modificaciones.length} modificación(es) oculta(s)
+                                   <RotateCcw size={10}/> {modificaciones.length} etiqueta(s) oculta(s)
                                  </span>
                               )}
 
