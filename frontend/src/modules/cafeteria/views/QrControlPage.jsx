@@ -2,9 +2,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  QrCode, RefreshCw, Trash2, Smartphone, 
+  QrCode, Trash2, Smartphone, 
   Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine,
-  AlertCircle, Power, PowerOff, ShieldAlert, CheckSquare, Square
+  AlertCircle, Power, PowerOff, CheckSquare, Square
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
@@ -21,8 +21,6 @@ export const QrControlPage = () => {
   const [previewMesa, setPreviewMesa] = useState(null);
   const [mesaToDelete, setMesaToDelete] = useState(null); 
   const [showToggleModal, setShowToggleModal] = useState(false); 
-  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
-  const [isRegeneratingLocal, setIsRegeneratingLocal] = useState(false);
   
   // Estados para la Impresión Selectiva
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -39,20 +37,6 @@ export const QrControlPage = () => {
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
   const baseUrl = window.location.origin;
   const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); 
-  
-  const handleRegenerateTokens = async () => {
-    if (isRegeneratingLocal) return;
-    setIsRegeneratingLocal(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
-      setShowRegenerateModal(false);
-      showLocalToast('Códigos QR regenerados con éxito. Sesiones antiguas revocadas.', 'success');
-    } catch (error) {
-      showLocalToast('Error de red al intentar regenerar los códigos.', 'error');
-    } finally {
-      setIsRegeneratingLocal(false);
-    }
-  };
 
   const handleOpenPrintModal = () => {
     // Por defecto, preseleccionamos todos
@@ -214,16 +198,6 @@ export const QrControlPage = () => {
           >
             <Printer size={18} className="text-gray-600 dark:text-gray-300 lya:text-lya-text pointer-events-none" />
             <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Imprimir QRs</span>
-          </motion.button>
-
-          {/* BOTÓN REGENERAR */}
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowRegenerateModal(true)}
-            className="flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text select-none touch-manipulation outline-none"
-          >
-            <RefreshCw size={18} className="text-orange-500 lya:text-lya-primary pointer-events-none" />
-            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Regenerar QRs</span>
           </motion.button>
 
           {/* BOTÓN KILL-SWITCH */}
@@ -538,7 +512,6 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-
       {/* ========================================== */}
       {/* MODAL DE PANTALLA COMPLETA (PREVIEW) */}
       {/* ========================================== */}
@@ -672,67 +645,6 @@ export const QrControlPage = () => {
                     </>
                   ) : (
                     <span className="pointer-events-none">{isQrActive ? 'Sí, Suspender' : 'Sí, Reactivar'}</span>
-                  )}
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================== */}
-      {/* MODAL: CONFIRMAR REGENERACIÓN QRS */}
-      {/* ========================================== */}
-      <AnimatePresence>
-        {showRegenerateModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!isRegeneratingLocal) setShowRegenerateModal(false);
-              }}
-              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
-            />
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-orange-200 dark:border-orange-800/30 lya:border-lya-border/40 transition-colors"
-            >
-              <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm bg-orange-100 dark:bg-orange-900/40 lya:bg-lya-secondary/10">
-                <ShieldAlert size={32} strokeWidth={2} className="text-orange-500 lya:text-lya-secondary" />
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
-                ¿Regenerar Llaves QR?
-              </h3>
-              
-              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
-                Esta es una <b>acción de seguridad estricta</b>. Todos los enlaces antiguos serán revocados inmediatamente y se expulsará a quienes los estén usando. Deberás imprimir y colocar los <b>nuevos QRs físicos</b> en cada mesa de la pastelería.
-              </p>
-              
-              <div className="flex gap-3 w-full">
-                <motion.button 
-                  whileTap={!isRegeneratingLocal ? { scale: 0.95 } : {}}
-                  onClick={() => setShowRegenerateModal(false)}
-                  disabled={isRegeneratingLocal}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
-                >
-                  Cancelar
-                </motion.button>
-                <motion.button 
-                  whileTap={!isRegeneratingLocal ? { scale: 0.95 } : {}}
-                  onClick={handleRegenerateTokens} 
-                  disabled={isRegeneratingLocal}
-                  className="flex-[1.5] py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg bg-orange-500 md:hover:bg-orange-600 shadow-orange-500/30 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 outline-none select-none"
-                >
-                  {isRegeneratingLocal ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin pointer-events-none" />
-                      <span className="pointer-events-none">Procesando...</span>
-                    </>
-                  ) : (
-                    <span className="pointer-events-none">Sí, Regenerar</span>
                   )}
                 </motion.button>
               </div>
