@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/TicketPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Printer, X, MessageCircle, Coffee, Loader2 } from 'lucide-react';
@@ -13,7 +14,8 @@ export const TicketPreviewModal = ({
   telefonoPredeterminado = '', 
   onConfirmPrint, 
   onSendWhatsApp,
-  userName = 'Cajero en turno'
+  userName = 'Cajero en turno',
+  cuentasPagadasReales = [] // 🔥 NUEVA PROP: Inteligencia de Cuentas
 }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [viewMode, setViewMode] = useState('Todas');
@@ -22,11 +24,20 @@ export const TicketPreviewModal = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   
-  const uniqueAccounts = Array.from(new Set(cart.map(item => item.cuenta || 'General')));
+  // 🔥 FILTRO ESTRICTO: Solo extraemos y mostramos las cuentas que YA ESTÁN PAGADAS
+  const validCart = cart.filter(item => cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED');
+  const uniqueAccounts = Array.from(new Set(validCart.map(item => item.cuenta || 'General')));
   
   useEffect(() => {
     if (isOpen) {
-      setViewMode(cuentaName || 'Todas');
+      // 🔥 LÓGICA INTELIGENTE DE SELECCIÓN INICIAL
+      if (cuentaName && uniqueAccounts.includes(cuentaName)) {
+        setViewMode(cuentaName); // Si abrieron el modal desde la tarjeta de una cuenta específica
+      } else if (uniqueAccounts.length === 1) {
+        setViewMode(uniqueAccounts[0]); // Si solo hay una cuenta pagada, seleccionarla por defecto
+      } else {
+        setViewMode('Todas'); // Si hay varias y le dieron al botón global
+      }
       
       if (telefonoPredeterminado) {
         setPhoneNumber(telefonoPredeterminado);
@@ -45,9 +56,11 @@ export const TicketPreviewModal = ({
       }
       setPhoneNumber('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mesa, cuentaName, telefonoPredeterminado]);
 
-  const itemsToPrint = viewMode === 'Todas' ? cart : cart.filter(item => (item.cuenta || 'General') === viewMode);
+  // Usamos el carrito válido (pagado) para calcular totales e impresión
+  const itemsToPrint = viewMode === 'Todas' ? validCart : validCart.filter(item => (item.cuenta || 'General') === viewMode);
   const totalToPrint = itemsToPrint.reduce((acc, item) => acc + (item.precio * item.qty), 0);
   const accountsToRender = viewMode === 'Todas' ? uniqueAccounts : [viewMode];
 
@@ -85,7 +98,6 @@ export const TicketPreviewModal = ({
     try {
       setIsPrinting(true);
       await onConfirmPrint(viewMode === 'Todas' ? null : viewMode);
-      // El onConfirmPrint debe manejar su propio toast de éxito si aplica
     } catch (error) {
       toast.error('Error al intentar imprimir el ticket.');
     } finally {
@@ -144,7 +156,7 @@ export const TicketPreviewModal = ({
               </button>
             </div>
 
-            {/* SELECTOR DE CUENTAS (Fijo) */}
+            {/* 🔥 SELECTOR DE CUENTAS (Desaparece si solo hay 1 pagada) */}
             {uniqueAccounts.length > 1 && (
               <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 lya:border-orange-100 bg-gray-50 dark:bg-gray-800/50 lya:bg-orange-50/30 shrink-0">
                 <p className="text-[10px] uppercase font-bold text-gray-500 lya:text-orange-600/70 mb-2 tracking-wider">
@@ -185,10 +197,8 @@ export const TicketPreviewModal = ({
             <div className="overflow-y-auto p-6 custom-scrollbar flex-1 bg-gray-100 dark:bg-gray-900 lya:bg-[#FDF8F5]">
               <div id="printable-ticket-content" className="bg-white dark:bg-gray-100 p-8 rounded-2xl shadow-sm border border-gray-200 text-gray-800 font-mono text-sm relative w-full mx-auto overflow-hidden">
                 
-                {/* Patrón de ticket rasgado (Decorativo) */}
                 <div className="absolute top-0 left-0 w-full h-2 bg-[radial-gradient(circle,transparent_4px,#fff_5px)] bg-[length:10px_10px] -mt-1 dark:opacity-10"></div>
 
-                {/* Header del Ticket con Icono y Folio Grande */}
                 <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                   <Coffee size={32} className="mx-auto mb-2 text-gray-800" />
                   <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
@@ -199,7 +209,6 @@ export const TicketPreviewModal = ({
                   </p>
                 </div>
 
-                {/* Info de Mesa, Cliente y Expedición */}
                 <div className="space-y-2 mb-4 text-sm">
                   <div className="flex justify-between items-start">
                     <span className="text-gray-500">Expedición:</span> 
@@ -229,7 +238,6 @@ export const TicketPreviewModal = ({
                   </div>
                 </div>
 
-                {/* Tabla de Productos */}
                 <div className="border-t border-b border-dashed border-gray-300 py-4 mb-4">
                   <div className="text-center mb-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Detalle de consumo</p>
@@ -308,7 +316,6 @@ export const TicketPreviewModal = ({
                   </table>
                 </div>
 
-                {/* Resumen por Cuentas */}
                 {uniqueAccounts.length > 1 && viewMode === 'Todas' && (
                   <div className="mb-4 text-xs text-gray-600">
                     <p className="font-bold border-b border-dashed border-gray-300 pb-1 mb-2 text-gray-500 uppercase tracking-wider text-[10px]">Resumen por Cuentas:</p>
@@ -326,7 +333,6 @@ export const TicketPreviewModal = ({
                   </div>
                 )}
 
-                {/* Gran Total */}
                 <div className="flex justify-between items-center text-base mt-2 pt-2 border-t border-gray-300">
                   <span className="font-bold text-gray-800">TOTAL:</span>
                   <span className="font-black text-black text-2xl">${totalToPrint.toFixed(2)}</span>
@@ -341,7 +347,6 @@ export const TicketPreviewModal = ({
 
             {/* CONTROLES INFERIORES (Fijos) */}
             <div className="bg-white dark:bg-gray-800 lya:bg-white border-t border-gray-200 dark:border-gray-700 lya:border-orange-100 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] z-10 shrink-0 p-5">
-              
               <div className="flex items-center gap-3 w-full">
                 <div className="flex-1 relative flex items-center">
                   <input 
@@ -371,7 +376,6 @@ export const TicketPreviewModal = ({
                   {isPrinting ? <Loader2 size={22} className="animate-spin" /> : <Printer size={22} />}
                 </button>
               </div>
-              
             </div>
 
           </motion.div>

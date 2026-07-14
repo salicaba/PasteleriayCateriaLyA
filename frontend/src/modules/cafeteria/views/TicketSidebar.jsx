@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/TicketSidebar.jsx
 import React, { useState, useRef } from 'react';
-import { Trash2, Minus, ArrowRightLeft, XCircle, ShoppingBag, AlertTriangle } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { Trash2, Minus, ArrowRightLeft, XCircle, ShoppingBag, AlertTriangle, Printer, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import OpcionesCancelacionModal from './OpcionesCancelacionModal'; 
 import { TicketAccountForm } from './components/ticket/TicketAccountForm';
@@ -33,7 +33,9 @@ export const TicketSidebar = ({
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInputValue, setModalInputValue] = useState('');
   
-  // ESTADOS DE CARGA (Prevención de Doble Clic)
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
+
   const [isModalProcessing, setIsModalProcessing] = useState(false);
   const [isClosingTable, setIsClosingTable] = useState(false);
   const [isDeliveringAll, setIsDeliveringAll] = useState(false);
@@ -49,19 +51,22 @@ export const TicketSidebar = ({
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
 
-  let isCompletamentePagada = false;
+  const isOrderFullyPaid = orderStatus === 'PAID' || orderStatus === 'CLOSED';
 
-  if (orderStatus === 'PAID') {
-      isCompletamentePagada = true;
-  } else if (activeCart.length > 0) {
-      const unpaidActiveItems = activeCart.filter(item => {
-          const cuentaDelItem = item.cuenta || 'General';
-          return !(paidAccounts?.includes(cuentaDelItem));
-      });
-      if (unpaidActiveItems.length === 0) {
-          isCompletamentePagada = true;
+  const cuentasPagadasReales = Array.from(new Set(activeCart.map(i => i.cuenta || 'General'))).filter(cuenta => {
+      if (paidAccounts?.includes(cuenta)) return true;
+      if (isOrderFullyPaid) {
+          const itemsDeCuenta = activeCart.filter(i => (i.cuenta || 'General') === cuenta);
+          return itemsDeCuenta.length > 0 && itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
       }
-  }
+      return false;
+  });
+
+  (paidAccounts || []).forEach(pa => {
+      if (!cuentasPagadasReales.includes(pa)) cuentasPagadasReales.push(pa);
+  });
+
+  const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultas.includes(acc));
 
   const handleAddCuenta = (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -70,7 +75,6 @@ export const TicketSidebar = ({
       addNewCuenta(name, newCuentaPhone);
       toast(`Cuenta "${name}" creada exitosamente`, 'success');
     }
-    
     setNewCuentaName('');
     setNewCuentaPhone('');
   };
@@ -113,6 +117,12 @@ export const TicketSidebar = ({
           if (otherGroupsWithItems) return false;
       }
       return true;
+  }).sort((a, b) => {
+      const aPagada = cuentasPagadasReales.includes(a.cuentaName);
+      const bPagada = cuentasPagadasReales.includes(b.cuentaName);
+      if (aPagada && !bPagada) return 1;  
+      if (!aPagada && bPagada) return -1; 
+      return 0; 
   });
 
   const handleContainerDragOver = (e) => {
@@ -165,12 +175,34 @@ export const TicketSidebar = ({
       else if (isLlevar) successMsg = 'Pedido para llevar finalizado exitosamente';
       toast(successMsg, 'success');
     } catch (error) {
-      let errorMsg = 'Error al liberar la mesa';
-      if (isVitrina) errorMsg = 'Error al finalizar la venta';
-      else if (isLlevar) errorMsg = 'Error al finalizar el pedido';
-      toast(errorMsg, 'error');
+      toast('Error al liberar', 'error');
     } finally {
       setIsClosingTable(false);
+    }
+  };
+
+  const handleReleaseAccounts = async (cuentasALiberar) => {
+    setIsReleasing(true);
+    try {
+      const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
+      setCuentasOcultas(updatedOcultas);
+
+      const unhiddenAccounts = activeCart.filter(item => {
+        const c = item.cuenta || 'General';
+        return !updatedOcultas.includes(c);
+      });
+
+      if (unhiddenAccounts.length === 0 && onCloseTable) {
+        await onCloseTable();
+        toast('Todas las cuentas finalizadas. Mesa liberada.', 'success');
+      } else {
+        toast(`Cuentas liberadas exitosamente.`, 'success');
+      }
+      setShowReleaseModal(false);
+    } catch (error) {
+      toast('Error al procesar la liberación', 'error');
+    } finally {
+      setIsReleasing(false);
     }
   };
 
@@ -321,7 +353,7 @@ export const TicketSidebar = ({
 
   const handleDropOnCuenta = async (cuentaName) => {
     setDragOverCuenta(null);
-    if (draggedItem && draggedItem.cuentaName !== cuentaName && !paidAccounts?.includes(cuentaName) && !isLlevar && !isVitrina) {
+    if (draggedItem && draggedItem.cuentaName !== cuentaName && !cuentasPagadasReales.includes(cuentaName) && !isLlevar && !isVitrina) {
       let qtyToMove = draggedItem.item.qty;
       const itemIdToProcess = draggedItem.item.backendItemId || draggedItem.item.id;
 
@@ -361,7 +393,6 @@ export const TicketSidebar = ({
   }
 
   const cuentasCancelables = Array.from(new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General')));
-  
   const sentItems = activeCart.filter(i => i.enviadoCocina);
   const hasSentItems = sentItems.length > 0;
   const allSentItemsDelivered = hasSentItems && sentItems.every(i => i.kitchenStatus === 'DELIVERED');
@@ -378,13 +409,12 @@ export const TicketSidebar = ({
           newCuentaName={newCuentaName} setNewCuentaName={setNewCuentaName}
           newCuentaPhone={newCuentaPhone} setNewCuentaPhone={setNewCuentaPhone}
           handleAddCuenta={handleAddCuenta}
-          isCompletamentePagada={isCompletamentePagada}
+          isCompletamentePagada={false} 
         />
       )}
 
       <div ref={scrollContainerRef} onDragOver={handleContainerDragOver} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar relative z-10">
         
-        {/* 🔥 FIX: Excepción añadida para !isLlevar. Si es Para Llevar, mostrará la tarjeta directamente en lugar del mensaje de "Orden Vacía" */}
         {activeCart.length === 0 && availableAccs.length === 1 && !isLlevar ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 lya:text-lya-text/40 opacity-70">
             <ShoppingBag size={48} strokeWidth={1.5} className="mb-3" />
@@ -397,7 +427,8 @@ export const TicketSidebar = ({
               const isActive = activeAcc === cuentaName;
               const isDragTarget = dragOverCuenta === cuentaName;
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
-              const isCuentaPagada = paidAccounts?.includes(cuentaName);
+              
+              const isCuentaPagada = cuentasPagadasReales.includes(cuentaName);
               const isTodoEntregadoEnCuenta = items.length > 0 && items.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
 
               return (
@@ -405,7 +436,7 @@ export const TicketSidebar = ({
                   key={cuentaName}
                   cuentaName={cuentaName} items={items}
                   isActive={isActive} isDragTarget={isDragTarget} subtotalCuenta={subtotalCuenta}
-                  isCuentaPagada={isCuentaPagada} isCompletamentePagada={isCompletamentePagada}
+                  isCuentaPagada={isCuentaPagada} isCompletamentePagada={false} 
                   isTodoEntregadoEnCuenta={isTodoEntregadoEnCuenta}
                   draggedItem={draggedItem} setDragOverCuenta={setDragOverCuenta} handleDropOnCuenta={handleDropOnCuenta}
                   openConfirmModal={openConfirmModal} setCuentaActiva={setCuentaActiva} cuentasTelefonos={cuentasTelefonos}
@@ -431,15 +462,60 @@ export const TicketSidebar = ({
 
       <TicketBottomBar 
         mesaTotal={mesaTotal} unsentTotal={unsentTotal} hasUnsentItems={hasUnsentItems}
-        activeCart={activeCart} isVitrina={isVitrina} isLlevar={isLlevar} isCompletamentePagada={isCompletamentePagada}
+        activeCart={activeCart} isVitrina={isVitrina} isLlevar={isLlevar} 
+        paidAccounts={paidAccounts} cuentasOcultas={cuentasOcultas}
+        orderStatus={orderStatus} 
+        cuentasPagadasReales={cuentasPagadasReales} 
+        
         showDeliverAllBtn={showDeliverAllBtn} hasReadyItems={hasReadyItems} hasCookingItems={hasCookingItems}
         isDeliveringAll={isDeliveringAll} handleDeliverAll={handleDeliverAll} openConfirmModal={openConfirmModal}
-        onPrintTicket={onPrintTicket} onCancelFullOrder={onCancelFullOrder} onCancelAccount={onCancelAccount}
+        
+        onCancelFullOrder={onCancelFullOrder} onCancelAccount={onCancelAccount}
         setShowCancelModal={setShowCancelModal}
-        handleCloseTableClick={handleCloseTableClick} isClosingTable={isClosingTable}
+        
+        onOpenReleaseModal={() => setShowReleaseModal(true)}
+        
+        // 🔥 Pasamos el onPrintTicket directo
+        onPrintTicket={onPrintTicket}
+
+        handleCloseTableClick={handleCloseTableClick}
+        isClosingTable={isClosingTable}
+
         handleSendToKitchenClick={handleSendToKitchenClick} isSendingToKitchen={isSendingToKitchen}
         handleCheckoutClick={handleCheckoutClick} isCheckingOut={isCheckingOut}
       />
+
+      {/* MODAL NEO-BENTO: SELECCIONAR CUENTAS A LIBERAR */}
+      <AnimatePresence>
+        {showReleaseModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col">
+              <div className="p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 text-center">
+                <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/40 lya:bg-lya-secondary/20 text-blue-500 lya:text-lya-secondary rounded-full flex items-center justify-center mb-3">
+                  <XCircle size={24} />
+                </div>
+                <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">Liberar Cuentas</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Selecciona las cuentas pagadas que deseas cerrar y ocultar de la mesa.</p>
+              </div>
+              <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
+                {cuentasPagadasVisibles.map(acc => (
+                  <motion.button 
+                    whileTap={!isReleasing ? { scale: 0.95 } : {}}
+                    key={acc} onClick={() => handleReleaseAccounts([acc])} disabled={isReleasing}
+                    className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none"
+                  >
+                    <span>{acc}</span> 
+                    {isReleasing ? <Loader2 size={16} className="text-gray-400 animate-spin" /> : <ArrowRightLeft size={16} className="text-gray-400 dark:text-gray-500" />}
+                  </motion.button>
+                ))}
+              </div>
+              <div className="p-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowReleaseModal(false)} className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none">Cancelar</motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <ConfirmActionModal 
         modalConfig={modalConfig} setModalConfig={setModalConfig}

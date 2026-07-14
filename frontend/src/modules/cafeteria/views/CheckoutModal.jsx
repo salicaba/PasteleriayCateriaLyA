@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/CheckoutModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
@@ -16,7 +17,7 @@ export const CheckoutModal = ({
   initialTarget, 
   cuentasResumen = [], 
   onConfirmPayment,
-  orderType = 'salon' // Puede ser: 'salon', 'mostrador', 'llevar'
+  orderType = 'salon' 
 }) => {
   const [method, setMethod] = useState('efectivo');
   const [amountReceived, setAmountReceived] = useState('');
@@ -25,11 +26,13 @@ export const CheckoutModal = ({
   
   const [cobroMode, setCobroMode] = useState('full');
   const [splitCount, setSplitCount] = useState(1);
-  const [selectedCuenta, setSelectedCuenta] = useState('');
+  
+  // 🔥 ESTADO DE SELECCIÓN MÚLTIPLE (Pilar de Lógica)
+  const [selectedCuentas, setSelectedCuentas] = useState([]);
   
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 🔥 ESTADO PARA LA NOTIFICACIÓN DE CÁPSULA
+  // ESTADO PARA LA NOTIFICACIÓN DE CÁPSULA NEO-BENTO
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
 
   const showToast = (message, type = 'error') => {
@@ -47,13 +50,12 @@ export const CheckoutModal = ({
       setIsProcessing(false); 
       setToast({ show: false, message: '', type: 'error' }); 
 
-      // Solo permite iniciar en 'nominal' (Por Persona) si es un pedido de Salón
       if (initialTarget?.type === 'partial' && orderType === 'salon') {
         setCobroMode('nominal');
-        setSelectedCuenta(initialTarget.cuentaName);
+        setSelectedCuentas(initialTarget.cuentaName ? [initialTarget.cuentaName] : []);
       } else {
         setCobroMode('full');
-        if (cuentasResumen.length > 0) setSelectedCuenta(cuentasResumen[0].nombre);
+        setSelectedCuentas([]);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,10 +72,14 @@ export const CheckoutModal = ({
     }
   }, [isOpen, method]);
 
+  // 🔥 CÁLCULO DE TOTAL DINÁMICO
   const amountToPay = 
     cobroMode === 'full' ? total :
     cobroMode === 'equal' ? total / splitCount :
-    (cuentasResumen.find(c => c.nombre === selectedCuenta)?.subtotal || 0);
+    selectedCuentas.reduce((acc, nombre) => {
+        const c = cuentasResumen.find(x => x.nombre === nombre);
+        return acc + (c ? c.subtotal : 0);
+    }, 0);
 
   useEffect(() => {
     if (method === 'efectivo') {
@@ -84,31 +90,62 @@ export const CheckoutModal = ({
     }
   }, [amountReceived, amountToPay, method]);
 
+  // Lógica de Selección de Cuentas
+  const toggleCuentaSelection = (nombreCuenta) => {
+    if (isProcessing) return;
+    setSelectedCuentas(prev => 
+      prev.includes(nombreCuenta) ? prev.filter(c => c !== nombreCuenta) : [...prev, nombreCuenta]
+    );
+  };
+
+  const selectAllCuentas = () => {
+    if (isProcessing) return;
+    const todas = cuentasResumen.filter(c => c.subtotal > 0).map(c => c.nombre);
+    setSelectedCuentas(todas);
+  };
+
+  // 🔥 BUCLE DE COBROS ASÍNCRONO
   const handlePayment = async () => {
     if (amountToPay <= 0) return showToast("No hay monto a cobrar en la selección actual.", "error");
     if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return showToast("El monto recibido es insuficiente.", "error");
+    if (cobroMode === 'nominal' && selectedCuentas.length === 0) return showToast("Debes seleccionar al menos una cuenta.", "error");
     
     setIsProcessing(true); 
-    setToast({ show: false, message: '', type: 'error' }); // Limpiar errores previos
+    setToast({ show: false, message: '', type: 'error' }); 
     
     try {
-      await onConfirmPayment({ 
-        method, 
-        amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
-        change, 
-        amountPaid: amountToPay,
-        targetType: cobroMode === 'nominal' ? 'partial' : cobroMode === 'equal' ? 'equal' : 'full',
-        cuentaName: cobroMode === 'nominal' ? selectedCuenta : null
-      });
-      // El onConfirmPayment se encarga de cerrar el modal y mostrar la pantalla de éxito
+      if (cobroMode === 'nominal' && selectedCuentas.length > 0) {
+          // Bucle para procesar cuenta por cuenta
+          for (let i = 0; i < selectedCuentas.length; i++) {
+              const cuentaTarget = selectedCuentas[i];
+              const cuentaMonto = cuentasResumen.find(c => c.nombre === cuentaTarget).subtotal;
+              
+              await onConfirmPayment({ 
+                method, 
+                amountReceived: cuentaMonto, 
+                change: 0, 
+                amountPaid: cuentaMonto,
+                targetType: 'partial',
+                cuentaName: cuentaTarget
+              });
+          }
+      } else {
+          await onConfirmPayment({ 
+            method, 
+            amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
+            change, 
+            amountPaid: amountToPay,
+            targetType: cobroMode === 'equal' ? 'equal' : 'full',
+            cuentaName: null
+          });
+      }
     } catch(e) {
       console.error(e);
       showToast(e?.response?.data?.message || e.message || "Ocurrió un error al procesar el pago.", "error");
-      setIsProcessing(false); // Solo desbloqueamos si hubo error
+      setIsProcessing(false); 
     }
   };
 
-  // Textos Dinámicos
   const getFullModeTextBtn = () => {
     if (orderType === 'mostrador') return 'Todo el Pedido';
     if (orderType === 'llevar') return 'Toda la Cuenta';
@@ -124,8 +161,9 @@ export const CheckoutModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4">
-      {/* NOTIFICACIÓN FLOTANTE (ESTILO CÁPSULA) */}
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 h-full w-full flex-col overflow-hidden">
+      
+      {/* NOTIFICACIÓN FLOTANTE (ESTILO CÁPSULA NEO-BENTO) */}
       <AnimatePresence>
         {toast.show && (
           <div className="fixed top-6 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -133,12 +171,12 @@ export const CheckoutModal = ({
               initial={{ opacity: 0, y: -40, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.95, y: -20 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-red-100 dark:border-red-900/30 lya:border-red-500/30 pointer-events-auto"
+              className="bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-red-200 dark:border-red-900/30 lya:border-red-500/30 pointer-events-auto"
             >
               <div className="bg-red-100 dark:bg-red-500/20 lya:bg-red-500/20 p-1.5 rounded-full shrink-0">
                 <AlertCircle size={18} className="text-red-500 lya:text-red-400" />
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col text-center">
                   <span className="text-xs sm:text-sm">{toast.message}</span>
               </div>
             </motion.div>
@@ -150,9 +188,7 @@ export const CheckoutModal = ({
 
       <motion.div 
         variants={modalVariants} 
-        initial="hidden" 
-        animate="visible" 
-        exit="exit" 
+        initial="hidden" animate="visible" exit="exit" 
         className="relative w-full max-w-md bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[95vh] sm:max-h-[90vh] transition-colors"
       >
         
@@ -161,53 +197,55 @@ export const CheckoutModal = ({
             <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">Caja y Pagos</h2>
             <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Selecciona qué vas a cobrar</p>
           </div>
-          <button 
+          <motion.button 
+            whileTap={{ scale: 0.9 }}
             onClick={onClose} 
             disabled={isProcessing}
-            className="p-2 sm:p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface hover:bg-gray-100 dark:hover:bg-gray-600 lya:hover:bg-lya-border/50 border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-full transition-colors disabled:opacity-50 shadow-sm"
+            className="p-2 sm:p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface md:hover:bg-gray-100 dark:md:hover:bg-gray-600 lya:md:hover:bg-lya-border/50 border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-full transition-colors disabled:opacity-50 shadow-sm outline-none"
           >
             <X size={18} className="text-gray-500 dark:text-gray-300 lya:text-lya-text/80" />
-          </button>
+          </motion.button>
         </div>
 
         <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-5">
           
-          {/* Selector de Modo de Cobro */}
           <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-gray-800/80 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-inner">
-            <button 
+            <motion.button 
+              whileTap={!isProcessing ? { scale: 0.95 } : {}}
               onClick={() => setCobroMode('full')} 
               disabled={isProcessing}
-              className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all ${
-                cobroMode === 'full' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 lya:text-lya-text/60 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+              className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all outline-none ${
+                cobroMode === 'full' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
               }`}
             >
               <LayoutList size={18}/> <span className="text-center px-1">{getFullModeTextBtn()}</span>
-            </button>
+            </motion.button>
             
             {orderType === 'salon' && (
-              <button 
+              <motion.button 
+                whileTap={!isProcessing ? { scale: 0.95 } : {}}
                 onClick={() => setCobroMode('nominal')} 
                 disabled={isProcessing}
-                className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all ${
-                  cobroMode === 'nominal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 lya:text-lya-text/60 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all outline-none ${
+                  cobroMode === 'nominal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
                 }`}
               >
-                <User size={18}/> Por Persona
-              </button>
+                <User size={18}/> Por Cuentas
+              </motion.button>
             )}
             
-            <button 
+            <motion.button 
+              whileTap={!isProcessing ? { scale: 0.95 } : {}}
               onClick={() => setCobroMode('equal')} 
               disabled={isProcessing}
-              className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all ${
-                cobroMode === 'equal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 lya:text-lya-text/60 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+              className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all outline-none ${
+                cobroMode === 'equal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
               }`}
             >
               <PieChart size={18}/> Dividir
-            </button>
+            </motion.button>
           </div>
 
-          {/* Opciones Específicas del Modo */}
           <div className="min-h-[60px] flex items-center justify-center">
             <AnimatePresence mode="wait">
               {cobroMode === 'full' && (
@@ -216,26 +254,38 @@ export const CheckoutModal = ({
                 </motion.div>
               )}
               
+              {/* 🔥 NUEVO PANEL MULTI-SELECCIÓN */}
               {cobroMode === 'nominal' && orderType === 'salon' && (
-                <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-wrap gap-2 justify-center">
-                  {cuentasResumen.length === 0 ? (
-                    <span className="text-xs font-medium text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg">No hay cuentas pendientes.</span>
-                  ) : (
-                     cuentasResumen.map(cuenta => (
-                       <button 
-                          key={cuenta.nombre} 
-                          onClick={() => setSelectedCuenta(cuenta.nombre)} 
-                          disabled={cuenta.subtotal === 0 || isProcessing}
-                          className={`px-3 py-2 rounded-xl text-xs font-black border-2 transition-all disabled:opacity-40 disabled:scale-100 ${
-                            selectedCuenta === cuenta.nombre 
-                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 lya:border-lya-primary lya:text-lya-primary lya:bg-lya-primary/10 scale-105 shadow-sm' 
-                              : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 hover:border-orange-300 dark:hover:border-orange-700'
-                          }`}
-                        >
-                          {cuenta.nombre} <span className="block text-[10px] font-black mt-0.5 opacity-80">${cuenta.subtotal.toFixed(2)}</span>
-                       </button>
-                     ))
-                  )}
+                <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-col gap-2">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Selecciona cuentas:</span>
+                    <button onClick={selectAllCuentas} disabled={isProcessing} className="text-[10px] font-black text-blue-500 md:hover:text-blue-600 uppercase transition-colors outline-none disabled:opacity-50">Seleccionar Todas</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {cuentasResumen.length === 0 ? (
+                      <span className="text-xs font-medium text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg w-full text-center">No hay cuentas pendientes.</span>
+                    ) : (
+                       cuentasResumen.map(cuenta => {
+                         const isSelected = selectedCuentas.includes(cuenta.nombre);
+                         return (
+                           <motion.button 
+                              whileTap={!isProcessing && cuenta.subtotal > 0 ? { scale: 0.95 } : {}}
+                              key={cuenta.nombre} 
+                              onClick={() => toggleCuentaSelection(cuenta.nombre)} 
+                              disabled={cuenta.subtotal === 0 || isProcessing}
+                              className={`px-3 py-2 flex flex-col rounded-xl text-xs font-black border-2 transition-all disabled:opacity-40 disabled:scale-100 outline-none ${
+                                isSelected 
+                                  ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 lya:border-lya-primary lya:text-lya-primary lya:bg-lya-primary/10 shadow-sm' 
+                                  : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:border-orange-300 dark:md:hover:border-orange-700'
+                              }`}
+                            >
+                              {cuenta.nombre} 
+                              <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'opacity-100' : 'opacity-60'}`}>${cuenta.subtotal.toFixed(2)}</span>
+                           </motion.button>
+                         )
+                       })
+                    )}
+                  </div>
                 </motion.div>
               )}
               
@@ -246,49 +296,46 @@ export const CheckoutModal = ({
                     <span className="text-xs font-black uppercase tracking-wider">Dividir:</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} disabled={isProcessing} className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/50 active:scale-95 disabled:opacity-50"><Minus size={16}/></button>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSplitCount(Math.max(1, splitCount - 1))} disabled={isProcessing} className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/50 disabled:opacity-50 outline-none"><Minus size={16}/></motion.button>
                     <span className="font-black text-xl w-6 text-center text-gray-900 dark:text-white lya:text-lya-text">{splitCount}</span>
-                    <button onClick={() => setSplitCount(splitCount + 1)} disabled={isProcessing} className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/50 active:scale-95 disabled:opacity-50"><Plus size={16}/></button>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSplitCount(splitCount + 1)} disabled={isProcessing} className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/50 disabled:opacity-50 outline-none"><Plus size={16}/></motion.button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Gran Total Central */}
           <div className="text-center py-3 sm:py-4 bg-gray-50 dark:bg-gray-800/30 lya:bg-lya-bg/50 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/20">
             <span className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 lya:text-lya-primary uppercase tracking-widest font-black block mb-0.5">
-              {cobroMode === 'full' ? getFullModeTextTotal() : cobroMode === 'equal' ? `Parte a cobrar (1 de ${splitCount})` : `Cobrando a ${selectedCuenta || '...'}`}
+              {cobroMode === 'full' ? getFullModeTextTotal() : cobroMode === 'equal' ? `Parte a cobrar (1 de ${splitCount})` : `Cobrando ${selectedCuentas.length} Cuentas`}
             </span>
             <div className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tighter drop-shadow-sm">
               ${amountToPay.toFixed(2)}
             </div>
           </div>
 
-          {/* Método de Pago */}
           <div className="grid grid-cols-2 gap-2.5">
             <motion.button whileTap={!isProcessing ? { scale: 0.95 } : {}} onClick={() => !isProcessing && setMethod('efectivo')}
-              className={`flex flex-col items-center justify-center p-3 sm:p-4 rounded-[1.25rem] border-2 transition-all ${
+              className={`flex flex-col items-center justify-center p-3 sm:p-4 rounded-[1.25rem] border-2 transition-all outline-none ${
                 method === 'efectivo' 
                   ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 lya:border-lya-primary lya:bg-lya-primary/10 shadow-sm scale-[1.02]' 
-                  : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-emerald-300 dark:hover:border-emerald-700'
+                  : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface md:hover:border-emerald-300 dark:md:hover:border-emerald-700'
               }`}>
               <Banknote size={24} strokeWidth={1.5} className={`mb-1.5 ${method === 'efectivo' ? 'text-emerald-500 lya:text-lya-primary' : 'text-gray-400 lya:text-lya-text/50'}`} />
               <span className={`text-[10px] sm:text-[11px] uppercase tracking-widest font-black ${method === 'efectivo' ? 'text-emerald-700 dark:text-emerald-400 lya:text-lya-text' : 'text-gray-400 lya:text-lya-text/50'}`}>Efectivo</span>
             </motion.button>
 
             <motion.button whileTap={!isProcessing ? { scale: 0.95 } : {}} onClick={() => !isProcessing && setMethod('transferencia')}
-              className={`flex flex-col items-center justify-center p-3 sm:p-4 rounded-[1.25rem] border-2 transition-all ${
+              className={`flex flex-col items-center justify-center p-3 sm:p-4 rounded-[1.25rem] border-2 transition-all outline-none ${
                 method === 'transferencia' 
                   ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 shadow-sm scale-[1.02]' 
-                  : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface hover:border-purple-300 dark:hover:border-purple-700'
+                  : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-white dark:bg-gray-800 lya:bg-lya-surface md:hover:border-purple-300 dark:md:hover:border-purple-700'
               }`}>
               <Smartphone size={24} strokeWidth={1.5} className={`mb-1.5 ${method === 'transferencia' ? 'text-purple-500' : 'text-gray-400 lya:text-lya-text/50'}`} />
               <span className={`text-[10px] sm:text-[11px] uppercase tracking-widest font-black ${method === 'transferencia' ? 'text-purple-700 dark:text-purple-400 lya:text-lya-text' : 'text-gray-400 lya:text-lya-text/50'}`}>Transferencia</span>
             </motion.button>
           </div>
 
-          {/* Detalles del Método */}
           <AnimatePresence mode='wait'>
             {method === 'efectivo' && (
               <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-3 space-y-3">
@@ -307,9 +354,9 @@ export const CheckoutModal = ({
                     />
                   </div>
                   <div className="flex gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
-                    <button type="button" disabled={isProcessing} onClick={() => setAmountReceived(amountToPay.toString())} className="px-4 py-2 bg-emerald-100 dark:bg-emerald-900/40 lya:bg-lya-primary/20 text-emerald-700 dark:text-emerald-400 lya:text-lya-primary border border-emerald-200 dark:border-emerald-700/50 lya:border-lya-primary/30 rounded-xl text-[11px] font-black whitespace-nowrap active:scale-95 transition-all shadow-sm disabled:opacity-50">Exacto</button>
+                    <motion.button whileTap={{ scale: 0.95 }} type="button" disabled={isProcessing} onClick={() => setAmountReceived(amountToPay.toString())} className="px-4 py-2 bg-emerald-100 dark:bg-emerald-900/40 lya:bg-lya-primary/20 text-emerald-700 dark:text-emerald-400 lya:text-lya-primary border border-emerald-200 dark:border-emerald-700/50 lya:border-lya-primary/30 rounded-xl text-[11px] font-black whitespace-nowrap shadow-sm disabled:opacity-50 outline-none">Exacto</motion.button>
                     {[50, 100, 200, 500, 1000].filter(v => v > amountToPay).map(val => (
-                       <button type="button" disabled={isProcessing} key={val} onClick={() => setAmountReceived(val.toString())} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl text-[11px] font-black whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-all disabled:opacity-50">${val}</button>
+                       <motion.button whileTap={{ scale: 0.95 }} type="button" disabled={isProcessing} key={val} onClick={() => setAmountReceived(val.toString())} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl text-[11px] font-black whitespace-nowrap md:hover:bg-gray-100 dark:md:hover:bg-gray-700 shadow-sm disabled:opacity-50 outline-none">${val}</motion.button>
                     ))}
                   </div>
                 </div>
@@ -327,7 +374,6 @@ export const CheckoutModal = ({
 
             {method === 'transferencia' && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
               <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-3">
-                
                 {transferInfo?.whatsapp_number && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-900/30 rounded-2xl p-4 flex gap-3 shadow-sm items-center">
                     <div className="bg-purple-100 dark:bg-purple-900/40 p-2.5 rounded-xl shrink-0">
@@ -377,12 +423,12 @@ export const CheckoutModal = ({
           </AnimatePresence>
         </div>
 
-        {/* FOOTER CON EL BOTÓN GORDITO SOLUCIONADO */}
         <div className="p-4 sm:p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0 transition-colors">
-          <button 
+          <motion.button 
+            whileTap={(!isProcessing && amountToPay > 0) ? { scale: 0.95 } : {}}
             onClick={handlePayment} 
             disabled={isProcessing || amountToPay <= 0 || (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay)}
-            className="w-full py-4 min-h-[56px] bg-gray-900 hover:bg-black dark:bg-emerald-600 dark:hover:bg-emerald-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black text-base sm:text-lg rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            className="w-full py-4 min-h-[56px] bg-gray-900 md:hover:bg-black dark:bg-emerald-600 dark:md:hover:bg-emerald-500 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white font-black text-base sm:text-lg rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none outline-none"
           >
             {isProcessing ? (
               <>
@@ -391,11 +437,11 @@ export const CheckoutModal = ({
               </>
             ) : (
               <>
-                <span>Confirmar Cobro de ${amountToPay.toFixed(2)}</span>
+                <span>Confirmar Cobro (${amountToPay.toFixed(2)})</span>
                 <CheckCircle size={20} strokeWidth={2.5} />
               </>
             )}
-          </button>
+          </motion.button>
         </div>
       </motion.div>
     </div>

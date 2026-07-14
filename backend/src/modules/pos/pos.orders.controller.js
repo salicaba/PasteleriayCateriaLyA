@@ -14,11 +14,11 @@ export const createOrder = async (req, res) => {
     let { ticketId } = req.body;
     const employeeId = req.user?.id || null; 
     
-    // 🔥 FIX CRÍTICO: Prevenir "Ghost Orders". Si es SALON pero el tableId es nulo o inválido, lo forzamos a LLEVAR.
+    // Prevenir "Ghost Orders". Si es SALON pero el tableId es nulo o inválido, lo forzamos a LLEVAR.
     const finalTableId = orderType === 'SALON' ? tableId : null;
     const finalOrderType = (orderType === 'SALON' && !finalTableId) ? 'LLEVAR' : orderType;
 
-    // 🔥 PURGA MASIVA: Matamos TODOS los zombies de esta mesa antes de crear una orden
+    // PURGA MASIVA: Matamos TODOS los zombies de esta mesa antes de crear una orden
     if (finalOrderType === 'SALON' && finalTableId) {
       const existingOrders = await Order.findAll({ 
         where: { tableId: finalTableId, status: ['OPEN', 'PAID'] } 
@@ -69,9 +69,7 @@ export const createOrder = async (req, res) => {
       totalAmount: 0 
     });
     
-    if (finalOrderType === 'SALON' && finalTableId) {
-      await Table.update({ status: 'occupied' }, { where: { id: finalTableId } });
-    }
+    // 🔥 FIX: Eliminada la actualización a "occupied" que rompía la BD de Postgres
 
     getIO().emit('pos:update');
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
@@ -122,13 +120,10 @@ export const addItemsToOrder = async (req, res) => {
     const hoursOld = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
     if (hoursOld > 12) {
       await order.update({ status: 'CLOSED' });
-      if (order.tableId) {
-        await Table.update({ status: 'active' }, { where: { id: order.tableId } });
-      }
+      // 🔥 FIX: Eliminada la restauración redundante a "active"
       return res.status(400).json({ message: 'Orden caducada por inactividad.' });
     }
 
-    // 🔥 REGLA DE NEGOCIO: Si es Para Llevar, forzamos Cuenta General en lugar de crear subcuentas por celular
     const itemsToInsert = items.map(item => ({ 
       ...item, 
       orderId, 
@@ -185,9 +180,7 @@ export const getActiveOrderByTable = async (req, res) => {
       }
     }
     
-    if (!validOrder) {
-      await Table.update({ status: 'active' }, { where: { id: tableId } });
-    }
+    // 🔥 FIX: Eliminada la restauración redundante a "active" si no hay validOrder
 
     res.json({ order: validOrder });
   } catch (error) { 
@@ -206,9 +199,7 @@ export const closeOrder = async (req, res) => {
     
     await order.update({ status: 'CLOSED' });
     
-    if (order.tableId) {
-      await Table.update({ status: 'active' }, { where: { id: order.tableId } });
-    }
+    // 🔥 FIX: Eliminada la restauración redundante a "active"
 
     getIO().emit('pos:update');
     res.json({ message: 'Mesa liberada y orden archivada.' });
@@ -244,17 +235,11 @@ export const getActiveOrders = async (req, res) => {
       const hoursOld = (now - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
       if (hoursOld > 12) {
         await order.update({ status: 'CLOSED' });
-        if (order.tableId) {
-          await Table.update({ status: 'active' }, { where: { id: order.tableId } });
-        }
+        // 🔥 FIX: Eliminada la restauración redundante a "active"
         zombiesFound = true;
       } else {
-        // 🔥 FILTRO NEO-BENTO: Evitamos Tarjetas Vacías de Clientes Curiosos
-        // Si la orden es Para Llevar, NO tiene productos y NO fue creada por un empleado, la ocultamos.
         if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
-           if (!order.createdBy) {
-              continue; 
-           }
+           if (!order.createdBy) continue; 
         }
         validOrders.push(order);
       }

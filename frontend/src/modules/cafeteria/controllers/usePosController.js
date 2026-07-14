@@ -97,6 +97,24 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const isVitrina = mesaActual?.zona === 'vitrina';
   const isLlevar = mesaActual?.zona === 'llevar';
 
+  // 🔥 INTELIGENCIA DE BLOQUEO CALCULADA EN EL CEREBRO 🔥
+  // Esto permite saber exactamente qué cuentas ya están selladas
+  const activeCartForLock = cart.filter(item => item.status !== 'CANCELLED');
+  const isOrderFullyPaid = orderStatus === 'PAID' || orderStatus === 'CLOSED';
+  
+  const cuentasPagadasReales = Array.from(new Set(activeCartForLock.map(i => i.cuenta || 'General'))).filter(cuenta => {
+      if (paidAccounts?.includes(cuenta)) return true;
+      if (isOrderFullyPaid) {
+          const itemsDeCuenta = activeCartForLock.filter(i => (i.cuenta || 'General') === cuenta);
+          return itemsDeCuenta.length > 0 && itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
+      }
+      return false;
+  });
+
+  (paidAccounts || []).forEach(pa => {
+      if (!cuentasPagadasReales.includes(pa)) cuentasPagadasReales.push(pa);
+  });
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -220,8 +238,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   }, [isOpen, mesaActual]);
 
   const addToCart = (productWithDetails, forceCuenta = null) => {
-    if (orderStatus === 'PAID') return;
     const targetCuenta = forceCuenta || cuentaActiva;
+
+    // 🔥 FIX MAESTRO: Si la cuenta de destino ya se pagó, bloqueamos la acción por cuenta, no por orden global.
+    if (cuentasPagadasReales.includes(targetCuenta)) {
+        triggerNotification(`La cuenta "${targetCuenta}" está sellada. Selecciona una cuenta nueva.`, 'error');
+        return;
+    }
     
     let finalDetails = productWithDetails.detalles || {};
     let finalPrice = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
@@ -704,7 +727,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             ));
         }
         
-        // 🔥 Reemplazado toast de terceros por notificación nativa Neo-Bento
         if (response.data.wasRefunded) {
           triggerNotification('Cancelado. Reembolso registrado en caja.', 'success');
         } else {
@@ -750,7 +772,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         setOrderStatus('CANCELLED');
         setCart(prev => prev.map(item => item.enviadoCocina ? { ...item, status: 'CANCELLED' } : item));
         
-        // 🔥 Reemplazado toast de terceros por notificación nativa Neo-Bento
         if (response.data.refundedAmount > 0) {
           triggerNotification(`Orden cancelada. Reembolso de $${response.data.refundedAmount} registrado.`, 'success');
         } else {
@@ -879,6 +900,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     dbCategories, orderStatus, paidAccounts, validateAllDelivered, toggleItemTakeaway, cuentasTelefonos,
     deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems, 
-    notification, triggerNotification // 🔥 Exportamos el estado para que la Vista lo dibuje
+    notification, triggerNotification
   };
 };

@@ -83,12 +83,26 @@ export const PosModal = ({
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
-  // 🔥 LÓGICA DE BLOQUEO: Verificamos si la cuenta seleccionada ya está cobrada, 
-  // o si el ticket entero (Para llevar/Mostrador) ya se cerró.
-  const isAccountLocked = 
-    orderStatus === 'PAID' || 
-    orderStatus === 'CLOSED' || 
-    (cuentaActiva && paidAccounts && paidAccounts.includes(cuentaActiva));
+  // 🔥 NUEVA LÓGICA DE BLOQUEO INTELIGENTE 🔥
+  // Calculamos las cuentas que REALMENTE están pagadas, igual que en el Sidebar
+  const activeCartForLock = cart.filter(item => item.status !== 'CANCELLED');
+  const isOrderFullyPaid = orderStatus === 'PAID' || orderStatus === 'CLOSED';
+  
+  const cuentasPagadasReales = Array.from(new Set(activeCartForLock.map(i => i.cuenta || 'General'))).filter(cuenta => {
+      if (paidAccounts?.includes(cuenta)) return true;
+      if (isOrderFullyPaid) {
+          const itemsDeCuenta = activeCartForLock.filter(i => (i.cuenta || 'General') === cuenta);
+          return itemsDeCuenta.length > 0 && itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
+      }
+      return false;
+  });
+
+  (paidAccounts || []).forEach(pa => {
+      if (!cuentasPagadasReales.includes(pa)) cuentasPagadasReales.push(pa);
+  });
+
+  // El menú SE BLOQUEA SOLO si la cuenta ACTIVA está dentro de las cuentas pagadas reales
+  const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
 
   useEffect(() => {
     if (isOpen) {
@@ -464,7 +478,8 @@ export const PosModal = ({
                   telefonoPredeterminado={previewTicketData?.telefono}
                   onConfirmPrint={executeRealPrint} 
                   onSendWhatsApp={handleSendWhatsAppTicket} 
-                  userName={nombreCajero} 
+                  userName={nombreCajero}
+                  cuentasPagadasReales={cuentasPagadasReales} // 🔥 EL PASO FINAL DE LA INTELIGENCIA
                 />
 
                 <AnimatePresence>
