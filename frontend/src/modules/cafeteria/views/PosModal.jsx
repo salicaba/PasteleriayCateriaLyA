@@ -55,13 +55,8 @@ export const PosModal = ({
   const [previewTicketData, setPreviewTicketData] = useState(null);
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
 
-  // 🔥 ESTADO DE UX MÓVIL: Controla el cajón deslizable de la comanda
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
-  
-  // 🔥 CANDADO GLOBAL: Previene doble envíos desde la raíz
   const [isProcessingAction, setIsProcessingAction] = useState(false);
-
-  // Fallback local en caso de que no exista el padre
   const [localToast, setLocalToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -83,25 +78,8 @@ export const PosModal = ({
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
-  // 🔥 NUEVA LÓGICA DE BLOQUEO INTELIGENTE 🔥
-  // Calculamos las cuentas que REALMENTE están pagadas, igual que en el Sidebar
-  const activeCartForLock = cart.filter(item => item.status !== 'CANCELLED');
-  const isOrderFullyPaid = orderStatus === 'PAID' || orderStatus === 'CLOSED';
-  
-  const cuentasPagadasReales = Array.from(new Set(activeCartForLock.map(i => i.cuenta || 'General'))).filter(cuenta => {
-      if (paidAccounts?.includes(cuenta)) return true;
-      if (isOrderFullyPaid) {
-          const itemsDeCuenta = activeCartForLock.filter(i => (i.cuenta || 'General') === cuenta);
-          return itemsDeCuenta.length > 0 && itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
-      }
-      return false;
-  });
-
-  (paidAccounts || []).forEach(pa => {
-      if (!cuentasPagadasReales.includes(pa)) cuentasPagadasReales.push(pa);
-  });
-
-  // El menú SE BLOQUEA SOLO si la cuenta ACTIVA está dentro de las cuentas pagadas reales
+  // 🔥 SOLUCIÓN DEFINITIVA AL PARPADEO 🔥
+  const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
 
   useEffect(() => {
@@ -112,7 +90,6 @@ export const PosModal = ({
     }
   }, [isOpen, categoriaActiva]); 
 
-  // 🔥 ESCUDO NEO-BENTO: Validación Estricta Anti-Contaminación de Zonas
   const rawNumeroStr = String(mesa?.numero || mesa?.id || '').trim();
   const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumeroStr);
 
@@ -221,14 +198,12 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
-  // 🔥 NUEVA LÓGICA DE EXTRACCIÓN LIMPIA 🔥
   let numeroReal = 'Pedido';
   let nombreParaSidebar = '';
 
   if (rawNumeroStr.includes(' - ')) {
      const partes = rawNumeroStr.split(' - ');
      numeroReal = partes[0].trim();
-     // Agrupamos el resto para mandarlo al Sidebar (Nombre y Teléfono si existe)
      nombreParaSidebar = partes.slice(1).join(' - ').trim();
   } else {
      numeroReal = rawNumeroStr.trim();
@@ -240,17 +215,7 @@ export const PosModal = ({
 
   const HeaderTitle = () => {
     if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
-    
-    if (isLlevar) {
-      // 🔥 Ahora solo devolvemos el Folio limpio (Ej: Llevar #5). 
-      // El nombre y teléfono se renderizan nativamente abajo en el TicketCartGroup
-      return (
-        <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">
-          {numeroReal}
-        </h3>
-      );
-    }
-    
+    if (isLlevar) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">{numeroReal}</h3>;
     return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mesa #{numeroReal}</h3>;
   };
 
@@ -275,7 +240,6 @@ export const PosModal = ({
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
     window.open(urlApiWhatsApp, '_blank');
-
     showToast('Redirigiendo a WhatsApp...', 'success');
   };
 
@@ -292,30 +256,24 @@ export const PosModal = ({
         telefonoPredeterminado = cuentasTelefonos[c] || '';
       } else {
         const telefonosGuardados = Object.values(cuentasTelefonos).filter(t => t && t.trim() !== '');
-        if (telefonosGuardados.length === 1) {
-          telefonoPredeterminado = telefonosGuardados[0];
-        }
+        if (telefonosGuardados.length === 1) telefonoPredeterminado = telefonosGuardados[0];
       }
       setPreviewTicketData({ cuentaName: c, telefono: telefonoPredeterminado });
     }, 
     onCloseTable: finalizeTable, toggleDeliveredStatus, 
     isLlevar: (isLlevar || isVitrina), 
     isVitrina, 
-    toggleItemTakeaway,
-    cuentasTelefonos,
+    toggleItemTakeaway, cuentasTelefonos,
     onDeliverAll: deliverAllActiveItems,        
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
-    // 🔥 Le pasamos el nombre extraído a la Sidebar para que lo pinte en la caja de abajo
     nombreCliente: isLlevar ? nombreParaSidebar : null,
     showToast 
   };
 
-  // 🔥 CÁLCULO DE CARRITO PARA EL BADGE MÓVIL
   const totalItemsInCart = cart.filter(item => item.status !== 'CANCELLED').reduce((acc, curr) => acc + curr.qty, 0);
 
-  // 🔥 ESTRUCTURA FLEX ESTRICTA
   const posContent = (
     <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${!inline ? 'md:rounded-[2.5rem] shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
       
@@ -336,7 +294,7 @@ export const PosModal = ({
             {!inline && (
               <button 
                 onClick={onClose} 
-                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm shrink-0"
+                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm shrink-0"
               >
                 <X size={20} />
               </button>
@@ -345,7 +303,6 @@ export const PosModal = ({
           <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
         </div>
 
-        {/* CONTENEDOR DE PRODUCTOS CON SCROLL INDEPENDIENTE */}
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative">
           <AnimatePresence mode="wait">
             {isRendering ? (
@@ -383,7 +340,7 @@ export const PosModal = ({
         </div>
       </div>
 
-      {/* SECCIÓN DERECHA: TICKET SIDEBAR (ESCRITORIO) */}
+      {/* SECCIÓN DERECHA */}
       <div className="hidden md:flex w-96 border-l border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface h-full shadow-2xl z-20 flex-col transition-colors shrink-0 overflow-hidden">
         <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors shrink-0">
            <div>
@@ -398,11 +355,11 @@ export const PosModal = ({
         </div>
       </div>
 
-      {/* 🔥 BOTÓN FLOTANTE (FAB) EXCLUSIVO PARA MÓVILES */}
+      {/* FAB MÓVIL */}
       <div className="md:hidden absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none px-4">
         <button
           onClick={() => setIsMobileCartOpen(true)}
-          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary"
+          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 active:bg-black dark:bg-white dark:active:bg-gray-100 lya:bg-lya-primary lya:active:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary"
         >
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -419,7 +376,7 @@ export const PosModal = ({
         </button>
       </div>
 
-      {/* 🔥 CAJÓN DESLIZABLE DE COMANDA (MÓVILES) */}
+      {/* CAJÓN DESLIZABLE */}
       <AnimatePresence>
         {isMobileCartOpen && (
           <motion.div
@@ -468,7 +425,6 @@ export const PosModal = ({
             </div>
 
             <div className="relative z-[9999]">
-                {/* MODALES HIJOS */}
                 <TicketPreviewModal 
                   isOpen={!!previewTicketData} 
                   onClose={() => setPreviewTicketData(null)} 
@@ -479,11 +435,10 @@ export const PosModal = ({
                   onConfirmPrint={executeRealPrint} 
                   onSendWhatsApp={handleSendWhatsAppTicket} 
                   userName={nombreCajero}
-                  cuentasPagadasReales={cuentasPagadasReales} // 🔥 EL PASO FINAL DE LA INTELIGENCIA
+                  cuentasPagadasReales={cuentasPagadasReales}
                 />
 
                 <AnimatePresence>
-                  {/* CÁPSULA NEO-BENTO DE FALLBACK LOCAL */}
                   {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
                       <motion.div 
@@ -503,18 +458,15 @@ export const PosModal = ({
                         }`}>
                           {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
                         </div>
-                        <div className="flex flex-col items-center justify-center text-center w-full">
+                        <div className="flex flex-col items-center justify-center w-full">
                           <span className="text-[15px] leading-tight text-center">{localToast.msg}</span>
                         </div>
                       </motion.div>
                     </div>
                   )}
 
-                  {/* SUCCESS SCREEN PARA PAGOS */}
                   {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
-                  
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
-                  
                   {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
                   
                   {showCheckout && (

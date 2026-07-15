@@ -1,6 +1,6 @@
 // src/modules/cafeteria/views/components/ticket/TicketBottomBar.jsx
 import React from 'react';
-import { ChefHat, CreditCard, CheckCheck, Printer, XCircle, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
+import { ChefHat, CreditCard, CheckCheck, Printer, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,9 +28,8 @@ export const TicketBottomBar = ({
   setShowCancelModal,
   
   onOpenReleaseModal,
-  // 🔥 ELIMINAMOS onOpenPrintModal de aquí
   
-  onPrintTicket, // Usamos la función de imprimir original
+  onPrintTicket,
   
   handleCloseTableClick,
   isClosingTable,
@@ -49,10 +48,13 @@ export const TicketBottomBar = ({
   const cuentasActivasArray = allCartAccounts.filter(acc => !cuentasPagadasReales.includes(acc));
   const hasCuentasActivas = cuentasActivasArray.length > 0;
 
+  // FIX BUG DE ENTREGA: Evalúa que no haya items pendientes de entrega para habilitar el cobro
   const isAnyCuentaReadyToPay = cuentasActivasArray.some(cuenta => {
     const itemsDeCuenta = activeCart.filter(i => (i.cuenta || 'General') === cuenta);
     if (itemsDeCuenta.length === 0) return false;
-    return itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
+    
+    const hasPending = itemsDeCuenta.some(i => !i.enviadoCocina || ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
+    return !hasPending;
   });
 
   const totalPendiente = activeCart
@@ -70,7 +72,6 @@ export const TicketBottomBar = ({
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
             className="flex gap-2 overflow-hidden"
           >
-            {/* 🔥 FIX: Ahora abre el Comprobante Digital DIRECTO */}
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => onPrintTicket(cuentasPagadasVisibles.length === 1 ? cuentasPagadasVisibles[0] : null)} 
@@ -80,7 +81,7 @@ export const TicketBottomBar = ({
             </motion.button>
             
             <motion.button 
-               whileTap={{ scale: 0.95 }}
+               whileTap={!isClosingTable ? { scale: 0.95 } : {}}
                onClick={isVitrina || isLlevar ? handleCloseTableClick : onOpenReleaseModal}
                disabled={isClosingTable}
                className={clsx(

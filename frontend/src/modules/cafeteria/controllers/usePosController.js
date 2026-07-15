@@ -82,7 +82,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
 
-  // 🔥 NUEVO ESTADO: Sistema de Notificaciones Nativo (Reemplaza react-hot-toast)
   const [notification, setNotification] = useState(null);
   const triggerNotification = (msg, type = 'success') => {
     setNotification({ msg, type, show: true });
@@ -97,23 +96,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const isVitrina = mesaActual?.zona === 'vitrina';
   const isLlevar = mesaActual?.zona === 'llevar';
 
-  // 🔥 INTELIGENCIA DE BLOQUEO CALCULADA EN EL CEREBRO 🔥
-  // Esto permite saber exactamente qué cuentas ya están selladas
-  const activeCartForLock = cart.filter(item => item.status !== 'CANCELLED');
-  const isOrderFullyPaid = orderStatus === 'PAID' || orderStatus === 'CLOSED';
-  
-  const cuentasPagadasReales = Array.from(new Set(activeCartForLock.map(i => i.cuenta || 'General'))).filter(cuenta => {
-      if (paidAccounts?.includes(cuenta)) return true;
-      if (isOrderFullyPaid) {
-          const itemsDeCuenta = activeCartForLock.filter(i => (i.cuenta || 'General') === cuenta);
-          return itemsDeCuenta.length > 0 && itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
-      }
-      return false;
-  });
-
-  (paidAccounts || []).forEach(pa => {
-      if (!cuentasPagadasReales.includes(pa)) cuentasPagadasReales.push(pa);
-  });
+  // 🔥 REGISTRO ABSOLUTO DE CUENTAS PAGADAS 🔥
+  const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
 
   useEffect(() => {
     const loadData = async () => {
@@ -126,7 +110,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         const prods = prodsRes.data;
         const cats = catsRes.data;
 
-        // FILTRAMOS Y TRADUCIMOS AL ESPAÑOL PARA LA VISTA
         const activeProducts = prods.filter(p => {
           const estado = p.isActive !== undefined ? p.isActive : p.disponible;
           if (estado === false || estado === 0 || estado === '0') return false;
@@ -142,7 +125,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         
         setDbProducts(activeProducts); 
 
-        // INYECTAMOS "Todas" AL PRINCIPIO
         const hasTodas = cats.some(c => c.id === 'todas' || c.name.trim().toLowerCase() === 'todas');
         const finalCats = hasTodas ? cats : [{ id: 'todas', name: 'Todas' }, ...cats];
         
@@ -172,16 +154,30 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         const currentOrderId = mesaActual.orderId;
         setActiveOrderId(currentOrderId);
         setOrderStatus(mesaActual.orderStatus || 'OPEN');
-        setPaidAccounts(mesaActual.paidAccounts || []);
+        
+        let loadedPaidAccounts = mesaActual.paidAccounts || [];
 
         if (currentOrderId) {
+            // RECUPERAR TELÉFONOS
             const storedPhones = localStorage.getItem(`lya_phones_${currentOrderId}`);
             if (storedPhones) {
                 try { 
                   setCuentasTelefonos(JSON.parse(storedPhones)); 
                 } catch(e) {}
             }
+
+            // 🛡️ ESCUDO CONTRA AMNESIA DE BD: RECUPERAR PAGOS LOCALES
+            const storedPaid = localStorage.getItem(`lya_paid_${currentOrderId}`);
+            if (storedPaid) {
+                try {
+                  const parsedPaid = JSON.parse(storedPaid);
+                  loadedPaidAccounts = Array.from(new Set([...loadedPaidAccounts, ...parsedPaid]));
+                } catch(e) {}
+            }
         }
+        
+        // Fusión de memorias
+        setPaidAccounts(prev => Array.from(new Set([...prev, ...loadedPaidAccounts])));
 
         const dbItems = mesaActual.items || [];
         
@@ -223,9 +219,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
             return finalCart;
         });
 
-        if (mesaActual.paidAccounts) {
-          mesaActual.paidAccounts.forEach(pa => nuevasCuentas.add(pa));
-        }
+        // Asegurar que las cuentas pagadas existan en la lista de nombres
+        loadedPaidAccounts.forEach(pa => nuevasCuentas.add(pa));
+        
     } else {
         setCart(prev => { 
           prev.forEach(c => nuevasCuentas.add(c.cuenta)); 
@@ -240,9 +236,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const addToCart = (productWithDetails, forceCuenta = null) => {
     const targetCuenta = forceCuenta || cuentaActiva;
 
-    // 🔥 FIX MAESTRO: Si la cuenta de destino ya se pagó, bloqueamos la acción por cuenta, no por orden global.
     if (cuentasPagadasReales.includes(targetCuenta)) {
-        triggerNotification(`La cuenta "${targetCuenta}" está sellada. Selecciona una cuenta nueva.`, 'error');
+        triggerNotification(`La cuenta "${targetCuenta}" está sellada y cobrada. Selecciona una cuenta nueva.`, 'error');
         return;
     }
     
@@ -479,6 +474,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   };
 
   const moveItemToCuenta = async (item, target, qtyToMove = item.qty) => { 
+    if (cuentasPagadasReales.includes(target)) {
+        triggerNotification(`La cuenta "${target}" ya está cobrada. No puedes moverle más productos.`, 'error');
+        return;
+    }
+
     const itemsToProcess = item._groupedItems || [item];
     
     try {
@@ -772,6 +772,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
         setOrderStatus('CANCELLED');
         setCart(prev => prev.map(item => item.enviadoCocina ? { ...item, status: 'CANCELLED' } : item));
         
+        // Limpiamos los archivos fantasma
+        localStorage.removeItem(`lya_paid_${activeOrderId}`); 
+        localStorage.removeItem(`lya_phones_${activeOrderId}`);
+
         if (response.data.refundedAmount > 0) {
           triggerNotification(`Orden cancelada. Reembolso de $${response.data.refundedAmount} registrado.`, 'success');
         } else {
@@ -788,7 +792,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       (cuentaName ? c.cuenta === cuentaName : true) && c.status !== 'CANCELLED'
     ); 
     if (itemsToCheck.length === 0) return false;
-    return itemsToCheck.every(item => item.enviadoCocina && item.kitchenStatus === 'DELIVERED'); 
+    
+    const hasPendingDelivery = itemsToCheck.some(item => 
+       !item.enviadoCocina || ['PENDING', 'PREPARING', 'READY'].includes(item.kitchenStatus)
+    );
+    return !hasPendingDelivery;
   };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
@@ -801,7 +809,14 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
           paymentMethod: method 
         });
       }
-      setPaidAccounts(prev => [...prev, nombreCuenta]);
+      
+      // ESCUDO DE GUARDADO: Memoria Local Permanente
+      setPaidAccounts(prev => {
+          const newArr = Array.from(new Set([...prev, nombreCuenta]));
+          if (activeOrderId) localStorage.setItem(`lya_paid_${activeOrderId}`, JSON.stringify(newArr));
+          return newArr;
+      });
+
       if (onComplete) onComplete();
     } catch (error) { 
       throw error; 
@@ -822,9 +837,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       }
       setOrderStatus('PAID');
       
+      // ESCUDO DE GUARDADO: Memoria Local Permanente
       setPaidAccounts(prev => {
         const todasLasCuentas = Array.from(new Set(cart.map(i => i.cuenta || 'General')));
-        return Array.from(new Set([...prev, ...todasLasCuentas]));
+        const newArr = Array.from(new Set([...prev, ...todasLasCuentas]));
+        if (activeOrderId) localStorage.setItem(`lya_paid_${activeOrderId}`, JSON.stringify(newArr));
+        return newArr;
       });
 
       if (onComplete) onComplete();
@@ -837,7 +855,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
       try {
         if(activeOrderId) { 
           await client.put(`/pos/orders/${activeOrderId}/close`); 
+          
+          // DESTRUCCIÓN LIMPIA AL FINALIZAR MESA
           localStorage.removeItem(`lya_phones_${activeOrderId}`); 
+          localStorage.removeItem(`lya_paid_${activeOrderId}`); 
         }
         setCart([]); 
         setActiveOrderId(null); 
@@ -858,9 +879,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   };
 
   const total = useMemo(() => 
-    cart.filter(item => !paidAccounts.includes(item.cuenta || 'General') && item.status !== 'CANCELLED')
+    cart.filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), 
-  [cart, paidAccounts]);
+  [cart, cuentasPagadasReales]);
 
   const unsentTotal = useMemo(() => 
     cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED')
@@ -873,9 +894,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     Array.from(new Set([...nombresCuentas, ...cart.map(i => i.cuenta || 'General')])), 
   [cart, nombresCuentas]);
 
-  const getSubtotalByCuenta = (nombreCuenta) => 
-    cart.filter(item => item.cuenta === nombreCuenta && item.status !== 'CANCELLED')
+  const getSubtotalByCuenta = (nombreCuenta) => {
+    // 🛡️ BARRERA ABSOLUTA: Si la cuenta está en el registro cobrado, retorna $0 al sistema.
+    if (cuentasPagadasReales.includes(nombreCuenta)) return 0;
+    
+    return cart.filter(item => item.cuenta === nombreCuenta && item.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
+  };
 
   const getProductQty = (id) => 
     cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva && p.status !== 'CANCELLED')

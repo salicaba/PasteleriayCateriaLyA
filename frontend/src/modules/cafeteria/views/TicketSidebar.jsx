@@ -51,20 +51,8 @@ export const TicketSidebar = ({
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
 
-  const isOrderFullyPaid = orderStatus === 'PAID' || orderStatus === 'CLOSED';
-
-  const cuentasPagadasReales = Array.from(new Set(activeCart.map(i => i.cuenta || 'General'))).filter(cuenta => {
-      if (paidAccounts?.includes(cuenta)) return true;
-      if (isOrderFullyPaid) {
-          const itemsDeCuenta = activeCart.filter(i => (i.cuenta || 'General') === cuenta);
-          return itemsDeCuenta.length > 0 && itemsDeCuenta.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
-      }
-      return false;
-  });
-
-  (paidAccounts || []).forEach(pa => {
-      if (!cuentasPagadasReales.includes(pa)) cuentasPagadasReales.push(pa);
-  });
+  // 🔥 SOLUCIÓN DEFINITIVA AL PARPADEO 🔥
+  const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
 
   const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultas.includes(acc));
 
@@ -393,13 +381,14 @@ export const TicketSidebar = ({
   }
 
   const cuentasCancelables = Array.from(new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General')));
+  
   const sentItems = activeCart.filter(i => i.enviadoCocina);
-  const hasSentItems = sentItems.length > 0;
-  const allSentItemsDelivered = hasSentItems && sentItems.every(i => i.kitchenStatus === 'DELIVERED');
+  const itemsNeedingDelivery = sentItems.filter(i => ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
   
   const hasReadyItems = sentItems.some(i => i.kitchenStatus === 'READY');
   const hasCookingItems = sentItems.some(i => ['PENDING', 'PREPARING'].includes(i.kitchenStatus));
-  const showDeliverAllBtn = !isVitrina && hasSentItems && !allSentItemsDelivered;
+  
+  const showDeliverAllBtn = !isVitrina && itemsNeedingDelivery.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative">
@@ -429,7 +418,7 @@ export const TicketSidebar = ({
               const subtotalCuenta = items.reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
               
               const isCuentaPagada = cuentasPagadasReales.includes(cuentaName);
-              const isTodoEntregadoEnCuenta = items.length > 0 && items.every(i => i.enviadoCocina && i.kitchenStatus === 'DELIVERED');
+              const isTodoEntregadoEnCuenta = items.length > 0 && !items.some(i => !i.enviadoCocina || ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
 
               return (
                 <TicketCartGroup 
@@ -475,7 +464,6 @@ export const TicketSidebar = ({
         
         onOpenReleaseModal={() => setShowReleaseModal(true)}
         
-        // 🔥 Pasamos el onPrintTicket directo
         onPrintTicket={onPrintTicket}
 
         handleCloseTableClick={handleCloseTableClick}
@@ -485,7 +473,6 @@ export const TicketSidebar = ({
         handleCheckoutClick={handleCheckoutClick} isCheckingOut={isCheckingOut}
       />
 
-      {/* MODAL NEO-BENTO: SELECCIONAR CUENTAS A LIBERAR */}
       <AnimatePresence>
         {showReleaseModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
