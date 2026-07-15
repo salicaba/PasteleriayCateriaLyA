@@ -18,25 +18,15 @@ export const createOrder = async (req, res) => {
     const finalTableId = orderType === 'SALON' ? tableId : null;
     const finalOrderType = (orderType === 'SALON' && !finalTableId) ? 'LLEVAR' : orderType;
 
-    // PURGA MASIVA: Matamos TODOS los zombies de esta mesa antes de crear una orden
+    // RECUPERACIÓN DE ORDEN EXISTENTE: Sin matar órdenes por tiempo
     if (finalOrderType === 'SALON' && finalTableId) {
       const existingOrders = await Order.findAll({ 
         where: { tableId: finalTableId, status: ['OPEN', 'PAID'] } 
       });
       
-      let validExistingOrder = null;
-
-      for (const ord of existingOrders) {
-        const hoursOld = (Date.now() - new Date(ord.createdAt).getTime()) / (1000 * 60 * 60);
-        if (hoursOld > 12) {
-          await ord.update({ status: 'CLOSED' }); // Asesinato silencioso del zombie
-        } else {
-          validExistingOrder = ord; // Rescatamos la orden si es de hoy
-        }
-      }
-
-      if (validExistingOrder) {
-        return res.status(200).json({ message: 'Orden activa recuperada', order: validExistingOrder });
+      if (existingOrders.length > 0) {
+        // Rescatamos la orden directamente sin importar la hora
+        return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrders[0] });
       }
     }
 
@@ -68,8 +58,6 @@ export const createOrder = async (req, res) => {
       status: 'OPEN', 
       totalAmount: 0 
     });
-    
-    // 🔥 FIX: Eliminada la actualización a "occupied" que rompía la BD de Postgres
 
     getIO().emit('pos:update');
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
@@ -117,12 +105,7 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
 
-    const hoursOld = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
-    if (hoursOld > 12) {
-      await order.update({ status: 'CLOSED' });
-      // 🔥 FIX: Eliminada la restauración redundante a "active"
-      return res.status(400).json({ message: 'Orden caducada por inactividad.' });
-    }
+    // Se eliminó la caducidad por inactividad. La mesa sigue viva.
 
     const itemsToInsert = items.map(item => ({ 
       ...item, 
@@ -170,17 +153,8 @@ export const getActiveOrderByTable = async (req, res) => {
       ]
     });
 
-    let validOrder = null;
-    for (const ord of orders) {
-      const hoursOld = (Date.now() - new Date(ord.createdAt).getTime()) / (1000 * 60 * 60);
-      if (hoursOld > 12) {
-        await ord.update({ status: 'CLOSED' });
-      } else {
-        validOrder = ord;
-      }
-    }
-    
-    // 🔥 FIX: Eliminada la restauración redundante a "active" si no hay validOrder
+    // Sin importar la hora, si hay órdenes abiertas, las mandamos al POS
+    const validOrder = orders.length > 0 ? orders[0] : null;
 
     res.json({ order: validOrder });
   } catch (error) { 
@@ -198,8 +172,6 @@ export const closeOrder = async (req, res) => {
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
     
     await order.update({ status: 'CLOSED' });
-    
-    // 🔥 FIX: Eliminada la restauración redundante a "active"
 
     getIO().emit('pos:update');
     res.json({ message: 'Mesa liberada y orden archivada.' });
@@ -227,26 +199,14 @@ export const getActiveOrders = async (req, res) => {
       ]
     });
 
-    const now = Date.now();
     const validOrders = [];
-    let zombiesFound = false;
 
     for (const order of activeOrders) {
-      const hoursOld = (now - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
-      if (hoursOld > 12) {
-        await order.update({ status: 'CLOSED' });
-        // 🔥 FIX: Eliminada la restauración redundante a "active"
-        zombiesFound = true;
-      } else {
-        if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
-           if (!order.createdBy) continue; 
-        }
-        validOrders.push(order);
+      // Filtrar órdenes fantasma 'Para Llevar' sin productos
+      if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
+         if (!order.createdBy) continue; 
       }
-    }
-
-    if (zombiesFound) {
-      getIO().emit('pos:update'); 
+      validOrders.push(order);
     }
 
     res.json(validOrders);
@@ -360,7 +320,7 @@ export const deliverAllItems = async (req, res) => {
         where: { 
           orderId: id, 
           status: 'ACTIVE',
-          kitchenStatus: ['PENDING', 'PREPARING', 'READY'] 
+          kitchenStatus: 'READY' // 🔥 CORRECCIÓN: SOLO cambia los que cocina ya marcó como Listos
         } 
       }
     );
@@ -368,7 +328,7 @@ export const deliverAllItems = async (req, res) => {
     getIO().emit('orderDeliveredAll', { orderId: id });
     getIO().emit('pos:update');
 
-    res.json({ message: 'Todos los productos han sido marcados como entregados' });
+    res.json({ message: 'Todos los productos listos han sido marcados como entregados' });
   } catch (error) {
     console.error('Error en deliverAllItems:', error);
     res.status(500).json({ message: 'Error al marcar todo como entregado' });
