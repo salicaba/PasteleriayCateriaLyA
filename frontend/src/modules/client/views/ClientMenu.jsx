@@ -315,6 +315,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     try {
       await new Promise(resolve => setTimeout(resolve, 150));
       
+      // 🚀 BARRERA DE STOCK: Verificación PREVIA antes de agregar al carrito
+      const currentTotalQty = cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
+
+      if (product.controlarStock && currentTotalQty >= product.stock) {
+        triggerNotification(`¡Límite alcanzado! Solo quedan ${product.stock}.`, 'warning');
+        return; // 🛑 SALIDA TEMPRANA - BLOQUEA LA ACCIÓN
+      }
+
       setCart(prev => {
         let newItem = { ...product, qty: 1, precioUnitario: product.precio };
         let uniqueCartId = product.id.toString();
@@ -346,7 +354,23 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
   });
   
-  const incrementInCart = (cartItemId) => setCart(prev => prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + 1 } : item));
+  // 🚀 BARRERA DE STOCK: Verificación estricta en el botón "+" del carrito
+  const incrementInCart = (cartItemId) => {
+    // 1. Encontrar el producto que se quiere incrementar
+    const existing = cart.find(item => item.cartItemId === cartItemId);
+    if (!existing) return;
+
+    // 2. Sumar totales del mismo producto (todas sus variantes en el carrito)
+    const currentTotalQty = cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
+
+    // 3. Validar contra el stock
+    if (existing.controlarStock && currentTotalQty >= existing.stock) {
+        triggerNotification(`¡Límite alcanzado! Solo quedan ${existing.stock}.`, 'warning');
+        return; // 🛑 BLOQUEA LA SUMA
+    }
+
+    setCart(prev => prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + 1 } : item));
+  };
 
   const totalCart = cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0);
   const totalItems = cart.reduce((acc, item) => acc + (item.qty || 0), 0);
@@ -537,9 +561,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-neutral-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200 dark:border-emerald-900/50 lya:border-emerald-200/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]' : 'border-red-200 dark:border-red-900/50 lya:border-red-200/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]'}`}>
-              <div className={`p-1 rounded-full ${notification.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                {notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-neutral-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200 dark:border-emerald-900/50 lya:border-emerald-200/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]' : 'border-amber-200 dark:border-amber-900/50 lya:border-amber-400/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]'}`}>
+              <div className={`p-1.5 rounded-full ${notification.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                {notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
               </div>
               <span className="text-sm tracking-wide text-center">{notification.msg}</span>
             </motion.div>

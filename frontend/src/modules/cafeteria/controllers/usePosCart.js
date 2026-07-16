@@ -1,7 +1,6 @@
-// src/modules/cafeteria/controllers/usePosCart.js
 import { useState, useMemo, useEffect } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
-import { socket } from '../../../api/socket.js'; // ✅ FIX: Importación nombrada destructurada
+import { socket } from '../../../api/socket.js';
 
 export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotification) => {
   const [cart, setCart] = useState([]);
@@ -18,15 +17,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
     if (cuentasPagadasReales.includes(targetCuenta)) {
         triggerNotification(`La cuenta "${targetCuenta}" está sellada y cobrada. Selecciona una cuenta nueva.`, 'error');
-        return;
+        return false; // 🛑 ABORTAMOS FLUJO
     }
 
-    // 🚀 BARRERA DE STOCK MÁXIMO
+    // 🚀 BARRERA DE STOCK MÁXIMO (Validación estricta anti falso-positivo)
     if (productWithDetails.controlarStock) {
       const currentUnsent = getUnsentQtyOfProduct(cart, productWithDetails.id);
       if (currentUnsent + 1 > productWithDetails.stock) {
          triggerNotification(`Stock límite alcanzado. Solo hay ${productWithDetails.stock} de ${productWithDetails.nombre}.`, 'warning');
-         return;
+         return false; // 🛑 ABORTAMOS FLUJO (Esto evita que se lance el mensaje de éxito abajo)
       }
     }
     
@@ -77,6 +76,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         requiereCocina: productWithDetails.requiereCocina !== false 
       }];
     });
+
+    // 🎉 LANZAMOS EL ÉXITO DESDE EL CONTROLADOR
+    // Al estar aquí, garantizamos que solo se notifica si pasó la barrera de stock.
+    triggerNotification(`¡${productWithDetails.nombre} agregado!`, 'success');
+    return true; 
   };
 
   // 🚀 RECONCILIADOR AUTOMÁTICO EN TIEMPO REAL (La Poda de Carrito)

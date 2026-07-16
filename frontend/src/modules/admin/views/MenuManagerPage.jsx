@@ -114,7 +114,8 @@ export const MenuManagerPage = () => {
 
   // Calcula descontando los que están explícita o matemáticamente agotados
   const productosRealmenteActivos = visibleProducts.filter(p => {
-    const isAgotado = p.isAgotado === true || (p.controlarStock === true && p.stock <= 0);
+    const stockActual = p.stockQuantity ?? p.stock ?? 0;
+    const isAgotado = p.isAgotado === true || (p.controlarStock === true && stockActual <= 0);
     return !isAgotado;
   }).length;
 
@@ -224,9 +225,15 @@ export const MenuManagerPage = () => {
                     <AnimatePresence mode="popLayout">
                       {categoryVisibleProducts.map((product, index) => {
                         
-                        // Lógica Unificada
-                        const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
+                        // 🔥 DIVISIÓN DE ESTADOS: Matemático vs Manual
+                        const stockActual = product.stockQuantity ?? product.stock ?? 0;
                         const hasStockControl = product.controlarStock === true;
+                        
+                        const isMathematicallyAgotado = hasStockControl && stockActual <= 0;
+                        const isManuallyAgotado = product.isAgotado === true;
+                        
+                        // Si está agotado por CUALQUIER razón, el UI general se pone opaco
+                        const isAgotado = isManuallyAgotado || isMathematicallyAgotado;
                         
                         const currentAction = processingActions?.[product.id];
                         const isProcessingAvailability = currentAction === 'availability';
@@ -242,23 +249,23 @@ export const MenuManagerPage = () => {
                           exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                           whileHover={{ y: -4, transition: { duration: 0.2 } }}
                           transition={{ type: "spring", stiffness: 300, damping: 25, delay: index * 0.03 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors ${
-                            isAgotado ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10'
-                            : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-300 lya:md:hover:border-lya-secondary/40'
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden ${
+                            isAgotado 
+                              ? 'border-gray-200 dark:border-neutral-800 opacity-70 grayscale-[40%]' 
+                              : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-300 lya:md:hover:border-lya-secondary/40'
                           }`}
                         >
-                          {/* 🔥 INDICADOR ADMINISTRATIVO DE STOCK EXACTO */}
-                          {hasStockControl && (
-                            <div className={`absolute top-4 right-4 z-10 text-[10px] font-black px-2 py-1 rounded-lg border flex items-center gap-1 shadow-sm ${
-                               product.stock <= 0 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
-                               product.stock <= 10 ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50' :
-                               'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/50'
-                            }`}>
-                               <Package size={12} /> Stock: {product.stock}
+
+                          {/* ⚠️ CINTA DE AGOTADO FLOTANTE */}
+                          {isAgotado && (
+                            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[120%] pointer-events-none">
+                              <div className="bg-red-500/95 dark:bg-red-600/95 lya:bg-red-500/95 backdrop-blur-md text-white text-center py-1.5 font-black tracking-widest uppercase transform -rotate-12 shadow-2xl border-y border-red-400/50 text-[11px]">
+                                {isMathematicallyAgotado ? 'Sin Stock' : 'Agotado'}
+                              </div>
                             </div>
                           )}
 
-                          <div className="flex items-center space-x-4 mb-4">
+                          <div className="flex items-center space-x-4 mb-4 relative z-10">
                             <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner flex items-center justify-center relative">
                               {product.image || product.imageUrl ? (
                                 <img src={product.image || product.imageUrl} alt={product.nombre || product.name} className="w-full h-full object-cover" />
@@ -266,31 +273,55 @@ export const MenuManagerPage = () => {
                                 <div className="text-3xl opacity-80">{product.imagen || <ImageIcon size={24} className="text-gray-300 dark:text-gray-600 lya:text-lya-text/30" />}</div>
                               )}
                             </div>
-                            <div className="flex-1 min-w-0 pr-16">
+                            <div className="flex-1 min-w-0">
                               <h3 className={`font-black text-base leading-tight truncate tracking-tight ${isAgotado ? 'text-amber-800 dark:text-amber-400' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
-                              <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                <p className="text-orange-500 dark:text-orange-400 lya:text-lya-primary font-black">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
+                              
+                              <div className="flex flex-col items-start gap-1.5 mt-1.5">
+                                <p className="text-orange-500 dark:text-orange-400 lya:text-lya-primary font-black leading-none">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
+                                
+                                {/* 🔥 INDICADOR DE STOCK */}
+                                {hasStockControl && (
+                                  <div className={`text-[10px] font-black px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
+                                     stockActual <= 0 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
+                                     stockActual <= 10 ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50' :
+                                     'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/50'
+                                  }`}>
+                                     <Package size={10} /> Stock: {stockActual}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
                           
-                          <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto">
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto relative z-10">
                             
                             <div className="flex flex-col gap-1.5 w-full mr-2">
-                              <button 
-                                onClick={() => !isProcessingAny && toggleAgotado(product.id)} 
-                                disabled={isProcessingAny}
-                                className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border outline-none ${
-                                  isProcessingAgotado
-                                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
-                                    : isAgotado 
-                                      ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 md:hover:bg-amber-100 shadow-sm active:scale-95' 
-                                      : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700/50 md:hover:bg-emerald-100 active:scale-95'
-                                }`}
-                              >
-                                {isProcessingAgotado ? <Loader2 size={12} className="animate-spin" /> : (isAgotado ? <PauseCircle size={12} /> : <PlayCircle size={12} />)} 
-                                <span>{isProcessingAgotado ? 'Espere...' : (isAgotado ? 'Agotado (Pausado)' : 'En Stock (Activo)')}</span>
-                              </button>
+                              {/* 🔥 LÓGICA DE BOTÓN INTELIGENTE (Action-Oriented Design) */}
+                              {isMathematicallyAgotado ? (
+                                <button 
+                                  onClick={() => openModal(product)} 
+                                  className="flex flex-1 items-center justify-center space-x-1.5 px-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border outline-none text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700/50 md:hover:bg-red-100 shadow-sm active:scale-95"
+                                  title="El producto se quedó sin stock matemático. Haz clic para editar y añadir más existencias."
+                                >
+                                  <AlertTriangle size={12} />
+                                  <span>Stock Cero (Editar)</span>
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => !isProcessingAny && toggleAgotado(product.id)} 
+                                  disabled={isProcessingAny}
+                                  className={`flex flex-1 items-center justify-center space-x-1.5 px-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border outline-none ${
+                                    isProcessingAgotado
+                                      ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait'
+                                      : isManuallyAgotado 
+                                        ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700/50 md:hover:bg-amber-100 shadow-sm active:scale-95' 
+                                        : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700/50 md:hover:bg-emerald-100 active:scale-95'
+                                  }`}
+                                >
+                                  {isProcessingAgotado ? <Loader2 size={12} className="animate-spin" /> : (isManuallyAgotado ? <PauseCircle size={12} /> : <PlayCircle size={12} />)} 
+                                  <span>{isProcessingAgotado ? 'Espere...' : (isManuallyAgotado ? 'Pausado (Reanudar)' : 'Activo (Pausar)')}</span>
+                                </button>
+                              )}
                             </div>
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
