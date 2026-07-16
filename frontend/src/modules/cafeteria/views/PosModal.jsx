@@ -1,4 +1,3 @@
-// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Phone, User, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
@@ -98,7 +97,7 @@ export const PosModal = ({
   const handleConfirmOption = (productWithOptions) => { 
     addToCart(productWithOptions); 
     setSelectedProduct(null); 
-    showToast('Producto añadido', 'success');
+    // 🔥 ELIMINADO: showToast('Producto añadido', 'success'); -> usePosCart ya lo gestiona
   };
 
   const handleSendToKitchen = async () => {
@@ -314,25 +313,35 @@ export const PosModal = ({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
               >
-                {filteredProducts.map(product => (
-                  <ProductCard 
-                    key={product.id} 
-                    product={product} 
-                    isLocked={isAccountLocked} 
-                    onClick={setSelectedProduct} 
-                    onQuickAdd={(p) => {
-                      let ops = p.opciones;
-                      if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
-                      let precioAdicional = 0, detalles = { tamano: 'Estándar' };
-                      if (ops && typeof ops === 'object') {
-                         if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
-                         if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
-                      }
-                      addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
-                      showToast('Producto añadido', 'success');
-                    }} 
-                  />
-                ))}
+                {filteredProducts.map(product => {
+                  
+                  // 🔥 CÁLCULO DE STOCK EN TIEMPO REAL PARA ESTA TARJETA
+                  const currentCartQty = cart
+                    .filter(item => item.id === product.id && item.status !== 'CANCELLED')
+                    .reduce((acc, item) => acc + item.qty, 0);
+
+                  return (
+                    <ProductCard 
+                      key={product.id} 
+                      product={product} 
+                      isLocked={isAccountLocked}
+                      cartQty={currentCartQty} // 🚀 Pasamos la cantidad actual en carrito
+                      onLimitReached={(stock) => showToast(`Límite en carrito: Solo quedan ${stock} en stock.`, 'warning')} // 🔒 Alerta del candado
+                      onClick={setSelectedProduct} 
+                      onQuickAdd={(p) => {
+                        let ops = p.opciones;
+                        if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+                        let precioAdicional = 0, detalles = { tamano: 'Estándar' };
+                        if (ops && typeof ops === 'object') {
+                           if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
+                           if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
+                        }
+                        addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
+                        // 🔥 ELIMINADO: showToast('Producto añadido', 'success'); -> usePosCart ya lo gestiona
+                      }} 
+                    />
+                  );
+                })}
               </motion.div>
             )}
           </AnimatePresence>
@@ -435,7 +444,7 @@ export const PosModal = ({
                   onSendWhatsApp={handleSendWhatsAppTicket} 
                   userName={nombreCajero}
                   cuentasPagadasReales={cuentasPagadasReales}
-                  cuentasTelefonos={cuentasTelefonos} // 🔥 ENLACE DE TELEFONOS APLICADO
+                  cuentasTelefonos={cuentasTelefonos} 
                 />
 
                 <AnimatePresence>
