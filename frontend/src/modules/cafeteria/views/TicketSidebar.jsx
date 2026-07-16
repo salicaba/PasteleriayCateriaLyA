@@ -51,6 +51,14 @@ export const TicketSidebar = ({
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
 
+  // 🔥 MAPA GLOBAL DE STOCK SIN ENVIAR
+  const globalUnsentQtyMap = activeCart
+    .filter(item => !item.enviadoCocina)
+    .reduce((acc, item) => {
+      acc[item.id] = (acc[item.id] || 0) + item.qty;
+      return acc;
+    }, {});
+
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultas.includes(acc));
 
@@ -167,9 +175,8 @@ export const TicketSidebar = ({
     }
   };
 
-  // 🚀 LÓGICA DE LIBERACIÓN OPTIMISTA (Cierre instantáneo)
   const handleReleaseAccounts = async (cuentasALiberar) => {
-    setIsReleasing(true); // Bloqueo de seguridad
+    setIsReleasing(true); 
 
     const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
     const unhiddenAccounts = activeCart.filter(item => {
@@ -177,13 +184,9 @@ export const TicketSidebar = ({
       return !updatedOcultas.includes(c);
     });
 
-    // 1. CIERRE INSTANTÁNEO (UX Optimista)
-    // Ocultamos el modal de inmediato antes de que el socket borre las cuentas
-    // y deje el modal "hueco".
     setCuentasOcultas(updatedOcultas);
     setShowReleaseModal(false);
 
-    // 2. Procesamiento asíncrono en segundo plano
     try {
       if (unhiddenAccounts.length === 0 && onCloseTable) {
         await onCloseTable();
@@ -193,7 +196,6 @@ export const TicketSidebar = ({
       }
     } catch (error) {
       toast('Error al procesar la liberación', 'error');
-      // Reversión de estado si falla la petición
       const revertOcultas = cuentasOcultas.filter(c => !cuentasALiberar.includes(c));
       setCuentasOcultas(revertOcultas);
     } finally {
@@ -434,6 +436,7 @@ export const TicketSidebar = ({
                   isActive={isActive} isDragTarget={isDragTarget} subtotalCuenta={subtotalCuenta}
                   isCuentaPagada={isCuentaPagada} isCompletamentePagada={false} 
                   isTodoEntregadoEnCuenta={isTodoEntregadoEnCuenta}
+                  globalUnsentQtyMap={globalUnsentQtyMap}
                   draggedItem={draggedItem} setDragOverCuenta={setDragOverCuenta} handleDropOnCuenta={handleDropOnCuenta}
                   openConfirmModal={openConfirmModal} setCuentaActiva={setCuentaActiva} cuentasTelefonos={cuentasTelefonos}
                   isVitrina={isVitrina} isLlevar={isLlevar} nombreCliente={nombreCliente} setCuentasOcultas={setCuentasOcultas}
@@ -443,6 +446,7 @@ export const TicketSidebar = ({
                   toggleItemTakeaway={toggleItemTakeaway} onCancelItem={onCancelItem}
                   onDragStart={(item, cName) => setDraggedItem({ item, cuentaName: cName })}
                   onDragEnd={() => setDraggedItem(null)}
+                  showToast={toast} // 🚀 ¡PASAMOS LA FUNCIÓN AQUÍ!
                 />
               );
             })}

@@ -1,4 +1,3 @@
-// src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer } from 'lucide-react';
@@ -7,13 +6,15 @@ import clsx from 'clsx';
 export const TicketCartGroup = ({
   cuentaName, items, isActive, isDragTarget, subtotalCuenta,
   isCuentaPagada, isCompletamentePagada, isTodoEntregadoEnCuenta,
+  globalUnsentQtyMap, 
   draggedItem, setDragOverCuenta, handleDropOnCuenta,
   openConfirmModal, setCuentaActiva, cuentasTelefonos,
   isVitrina, isLlevar, nombreCliente, setCuentasOcultas,
   onPayCuenta, onPrintTicket, availableAccs,
   processingItems, handleToggleStatus, handleRemoveUnsent, onAdd,
   handleDeleteUnsent, handleCancelItem, toggleItemTakeaway, onCancelItem,
-  onDragStart, onDragEnd
+  onDragStart, onDragEnd,
+  showToast // 🚀 PROP AÑADIDA: Necesaria para lanzar la notificación temprana
 }) => {
 
   // 🔥 MAGIA DE PARSEO: Separamos el número si viene concatenado desde el QR del Cliente
@@ -29,7 +30,6 @@ export const TicketCartGroup = ({
       } else if (rawDisplayName.includes(' - ')) {
           const parts = rawDisplayName.split(' - ');
           const lastPart = parts[parts.length - 1].trim();
-          // Validamos si la última parte es un número telefónico de 10 dígitos
           if (lastPart.replace(/\D/g, '').length === 10) {
               if (!finalDisplayPhone) finalDisplayPhone = lastPart;
               finalDisplayName = parts.slice(0, -1).join(' - ').trim();
@@ -37,7 +37,7 @@ export const TicketCartGroup = ({
       }
   }
 
-  // 🔥 ESCUDO ANTI-DUPLICADOS: Limpia el teléfono si el backend lo guardó repetido (ej. "435... - 435...")
+  // 🔥 ESCUDO ANTI-DUPLICADOS: Limpia el teléfono si el backend lo guardó repetido
   if (finalDisplayPhone) {
       const strPhone = String(finalDisplayPhone);
       if (strPhone.includes(' - ')) {
@@ -106,7 +106,6 @@ export const TicketCartGroup = ({
                 {finalDisplayName}
               </h4>
               
-              {/* 🔥 EL RECUADRO VERDE HERMOSO DEL TELÉFONO 🔥 */}
               {finalDisplayPhone && (
                 <span className="flex items-center gap-1 text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 lya:bg-lya-primary/10 lya:text-lya-primary px-1.5 py-0.5 rounded-md font-bold tracking-wider shadow-sm shrink-0 border border-emerald-200 dark:border-emerald-800/50 lya:border-lya-primary/20">
                   <Phone size={8} /> {finalDisplayPhone}
@@ -125,48 +124,52 @@ export const TicketCartGroup = ({
           </span>
           <div className="flex gap-1.5 flex-wrap justify-end pointer-events-auto">
             {items.length === 0 && cuentaName !== 'General' && (
-              <button 
+              <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
-                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border border-transparent dark:border-gray-700 lya:border-lya-border/40 hover:border-red-200 dark:hover:border-red-900 hover:bg-red-50 dark:hover:bg-red-900/20 lya:hover:bg-red-500/10 text-gray-500 hover:text-red-500 px-2 py-1 rounded-lg uppercase flex gap-1 items-center active:scale-95 transition-all shadow-sm"
+                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border border-transparent dark:border-gray-700 lya:border-lya-border/40 md:hover:border-red-200 dark:md:hover:border-red-900 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 lya:md:hover:bg-red-500/10 text-gray-500 md:hover:text-red-500 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none"
               >
                 <Trash2 size={10}/> Ocultar
-              </button>
+              </motion.button>
             )}
 
             {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && subtotalCuenta > 0 && !isVitrina && (
-              <button 
+              <motion.button 
+                  whileTap={isTodoEntregadoEnCuenta ? { scale: 0.95 } : {}}
                   disabled={!isTodoEntregadoEnCuenta} 
                   onClick={(e) => { 
                       e.stopPropagation(); 
                       if (isTodoEntregadoEnCuenta && onPayCuenta) onPayCuenta(cuentaName); 
                   }} 
                   className={clsx(
-                      "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-all shadow-sm border", 
+                      "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border outline-none", 
                       isTodoEntregadoEnCuenta 
-                          ? "bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white border-emerald-600 dark:border-emerald-700 active:scale-95 lya:bg-lya-primary lya:border-lya-primary" 
+                          ? "bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-500 text-white border-emerald-600 dark:border-emerald-700 lya:bg-lya-primary lya:border-lya-primary" 
                           : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-80"
                   )}
               >
                 Cobrar
-              </button>
+              </motion.button>
             )}
             
             {!isVitrina && !isLlevar && (isCuentaPagada || isCompletamentePagada) && items.length > 0 && (
-              <button 
+              <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
-                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 uppercase flex gap-1 items-center active:scale-95 transition-all shadow-sm"
+                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 uppercase flex gap-1 items-center transition-colors shadow-sm outline-none"
               >
                 <Printer size={10}/> Ticket
-              </button>
+              </motion.button>
             )}
 
             {!isVitrina && !isLlevar && isCuentaPagada && items.length > 0 && (
-              <button 
+              <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
-                  className="text-[9px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 px-2 py-1 rounded-lg uppercase flex gap-1 items-center active:scale-95 transition-all shadow-sm"
+                  className="text-[9px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none"
               >
                 <XCircle size={10}/> Ocultar
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
@@ -178,6 +181,9 @@ export const TicketCartGroup = ({
           const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}`;
           const isProcessing = processingItems[item.backendItemId || item.id];
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
+
+          // 🔥 CÁLCULO DE LÍMITE ALCANZADO (Stock Poka-Yoke)
+          const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
           return (
           <motion.div 
@@ -254,14 +260,15 @@ export const TicketCartGroup = ({
                 {!isVitrina && (
                   <div className="flex-1 flex items-center gap-1.5">
                     {item.enviadoCocina ? (
-                      <button 
+                      <motion.button 
+                        whileTap={!isProcessing && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
                         onClick={() => handleToggleStatus(item)} 
                         disabled={isProcessing || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                         className={clsx(
-                            "flex items-center justify-center gap-1 text-[9px] font-black px-2 py-1.5 rounded-lg border uppercase transition-all duration-300 w-full text-center shadow-sm", 
+                            "flex items-center justify-center gap-1 text-[9px] font-black px-2 py-1.5 rounded-lg border uppercase transition-colors w-full text-center shadow-sm outline-none", 
                             isProcessing ? "bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
                             item.kitchenStatus === 'DELIVERED' ? clsx("text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50", isStatusLocked ? "cursor-default opacity-70" : "cursor-pointer") 
-                            : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 shadow-md active:scale-95 cursor-pointer animate-pulse" 
+                            : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 shadow-md cursor-pointer animate-pulse" 
                             : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
                         )}
                       >
@@ -274,7 +281,7 @@ export const TicketCartGroup = ({
                         ) : (
                             <><ChefHat size={10} /> Cocina</>
                         )}
-                      </button>
+                      </motion.button>
                     ) : (
                       <>
                         <span className={clsx(
@@ -284,15 +291,16 @@ export const TicketCartGroup = ({
                           Por enviar
                         </span>
                         {!isLlevar && toggleItemTakeaway && (
-                          <button 
+                          <motion.button 
+                              whileTap={{ scale: 0.95 }}
                               onClick={() => toggleItemTakeaway(item)} 
                               className={clsx(
-                                  "flex items-center justify-center gap-1 text-[8px] font-black px-1.5 py-1.5 rounded-lg border uppercase tracking-tighter transition-all active:scale-95 cursor-pointer flex-1 text-center shadow-sm", 
-                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:text-orange-500 hover:border-orange-300"
+                                  "flex items-center justify-center gap-1 text-[8px] font-black px-1.5 py-1.5 rounded-lg border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none", 
+                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 md:hover:border-orange-300"
                               )} 
                           >
                             <ShoppingBag size={10} className={item.isTakeaway ? "text-orange-600 lya:text-lya-secondary" : "text-gray-400"} /> {item.isTakeaway ? 'Empacar' : 'Mesa'}
-                          </button>
+                          </motion.button>
                         )}
                       </>
                     )}
@@ -306,17 +314,40 @@ export const TicketCartGroup = ({
                   )}>
                     {!item.enviadoCocina && !isCuentaPagada && (
                       <>
-                        <button onClick={() => handleRemoveUnsent(item)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-red-500 transition-colors active:scale-90", isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1")}><Minus size={isVitrina ? 16 : 12} /></button>
-                        <button onClick={() => onAdd(item, cuentaName)} className={clsx("hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-orange-500 lya:text-lya-primary transition-colors active:scale-90", isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1")}><Plus size={isVitrina ? 16 : 12} /></button>
+                        <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleRemoveUnsent(item)} className={clsx("md:hover:bg-gray-100 dark:md:hover:bg-gray-800 rounded-md text-gray-400 md:hover:text-red-500 transition-colors outline-none", isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1")}><Minus size={isVitrina ? 16 : 12} /></motion.button>
+                        
+                        {/* 🔥 BOTÓN "+" BLINDADO CON ALERTA TEMPRANA */}
+                        <motion.button 
+                          whileTap={!isLimitReached ? { scale: 0.9 } : {}}
+                          onClick={() => {
+                            if (isLimitReached) {
+                              if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
+                              return; // 🛑 INTERCEPAMOS EL CLIC AQUÍ MISMO
+                            }
+                            onAdd(item, cuentaName);
+                          }} 
+                          className={clsx(
+                            "rounded-md transition-colors flex items-center justify-center outline-none", 
+                            isVitrina ? "flex-1 py-1.5" : "p-1",
+                            isLimitReached 
+                              ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
+                              : "text-orange-500 lya:text-lya-primary md:hover:bg-gray-100 dark:md:hover:bg-gray-800" 
+                          )}
+                          title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
+                        >
+                          {isLimitReached ? <Lock size={isVitrina ? 16 : 12} /> : <Plus size={isVitrina ? 16 : 12} />}
+                        </motion.button>
+
                         <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-0.5", isVitrina ? "w-px h-5" : "w-px h-3")} />
-                        <button onClick={() => handleDeleteUnsent(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md text-gray-400 hover:text-red-500 transition-colors active:scale-90", isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1")}><Trash2 size={isVitrina ? 16 : 12} /></button>
+                        
+                        <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleDeleteUnsent(item)} className={clsx("md:hover:bg-red-50 dark:md:hover:bg-red-900/20 rounded-md text-gray-400 md:hover:text-red-500 transition-colors outline-none", isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1")}><Trash2 size={isVitrina ? 16 : 12} /></motion.button>
                       </>
                     )}
                     {item.enviadoCocina && onCancelItem && (
-                        <button onClick={() => handleCancelItem(item)} className={clsx("hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md text-red-400 hover:text-red-600 transition-colors active:scale-95", isVitrina ? "w-full py-1.5 flex justify-center items-center gap-1.5" : "p-1")} title="Cancelar Producto">
+                        <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleCancelItem(item)} className={clsx("md:hover:bg-red-50 dark:md:hover:bg-red-900/20 rounded-md text-red-400 md:hover:text-red-600 transition-colors outline-none", isVitrina ? "w-full py-1.5 flex justify-center items-center gap-1.5" : "p-1")} title="Cancelar Producto">
                           <XCircle size={isVitrina ? 14 : 12} />
                           {isVitrina && <span className="text-[9px] font-black uppercase tracking-wider">Cancelar</span>}
-                        </button>
+                        </motion.button>
                     )}
                   </div>
                 )}
