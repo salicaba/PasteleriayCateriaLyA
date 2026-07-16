@@ -1,6 +1,6 @@
 // src/modules/cafeteria/views/TicketSidebar.jsx
 import React, { useState, useRef } from 'react';
-import { Trash2, Minus, ArrowRightLeft, XCircle, ShoppingBag, AlertTriangle, Printer, Loader2 } from 'lucide-react';
+import { Trash2, Minus, ArrowRightLeft, XCircle, ShoppingBag, AlertTriangle, Printer, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import OpcionesCancelacionModal from './OpcionesCancelacionModal'; 
@@ -51,9 +51,7 @@ export const TicketSidebar = ({
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
 
-  // 🔥 SOLUCIÓN DEFINITIVA AL PARPADEO 🔥
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
-
   const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultas.includes(acc));
 
   const handleAddCuenta = (e) => {
@@ -169,26 +167,35 @@ export const TicketSidebar = ({
     }
   };
 
+  // 🚀 LÓGICA DE LIBERACIÓN OPTIMISTA (Cierre instantáneo)
   const handleReleaseAccounts = async (cuentasALiberar) => {
-    setIsReleasing(true);
+    setIsReleasing(true); // Bloqueo de seguridad
+
+    const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
+    const unhiddenAccounts = activeCart.filter(item => {
+      const c = item.cuenta || 'General';
+      return !updatedOcultas.includes(c);
+    });
+
+    // 1. CIERRE INSTANTÁNEO (UX Optimista)
+    // Ocultamos el modal de inmediato antes de que el socket borre las cuentas
+    // y deje el modal "hueco".
+    setCuentasOcultas(updatedOcultas);
+    setShowReleaseModal(false);
+
+    // 2. Procesamiento asíncrono en segundo plano
     try {
-      const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
-      setCuentasOcultas(updatedOcultas);
-
-      const unhiddenAccounts = activeCart.filter(item => {
-        const c = item.cuenta || 'General';
-        return !updatedOcultas.includes(c);
-      });
-
       if (unhiddenAccounts.length === 0 && onCloseTable) {
         await onCloseTable();
         toast('Todas las cuentas finalizadas. Mesa liberada.', 'success');
       } else {
         toast(`Cuentas liberadas exitosamente.`, 'success');
       }
-      setShowReleaseModal(false);
     } catch (error) {
       toast('Error al procesar la liberación', 'error');
+      // Reversión de estado si falla la petición
+      const revertOcultas = cuentasOcultas.filter(c => !cuentasALiberar.includes(c));
+      setCuentasOcultas(revertOcultas);
     } finally {
       setIsReleasing(false);
     }
@@ -477,28 +484,46 @@ export const TicketSidebar = ({
         {showReleaseModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col">
+              
               <div className="p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 text-center">
                 <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/40 lya:bg-lya-secondary/20 text-blue-500 lya:text-lya-secondary rounded-full flex items-center justify-center mb-3">
-                  <XCircle size={24} />
+                  <CheckCircle2 size={24} />
                 </div>
                 <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">Liberar Cuentas</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Selecciona las cuentas pagadas que deseas cerrar y ocultar de la mesa.</p>
               </div>
-              <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar space-y-2">
+
+              <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                
+                {cuentasPagadasVisibles.length > 1 && (
+                  <motion.button
+                    whileTap={!isReleasing ? { scale: 0.95 } : {}}
+                    onClick={() => handleReleaseAccounts(cuentasPagadasVisibles)}
+                    disabled={isReleasing}
+                    className="w-full p-3 mb-2 text-center rounded-xl border-2 border-blue-200 dark:border-blue-900 lya:border-lya-secondary/40 bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-secondary/10 font-black text-blue-600 dark:text-blue-400 lya:text-lya-secondary md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 transition-colors flex justify-center items-center gap-2 outline-none shadow-sm disabled:opacity-50"
+                  >
+                    {isReleasing ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} strokeWidth={2.5} />}
+                    Liberar Todas las Cuentas
+                  </motion.button>
+                )}
+
                 {cuentasPagadasVisibles.map(acc => (
                   <motion.button 
                     whileTap={!isReleasing ? { scale: 0.95 } : {}}
                     key={acc} onClick={() => handleReleaseAccounts([acc])} disabled={isReleasing}
-                    className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none"
+                    className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none disabled:opacity-50"
                   >
                     <span>{acc}</span> 
                     {isReleasing ? <Loader2 size={16} className="text-gray-400 animate-spin" /> : <ArrowRightLeft size={16} className="text-gray-400 dark:text-gray-500" />}
                   </motion.button>
                 ))}
+
               </div>
+              
               <div className="p-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                 <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowReleaseModal(false)} className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none">Cancelar</motion.button>
               </div>
+
             </motion.div>
           </div>
         )}

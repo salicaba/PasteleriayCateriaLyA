@@ -9,6 +9,72 @@ import User from '../users/User.model.js';
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
 // ==========================================
+// 🧾 OBTENER HISTORIAL DE TICKETS (SOLO PAGADOS)
+// ==========================================
+export const getTickets = async (req, res) => {
+  try {
+    // 🔥 REGLA DE DOMINIO FINANCIERO:
+    // Solo traemos órdenes cuyo status general sea 'PAID'.
+    const tickets = await Order.findAll({
+      where: {
+        status: 'PAID' 
+      },
+      include: [
+        { model: Table, as: 'table', attributes: ['id', 'number', 'zone'] },
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+        }
+      ],
+      order: [['updatedAt', 'DESC']],
+      limit: 150 // Límite de seguridad para evitar cuellos de botella en memoria
+    });
+
+    res.json(tickets);
+  } catch (error) {
+    console.error("🔥 Error crítico al obtener tickets pagados:", error);
+    res.status(500).json({ message: 'Error interno del servidor', error: error.message });
+  }
+};
+
+// ==========================================
+// 📅 OBTENER VENTAS DE HOY (TICKETS CERRADOS)
+// ==========================================
+export const getTodayTickets = async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const tickets = await Order.findAll({
+      where: {
+        status: 'PAID', // 🔥 GARANTÍA: Estrictamente pagadas.
+        updatedAt: {
+          [Op.between]: [startOfDay, endOfDay]
+        }
+      },
+      include: [
+        { model: Table, as: 'table', attributes: ['id', 'number', 'zone'] },
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice'] }]
+        }
+      ],
+      order: [['updatedAt', 'DESC']]
+    });
+
+    res.json(tickets);
+  } catch (error) {
+    console.error("🔥 Error al obtener ventas de hoy:", error);
+    res.status(500).json({ message: 'Error interno del servidor', error: error.message });
+  }
+};
+
+// ==========================================
 // 🖨️ IMPRIMIR TICKET (CONSOLA BACKEND / FÍSICO)
 // ==========================================
 export const printOrderTicket = async (req, res) => {

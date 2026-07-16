@@ -7,6 +7,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
   const [imgError, setImgError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   
+  // 🚀 CÁLCULO ESTRICTO DE AGOTADO
   const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
   const imageUrl = product.image || product.imagen;
 
@@ -24,11 +25,15 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
     e.stopPropagation(); 
     if (isAgotado || isAdding || isLocked) return;
     
+    // 🛡️ BLOQUEO ANTI-DOBLE CLIC (Asíncrono)
     setIsAdding(true);
-    if (onQuickAdd) {
-      await onQuickAdd(product);
+    try {
+      if (onQuickAdd) {
+        await onQuickAdd(product);
+      }
+    } finally {
+      setIsAdding(false);
     }
-    setIsAdding(false);
   };
 
   return (
@@ -37,14 +42,14 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      // 🔥 FIX: Si está bloqueado, no hace animación al tocarlo
-      whileTap={!isAgotado && !isLocked ? { scale: 0.96 } : {}}
+      // 📱 BLINDAJE TÁCTIL: Solo hacemos down-scale en móviles con Framer, si no está bloqueado
+      whileTap={!isAgotado && !isLocked ? { scale: 0.95 } : {}}
       onClick={() => {
         if (!isAgotado && !isLocked && onClick) {
           onClick(product);
         }
       }}
-      // 🔥 FIX NEO-BENTO: Si está bloqueado, bajamos un poco la opacidad y quitamos el efecto hover
+      // 🎨 GEOMETRÍA PREMIUM & ANTI-GHOST HOVER (md:hover:)
       className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-3 transition-all duration-300 overflow-hidden border-2 h-full transform ${
         isAgotado 
           ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 opacity-60 grayscale-[80%] cursor-not-allowed' 
@@ -53,7 +58,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
             : 'border-transparent dark:border-transparent lya:border-lya-border/20 shadow-[0_5px_15px_rgba(0,0,0,0.03)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,139,49,0.15)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
       }`}
     >
-      {/* CINTA DE AGOTADO */}
+      {/* ⚠️ CINTA DE AGOTADO */}
       {isAgotado && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[120%] pointer-events-none">
           <div className="bg-red-500/95 dark:bg-red-600/95 lya:bg-red-500/95 backdrop-blur-md text-white text-center py-2 font-black tracking-widest uppercase transform -rotate-12 shadow-2xl border-y-2 border-red-400/50 text-[11px]">
@@ -62,14 +67,13 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
         </div>
       )}
 
-      {/* CONTENEDOR DE IMAGEN */}
+      {/* CONTENEDOR DE IMAGEN NEO-BENTO */}
       <div className="h-28 w-full rounded-[1.25rem] bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group transition-colors shadow-inner shrink-0">
         {imageUrl && !imgError ? (
           <img 
             src={imageUrl} 
             alt={product.nombre} 
             onError={() => setImgError(true)}
-            // Solo hace zoom si no está bloqueado
             className={`w-full h-full object-contain drop-shadow-md transition-transform duration-500 ease-out ${!isLocked && 'md:group-hover:scale-110'}`} 
           />
         ) : (
@@ -92,13 +96,12 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
           </div>
         </div>
         
-        {/* SECCIÓN DE PRECIO Y BOTÓN */}
+        {/* FOOTER DEL CARD */}
         <div className="mt-auto flex items-center justify-between pt-2.5 border-t-2 border-gray-50 dark:border-gray-800/80 lya:border-lya-border/40 transition-colors">
           <span className={`font-black text-base pl-1 tracking-tight ${isAgotado ? 'text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>
             ${Number(product.precioBase || product.precio || 0).toFixed(2)}
           </span>
           
-          {/* 🔥 FIX: SI LA CUENTA ESTÁ BLOQUEADA (PAGADA), DESAPARECEMOS EL BOTÓN DE AGREGAR */}
           {!isLocked ? (
             <button 
               disabled={isAgotado || isAdding}

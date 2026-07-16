@@ -1,6 +1,7 @@
 // src/modules/cafeteria/controllers/usePosMenu.js
 import { useState, useEffect, useMemo } from 'react';
 import client from '../../../api/client.js';
+import { socket } from '../../../api/socket.js'; // ✅ FIX: Importación nombrada destructurada
 
 export const usePosMenu = (isVitrina) => {
   const [dbProducts, setDbProducts] = useState([]); 
@@ -45,11 +46,26 @@ export const usePosMenu = (isVitrina) => {
     loadData();
   }, []);
 
+  // 🚀 ESCUCHADOR DE STOCK EN TIEMPO REAL
+  useEffect(() => {
+    const handleStockUpdate = (updates) => {
+      setDbProducts(prevProducts => prevProducts.map(p => {
+        const update = updates.find(u => u.id === p.id);
+        if (update) {
+          return { ...p, stock: update.stock, isAgotado: update.isAgotado };
+        }
+        return p;
+      }));
+    };
+
+    socket.on('stock:update', handleStockUpdate);
+    return () => socket.off('stock:update', handleStockUpdate);
+  }, []);
+
   const filteredProducts = useMemo(() => {
     return dbProducts.filter(p => {
        const productName = p.nombre || p.name || '';
        const matchText = productName.toLowerCase().includes((filtroTexto || '').toLowerCase());
-       
        const matchCat = categoriaActiva === 'todas' || p.categoria === categoriaActiva || p.categoryId === categoriaActiva;
        
        if (isVitrina) return matchText && matchCat && p.requiereCocina === false;

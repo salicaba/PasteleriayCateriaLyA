@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/TicketPreviewModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Printer, X, MessageCircle, Coffee, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,51 +15,63 @@ export const TicketPreviewModal = ({
   onConfirmPrint, 
   onSendWhatsApp,
   userName = 'Cajero en turno',
-  cuentasPagadasReales = [] // 🔥 NUEVA PROP: Inteligencia de Cuentas
+  cuentasPagadasReales = [], 
+  cuentasTelefonos = {} // 🔥 RECIBIMOS EL DICCIONARIO DE TELÉFONOS
 }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [viewMode, setViewMode] = useState('Todas');
   
-  // Estados para la Trinidad de UX (Prevención de Doble Clic)
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   
-  // 🔥 FILTRO ESTRICTO: Solo extraemos y mostramos las cuentas que YA ESTÁN PAGADAS
-  const validCart = cart.filter(item => cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED');
-  const uniqueAccounts = Array.from(new Set(validCart.map(item => item.cuenta || 'General')));
+  const validCart = useMemo(() => cart.filter(item => cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED'), [cart, cuentasPagadasReales]);
+  const uniqueAccounts = useMemo(() => Array.from(new Set(validCart.map(item => item.cuenta || 'General'))), [validCart]);
   
+  // 🔥 LÓGICA DE MONTAJE: Solo se ejecuta al abrir el modal
   useEffect(() => {
     if (isOpen) {
-      // 🔥 LÓGICA INTELIGENTE DE SELECCIÓN INICIAL
+      let initialMode = 'Todas';
       if (cuentaName && uniqueAccounts.includes(cuentaName)) {
-        setViewMode(cuentaName); // Si abrieron el modal desde la tarjeta de una cuenta específica
+        initialMode = cuentaName;
       } else if (uniqueAccounts.length === 1) {
-        setViewMode(uniqueAccounts[0]); // Si solo hay una cuenta pagada, seleccionarla por defecto
-      } else {
-        setViewMode('Todas'); // Si hay varias y le dieron al botón global
+        initialMode = uniqueAccounts[0];
       }
+      setViewMode(initialMode);
       
-      if (telefonoPredeterminado) {
+      // Asignar teléfono inicial inteligentemente
+      if (initialMode !== 'Todas' && cuentasTelefonos[initialMode]) {
+        setPhoneNumber(cuentasTelefonos[initialMode]);
+      } else if (telefonoPredeterminado) {
         setPhoneNumber(telefonoPredeterminado);
-        return;
-      }
-      
-      if (mesa) {
-        const partes = (mesa.numero || '').toString().split(' - ');
-        if (mesa.zona === 'llevar' && partes.length > 2) {
-          const posibleTelefono = partes[partes.length - 1].replace(/\D/g, '');
-          if (posibleTelefono.length >= 10) {
-            setPhoneNumber(posibleTelefono.slice(0, 10));
-            return;
+      } else {
+        if (mesa) {
+          const partes = (mesa.numero || '').toString().split(' - ');
+          if (mesa.zona === 'llevar' && partes.length > 2) {
+            const posibleTelefono = partes[partes.length - 1].replace(/\D/g, '');
+            if (posibleTelefono.length >= 10) {
+              setPhoneNumber(posibleTelefono.slice(0, 10));
+              return;
+            }
           }
         }
+        setPhoneNumber('');
       }
-      setPhoneNumber('');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mesa, cuentaName, telefonoPredeterminado]);
+  }, [isOpen]); // 🛡️ NO SE AGREGAN DEPENDENCIAS REACTIVAS PARA NO BORRAR INPUT DEL USUARIO
 
-  // Usamos el carrito válido (pagado) para calcular totales e impresión
+  // 🔥 CONTROLADOR DE PESTAÑAS (Cambio Dinámico)
+  const handleTabChange = (newMode) => {
+    setViewMode(newMode);
+    if (newMode !== 'Todas' && cuentasTelefonos[newMode]) {
+      setPhoneNumber(cuentasTelefonos[newMode]);
+    } else if (newMode === 'Todas' && telefonoPredeterminado) {
+      setPhoneNumber(telefonoPredeterminado);
+    } else {
+      setPhoneNumber(''); // Vaciamos si no hay número para esa cuenta
+    }
+  };
+
   const itemsToPrint = viewMode === 'Todas' ? validCart : validCart.filter(item => (item.cuenta || 'General') === viewMode);
   const totalToPrint = itemsToPrint.reduce((acc, item) => acc + (item.precio * item.qty), 0);
   const accountsToRender = viewMode === 'Todas' ? uniqueAccounts : [viewMode];
@@ -93,7 +105,6 @@ export const TicketPreviewModal = ({
 
   const ticketFolio = generarFolio();
 
-  // Envoltorio con Promesas para estados asíncronos y UX limpia
   const handlePhysicalPrint = async () => {
     try {
       setIsPrinting(true);
@@ -141,7 +152,6 @@ export const TicketPreviewModal = ({
             className="bg-gray-100 dark:bg-gray-900 lya:bg-[#FDF8F5] rounded-[2rem] w-full max-w-md shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-orange-100 max-h-[90vh]"
           >
             
-            {/* CABECERA (Fija) */}
             <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-800 lya:border-orange-100 bg-white dark:bg-gray-800 lya:bg-white shrink-0">
               <h3 className="font-bold text-gray-800 dark:text-gray-100 lya:text-orange-950 text-lg flex items-center gap-2">
                 <Coffee size={20} className="text-orange-500" />
@@ -156,7 +166,7 @@ export const TicketPreviewModal = ({
               </button>
             </div>
 
-            {/* 🔥 SELECTOR DE CUENTAS (Desaparece si solo hay 1 pagada) */}
+            {/* 🔥 CONTENEDOR DE PESTAÑAS */}
             {uniqueAccounts.length > 1 && (
               <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 lya:border-orange-100 bg-gray-50 dark:bg-gray-800/50 lya:bg-orange-50/30 shrink-0">
                 <p className="text-[10px] uppercase font-bold text-gray-500 lya:text-orange-600/70 mb-2 tracking-wider">
@@ -164,7 +174,7 @@ export const TicketPreviewModal = ({
                 </p>
                 <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
                   <button
-                    onClick={() => setViewMode('Todas')}
+                    onClick={() => handleTabChange('Todas')} // 🔌 REEMPLAZADO CON CONTROLADOR
                     className={clsx(
                       "px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200",
                       viewMode === 'Todas' 
@@ -177,7 +187,7 @@ export const TicketPreviewModal = ({
                   {uniqueAccounts.map(acc => (
                     <button
                       key={acc}
-                      onClick={() => setViewMode(acc)}
+                      onClick={() => handleTabChange(acc)} // 🔌 REEMPLAZADO CON CONTROLADOR
                       className={clsx(
                         "px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-2",
                         viewMode === acc 
@@ -193,7 +203,6 @@ export const TicketPreviewModal = ({
               </div>
             )}
 
-            {/* TICKET VISUAL ESTILO PASTELERÍA (Scroll Interno) */}
             <div className="overflow-y-auto p-6 custom-scrollbar flex-1 bg-gray-100 dark:bg-gray-900 lya:bg-[#FDF8F5]">
               <div id="printable-ticket-content" className="bg-white dark:bg-gray-100 p-8 rounded-2xl shadow-sm border border-gray-200 text-gray-800 font-mono text-sm relative w-full mx-auto overflow-hidden">
                 
@@ -345,7 +354,6 @@ export const TicketPreviewModal = ({
               </div>
             </div>
 
-            {/* CONTROLES INFERIORES (Fijos) */}
             <div className="bg-white dark:bg-gray-800 lya:bg-white border-t border-gray-200 dark:border-gray-700 lya:border-orange-100 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] z-10 shrink-0 p-5">
               <div className="flex items-center gap-3 w-full">
                 <div className="flex-1 relative flex items-center">

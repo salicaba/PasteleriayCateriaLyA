@@ -14,18 +14,15 @@ export const createOrder = async (req, res) => {
     let { ticketId } = req.body;
     const employeeId = req.user?.id || null; 
     
-    // Prevenir "Ghost Orders". Si es SALON pero el tableId es nulo o inválido, lo forzamos a LLEVAR.
     const finalTableId = orderType === 'SALON' ? tableId : null;
     const finalOrderType = (orderType === 'SALON' && !finalTableId) ? 'LLEVAR' : orderType;
 
-    // RECUPERACIÓN DE ORDEN EXISTENTE: Sin matar órdenes por tiempo
     if (finalOrderType === 'SALON' && finalTableId) {
       const existingOrders = await Order.findAll({ 
         where: { tableId: finalTableId, status: ['OPEN', 'PAID'] } 
       });
       
       if (existingOrders.length > 0) {
-        // Rescatamos la orden directamente sin importar la hora
         return res.status(200).json({ message: 'Orden activa recuperada', order: existingOrders[0] });
       }
     }
@@ -63,37 +60,21 @@ export const createOrder = async (req, res) => {
     res.status(201).json({ message: 'Orden iniciada', order: newOrder });
   } catch (error) { 
     console.error("🔥 Error crítico al crear orden:", error);
-
     if (error.name === 'SequelizeForeignKeyConstraintError') {
-      return res.status(400).json({
-        success: false,
-        message: "La mesa que intentas usar no existe o tu sesión tiene datos cruzados. Por favor, limpia tu sesión y escanea el QR nuevamente."
-      });
+      return res.status(400).json({ success: false, message: "La mesa que intentas usar no existe o tu sesión tiene datos cruzados. Por favor, limpia tu sesión y escanea el QR nuevamente." });
     }
-
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({
-        success: false,
-        message: "Esta mesa ya tiene un pedido activo en curso o hay un conflicto de sesión."
-      });
+      return res.status(400).json({ success: false, message: "Esta mesa ya tiene un pedido activo en curso o hay un conflicto de sesión." });
     }
-
     if (error.name === 'SequelizeValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: "Los datos enviados están incompletos o corruptos."
-      });
+      return res.status(400).json({ success: false, message: "Los datos enviados están incompletos o corruptos." });
     }
-
-    return res.status(500).json({
-      success: false,
-      message: `Error interno de base de datos: ${error.message}`
-    });
+    return res.status(500).json({ success: false, message: `Error interno de base de datos: ${error.message}` });
   }
 };
 
 // ==========================================
-// ➕ AGREGAR PRODUCTOS A LA COMANDA
+// ➕ AGREGAR PRODUCTOS A LA COMANDA & CONTROL DE STOCK
 // ==========================================
 export const addItemsToOrder = async (req, res) => {
   try {
@@ -104,8 +85,6 @@ export const addItemsToOrder = async (req, res) => {
     if (!order || !['OPEN', 'PAID'].includes(order.status)) {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
-
-    // Se eliminó la caducidad por inactividad. La mesa sigue viva.
 
     const itemsToInsert = items.map(item => ({ 
       ...item, 
@@ -120,6 +99,38 @@ export const addItemsToOrder = async (req, res) => {
     const subtotalNuevo = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
     await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
 
+    // 🚀 MOTOR DE STOCK: Deducción en Tiempo Real
+    const stockToDeduct = {};
+    items.forEach(item => {
+      if (!stockToDeduct[item.productId]) stockToDeduct[item.productId] = 0;
+      stockToDeduct[item.productId] += (item.quantity || 1);
+    });
+
+    const stockAlerts = [];
+    for (const [productId, qtyToSubstract] of Object.entries(stockToDeduct)) {
+      const product = await Product.findByPk(productId);
+      if (product && product.controlarStock) {
+        const newStock = Math.max(0, product.stockQuantity - qtyToSubstract);
+        const isNowAgotado = newStock === 0 || product.isAgotado;
+        
+        await product.update({ 
+          stockQuantity: newStock, 
+          isAgotado: isNowAgotado 
+        });
+        
+        stockAlerts.push({ 
+          id: product.id, 
+          stock: newStock, 
+          isAgotado: isNowAgotado 
+        });
+      }
+    }
+
+    // 📡 Emitir actualizaciones de stock si hubo cambios
+    if (stockAlerts.length > 0) {
+      getIO().emit('stock:update', stockAlerts);
+    }
+
     const allItems = await OrderItem.findAll({
       where: { orderId, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
@@ -130,6 +141,7 @@ export const addItemsToOrder = async (req, res) => {
     
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems });
   } catch (error) { 
+    console.error("🔥 Error crítico al agregar items:", error);
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
   }
 };
@@ -152,10 +164,7 @@ export const getActiveOrderByTable = async (req, res) => {
         }
       ]
     });
-
-    // Sin importar la hora, si hay órdenes abiertas, las mandamos al POS
     const validOrder = orders.length > 0 ? orders[0] : null;
-
     res.json({ order: validOrder });
   } catch (error) { 
     res.status(500).json({ message: 'Error al recuperar comanda', error: error.message }); 
@@ -170,9 +179,7 @@ export const closeOrder = async (req, res) => {
     const { orderId } = req.params;
     const order = await Order.findByPk(orderId);
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
-    
     await order.update({ status: 'CLOSED' });
-
     getIO().emit('pos:update');
     res.json({ message: 'Mesa liberada y orden archivada.' });
   } catch (error) { 
@@ -200,15 +207,12 @@ export const getActiveOrders = async (req, res) => {
     });
 
     const validOrders = [];
-
     for (const order of activeOrders) {
-      // Filtrar órdenes fantasma 'Para Llevar' sin productos
       if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
          if (!order.createdBy) continue; 
       }
       validOrders.push(order);
     }
-
     res.json(validOrders);
   } catch (error) { 
     res.status(500).json({ message: 'Error al listar órdenes', error: error.message }); 
@@ -227,7 +231,6 @@ export const moveItemAccount = async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
     
     const unitPrice = Number(item.subtotal) / item.quantity;
-
     const existingItems = await OrderItem.findAll({
         where: {
             orderId: item.orderId,
@@ -240,7 +243,6 @@ export const moveItemAccount = async (req, res) => {
     });
 
     const existingItem = existingItems.find(i => (Number(i.subtotal) / i.quantity) === unitPrice);
-
     let moveNotes = [];
     try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
     if (!Array.isArray(moveNotes)) moveNotes = [moveNotes];
@@ -252,40 +254,22 @@ export const moveItemAccount = async (req, res) => {
         let existingNotes = [];
         try { existingNotes = JSON.parse(existingItem.notes || '[]'); } catch(e){}
         if (!Array.isArray(existingNotes)) existingNotes = [existingNotes];
-
         await existingItem.update({
             quantity: existingItem.quantity + qtyToMove,
             subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove),
             notes: JSON.stringify([...existingNotes, ...notesToMove])
         });
-
         if (qtyToMove >= item.quantity) {
             await item.destroy();
         } else {
-            await item.update({
-                quantity: item.quantity - qtyToMove,
-                subtotal: unitPrice * (item.quantity - qtyToMove),
-                notes: JSON.stringify(remainingNotes)
-            });
+            await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
         }
     } else {
         if (qtyToMove < item.quantity) {
-           await item.update({ 
-             quantity: item.quantity - qtyToMove, 
-             subtotal: unitPrice * (item.quantity - qtyToMove),
-             notes: JSON.stringify(remainingNotes)
-           });
-           
+           await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
            await OrderItem.create({
-             orderId: item.orderId,
-             productId: item.productId,
-             quantity: qtyToMove,
-             subtotal: unitPrice * qtyToMove,
-             cuenta: targetCuenta,
-             notes: JSON.stringify(notesToMove),
-             kitchenStatus: item.kitchenStatus,
-             isTakeaway: item.isTakeaway,
-             status: 'ACTIVE'
+             orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove,
+             cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE'
            });
         } else {
            await item.update({ cuenta: targetCuenta });
@@ -310,27 +294,16 @@ export const moveItemAccount = async (req, res) => {
 export const deliverAllItems = async (req, res) => {
   try {
     const { id } = req.params;
-
     const order = await Order.findByPk(id);
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
-
     await OrderItem.update(
       { kitchenStatus: 'DELIVERED' },
-      { 
-        where: { 
-          orderId: id, 
-          status: 'ACTIVE',
-          kitchenStatus: 'READY' // 🔥 CORRECCIÓN: SOLO cambia los que cocina ya marcó como Listos
-        } 
-      }
+      { where: { orderId: id, status: 'ACTIVE', kitchenStatus: 'READY' } }
     );
-
     getIO().emit('orderDeliveredAll', { orderId: id });
     getIO().emit('pos:update');
-
     res.json({ message: 'Todos los productos listos han sido marcados como entregados' });
   } catch (error) {
-    console.error('Error en deliverAllItems:', error);
     res.status(500).json({ message: 'Error al marcar todo como entregado' });
   }
 };
@@ -342,23 +315,12 @@ export const checkOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { cuenta } = req.query; 
-
     const order = await Order.findByPk(orderId);
-    
-    if (!order) {
-       return res.json({ status: 'DELETED' });
-    }
-
-    if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) {
-      return res.json({ status: order.status });
-    }
-
+    if (!order) return res.json({ status: 'DELETED' });
+    if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) return res.json({ status: order.status });
     if (cuenta && order.paidAccounts && Array.isArray(order.paidAccounts)) {
-      if (order.paidAccounts.includes(cuenta)) {
-        return res.json({ status: 'PAID' });
-      }
+      if (order.paidAccounts.includes(cuenta)) return res.json({ status: 'PAID' });
     }
-    
     res.json({ status: order.status });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });

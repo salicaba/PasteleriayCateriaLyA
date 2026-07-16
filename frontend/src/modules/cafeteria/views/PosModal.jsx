@@ -78,7 +78,6 @@ export const PosModal = ({
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
-  // 🔥 SOLUCIÓN DEFINITIVA AL PARPADEO 🔥
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
 
@@ -436,6 +435,7 @@ export const PosModal = ({
                   onSendWhatsApp={handleSendWhatsAppTicket} 
                   userName={nombreCajero}
                   cuentasPagadasReales={cuentasPagadasReales}
+                  cuentasTelefonos={cuentasTelefonos} // 🔥 ENLACE DE TELEFONOS APLICADO
                 />
 
                 <AnimatePresence>
