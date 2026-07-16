@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Loader2, Lock } from 'lucide-react';
+import { Plus, Loader2, Lock, Flame } from 'lucide-react';
 
 export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) => {
   const [imgError, setImgError] = useState(false);
@@ -9,6 +9,10 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
   
   // 🚀 CÁLCULO ESTRICTO DE AGOTADO
   const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
+  
+  // 🔥 PRINCIPIO DE ESCASEZ: Solo mostramos si hay 10 o menos (y no está agotado)
+  const showScarcity = !isAgotado && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
+  
   const imageUrl = product.image || product.imagen;
 
   const hasOptions = useMemo(() => {
@@ -69,6 +73,14 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false }) 
 
       {/* CONTENEDOR DE IMAGEN NEO-BENTO */}
       <div className="h-28 w-full rounded-[1.25rem] bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group transition-colors shadow-inner shrink-0">
+        
+        {/* 🔥 BADGE DE ESCASEZ VISUAL (Scarcity Principle) */}
+        {showScarcity && (
+          <div className="absolute top-2 right-2 z-10 bg-amber-500/95 dark:bg-amber-600/95 lya:bg-lya-secondary/95 backdrop-blur-md text-white text-[9px] font-black px-2 py-1 rounded-full shadow-lg border border-amber-400/50 flex items-center gap-1 animate-pulse">
+            <Flame size={10} /> ¡Quedan {product.stock}!
+          </div>
+        )}
+
         {imageUrl && !imgError ? (
           <img 
             src={imageUrl} 
