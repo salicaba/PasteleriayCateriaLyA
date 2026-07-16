@@ -1,7 +1,6 @@
-// src/modules/client/views/components/ClientCheckoutModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
@@ -79,6 +78,10 @@ export default function ClientCheckoutModal({
             const qty = item.qty || 0;
             const precioTotalItem = precioUnitario * qty;
 
+            // 🔥 CÁLCULO DE LÍMITE (Poka-Yoke) PARA EL BOTÓN DE INCREMENTO
+            const currentTotalQty = cart.filter(i => i.id === item.id).reduce((acc, i) => acc + i.qty, 0);
+            const isLimitReached = item.controlarStock && currentTotalQty >= item.stock && item.stock > 0;
+
             return (
               <div key={item.cartItemId} className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-lya-surface p-4 rounded-3xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm transition-colors">
                 <div className="min-w-0 flex-1 pr-3">
@@ -92,9 +95,8 @@ export default function ClientCheckoutModal({
                     </div>
                   )}
                   
-                  {/* 🔥 FIX: NODO ESTABLE PARA EL PRECIO */}
+                  {/* NODO ESTABLE PARA EL PRECIO */}
                   <div className="mt-1.5 flex items-baseline gap-2 h-5 relative overflow-hidden">
-                    {/* Capa de carga que se superpone sin destruir los precios de abajo */}
                     {isThisItemLoading && (
                       <div className="absolute inset-0 bg-white dark:bg-gray-800 lya:bg-lya-surface z-10 flex items-center gap-1.5">
                         <Loader2 size={12} className="animate-spin text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
@@ -102,7 +104,6 @@ export default function ClientCheckoutModal({
                       </div>
                     )}
                     
-                    {/* Nodos de precio que nunca se desmontan */}
                     <span className="text-sm font-black text-gray-700 dark:text-gray-300 lya:text-lya-text/80">
                       ${precioTotalItem.toFixed(2)}
                     </span>
@@ -116,30 +117,50 @@ export default function ClientCheckoutModal({
                   </div>
                 </div>
                 
+                {/* BOTONES DE ACCIÓN BLINDADOS */}
                 <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-[1.25rem] p-1.5 shrink-0">
-                  <button 
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
                     onClick={(e) => handleAction(e, item.cartItemId, 'decrement')} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 md:hover:text-red-500 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation active:scale-90 active:bg-gray-200 transition-all relative overflow-hidden"
+                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-red-50 md:hover:text-red-500 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none select-none touch-manipulation transition-colors relative overflow-hidden"
                   >
                     {isThisItemLoading && actionLoading?.action === 'decrement' ? (
                       <Loader2 size={16} className="animate-spin text-orange-500 absolute" />
                     ) : (
                       <Minus size={16} strokeWidth={3} className="absolute" />
                     )}
-                  </button>
+                  </motion.button>
                   
                   <span className="font-black w-4 text-center text-sm text-gray-900 dark:text-white lya:text-lya-text">{qty}</span>
                   
-                  <button 
-                    onClick={(e) => handleAction(e, item.cartItemId, 'increment')} 
-                    className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 shadow-sm font-bold outline-none select-none touch-manipulation active:scale-90 active:bg-gray-700 transition-all relative overflow-hidden"
+                  {/* 🔥 BOTÓN "+" CON CANDADO DE STOCK TEMPRANO */}
+                  <motion.button 
+                    whileTap={!isLimitReached ? { scale: 0.9 } : {}}
+                    onClick={(e) => {
+                      if (isLimitReached) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // 🛑 Dispara la notificación del ClientMenu.jsx sin activar el Loader
+                        incrementInCart(item.cartItemId); 
+                        return;
+                      }
+                      handleAction(e, item.cartItemId, 'increment');
+                    }} 
+                    className={clsx(
+                      "w-8 h-8 flex items-center justify-center rounded-[1rem] shadow-sm font-bold outline-none select-none touch-manipulation transition-colors relative overflow-hidden",
+                      isLimitReached
+                        ? "bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-500" // Candado color ámbar
+                        : "bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 md:hover:bg-gray-800 dark:md:hover:bg-gray-200"
+                    )}
                   >
-                    {isThisItemLoading && actionLoading?.action === 'increment' ? (
+                    {isThisItemLoading && actionLoading?.action === 'increment' && !isLimitReached ? (
                       <Loader2 size={16} className="animate-spin text-white dark:text-gray-900 absolute" />
+                    ) : isLimitReached ? (
+                      <Lock size={14} strokeWidth={3} className="absolute" />
                     ) : (
                       <Plus size={16} strokeWidth={3} className="absolute" />
                     )}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             );

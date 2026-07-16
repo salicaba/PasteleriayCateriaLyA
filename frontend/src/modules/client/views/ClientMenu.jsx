@@ -1,10 +1,9 @@
-// src/modules/client/views/ClientMenu.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  AlertCircle, PowerOff, Clock, Phone, Flame, Lock // 🔒 AÑADIDO LOCK
+  AlertCircle, PowerOff, Clock, Phone, Flame, Lock
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -277,6 +276,81 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     }
   }, [sessionExpired]);
 
+  // 🚀 ACTUALIZACIÓN Y PODA EN TIEMPO REAL PARA EL CLIENTE
+  useEffect(() => {
+    const handleStockAdjustment = (updates) => {
+      // 1. Actualizamos el catálogo visual de productos
+      setProducts(prevProducts => prevProducts.map(p => {
+        const update = updates.find(u => u.id === p.id);
+        if (update) {
+          const newStock = update.stock;
+          const isAgotado = p.isAgotado === true || (p.controlarStock && newStock <= 0);
+          return { ...p, stock: newStock, isAgotado };
+        }
+        return p;
+      }));
+
+      // 2. Revisamos el carrito del cliente (Poda)
+      setCart(prevCart => {
+        let modifiedCart = [...prevCart];
+        let notificationsToFire = new Set();
+        
+        // Actualizamos la propiedad stock de todos los items en el carrito para que los modales se enteren
+        modifiedCart = modifiedCart.map(item => {
+           const update = updates.find(u => u.id === item.id);
+           return update ? { ...item, stock: update.stock } : item;
+        });
+
+        for (const update of updates) {
+          const itemsOfProduct = modifiedCart.filter(i => i.id === update.id);
+          if (itemsOfProduct.length === 0) continue;
+          
+          if (!itemsOfProduct[0].controlarStock) continue;
+
+          let currentTotalQty = itemsOfProduct.reduce((sum, i) => sum + i.qty, 0);
+          
+          // Verificamos si la suma de lo que tiene el cliente en carrito supera el nuevo stock
+          if (currentTotalQty > update.stock) {
+            if (update.stock === 0) {
+              notificationsToFire.add({ msg: `Un producto de tu carrito se agotó y fue removido.`, type: 'error' });
+              modifiedCart = modifiedCart.filter(i => i.id !== update.id);
+            } else {
+              notificationsToFire.add({ msg: `Ajustamos la cantidad de un producto en tu carrito por disponibilidad.`, type: 'warning' });
+              
+              for (let i = modifiedCart.length - 1; i >= 0; i--) {
+                const item = modifiedCart[i];
+                if (item.id === update.id) {
+                  const excess = currentTotalQty - update.stock;
+                  if (excess >= item.qty) {
+                    currentTotalQty -= item.qty;
+                    modifiedCart.splice(i, 1);
+                  } else {
+                    modifiedCart[i] = { ...item, qty: item.qty - excess };
+                    currentTotalQty -= excess;
+                  }
+                  if (currentTotalQty <= update.stock) break;
+                }
+              }
+            }
+          }
+        }
+
+        // Lanzamos side-effects de forma segura fuera del render cycle
+        setTimeout(() => {
+           notificationsToFire.forEach(notif => {
+               setNotification({ msg: notif.msg, type: notif.type });
+               setTimeout(() => setNotification(null), 4000);
+           });
+        }, 0);
+
+        return modifiedCart;
+      });
+    };
+
+    socket.on('stock:update', handleStockAdjustment);
+    return () => socket.off('stock:update', handleStockAdjustment);
+  }, []);
+
   const activeCatObj = categories.find(c => c.id === activeCategory);
   const isTodasCategory = activeCatObj && activeCatObj.name.trim().toLowerCase() === 'todas';
   const visibleProducts = isTodasCategory ? products : products.filter(p => p.categoria === activeCategory);
@@ -317,7 +391,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       const currentTotalQty = cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
 
       if (product.controlarStock && currentTotalQty >= product.stock) {
-        triggerNotification(`¡Límite alcanzado! Solo quedan ${product.stock}.`, 'warning');
+        triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
         return; 
       }
 
@@ -352,6 +426,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
   });
   
+  // 🚀 EL BLOQUEO NOTIFICADO AL PRESIONAR EL "+" DEL CARRITO
   const incrementInCart = (cartItemId) => {
     const existing = cart.find(item => item.cartItemId === cartItemId);
     if (!existing) return;
@@ -359,7 +434,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     const currentTotalQty = cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
 
     if (existing.controlarStock && currentTotalQty >= existing.stock) {
-        triggerNotification(`¡Límite alcanzado! Solo quedan ${existing.stock}.`, 'warning');
+        // Notificación exigida 
+        triggerNotification(`Límite en carrito: Solo hay ${existing.stock} en stock.`, 'warning');
         return;
     }
 
@@ -600,7 +676,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             
             const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
             
-            // 🔥 CÁLCULO DE LÍMITE DE STOCK EN CARRITO
             const cartQty = cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
             const isLimitReached = product.controlarStock && cartQty >= product.stock && product.stock > 0;
             
@@ -620,12 +695,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   }
                   if (isCustomizable) setSelectedProduct(product);
                 }} 
-                // 🎨 AÑADIMOS ESTILO VISUAL DE BLOQUEO (Candado)
                 className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border shadow-sm transition-all overflow-hidden ${
                   isAgotado 
                     ? 'border-gray-200 dark:border-neutral-800 opacity-60 grayscale-[50%]' 
                     : isLimitReached
-                      ? 'border-amber-200 dark:border-amber-900/40 opacity-80' // Estilo de límite alcanzado
+                      ? 'border-amber-200 dark:border-amber-900/40 opacity-80' 
                       : `border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9] ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] md:hover:shadow-md dark:md:hover:bg-neutral-800/80 lya:md:hover:bg-[#EADCC9]/30' : ''}`
                 }`}
               >
@@ -653,7 +727,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
                     <h3 className="font-extrabold text-[15px] sm:text-base text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
                     {isCustomizable && !isLimitReached && <span className="inline-flex mt-1.5 text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800/30 lya:border-transparent">✨ Personalizable</span>}
-                    {/* Mensaje de límite debajo del nombre si está bloqueado */}
                     {isLimitReached && <span className="inline-flex mt-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800/30"><Lock size={10} className="mr-1 inline" /> Límite: {product.stock}</span>}
                   </div>
                   <div className="flex items-end justify-between mt-auto">
@@ -662,7 +735,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                     <button 
                       disabled={isAdding || addingToCartId !== null || isAgotado} 
                       onClick={(e) => { 
-                        e.stopPropagation(); // 🛡️ Evita que abra el modal si hace clic justo en el botón
+                        e.stopPropagation(); 
                         if (isAgotado) return;
                         if (isLimitReached) {
                           triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
@@ -675,11 +748,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                         isAgotado 
                           ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed'
                           : isLimitReached
-                            ? 'bg-neutral-200 dark:bg-neutral-800 text-amber-500' // Candado color ambar
+                            ? 'bg-neutral-200 dark:bg-neutral-800 text-amber-500' 
                             : 'bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white md:hover:bg-neutral-800 dark:md:hover:bg-neutral-700 lya:md:hover:bg-[#5C240A] active:scale-90 disabled:opacity-50'
                       }`}
                     >
-                      {/* 🔥 ICONO DINÁMICO */}
                       {isAdding ? <Loader2 size={20} className="animate-spin" /> : (isLimitReached ? <Lock size={20} strokeWidth={3} /> : <Plus size={20} strokeWidth={3} />)}
                     </button>
                   </div>
@@ -690,7 +762,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </motion.div>
 
-      {/* RESTO DEL CÓDIGO INTACTO... */}
       <AnimatePresence>
         {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")} style={{ width: 'calc(100% - 3rem)' }}>
