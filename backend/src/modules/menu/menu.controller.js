@@ -1,9 +1,10 @@
-// src/modules/menu/menu.controller.js
+// backend/src/modules/menu/menu.controller.js
 import Category from './Category.model.js';
 import Product from './Product.model.js';
 import Variant from './Variant.model.js';
 import sequelize from '../../config/database.js';
 import GlobalOption from './GlobalOption.model.js';
+import { getIO } from '../../config/socket.js'; // 🔥 IMPORTAMOS LOS WEBSOCKETS
 
 // ==========================================
 // 📁 GESTIÓN DE CATEGORÍAS (Drag & Drop)
@@ -122,14 +123,22 @@ export const createProduct = async (req, res) => {
     const { 
       name, description, basePrice, imageUrl, controlarStock, stockQuantity, 
       categoryId, opciones, departamento, requiereCocina, isActive, 
-      isAgotado // 🔥 Recibimos el nuevo campo
+      isAgotado 
     } = req.body;
     
     const newProduct = await Product.create({
       name, description, basePrice, imageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
       isActive: isActive !== undefined ? isActive : true,
-      isAgotado: isAgotado || false // 🔥 Guardamos
+      isAgotado: isAgotado || false
     });
+
+    // 🔥 EMITIR EN TIEMPO REAL: Por si se crea como agotado o con poco stock
+    getIO().emit('stock:update', [{
+      id: newProduct.id,
+      stock: newProduct.stockQuantity,
+      isAgotado: newProduct.isAgotado
+    }]);
+    getIO().emit('pos:update'); // Refrescar catálogos
 
     res.status(201).json({ message: 'Producto creado', product: newProduct });
   } catch (error) {
@@ -143,7 +152,7 @@ export const updateProduct = async (req, res) => {
     const { 
       name, description, basePrice, imageUrl, controlarStock, stockQuantity, 
       categoryId, opciones, departamento, requiereCocina, isActive, disponible,
-      isAgotado // 🔥 Recibimos el nuevo campo
+      isAgotado 
     } = req.body;
 
     const product = await Product.findByPk(id);
@@ -155,9 +164,17 @@ export const updateProduct = async (req, res) => {
     await product.update({
       name, description, basePrice, imageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
       isActive: estadoFinal,
-      isAgotado: agotadoFinal // 🔥 Actualizamos
+      isAgotado: agotadoFinal 
     });
     
+    // 🔥 MAGIA DE TIEMPO REAL: Le avisamos a todos los clientes y empleados del nuevo stock
+    getIO().emit('stock:update', [{
+      id: product.id,
+      stock: product.stockQuantity,
+      isAgotado: product.isAgotado
+    }]);
+    getIO().emit('pos:update'); // Forzar refresco de tarjetas en todo el local
+
     res.json({ message: 'Producto actualizado', product });
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar producto', error: error.message });
@@ -171,6 +188,15 @@ export const deleteProduct = async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
 
     await product.update({ isActive: false });
+    
+    // 🔥 EMITIR EN TIEMPO REAL: Forzamos stock 0 y Agotado para que los carritos lo expulsen
+    getIO().emit('stock:update', [{
+      id: product.id,
+      stock: 0,
+      isAgotado: true
+    }]);
+    getIO().emit('pos:update');
+
     res.json({ message: 'Producto eliminado (desactivado)' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar producto', error: error.message });
