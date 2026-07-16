@@ -191,6 +191,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
         className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm pointer-events-auto transition-colors" 
       />
 
+      {/* 🔥 ESTRUCTURA RAIZ ESTRICTA FLEXBOX */}
       <motion.div 
         initial={{ y: "100%" }} 
         animate={{ y: 0 }} 
@@ -225,7 +226,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
           {availableModifiers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center space-y-3">
               <span className="text-5xl opacity-50 pointer-events-none">🍽️</span>
-              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium pointer-events-none">Este producto no tiene opciones adicionales configuradas.</p>
+              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium pointer-events-none text-center">Este producto no tiene opciones adicionales configuradas.</p>
             </div>
           ) : (
             availableModifiers.map(mod => (
@@ -322,6 +323,7 @@ export const ProductOptionsModal = ({ product, isVitrina, isLlevar, onClose, onC
                   <span className="font-black text-orange-900 dark:text-orange-100 lya:text-lya-text text-sm flex items-center gap-2">
                     <ShoppingBag size={16} /> Empaquetar para Llevar
                   </span>
+                  {/* 🔥 TEXTO DESCRIPTIVO JUSTIFICADO */}
                   <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400 lya:text-lya-text/60 mt-0.5 text-justify leading-tight">
                     Se enviará a cocina con indicación de empaque desechable.
                   </span>

@@ -400,7 +400,8 @@ export const TicketSidebar = ({
   const showDeliverAllBtn = !isVitrina && itemsNeedingDelivery.length > 0;
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative">
+    // 🔥 ESTRUCTURA RAIZ ESTRICTA FLEXBOX
+    <div className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative overflow-hidden">
       
       {!(isLlevar || isVitrina) && (
         <TicketAccountForm 
@@ -411,13 +412,14 @@ export const TicketSidebar = ({
         />
       )}
 
+      {/* 🔥 CONTENEDOR DE LISTAS SCROLL */}
       <div ref={scrollContainerRef} onDragOver={handleContainerDragOver} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar relative z-10">
         
         {activeCart.length === 0 && availableAccs.length === 1 && !isLlevar ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 lya:text-lya-text/40 opacity-70">
             <ShoppingBag size={48} strokeWidth={1.5} className="mb-3" />
-            <p className="text-xs font-black uppercase tracking-widest">{isVitrina ? 'Mostrador Libre' : 'Mesa vacía'}</p>
-            <p className="text-[10px] font-medium mt-1">Añade productos del menú</p>
+            <p className="text-xs font-black uppercase tracking-widest text-center">{isVitrina ? 'Mostrador Libre' : 'Mesa vacía'}</p>
+            <p className="text-[10px] font-medium mt-1 text-center">Añade productos del menú</p>
           </div>
         ) : (
           <AnimatePresence mode="popLayout"> 
@@ -446,7 +448,7 @@ export const TicketSidebar = ({
                   toggleItemTakeaway={toggleItemTakeaway} onCancelItem={onCancelItem}
                   onDragStart={(item, cName) => setDraggedItem({ item, cuentaName: cName })}
                   onDragEnd={() => setDraggedItem(null)}
-                  showToast={toast} // 🚀 ¡PASAMOS LA FUNCIÓN AQUÍ!
+                  showToast={toast}
                 />
               );
             })}
@@ -487,14 +489,15 @@ export const TicketSidebar = ({
       <AnimatePresence>
         {showReleaseModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
+            {/* 🔥 MODAL CON BORDES REDONDEADOS Y TEXTOS CENTRADOS */}
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col">
               
               <div className="p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 text-center">
                 <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/40 lya:bg-lya-secondary/20 text-blue-500 lya:text-lya-secondary rounded-full flex items-center justify-center mb-3">
                   <CheckCircle2 size={24} />
                 </div>
-                <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">Liberar Cuentas</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Selecciona las cuentas pagadas que deseas cerrar y ocultar de la mesa.</p>
+                <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text text-center">Liberar Cuentas</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 text-center">Selecciona las cuentas pagadas que deseas cerrar y ocultar de la mesa.</p>
               </div>
 
               <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
@@ -504,7 +507,7 @@ export const TicketSidebar = ({
                     whileTap={!isReleasing ? { scale: 0.95 } : {}}
                     onClick={() => handleReleaseAccounts(cuentasPagadasVisibles)}
                     disabled={isReleasing}
-                    className="w-full p-3 mb-2 text-center rounded-xl border-2 border-blue-200 dark:border-blue-900 lya:border-lya-secondary/40 bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-secondary/10 font-black text-blue-600 dark:text-blue-400 lya:text-lya-secondary md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 transition-colors flex justify-center items-center gap-2 outline-none shadow-sm disabled:opacity-50"
+                    className="w-full p-3 mb-2 text-center rounded-xl border-2 border-blue-200 dark:border-blue-900 lya:border-lya-secondary/40 bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-secondary/10 font-black text-blue-600 dark:text-blue-400 lya:text-lya-secondary md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 lya:md:hover:bg-lya-secondary/20 transition-colors flex justify-center items-center gap-2 outline-none shadow-sm disabled:opacity-50 touch-manipulation"
                   >
                     {isReleasing ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} strokeWidth={2.5} />}
                     Liberar Todas las Cuentas
@@ -515,7 +518,7 @@ export const TicketSidebar = ({
                   <motion.button 
                     whileTap={!isReleasing ? { scale: 0.95 } : {}}
                     key={acc} onClick={() => handleReleaseAccounts([acc])} disabled={isReleasing}
-                    className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none disabled:opacity-50"
+                    className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none disabled:opacity-50 touch-manipulation"
                   >
                     <span>{acc}</span> 
                     {isReleasing ? <Loader2 size={16} className="text-gray-400 animate-spin" /> : <ArrowRightLeft size={16} className="text-gray-400 dark:text-gray-500" />}
@@ -525,7 +528,7 @@ export const TicketSidebar = ({
               </div>
               
               <div className="p-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
-                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowReleaseModal(false)} className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none">Cancelar</motion.button>
+                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowReleaseModal(false)} className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none touch-manipulation">Cancelar</motion.button>
               </div>
 
             </motion.div>

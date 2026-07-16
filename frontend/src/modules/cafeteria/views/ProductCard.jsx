@@ -138,7 +138,8 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                   ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-400 dark:text-gray-600 lya:text-lya-text/30 cursor-not-allowed' 
                   : isLimitReached
                     ? 'bg-gray-100 dark:bg-gray-800 text-amber-500' // Candado color ambar
-                    : 'bg-orange-500 text-white lya:text-lya-surface shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 active:scale-90 disabled:opacity-50 md:hover:bg-orange-600 md:dark:hover:bg-orange-500 md:lya:hover:bg-lya-primary/90'
+                    // 🔥 ARREGLO DE TEMA: Integración completa de dark y lya al botón
+                    : 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 active:scale-90 disabled:opacity-50 md:hover:bg-orange-600 md:dark:hover:bg-orange-500 md:lya:hover:bg-lya-primary/90'
               }`}
               title="Añadir directo a la orden"
             >

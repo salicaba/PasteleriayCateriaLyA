@@ -1,40 +1,52 @@
+// src/components/animations/MenuLoader.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
+import { CheckCircle2 } from 'lucide-react';
+import logo from '../../assets/logo.jpeg'; 
 
-const MenuLoader = () => {
+const MenuLoader = ({ 
+  title = "Preparando tu mesa...", 
+  subtitle = "Cargando el menú más fresco" 
+}) => {
   return (
-    <motion.div
-      key="menu-loader"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.3 } }}
-      className="w-full h-full min-h-[50vh] flex flex-col items-center justify-center space-y-6 p-6"
-    >
-      {/* Contenedor del Logo con respiración adaptado a los 3 temas */}
-      <motion.div
-        animate={{ scale: [0.95, 1.05, 0.95], opacity: [0.8, 1, 0.8] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        className="bg-white/60 dark:bg-gray-800/60 lya:bg-lya-surface/60 backdrop-blur-xl p-8 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center"
+    // 🎨 Fondo color crema idéntico a la imagen (adaptable a oscuro)
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FDF6E3] dark:bg-gray-950 lya:bg-[#FDF6E3] overflow-hidden rounded-[inherit] w-full h-full z-[150]">
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex flex-col items-center justify-center z-10 w-full px-6"
       >
-        <span 
-          // El texto se verá Naranja en Claro/Oscuro y tomará tu color primario en el tema Lya
-          className="text-6xl font-bold text-orange-500 lya:text-orange-400" 
-          style={{ fontFamily: 'cursive' }}
-        >
-          𝓛𝔂𝓪
-        </span>
-      </motion.div>
+        {/* 🌟 Animación del Logo con los aros Rosa y Teal de Lya */}
+        <div className="relative mb-6">
+          <motion.div 
+            animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+            className="relative w-36 h-36 md:w-44 md:h-44 rounded-full border-[5px] border-[#F48FB1] p-1 flex items-center justify-center bg-transparent shadow-xl"
+          >
+            <div className="w-full h-full rounded-full border-[4px] border-[#4DD0E1] p-1 bg-white">
+              <img 
+                src={logo} 
+                alt="Lya Pastelería" 
+                className="w-full h-full object-cover rounded-full"
+              />
+            </div>
+          </motion.div>
+        </div>
 
-      {/* Texto de carga adaptado a los 3 temas */}
-      <motion.p
-        animate={{ opacity: [0.4, 1, 0.4] }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-        // Gris normal, Gris claro en Oscuro, y el color de texto de tu tema Lya
-        className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70 font-medium tracking-widest uppercase text-sm"
-      >
-        Cargando Delicias...
-      </motion.p>
-    </motion.div>
+        {/* 📝 Título Principal (Café oscuro) */}
+        <h2 className="text-[22px] md:text-3xl font-black text-[#5C4033] dark:text-white lya:text-[#5C4033] mb-3 text-center tracking-tight">
+          {title}
+        </h2>
+        
+        {/* ✅ Subtítulo con Check Verde */}
+        <div className="flex items-center justify-center gap-2 text-[#7A6355] dark:text-gray-300 lya:text-[#7A6355]">
+          <CheckCircle2 size={18} className="text-[#10B981]" strokeWidth={2.5} />
+          <span className="text-sm md:text-base font-medium">{subtitle}</span>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 

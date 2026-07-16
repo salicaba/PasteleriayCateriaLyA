@@ -47,7 +47,7 @@ export const PosModal = ({
 
   const nombreCajero = getLoggedUserName();
 
-  const [isRendering, setIsRendering] = useState(true);
+  const [isMenuLoaded, setIsMenuLoaded] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
@@ -81,13 +81,24 @@ export const PosModal = ({
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
 
+  // 🚀 LÓGICA DE CARGA REAL
   useEffect(() => {
     if (isOpen) {
-      setIsRendering(true);
-      const timer = setTimeout(() => setIsRendering(false), 400); 
-      return () => clearTimeout(timer);
+      setIsMenuLoaded(false);
     }
-  }, [isOpen, categoriaActiva]); 
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (dbCategories && dbCategories.length > 0) {
+        const timer = setTimeout(() => setIsMenuLoaded(true), 800);
+        return () => clearTimeout(timer);
+      } else {
+        const fallback = setTimeout(() => setIsMenuLoaded(true), 2500);
+        return () => clearTimeout(fallback);
+      }
+    }
+  }, [isOpen, dbCategories]);
 
   const rawNumeroStr = String(mesa?.numero || mesa?.id || '').trim();
   const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumeroStr);
@@ -211,6 +222,13 @@ export const PosModal = ({
     numeroReal = numeroReal.replace(/#/g, '').trim();
   }
 
+  // 🌟 TÍTULO DEL LOADER SEGÚN EL ÁREA
+  const loaderTitle = isVitrina 
+    ? "Preparando el mostrador..." 
+    : isLlevar 
+      ? "Preparando pedido para llevar..." 
+      : "Preparando tu mesa...";
+
   const HeaderTitle = () => {
     if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
     if (isLlevar) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">{numeroReal}</h3>;
@@ -273,8 +291,23 @@ export const PosModal = ({
   const totalItemsInCart = cart.filter(item => item.status !== 'CANCELLED').reduce((acc, curr) => acc + curr.qty, 0);
 
   const posContent = (
-    <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${!inline ? 'md:rounded-[2.5rem] shadow-2xl overflow-hidden lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden'}`}>
+    <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 overflow-hidden ${!inline ? 'md:rounded-[2.5rem] shadow-2xl lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`}>
       
+      {/* 🚀 OVERLAY DE CARGA A PANTALLA COMPLETA */}
+      <AnimatePresence>
+        {!isMenuLoaded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 z-[150] rounded-[inherit] overflow-hidden"
+          >
+            <MenuLoader title={loaderTitle} subtitle="Cargando el menú más fresco" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* SECCIÓN IZQUIERDA: MENÚ Y BÚSQUEDA */}
       <div className="flex-1 flex flex-col h-full relative z-0 overflow-hidden">
         <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors shrink-0">
@@ -292,7 +325,7 @@ export const PosModal = ({
             {!inline && (
               <button 
                 onClick={onClose} 
-                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm shrink-0"
+                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm shrink-0 outline-none"
               >
                 <X size={20} />
               </button>
@@ -301,49 +334,41 @@ export const PosModal = ({
           <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative">
-          <AnimatePresence mode="wait">
-            {isRendering ? (
-              <MenuLoader key="menu-loader" />
-            ) : (
-              <motion.div
-                key="product-grid"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
-              >
-                {filteredProducts.map(product => {
-                  
-                  // 🔥 SOLUCIÓN DOBLE RESTA: Solo contamos lo que NO se ha enviado a cocina
-                  const currentCartQty = cart
-                    .filter(item => item.id === product.id && !item.enviadoCocina && item.status !== 'CANCELLED')
-                    .reduce((acc, item) => acc + item.qty, 0);
+        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative flex flex-col">
+            <motion.div
+              key="product-grid"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
+            >
+              {filteredProducts.map(product => {
+                const currentCartQty = cart
+                  .filter(item => item.id === product.id && !item.enviadoCocina && item.status !== 'CANCELLED')
+                  .reduce((acc, item) => acc + item.qty, 0);
 
-                  return (
-                    <ProductCard 
-                      key={product.id} 
-                      product={product} 
-                      isLocked={isAccountLocked}
-                      cartQty={currentCartQty} 
-                      onLimitReached={(stock) => showToast(`Límite en carrito: Solo quedan ${stock} en stock.`, 'warning')} 
-                      onClick={setSelectedProduct} 
-                      onQuickAdd={(p) => {
-                        let ops = p.opciones;
-                        if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
-                        let precioAdicional = 0, detalles = { tamano: 'Estándar' };
-                        if (ops && typeof ops === 'object') {
-                           if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
-                           if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
-                        }
-                        addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
-                      }} 
-                    />
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                return (
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    isLocked={isAccountLocked}
+                    cartQty={currentCartQty} 
+                    onLimitReached={(stock) => showToast(`Límite en carrito: Solo quedan ${stock} en stock.`, 'warning')} 
+                    onClick={setSelectedProduct} 
+                    onQuickAdd={(p) => {
+                      let ops = p.opciones;
+                      if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+                      let precioAdicional = 0, detalles = { tamano: 'Estándar' };
+                      if (ops && typeof ops === 'object') {
+                         if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
+                         if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
+                      }
+                      addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
+                    }} 
+                  />
+                );
+              })}
+            </motion.div>
         </div>
       </div>
 
@@ -357,7 +382,7 @@ export const PosModal = ({
               </p>
            </div>
         </div>
-        <div className="flex-1 overflow-hidden h-full">
+        <div className="flex-1 overflow-hidden h-full flex flex-col">
           <TicketSidebar {...sidebarProps} />
         </div>
       </div>
@@ -366,13 +391,13 @@ export const PosModal = ({
       <div className="md:hidden absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none px-4">
         <button
           onClick={() => setIsMobileCartOpen(true)}
-          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 active:bg-black dark:bg-white dark:active:bg-gray-100 lya:bg-lya-primary lya:active:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary"
+          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 active:bg-black dark:bg-white dark:active:bg-gray-100 lya:bg-lya-primary lya:active:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary outline-none touch-manipulation"
         >
           <div className="flex items-center gap-3">
             <div className="relative">
               <ShoppingBag size={22} />
               {totalItemsInCart > 0 && (
-                <span className="absolute -top-2 -right-2 bg-orange-500 lya:bg-lya-secondary text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-gray-900 dark:border-white lya:border-lya-primary shadow-sm">
+                <span className="absolute -top-2 -right-2 bg-orange-500 dark:bg-orange-600 lya:bg-lya-secondary text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-gray-900 dark:border-white lya:border-lya-primary shadow-sm">
                   {totalItemsInCart}
                 </span>
               )}
@@ -402,12 +427,12 @@ export const PosModal = ({
               </div>
               <button
                 onClick={() => setIsMobileCartOpen(false)}
-                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 active:scale-95 transition-transform shrink-0"
+                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 active:scale-95 transition-transform shrink-0 outline-none"
               >
                 <ChevronDown size={20} className="text-gray-900 dark:text-white lya:text-lya-text" />
               </button>
             </div>
-            <div className="flex-1 overflow-hidden h-full">
+            <div className="flex-1 overflow-hidden h-full flex flex-col">
               <TicketSidebar {...sidebarProps} />
             </div>
           </motion.div>
@@ -453,7 +478,7 @@ export const PosModal = ({
                         initial={{ opacity: 0, y: -50, scale: 0.9 }} 
                         animate={{ opacity: 1, y: 0, scale: 1 }} 
                         exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                        className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
+                        className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
                           localToast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
                           localToast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
                           'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'

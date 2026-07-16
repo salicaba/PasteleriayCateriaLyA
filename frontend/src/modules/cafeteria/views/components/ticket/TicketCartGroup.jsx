@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer } from 'lucide-react';
@@ -14,10 +15,9 @@ export const TicketCartGroup = ({
   processingItems, handleToggleStatus, handleRemoveUnsent, onAdd,
   handleDeleteUnsent, handleCancelItem, toggleItemTakeaway, onCancelItem,
   onDragStart, onDragEnd,
-  showToast // 🚀 PROP AÑADIDA: Necesaria para lanzar la notificación temprana
+  showToast 
 }) => {
 
-  // 🔥 MAGIA DE PARSEO: Separamos el número si viene concatenado desde el QR del Cliente
   let rawDisplayName = isVitrina ? 'Cuenta Express' : (isLlevar && nombreCliente ? nombreCliente : cuentaName);
   let finalDisplayName = rawDisplayName;
   let finalDisplayPhone = cuentasTelefonos?.[cuentaName] || null;
@@ -37,7 +37,6 @@ export const TicketCartGroup = ({
       }
   }
 
-  // 🔥 ESCUDO ANTI-DUPLICADOS: Limpia el teléfono si el backend lo guardó repetido
   if (finalDisplayPhone) {
       const strPhone = String(finalDisplayPhone);
       if (strPhone.includes(' - ')) {
@@ -68,7 +67,6 @@ export const TicketCartGroup = ({
         : "border border-transparent bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/80 opacity-90"
       )}
     >
-      {/* HEADER DE LA CUENTA */}
       <div 
           onClick={() => { 
               if (isCuentaPagada) {
@@ -127,7 +125,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
-                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border border-transparent dark:border-gray-700 lya:border-lya-border/40 md:hover:border-red-200 dark:md:hover:border-red-900 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 lya:md:hover:bg-red-500/10 text-gray-500 md:hover:text-red-500 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none"
+                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border border-transparent dark:border-gray-700 lya:border-lya-border/40 md:hover:border-red-200 dark:md:hover:border-red-900 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 lya:md:hover:bg-red-500/10 text-gray-500 md:hover:text-red-500 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation"
               >
                 <Trash2 size={10}/> Ocultar
               </motion.button>
@@ -142,7 +140,7 @@ export const TicketCartGroup = ({
                       if (isTodoEntregadoEnCuenta && onPayCuenta) onPayCuenta(cuentaName); 
                   }} 
                   className={clsx(
-                      "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border outline-none", 
+                      "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border outline-none touch-manipulation", 
                       isTodoEntregadoEnCuenta 
                           ? "bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-500 text-white border-emerald-600 dark:border-emerald-700 lya:bg-lya-primary lya:border-lya-primary" 
                           : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-80"
@@ -156,7 +154,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => { e.stopPropagation(); onPrintTicket(cuentaName); }} 
-                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 uppercase flex gap-1 items-center transition-colors shadow-sm outline-none"
+                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation"
               >
                 <Printer size={10}/> Ticket
               </motion.button>
@@ -166,7 +164,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => { e.stopPropagation(); setCuentasOcultas(prev => [...prev, cuentaName]); }} 
-                  className="text-[9px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none"
+                  className="text-[9px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation"
               >
                 <XCircle size={10}/> Ocultar
               </motion.button>
@@ -182,7 +180,7 @@ export const TicketCartGroup = ({
           const isProcessing = processingItems[item.backendItemId || item.id];
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
 
-          // 🔥 CÁLCULO DE LÍMITE ALCANZADO (Stock Poka-Yoke)
+          // 🔥 CÁLCULO DE LÍMITE ALCANZADO
           const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
           return (
@@ -234,7 +232,7 @@ export const TicketCartGroup = ({
                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5">
                     {item.qty > 1 && <span className="text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 px-1 py-0.5 rounded border border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20">{item.qty}x</span>}
                     {item.isTakeaway && item.enviadoCocina && !isVitrina && (
-                        <span className="text-[8px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 inline-flex items-center gap-1 shadow-sm">
+                        <span className="text-[8px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
                             <ShoppingBag size={8} /> Empacar
                         </span>
                     )}
@@ -265,7 +263,7 @@ export const TicketCartGroup = ({
                         onClick={() => handleToggleStatus(item)} 
                         disabled={isProcessing || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                         className={clsx(
-                            "flex items-center justify-center gap-1 text-[9px] font-black px-2 py-1.5 rounded-lg border uppercase transition-colors w-full text-center shadow-sm outline-none", 
+                            "flex items-center justify-center gap-1 text-[9px] font-black px-2 py-1.5 rounded-lg border uppercase transition-colors w-full text-center shadow-sm outline-none touch-manipulation", 
                             isProcessing ? "bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
                             item.kitchenStatus === 'DELIVERED' ? clsx("text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50", isStatusLocked ? "cursor-default opacity-70" : "cursor-pointer") 
                             : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 shadow-md cursor-pointer animate-pulse" 
@@ -295,8 +293,9 @@ export const TicketCartGroup = ({
                               whileTap={{ scale: 0.95 }}
                               onClick={() => toggleItemTakeaway(item)} 
                               className={clsx(
-                                  "flex items-center justify-center gap-1 text-[8px] font-black px-1.5 py-1.5 rounded-lg border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none", 
-                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 md:hover:border-orange-300"
+                                  "flex items-center justify-center gap-1 text-[8px] font-black px-1.5 py-1.5 rounded-lg border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
+                                  // 🔥 TEMA COMPLETO APLICADO AQUÍ
+                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 dark:md:hover:text-orange-400 lya:md:hover:text-lya-primary md:hover:border-orange-300 dark:md:hover:border-orange-700 lya:md:hover:border-lya-primary/50"
                               )} 
                           >
                             <ShoppingBag size={10} className={item.isTakeaway ? "text-orange-600 lya:text-lya-secondary" : "text-gray-400"} /> {item.isTakeaway ? 'Empacar' : 'Mesa'}
@@ -316,13 +315,13 @@ export const TicketCartGroup = ({
                       <>
                         <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleRemoveUnsent(item)} className={clsx("md:hover:bg-gray-100 dark:md:hover:bg-gray-800 rounded-md text-gray-400 md:hover:text-red-500 transition-colors outline-none", isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1")}><Minus size={isVitrina ? 16 : 12} /></motion.button>
                         
-                        {/* 🔥 BOTÓN "+" BLINDADO CON ALERTA TEMPRANA */}
+                        {/* 🔥 BOTÓN "+" BLINDADO Y TEMATIZADO CORRECTAMENTE */}
                         <motion.button 
                           whileTap={!isLimitReached ? { scale: 0.9 } : {}}
                           onClick={() => {
                             if (isLimitReached) {
                               if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
-                              return; // 🛑 INTERCEPAMOS EL CLIC AQUÍ MISMO
+                              return; 
                             }
                             onAdd(item, cuentaName);
                           }} 
@@ -331,7 +330,7 @@ export const TicketCartGroup = ({
                             isVitrina ? "flex-1 py-1.5" : "p-1",
                             isLimitReached 
                               ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
-                              : "text-orange-500 lya:text-lya-primary md:hover:bg-gray-100 dark:md:hover:bg-gray-800" 
+                              : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
                           )}
                           title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
                         >
