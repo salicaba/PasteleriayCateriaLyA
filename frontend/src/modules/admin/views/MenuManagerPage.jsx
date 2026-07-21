@@ -2,11 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore, Package } from 'lucide-react';
+// 🔥 Añadí el icono "Tag" para las promociones
+import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore, Package, Tag } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
+
+// 🔥 IMPORTAMOS EL NUEVO MODAL DE PROMOCIONES
+import PromotionManagerModal from './PromotionManagerModal';
 
 // 🔥 IMPORTAMOS TU COMPONENTE STATCARD DE MESAS (Adaptado para el Menú)
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
@@ -27,6 +31,10 @@ const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, 
 export const MenuManagerPage = () => {
   const [toast, setToast] = useState(null);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  
+  // 🔥 ESTADOS PARA EL MODAL DE PROMOCIONES
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [selectedProductForPromo, setSelectedProductForPromo] = useState(null);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -57,6 +65,12 @@ export const MenuManagerPage = () => {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // 🔥 Función para abrir el gestor de promociones
+  const handleOpenPromo = (product) => {
+    setSelectedProductForPromo(product);
+    setIsPromoModalOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -112,7 +126,6 @@ export const MenuManagerPage = () => {
   const visibleProducts = products.filter(p => p.isActive !== false && p.disponible !== false);
   const hiddenProducts = products.filter(p => p.isActive === false || p.disponible === false);
 
-  // Calcula descontando los que están explícita o matemáticamente agotados
   const productosRealmenteActivos = visibleProducts.filter(p => {
     const stockActual = p.stockQuantity ?? p.stock ?? 0;
     const isAgotado = p.isAgotado === true || (p.controlarStock === true && stockActual <= 0);
@@ -225,14 +238,12 @@ export const MenuManagerPage = () => {
                     <AnimatePresence mode="popLayout">
                       {categoryVisibleProducts.map((product, index) => {
                         
-                        // 🔥 DIVISIÓN DE ESTADOS: Matemático vs Manual
                         const stockActual = product.stockQuantity ?? product.stock ?? 0;
                         const hasStockControl = product.controlarStock === true;
                         
                         const isMathematicallyAgotado = hasStockControl && stockActual <= 0;
                         const isManuallyAgotado = product.isAgotado === true;
                         
-                        // Si está agotado por CUALQUIER razón, el UI general se pone opaco
                         const isAgotado = isManuallyAgotado || isMathematicallyAgotado;
                         
                         const currentAction = processingActions?.[product.id];
@@ -282,11 +293,11 @@ export const MenuManagerPage = () => {
                                 {/* 🔥 INDICADOR DE STOCK */}
                                 {hasStockControl && (
                                   <div className={`text-[10px] font-black px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
-                                     stockActual <= 0 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
-                                     stockActual <= 10 ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50' :
-                                     'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/50'
+                                      stockActual <= 0 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
+                                      stockActual <= 10 ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50' :
+                                      'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/50'
                                   }`}>
-                                     <Package size={10} /> Stock: {stockActual}
+                                      <Package size={10} /> Stock: {stockActual}
                                   </div>
                                 )}
                               </div>
@@ -325,6 +336,15 @@ export const MenuManagerPage = () => {
                             </div>
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
+                              {/* 🔥 NUEVO BOTÓN: GESTOR DE PROMOCIONES */}
+                              <button 
+                                onClick={() => handleOpenPromo(product)} 
+                                className="p-2.5 text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400 md:hover:bg-rose-100 dark:md:hover:bg-rose-900/40 rounded-xl transition-colors active:scale-90 outline-none" 
+                                title="Configurar Promoción (Motor de Ofertas)"
+                              >
+                                <Tag size={16} />
+                              </button>
+
                               <button onClick={() => openModal(product)} className="p-2.5 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 lya:text-lya-secondary lya:bg-lya-secondary/10 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 rounded-xl transition-colors active:scale-90 outline-none" title="Editar">
                                 <Edit2 size={16} />
                               </button>
@@ -605,6 +625,20 @@ export const MenuManagerPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 🔥 AQUÍ INYECTAMOS EL GESTOR DE PROMOCIONES AL FINAL DE LA VISTA */}
+      <PromotionManagerModal 
+        isOpen={isPromoModalOpen}
+        onClose={() => {
+          setIsPromoModalOpen(false);
+          setSelectedProductForPromo(null);
+        }}
+        product={selectedProductForPromo}
+        onPromotionSaved={(promoInfo) => {
+          // Usamos tu sistema nativo de Toasts para notificar el éxito
+          showToast(`¡Promoción configurada exitosamente!`, 'success');
+        }}
+      />
 
     </motion.div>
   );

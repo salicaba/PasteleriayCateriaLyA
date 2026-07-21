@@ -11,6 +11,8 @@ import settingsRoutes from './modules/settings/settings.routes.js';
 import cashRoutes from './modules/cash/cash.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js'; 
 import reportsRoutes from './modules/reports/reports.routes.js'; 
+// 🔥 1. AGREGAMOS EL IMPORT DE PROMOCIONES
+import promotionsRoutes from './modules/menu/promotions.routes.js'; 
 
 const app = express();
 
@@ -23,14 +25,13 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir peticiones sin origen (ej. peticiones de servidor a servidor o Postman local)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Bloqueado por la política de CORS'));
     }
   },
-  credentials: true, // Crucial para permitir envío de tokens, cookies y uso de WebSockets cruzados
+  credentials: true, 
 }));
 // ------------------------------------------------
 
@@ -48,6 +49,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/cash', cashRoutes);
 app.use('/api/inventory', inventoryRoutes); 
 app.use('/api/reports', reportsRoutes); 
+// 🔥 2. MONTAMOS LA RUTA EN LA API
+app.use('/api/promotions', promotionsRoutes); 
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓪 operando correctamente' });

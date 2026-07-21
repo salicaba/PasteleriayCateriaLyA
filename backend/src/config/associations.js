@@ -1,6 +1,7 @@
 import Order from '../modules/pos/Order.model.js';
 import OrderItem from '../modules/pos/OrderItem.model.js';
 import Product from '../modules/menu/Product.model.js';
+import Promotion from '../modules/menu/Promotion.model.js'; // <-- NUEVO MODELO DE PROMOCIONES
 import Table from '../modules/pos/Table.model.js';
 import Category from '../modules/menu/Category.model.js';
 import Variant from '../modules/menu/Variant.model.js'; 
@@ -37,6 +38,13 @@ export const setupAssociations = () => {
   Transaction.belongsTo(User, { foreignKey: 'cancelledBy', as: 'canceller' });
 
   // ==========================================
+  // RELACIONES: PROMOCIONES (MOTOR RAPPI/NUEVO)
+  // ==========================================
+  // Un Producto puede tener una Promoción activa configurada
+  Product.hasOne(Promotion, { foreignKey: 'productId', as: 'promotion' });
+  Promotion.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+
+  // ==========================================
   // RELACIONES: CONTROL DE INVENTARIO
   // ==========================================
   InventoryItem.hasMany(InventoryTransaction, { foreignKey: 'inventoryItemId', as: 'transactions' });
@@ -46,7 +54,7 @@ export const setupAssociations = () => {
   InventoryTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
   // ==========================================
-  // RELACIONES: ARQUEO DE INVENTARIO (NUEVO)
+  // RELACIONES: ARQUEO DE INVENTARIO
   // ==========================================
   
   // Usuario que realiza el arqueo

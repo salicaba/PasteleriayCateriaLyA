@@ -1,38 +1,82 @@
 // src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Loader2, Lock, Flame } from 'lucide-react';
+import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
-export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, cartQty = 0, onLimitReached }) => {
+export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, cartQty = 0, onLimitReached, activePromotions = [] }) => {
   const [imgError, setImgError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   
-  // 🚀 LÓGICA DE ESTADO
   const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
-  
-  // 🔥 CÁLCULO DE LÍMITE (Poka-Yoke)
   const isLimitReached = product.controlarStock === true && cartQty >= product.stock && product.stock > 0;
   const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
   
   const imageUrl = product.image || product.imagen;
 
-  const hasOptions = useMemo(() => {
+  // 🔥 1. Parsear Opciones de Forma Segura
+  const parsedOptions = useMemo(() => {
     try {
-      if (!product.opciones) return false;
-      const ops = typeof product.opciones === 'string' ? JSON.parse(product.opciones) : product.opciones;
-      return ops && (ops.tamanos?.length > 0 || ops.leches?.length > 0 || ops.extras?.length > 0);
+      if (!product.opciones) return null;
+      return typeof product.opciones === 'string' ? JSON.parse(product.opciones) : product.opciones;
     } catch (e) {
-      return false;
+      return null;
     }
   }, [product.opciones]);
+
+  const hasOptions = parsedOptions && (parsedOptions.tamanos?.length > 0 || parsedOptions.leches?.length > 0 || parsedOptions.extras?.length > 0);
+
+  // 🔥 2. CÁLCULO DEL PRECIO REAL (Precio Base de BD + Costo de Opciones por Defecto)
+  // Esto evita el "WTF" del cliente al ver que el precio sube mágicamente.
+  const realBasePrice = useMemo(() => {
+    let base = Number(product.precioBase || product.precio || 0);
+    if (parsedOptions && parsedOptions.defaults) {
+      const defaultTamano = parsedOptions.defaults.tamano;
+      const defaultLeche = parsedOptions.defaults.leche;
+
+      if (defaultTamano) {
+        const t = parsedOptions.tamanos?.find(x => x.nombre === defaultTamano);
+        if (t && t.precioAdicional) base += Number(t.precioAdicional);
+      }
+      if (defaultLeche) {
+        const l = parsedOptions.leches?.find(x => x.nombre === defaultLeche);
+        if (l && l.precioAdicional) base += Number(l.precioAdicional);
+      }
+    }
+    return base;
+  }, [product.precioBase, product.precio, parsedOptions]);
+
+  const activePromo = useMemo(() => {
+    const promo = activePromotions.find(p => p.productId === product.id);
+    if (!promo || !promo.isActive) return null;
+    const today = new Date().getDay();
+    if (!promo.validDays.includes(today)) return null;
+    return promo;
+  }, [activePromotions, product.id]);
+
+  // 🔥 3. CÁLCULO DE PROMOCIÓN FIJA (Respetando el costo de los extras)
+  // Si la promo dice que cuesta $50, pero lleva leche extra de $15, el precio final tachado será $65
+  const promoFixedPrice = useMemo(() => {
+    if (!activePromo || activePromo.type !== 'FIXED') return 0;
+    const originalDbPrice = Number(product.precioBase || product.precio || 0);
+    const costoExtras = realBasePrice - originalDbPrice;
+    return Number(activePromo.discountValue) + costoExtras;
+  }, [activePromo, realBasePrice, product.precioBase, product.precio]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
     if (isAgotado || isAdding || isLocked) return;
     
-    // 🛡️ BLOQUEO TEMPRANO SI ALCANZA EL LÍMITE
     if (isLimitReached) {
       if (onLimitReached) onLimitReached(product.stock);
+      return;
+    }
+
+    // 🔥 4. ESCUDO PARA OPCIONES OBLIGATORIAS ("Elegir...")
+    // Si la opción por defecto contiene la palabra "elegir", bloqueamos el "+" rápido 
+    // y obligamos a abrir el modal de personalización.
+    const defaultTamano = parsedOptions?.defaults?.tamano;
+    if (hasOptions && (!defaultTamano || defaultTamano.toLowerCase().includes('elegir'))) {
+      if (onClick) onClick(product); // Abre el modal
       return;
     }
 
@@ -52,7 +96,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      // 📱 BLINDAJE TÁCTIL
       whileTap={!isAgotado && !isLocked && !isLimitReached ? { scale: 0.95 } : {}}
       onClick={() => {
         if (isAgotado || isLocked) return;
@@ -62,18 +105,18 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         }
         if (onClick) onClick(product);
       }}
-      // 🎨 GEOMETRÍA PREMIUM & ESTADO BLOQUEADO
       className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-3 transition-all duration-300 overflow-hidden border-2 h-full transform ${
         isAgotado 
           ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 opacity-60 grayscale-[80%] cursor-not-allowed' 
           : isLocked
             ? 'border-transparent dark:border-transparent lya:border-lya-border/20 opacity-80 cursor-default'
             : isLimitReached
-              ? 'border-amber-200 dark:border-amber-900/50 lya:border-amber-500/30 opacity-80 shadow-inner' // Estilo de límite alcanzado
-              : 'border-transparent dark:border-transparent lya:border-lya-border/20 shadow-[0_5px_15px_rgba(0,0,0,0.03)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,139,49,0.15)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
+              ? 'border-amber-200 dark:border-amber-900/50 lya:border-amber-500/30 opacity-80 shadow-inner'
+              : activePromo 
+                ? 'border-rose-200 dark:border-rose-900/40 lya:border-lya-primary/40 shadow-[0_5px_20px_rgba(244,63,94,0.1)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
+                : 'border-transparent dark:border-transparent lya:border-lya-border/20 shadow-[0_5px_15px_rgba(0,0,0,0.03)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,139,49,0.15)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
       }`}
     >
-      {/* ⚠️ CINTA DE AGOTADO */}
       {isAgotado && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[120%] pointer-events-none">
           <div className="bg-red-500/95 dark:bg-red-600/95 lya:bg-red-500/95 backdrop-blur-md text-white text-center py-2 font-black tracking-widest uppercase transform -rotate-12 shadow-2xl border-y-2 border-red-400/50 text-[11px]">
@@ -82,12 +125,19 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         </div>
       )}
 
-      {/* CONTENEDOR DE IMAGEN NEO-BENTO */}
       <div className="h-28 w-full rounded-[1.25rem] bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group transition-colors shadow-inner shrink-0">
         
-        {/* 🔥 BADGE DE ESCASEZ VISUAL */}
+        {activePromo && !isAgotado && (
+          <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg border border-rose-400 flex items-center gap-1 uppercase tracking-widest">
+            <Tag size={10} strokeWidth={3} />
+            {activePromo.type === 'NxM' && `${activePromo.buyQty}x${activePromo.payQty}`}
+            {activePromo.type === 'FIXED' && `¡Oferta!`}
+            {activePromo.type === 'NTH_FIXED' && `Promo #${activePromo.buyQty}`}
+          </div>
+        )}
+
         {showScarcity && (
-          <div className="absolute top-2 right-2 z-10 bg-amber-500/95 dark:bg-amber-600/95 lya:bg-lya-secondary/95 backdrop-blur-md text-white text-[9px] font-black px-2 py-1 rounded-full shadow-lg border border-amber-400/50 flex items-center gap-1 animate-pulse">
+          <div className={`absolute top-2 z-10 bg-amber-500/95 dark:bg-amber-600/95 lya:bg-lya-secondary/95 backdrop-blur-md text-white text-[9px] font-black px-2 py-1 rounded-full shadow-lg border border-amber-400/50 flex items-center gap-1 animate-pulse ${activePromo ? 'right-2' : 'left-2'}`}>
             <Flame size={10} /> ¡Quedan {product.stock}!
           </div>
         )}
@@ -123,11 +173,25 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
           </div>
         </div>
         
-        {/* FOOTER DEL CARD */}
         <div className="mt-auto flex items-center justify-between pt-2.5 border-t-2 border-gray-50 dark:border-gray-800/80 lya:border-lya-border/40 transition-colors">
-          <span className={`font-black text-base pl-1 tracking-tight ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>
-            ${Number(product.precioBase || product.precio || 0).toFixed(2)}
-          </span>
+          
+          <div className="flex flex-col items-start pl-1">
+            {/* 🔥 RENDERIZADO DE PRECIO REAL Y TACHADO SI HAY PROMOCIÓN FIJA */}
+            {(activePromo && activePromo.type === 'FIXED') ? (
+              <>
+                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 line-through leading-none">
+                  ${realBasePrice.toFixed(2)}
+                </span>
+                <span className="font-black text-base tracking-tight text-rose-600 dark:text-rose-400 lya:text-lya-primary leading-tight">
+                  ${promoFixedPrice.toFixed(2)}
+                </span>
+              </>
+            ) : (
+              <span className={`font-black text-base tracking-tight ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>
+                ${realBasePrice.toFixed(2)}
+              </span>
+            )}
+          </div>
           
           {!isLocked ? (
             <button 
@@ -137,11 +201,12 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                 isAgotado 
                   ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-400 dark:text-gray-600 lya:text-lya-text/30 cursor-not-allowed' 
                   : isLimitReached
-                    ? 'bg-gray-100 dark:bg-gray-800 text-amber-500' // Candado color ambar
-                    // 🔥 ARREGLO DE TEMA: Integración completa de dark y lya al botón
-                    : 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 active:scale-90 disabled:opacity-50 md:hover:bg-orange-600 md:dark:hover:bg-orange-500 md:lya:hover:bg-lya-primary/90'
+                    ? 'bg-gray-100 dark:bg-gray-800 text-amber-500'
+                    : activePromo 
+                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg shadow-rose-500/30 active:scale-90 disabled:opacity-50 md:hover:from-rose-600 md:hover:to-rose-700'
+                      : 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 active:scale-90 disabled:opacity-50 md:hover:bg-orange-600 md:dark:hover:bg-orange-500 md:lya:hover:bg-lya-primary/90'
               }`}
-              title="Añadir directo a la orden"
+              title={activePromo ? 'Añadir Oferta' : 'Añadir directo a la orden'}
             >
               {isAdding ? <Loader2 size={18} className="animate-spin" /> : (isLimitReached ? <Lock size={18} strokeWidth={3} /> : <Plus size={18} strokeWidth={3} />)}
             </button>

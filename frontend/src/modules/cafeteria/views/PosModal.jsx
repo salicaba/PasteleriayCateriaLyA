@@ -75,11 +75,22 @@ export const PosModal = ({
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered,
-    toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems
+    toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
+    promoWarning, confirmPromoRupture, cancelPromoRupture
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
+
+  // 🔥 FETCH DE PROMOCIONES ACTIVAS PARA EL MENÚ
+  const [activePromotions, setActivePromotions] = useState([]);
+  useEffect(() => {
+    if (isOpen) {
+      client.get('/promotions').then(res => {
+        if (res.data.success) setActivePromotions(res.data.data);
+      }).catch(err => console.error("Error al cargar promociones en POS", err));
+    }
+  }, [isOpen]);
 
   // 🚀 LÓGICA DE CARGA REAL
   useEffect(() => {
@@ -222,7 +233,6 @@ export const PosModal = ({
     numeroReal = numeroReal.replace(/#/g, '').trim();
   }
 
-  // 🌟 TÍTULO DEL LOADER SEGÚN EL ÁREA
   const loaderTitle = isVitrina 
     ? "Preparando el mostrador..." 
     : isLlevar 
@@ -293,7 +303,6 @@ export const PosModal = ({
   const posContent = (
     <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 overflow-hidden ${!inline ? 'md:rounded-[2.5rem] shadow-2xl lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`}>
       
-      {/* 🚀 OVERLAY DE CARGA A PANTALLA COMPLETA */}
       <AnimatePresence>
         {!isMenuLoaded && (
           <motion.div
@@ -308,7 +317,6 @@ export const PosModal = ({
         )}
       </AnimatePresence>
 
-      {/* SECCIÓN IZQUIERDA: MENÚ Y BÚSQUEDA */}
       <div className="flex-1 flex flex-col h-full relative z-0 overflow-hidden">
         <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors shrink-0">
           <div className="flex items-center gap-4 mb-4">
@@ -344,13 +352,14 @@ export const PosModal = ({
             >
               {filteredProducts.map(product => {
                 const currentCartQty = cart
-                  .filter(item => item.id === product.id && !item.enviadoCocina && item.status !== 'CANCELLED')
+                  .filter(item => item.id === product.id && !item.enviadoCocina && item.status !== 'CANCELLED' && !item.isAutoPromo)
                   .reduce((acc, item) => acc + item.qty, 0);
 
                 return (
                   <ProductCard 
                     key={product.id} 
                     product={product} 
+                    activePromotions={activePromotions}
                     isLocked={isAccountLocked}
                     cartQty={currentCartQty} 
                     onLimitReached={(stock) => showToast(`Límite en carrito: Solo quedan ${stock} en stock.`, 'warning')} 
@@ -372,7 +381,6 @@ export const PosModal = ({
         </div>
       </div>
 
-      {/* SECCIÓN DERECHA */}
       <div className="hidden md:flex w-96 border-l border-gray-100 dark:border-gray-800 lya:border-lya-border/40 bg-white dark:bg-gray-900 lya:bg-lya-surface h-full shadow-2xl z-20 flex-col transition-colors shrink-0 overflow-hidden">
         <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 lya:bg-lya-primary/5 border-b border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20 flex justify-between items-start transition-colors shrink-0">
            <div>
@@ -387,7 +395,6 @@ export const PosModal = ({
         </div>
       </div>
 
-      {/* FAB MÓVIL */}
       <div className="md:hidden absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none px-4">
         <button
           onClick={() => setIsMobileCartOpen(true)}
@@ -408,7 +415,6 @@ export const PosModal = ({
         </button>
       </div>
 
-      {/* CAJÓN DESLIZABLE */}
       <AnimatePresence>
         {isMobileCartOpen && (
           <motion.div
@@ -457,6 +463,47 @@ export const PosModal = ({
             </div>
 
             <div className="relative z-[9999]">
+                
+                {/* 🔥 ESCUDO POKA-YOKE NEO-BENTO PARA RUPTURA DE PROMOCIONES */}
+                <AnimatePresence>
+                  {promoWarning?.isOpen && (
+                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-sm w-full rounded-[2.5rem] shadow-2xl p-8 flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+                      >
+                        <div className="h-16 w-16 bg-amber-100 dark:bg-amber-900/30 text-amber-500 rounded-full flex items-center justify-center mb-5">
+                          <AlertTriangle size={32} strokeWidth={2.5} />
+                        </div>
+                        <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text text-center mb-2 line-clamp-2">
+                          Ruptura de Promoción
+                        </h3>
+                        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-center mb-8 leading-relaxed">
+                          {promoWarning.message}
+                        </p>
+                        <div className="flex w-full gap-3">
+                          <motion.button 
+                            whileTap={{ scale: 0.95 }}
+                            onClick={cancelPromoRupture}
+                            className="flex-1 py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
+                          >
+                            Cancelar
+                          </motion.button>
+                          <motion.button 
+                            whileTap={{ scale: 0.95 }}
+                            onClick={confirmPromoRupture}
+                            className="flex-1 py-3.5 bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface font-black rounded-2xl md:hover:bg-orange-600 dark:md:hover:bg-orange-500 lya:md:hover:bg-lya-primary/90 transition-colors shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none"
+                          >
+                            Aceptar
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
+
                 <TicketPreviewModal 
                   isOpen={!!previewTicketData} 
                   onClose={() => setPreviewTicketData(null)} 
@@ -497,7 +544,9 @@ export const PosModal = ({
                       </motion.div>
                     </div>
                   )}
+                </AnimatePresence>
 
+                <AnimatePresence>
                   {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
                   {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
                   {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
@@ -524,6 +573,7 @@ export const PosModal = ({
                     />
                   )}
                 </AnimatePresence>
+                
             </div>
           </>,
           document.body

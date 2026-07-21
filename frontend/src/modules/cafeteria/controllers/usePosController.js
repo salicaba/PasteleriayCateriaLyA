@@ -40,7 +40,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     triggerNotification
   });
 
-  // 4. EL ORQUESTRADOR DE SINCRONIZACIÓN (Base de Datos a UI)
+  // 4. EL ORQUESTADOR DE SINCRONIZACIÓN (Base de Datos a UI)
   const { setCart } = cartLogic;
   const { setPaidAccounts, setNombresCuentas, setCuentaActiva, setCuentasTelefonos } = accounts;
 
@@ -148,6 +148,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     getProductQty: cartLogic.getProductQty,
     getSubtotalByCuenta: cartLogic.getSubtotalByCuenta,
     
+    // 🔥 NUEVO: Dominio del Escudo Poka-Yoke (Promociones)
+    promoWarning: cartLogic.promoWarning,
+    confirmPromoRupture: cartLogic.confirmPromoRupture,
+    cancelPromoRupture: cartLogic.cancelPromoRupture,
+    
     // Dominio: Menú
     filtroTexto: menu.filtroTexto, 
     setFiltroTexto: menu.setFiltroTexto, 
@@ -167,7 +172,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     // Dominio: Mutaciones (Pedidos/Cocina) y Estado Global
     orderStatus,
     isSuccess: mutations.isSuccess, 
-    isProcessing: mutations.isProcessing, // 🔥 NUEVO: Lock exportado para usar en UI (disabled={isProcessing})
+    isProcessing: mutations.isProcessing,
     simulateKitchenSend: mutations.simulateKitchenSend,
     moveItemToCuenta: mutations.moveItemToCuenta,
     toggleDeliveredStatus: mutations.toggleDeliveredStatus,
