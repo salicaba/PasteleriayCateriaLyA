@@ -1,4 +1,3 @@
-// src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag } from 'lucide-react';
@@ -182,10 +181,8 @@ export const TicketCartGroup = ({
 
           const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
-          // 🔥 BANDERA DE RENDERIZADO VISUAL PARA PREPARACIONES
           const hasRealPreparations = item.preparaciones?.some(prep => {
             if (!prep) return false;
-            // Si el objeto está vacío `{}`, o si solo tiene los valores por defecto "limpios" sin extras.
             if (Object.keys(prep).length === 0) return false;
             if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
             return true;
@@ -243,22 +240,22 @@ export const TicketCartGroup = ({
                     <h5 className="text-xs font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
                       {item.nombre}
                     </h5>
-                    {/* 🔥 ETIQUETA DE PROMOCIÓN */}
-                    {item.promoLabel && (
-                       <span className="text-[8px] font-black text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1 py-0.5 rounded uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1">
-                         <Tag size={8} strokeWidth={3} /> {item.promoLabel}
+                    {/* 🔥 ETIQUETA DE PROMOCIÓN VISUAL */}
+                    {item.isAutoPromo && (
+                       <span className="text-[8px] font-black text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 border border-rose-200 dark:border-rose-800/50 shadow-sm">
+                         <Tag size={8} strokeWidth={3} /> {item.promoLabel || 'OFERTA'}
                        </span>
                     )}
                   </div>
                   
                   <div className="flex flex-col items-end">
-                    {/* 🔥 ANCLAJE DE PRECIO PARA REGALOS / OFERTAS */}
-                    {item.precioOriginal && item.precioOriginal > item.precio && (
-                      <span className="text-[9px] font-bold text-gray-400 line-through leading-none mb-0.5">
+                    {/* 🔥 ANCLAJE DE PRECIO ORIGINAL TACHADO PARA OFERTAS FIJAS */}
+                    {item.precioOriginal && Number(item.precioOriginal) > Number(item.precio) && (
+                      <span className="text-[10px] md:text-[11px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none mb-0.5">
                         ${(Number(item.precioOriginal) * item.qty).toFixed(2)}
                       </span>
                     )}
-                    <span className={clsx("text-xs font-black", item.isAutoPromo ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
+                    <span className={clsx("text-xs font-black", item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
                       ${(Number(item.precio) * item.qty).toFixed(2)}
                     </span>
                   </div>
@@ -273,7 +270,6 @@ export const TicketCartGroup = ({
                     )}
                 </div>
 
-                {/* 🔥 DESTRUCCIÓN DEL RECUADRO VACÍO: Solo renderiza si hay opciones reales */}
                 {hasRealPreparations && (
                   <div className="space-y-0.5 pointer-events-none mt-1">
                     {item.preparaciones?.map((prep, pIdx) => {
@@ -290,7 +286,7 @@ export const TicketCartGroup = ({
               </div>
             </div>
 
-            {/* CONTROLES: Los ítems de Auto-Promo NO se pueden sumar ni restar ni ocultar. Solo se atan al producto padre. */}
+            {/* CONTROLES: Los ítems de Auto-Promo NO se pueden sumar ni restar ni ocultar manualmente. */}
             {!item.isAutoPromo && (!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
               <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 

@@ -2,17 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-// 🔥 Añadí el icono "Tag" para las promociones
 import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore, Package, Tag } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
 
-// 🔥 IMPORTAMOS EL NUEVO MODAL DE PROMOCIONES
-import PromotionManagerModal from './PromotionManagerModal';
+// 🔥 IMPORTAMOS LOS DOS MODALES DEL MOTOR DE PROMOCIONES
+import PromotionManagerModal from './PromotionManagerModal'; // El Wizard
+import PromotionListModal from './PromotionListModal';       // El Mini-Dashboard
 
-// 🔥 IMPORTAMOS TU COMPONENTE STATCARD DE MESAS (Adaptado para el Menú)
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
     onClick={onClick}
@@ -32,9 +31,11 @@ export const MenuManagerPage = () => {
   const [toast, setToast] = useState(null);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   
-  // 🔥 ESTADOS PARA EL MODAL DE PROMOCIONES
-  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  // 🔥 ESTADOS DIVIDIDOS PARA EL FLUJO DE PROMOCIONES
+  const [isPromoListOpen, setIsPromoListOpen] = useState(false);
+  const [isPromoWizardOpen, setIsPromoWizardOpen] = useState(false);
   const [selectedProductForPromo, setSelectedProductForPromo] = useState(null);
+  const [editingPromoData, setEditingPromoData] = useState(null); // 🔥 NUEVO: Guarda la promo a editar
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -66,10 +67,10 @@ export const MenuManagerPage = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // 🔥 Función para abrir el gestor de promociones
-  const handleOpenPromo = (product) => {
+  // 🔥 Función para abrir PRIMERO el Mini-Dashboard (Lista)
+  const handleOpenPromoList = (product) => {
     setSelectedProductForPromo(product);
-    setIsPromoModalOpen(true);
+    setIsPromoListOpen(true);
   };
 
   if (isLoading) {
@@ -178,16 +179,16 @@ export const MenuManagerPage = () => {
           </div>
         </div>
         
-        <div className="flex flex-wrap space-x-0 space-y-3 md:space-y-0 md:space-x-3 w-full md:w-auto">
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsOptionsManagerOpen(true)} className="w-full md:w-auto flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20">
+        <div className="grid grid-cols-2 md:flex md:flex-row gap-3 w-full md:w-auto">
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsOptionsManagerOpen(true)} className="col-span-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-4 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20 outline-none">
             <Settings size={20} /> <span className="hidden sm:inline">Opciones Globales</span>
           </motion.button>
           
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsCategoryManagerOpen(true)} className="flex-1 md:flex-none bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text px-5 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2">
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsCategoryManagerOpen(true)} className="col-span-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text px-4 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 outline-none border border-transparent">
             <LayoutGrid size={20} /> <span className="hidden sm:inline">Categorías</span>
           </motion.button>
           
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => openModal()} className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 transition-all flex items-center justify-center space-x-2">
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => openModal()} className="col-span-2 md:col-span-1 bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 transition-all flex items-center justify-center space-x-2 outline-none">
             <Plus size={20} /> <span>Nuevo Producto</span>
           </motion.button>
         </div>
@@ -307,7 +308,7 @@ export const MenuManagerPage = () => {
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto relative z-10">
                             
                             <div className="flex flex-col gap-1.5 w-full mr-2">
-                              {/* 🔥 LÓGICA DE BOTÓN INTELIGENTE (Action-Oriented Design) */}
+                              {/* 🔥 LÓGICA DE BOTÓN INTELIGENTE */}
                               {isMathematicallyAgotado ? (
                                 <button 
                                   onClick={() => openModal(product)} 
@@ -336,11 +337,11 @@ export const MenuManagerPage = () => {
                             </div>
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
-                              {/* 🔥 NUEVO BOTÓN: GESTOR DE PROMOCIONES */}
+                              {/* 🔥 BOTÓN PARA ABRIR LISTA DE PROMOCIONES */}
                               <button 
-                                onClick={() => handleOpenPromo(product)} 
+                                onClick={() => handleOpenPromoList(product)} 
                                 className="p-2.5 text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400 md:hover:bg-rose-100 dark:md:hover:bg-rose-900/40 rounded-xl transition-colors active:scale-90 outline-none" 
-                                title="Configurar Promoción (Motor de Ofertas)"
+                                title="Configurar Promociones (Motor de Ofertas)"
                               >
                                 <Tag size={16} />
                               </button>
@@ -626,17 +627,38 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 🔥 AQUÍ INYECTAMOS EL GESTOR DE PROMOCIONES AL FINAL DE LA VISTA */}
-      <PromotionManagerModal 
-        isOpen={isPromoModalOpen}
+      {/* =========================================================================
+          🔥 ECOSISTEMA DE PROMOCIONES (MODAL 1: LISTA | MODAL 2: WIZARD)
+          ========================================================================= */}
+          
+      {/* 1. Dashboard de Promociones (La Lista) */}
+      <PromotionListModal
+        isOpen={isPromoListOpen}
         onClose={() => {
-          setIsPromoModalOpen(false);
+          setIsPromoListOpen(false);
           setSelectedProductForPromo(null);
+          setEditingPromoData(null);
         }}
         product={selectedProductForPromo}
+        onOpenWizard={(promoToEdit = null) => {
+          setEditingPromoData(promoToEdit); // 🔥 Recibimos la promo a editar (o null si es nueva)
+          setIsPromoListOpen(false); // Cerramos temporalmente la lista
+          setIsPromoWizardOpen(true); // Abrimos el Wizard
+        }}
+      />
+
+      {/* 2. Wizard de Creación/Edición de Promociones */}
+      <PromotionManagerModal 
+        isOpen={isPromoWizardOpen}
+        onClose={() => {
+          setIsPromoWizardOpen(false);
+          setIsPromoListOpen(true); // Regresamos a la lista
+          setEditingPromoData(null); // Limpiamos la caché de edición
+        }}
+        product={selectedProductForPromo}
+        editData={editingPromoData} // 🔥 Pasamos los datos al Wizard
         onPromotionSaved={(promoInfo) => {
-          // Usamos tu sistema nativo de Toasts para notificar el éxito
-          showToast(`¡Promoción configurada exitosamente!`, 'success');
+          showToast(`¡Promoción guardada exitosamente!`, 'success');
         }}
       />
 

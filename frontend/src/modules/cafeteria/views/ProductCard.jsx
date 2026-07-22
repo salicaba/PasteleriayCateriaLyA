@@ -1,6 +1,6 @@
 // src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
 export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, cartQty = 0, onLimitReached, activePromotions = [] }) => {
@@ -13,7 +13,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
   
   const imageUrl = product.image || product.imagen;
 
-  // 🔥 1. Parsear Opciones de Forma Segura
   const parsedOptions = useMemo(() => {
     try {
       if (!product.opciones) return null;
@@ -25,8 +24,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
   const hasOptions = parsedOptions && (parsedOptions.tamanos?.length > 0 || parsedOptions.leches?.length > 0 || parsedOptions.extras?.length > 0);
 
-  // 🔥 2. CÁLCULO DEL PRECIO REAL (Precio Base de BD + Costo de Opciones por Defecto)
-  // Esto evita el "WTF" del cliente al ver que el precio sube mágicamente.
   const realBasePrice = useMemo(() => {
     let base = Number(product.precioBase || product.precio || 0);
     if (parsedOptions && parsedOptions.defaults) {
@@ -45,22 +42,42 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return base;
   }, [product.precioBase, product.precio, parsedOptions]);
 
+  // 🔥 PARSER SEGURO INYECTADO
   const activePromo = useMemo(() => {
     const promo = activePromotions.find(p => p.productId === product.id);
     if (!promo || !promo.isActive) return null;
+    
     const today = new Date().getDay();
-    if (!promo.validDays.includes(today)) return null;
+    
+    let validDaysAsNumbers = [];
+    if (Array.isArray(promo.validDays)) {
+      validDaysAsNumbers = promo.validDays.map(Number);
+    } else if (typeof promo.validDays === 'string') {
+      try { 
+        validDaysAsNumbers = JSON.parse(promo.validDays).map(Number); 
+      } catch (e) { 
+        validDaysAsNumbers = promo.validDays.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+      }
+    }
+
+    if (!validDaysAsNumbers.includes(today)) return null;
     return promo;
   }, [activePromotions, product.id]);
 
-  // 🔥 3. CÁLCULO DE PROMOCIÓN FIJA (Respetando el costo de los extras)
-  // Si la promo dice que cuesta $50, pero lleva leche extra de $15, el precio final tachado será $65
   const promoFixedPrice = useMemo(() => {
     if (!activePromo || activePromo.type !== 'FIXED') return 0;
     const originalDbPrice = Number(product.precioBase || product.precio || 0);
     const costoExtras = realBasePrice - originalDbPrice;
     return Number(activePromo.discountValue) + costoExtras;
   }, [activePromo, realBasePrice, product.precioBase, product.precio]);
+
+  const discountPercent = useMemo(() => {
+    if (activePromo?.type === 'FIXED' && realBasePrice > 0) {
+      const percent = ((realBasePrice - promoFixedPrice) / realBasePrice) * 100;
+      return Math.max(0, Math.round(percent));
+    }
+    return 0;
+  }, [activePromo, realBasePrice, promoFixedPrice]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
@@ -71,20 +88,15 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       return;
     }
 
-    // 🔥 4. ESCUDO PARA OPCIONES OBLIGATORIAS ("Elegir...")
-    // Si la opción por defecto contiene la palabra "elegir", bloqueamos el "+" rápido 
-    // y obligamos a abrir el modal de personalización.
     const defaultTamano = parsedOptions?.defaults?.tamano;
     if (hasOptions && (!defaultTamano || defaultTamano.toLowerCase().includes('elegir'))) {
-      if (onClick) onClick(product); // Abre el modal
+      if (onClick) onClick(product); 
       return;
     }
 
     setIsAdding(true);
     try {
-      if (onQuickAdd) {
-        await onQuickAdd(product);
-      }
+      if (onQuickAdd) await onQuickAdd(product);
     } finally {
       setIsAdding(false);
     }
@@ -131,7 +143,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
           <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg border border-rose-400 flex items-center gap-1 uppercase tracking-widest">
             <Tag size={10} strokeWidth={3} />
             {activePromo.type === 'NxM' && `${activePromo.buyQty}x${activePromo.payQty}`}
-            {activePromo.type === 'FIXED' && `¡Oferta!`}
+            {activePromo.type === 'FIXED' && `-${discountPercent}% OFF`}
             {activePromo.type === 'NTH_FIXED' && `Promo #${activePromo.buyQty}`}
           </div>
         )}
@@ -176,7 +188,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         <div className="mt-auto flex items-center justify-between pt-2.5 border-t-2 border-gray-50 dark:border-gray-800/80 lya:border-lya-border/40 transition-colors">
           
           <div className="flex flex-col items-start pl-1">
-            {/* 🔥 RENDERIZADO DE PRECIO REAL Y TACHADO SI HAY PROMOCIÓN FIJA */}
             {(activePromo && activePromo.type === 'FIXED') ? (
               <>
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 line-through leading-none">

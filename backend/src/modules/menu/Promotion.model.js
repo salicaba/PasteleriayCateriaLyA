@@ -11,7 +11,7 @@ const Promotion = sequelize.define('Promotion', {
   productId: {
     type: DataTypes.UUID,
     allowNull: false,
-    unique: true, // Un producto solo puede tener una promo activa a la vez
+    //unique: true, // Un producto solo puede tener una promo activa a la vez
     references: {
       model: Product,
       key: 'id'

@@ -1,4 +1,5 @@
 // src/modules/cafeteria/views/PosModal.jsx
+import { socket } from '../../../api/socket.js';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Phone, User, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
@@ -82,7 +83,7 @@ export const PosModal = ({
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
 
-  // 🔥 FETCH DE PROMOCIONES ACTIVAS PARA EL MENÚ
+  // 🔥 FETCH Y SINCRONIZACIÓN EN TIEMPO REAL DE PROMOCIONES PARA EL MENÚ
   const [activePromotions, setActivePromotions] = useState([]);
   useEffect(() => {
     if (isOpen) {
@@ -90,13 +91,18 @@ export const PosModal = ({
         if (res.data.success) setActivePromotions(res.data.data);
       }).catch(err => console.error("Error al cargar promociones en POS", err));
     }
-  }, [isOpen]);
 
-  // 🚀 LÓGICA DE CARGA REAL
-  useEffect(() => {
-    if (isOpen) {
-      setIsMenuLoaded(false);
-    }
+    // Escuchar el socket para que si activas una promo en otra ventana, el cajero la vea al instante
+    const handlePromoUpdate = (data) => {
+      setActivePromotions(prev => {
+        const filtered = prev.filter(p => p.productId !== data.productId);
+        if (data.promotion) filtered.push(data.promotion);
+        return filtered;
+      });
+    };
+    
+    socket.on('menu:promotions_updated', handlePromoUpdate);
+    return () => socket.off('menu:promotions_updated', handlePromoUpdate);
   }, [isOpen]);
 
   useEffect(() => {

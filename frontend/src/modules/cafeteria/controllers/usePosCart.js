@@ -4,6 +4,20 @@ import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js'; 
 
+// 🔥 PARSER INDESTRUCTIBLE PARA LOS DÍAS
+const parseValidDays = (daysData) => {
+  if (!daysData) return [];
+  if (Array.isArray(daysData)) return daysData.map(Number);
+  if (typeof daysData === 'string') {
+    try { 
+      return JSON.parse(daysData).map(Number); 
+    } catch (e) { 
+      return daysData.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+    }
+  }
+  return [];
+};
+
 export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotification) => {
   const [cart, setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
@@ -41,8 +55,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const getActivePromo = (productId) => {
     const promo = promotions.find(p => p.productId === productId);
     if (!promo || !promo.isActive) return null;
+    
     const today = new Date().getDay();
-    if (!promo.validDays.includes(today)) return null;
+    const validDaysAsNumbers = parseValidDays(promo.validDays);
+    
+    if (!validDaysAsNumbers.includes(today)) return null;
     return promo;
   };
 
@@ -176,7 +193,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         const ghostQtyPerBundle = activePromo.type === 'NxM' ? (activePromo.buyQty - activePromo.payQty) : 1;
         qtyToAdd += ghostQtyPerBundle;
         ghostPrice = activePromo.type === 'NxM' ? 0 : parseFloat(activePromo.discountValue);
-        ghostLabel = activePromo.type === 'NxM' ? 'GRATIS' : 'OFERTA';
+        ghostLabel = activePromo.type === 'NxM' ? '🎁 GRATIS' : '✨ OFERTA';
       }
     }
 
@@ -189,11 +206,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     }
     
     let finalDetails = productWithDetails.detalles || {};
-    let finalPrice = productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0;
+    let finalPrice = parseFloat(productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0);
     
+    // GUARDADO DEL PRECIO ORIGINAL (PARA LA UI)
+    let precioOriginalParaTachar = null; 
+
     if (activePromo && activePromo.type === 'FIXED') {
       const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
       const costoExtras = finalPrice - baseOriginal;
+      precioOriginalParaTachar = finalPrice; 
       finalPrice = parseFloat(activePromo.discountValue) + (costoExtras > 0 ? costoExtras : 0);
     } else if (!productWithDetails.detalles) {
         const defaultCustoms = getDefaultCustomizations(productWithDetails);
@@ -219,6 +240,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           newCart.push({ 
             ...productWithDetails, 
             precio: finalPrice, 
+            precioOriginal: precioOriginalParaTachar,
             qty: 1, 
             preparaciones: [finalDetails], 
             enviadoCocina: false, 
@@ -230,23 +252,19 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           });
       }
 
-      // 🔥 AUTO-AÑADIDO DEL ITEM FANTASMA (El Regalo o Descuento)
       if (willAddGhost) {
         const ghostQtyToAdd = qtyToAdd - 1;
         const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
 
-        // 🔥 OBTENER EXACTAMENTE LOS PREDETERMINADOS DEL GESTOR DE MENÚ
         let ops = productWithDetails.opciones;
         if (typeof ops === 'string') {
           try { ops = JSON.parse(ops); } catch (e) { ops = null; }
         }
         
-        // Extraemos solo lo que explícitamente se marcó como default
         let ghostDetails = {};
         if (ops && typeof ops === 'object') {
            if (ops.defaults?.tamano) ghostDetails.tamano = ops.defaults.tamano;
            if (ops.defaults?.leche) ghostDetails.leche = ops.defaults.leche;
-           // Aseguramos que no lleva extras (para no cobrarle ni regalarle ingredientes premium)
            ghostDetails.extras = []; 
         }
 
@@ -257,7 +275,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           promoLabel: ghostLabel,            
           precio: ghostPrice,
           qty: ghostQtyToAdd,
-          // 🔥 Hereda SOLO lo que el admin puso como predeterminado
           preparaciones: Array(ghostQtyToAdd).fill(ghostDetails), 
           enviadoCocina: false,
           status: 'ACTIVE',
