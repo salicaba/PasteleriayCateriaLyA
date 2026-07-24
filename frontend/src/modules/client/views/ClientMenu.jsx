@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  AlertCircle, PowerOff, Clock, Phone, Flame, Lock
+  PowerOff, Clock, Phone, Flame, Lock
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -20,6 +20,9 @@ import {
   getProductModifiers, getDefaultCustomizations 
 } from './utils/clientMenuUtils';
 
+// Importación del Cerebro Matemático (Custom Hook)
+import { useClientCart } from '../controllers/useClientCart';
+
 import { socket } from '../../../api/socket';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -29,7 +32,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const [isLoading, setIsLoading] = useState(true);
   
   const [activeCategory, setActiveCategory] = useState(null);
-  const [cart, setCart] = useState([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -57,6 +59,23 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
   });
 
+  // Notificador Global para inyectar en el hook
+  const triggerNotification = (msg, notifType = 'success') => {
+    setNotification({ msg, type: notifType });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
+  // 🚀 INICIALIZACIÓN DEL CEREBRO MATEMÁTICO
+  const { 
+    cart, 
+    setCart, 
+    addToCart, 
+    removeFromCart, 
+    incrementInCart, 
+    totalCart, 
+    totalItems 
+  } = useClientCart(triggerNotification);
+
   useEffect(() => {
     localStorage.setItem('lya_client_is_confirmed', isConfirmed);
   }, [isConfirmed]);
@@ -65,7 +84,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   
   const initialActivity = parseInt(localStorage.getItem('lya_client_last_activity')) || Date.now();
   const lastActivityRef = useRef(initialActivity);
-  const isProcessingRef = useRef(false);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
@@ -276,10 +294,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     }
   }, [sessionExpired]);
 
-  // 🚀 ACTUALIZACIÓN Y PODA EN TIEMPO REAL PARA EL CLIENTE
+  // 🚀 ACTUALIZACIÓN EN TIEMPO REAL (Solo visual. El carrito lo maneja el custom hook)
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
-      // 1. Actualizamos el catálogo visual de productos
       setProducts(prevProducts => prevProducts.map(p => {
         const update = updates.find(u => u.id === p.id);
         if (update) {
@@ -289,62 +306,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         }
         return p;
       }));
-
-      // 2. Revisamos el carrito del cliente (Poda)
-      setCart(prevCart => {
-        let modifiedCart = [...prevCart];
-        let notificationsToFire = new Set();
-        
-        // Actualizamos la propiedad stock de todos los items en el carrito para que los modales se enteren
-        modifiedCart = modifiedCart.map(item => {
-           const update = updates.find(u => u.id === item.id);
-           return update ? { ...item, stock: update.stock } : item;
-        });
-
-        for (const update of updates) {
-          const itemsOfProduct = modifiedCart.filter(i => i.id === update.id);
-          if (itemsOfProduct.length === 0) continue;
-          
-          if (!itemsOfProduct[0].controlarStock) continue;
-
-          let currentTotalQty = itemsOfProduct.reduce((sum, i) => sum + i.qty, 0);
-          
-          // Verificamos si la suma de lo que tiene el cliente en carrito supera el nuevo stock
-          if (currentTotalQty > update.stock) {
-            if (update.stock === 0) {
-              notificationsToFire.add({ msg: `Un producto de tu carrito se agotó y fue removido.`, type: 'error' });
-              modifiedCart = modifiedCart.filter(i => i.id !== update.id);
-            } else {
-              notificationsToFire.add({ msg: `Ajustamos la cantidad de un producto en tu carrito por disponibilidad.`, type: 'warning' });
-              
-              for (let i = modifiedCart.length - 1; i >= 0; i--) {
-                const item = modifiedCart[i];
-                if (item.id === update.id) {
-                  const excess = currentTotalQty - update.stock;
-                  if (excess >= item.qty) {
-                    currentTotalQty -= item.qty;
-                    modifiedCart.splice(i, 1);
-                  } else {
-                    modifiedCart[i] = { ...item, qty: item.qty - excess };
-                    currentTotalQty -= excess;
-                  }
-                  if (currentTotalQty <= update.stock) break;
-                }
-              }
-            }
-          }
-        }
-
-        // Lanzamos side-effects de forma segura fuera del render cycle
-        setTimeout(() => {
-           notificationsToFire.forEach(notif => {
-               setNotification({ msg: notif.msg, type: notif.type });
-               setTimeout(() => setNotification(null), 4000);
-           });
-        }, 0);
-
-        return modifiedCart;
-      });
     };
 
     socket.on('stock:update', handleStockAdjustment);
@@ -370,80 +331,21 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
   const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 
-  const triggerNotification = (msg, notifType = 'success') => {
-    setNotification({ msg, type: notifType });
-    setTimeout(() => setNotification(null), 3500);
-  };
-
+  // 🚀 Wrapper visual para la inyección de items al carrito
   const handleAddDirectly = async (product, customizations = null, e = null) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    if (isProcessingRef.current) return;
-    isProcessingRef.current = true;
     setAddingToCartId(product.id);
-
     try {
       await new Promise(resolve => setTimeout(resolve, 150));
-      
-      const currentTotalQty = cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
-
-      if (product.controlarStock && currentTotalQty >= product.stock) {
-        triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
-        return; 
-      }
-
-      setCart(prev => {
-        let newItem = { ...product, qty: 1, precioUnitario: product.precio };
-        let uniqueCartId = product.id.toString();
-
-        if (customizations) {
-          newItem = { ...newItem, precioUnitario: customizations.precioFinal, detalles: customizations.detalles, isTakeaway: customizations.isTakeaway };
-          const detailStr = JSON.stringify(customizations.detalles) + (customizations.isTakeaway ? '-llevar' : '');
-          uniqueCartId = `${product.id}-${detailStr}`;
-        }
-
-        newItem.cartItemId = uniqueCartId;
-        const existing = prev.find(item => item.cartItemId === uniqueCartId);
-        if (existing) return prev.map(item => item.cartItemId === uniqueCartId ? { ...item, qty: item.qty + 1 } : item);
-        return [...prev, newItem];
-      });
-      
+      addToCart(product, customizations);
       setSelectedProduct(null);
-      triggerNotification(`¡${product.nombre} agregado!`, 'success');
     } finally {
       setAddingToCartId(null);
-      isProcessingRef.current = false;
     }
   };
-
-  const removeFromCart = (cartItemId) => setCart(prev => {
-      const existing = prev.find(item => item.cartItemId === cartItemId);
-      if (!existing) return prev; 
-      if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
-      return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
-  });
-  
-  // 🚀 EL BLOQUEO NOTIFICADO AL PRESIONAR EL "+" DEL CARRITO
-  const incrementInCart = (cartItemId) => {
-    const existing = cart.find(item => item.cartItemId === cartItemId);
-    if (!existing) return;
-
-    const currentTotalQty = cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
-
-    if (existing.controlarStock && currentTotalQty >= existing.stock) {
-        // Notificación exigida 
-        triggerNotification(`Límite en carrito: Solo hay ${existing.stock} en stock.`, 'warning');
-        return;
-    }
-
-    setCart(prev => prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + 1 } : item));
-  };
-
-  const totalCart = cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0);
-  const totalItems = cart.reduce((acc, item) => acc + (item.qty || 0), 0);
 
   const handleConfirmOrder = async () => {
     if (cart.length === 0) return;
@@ -478,7 +380,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           subtotal: item.precioUnitario * item.qty,
           cuenta: dbOrderType === 'LLEVAR' ? 'General' : (clientData.name || 'General'), 
           notes: JSON.stringify(item.detalles ? [item.detalles] : []), 
-          isTakeaway: item.isTakeaway || false
+          isTakeaway: item.isTakeaway || false,
+          isAutoPromo: item.isAutoPromo || false,
+          promoLabel: item.promoLabel || null,
+          precioOriginal: item.precioOriginal || null
         }))
       };
 
@@ -506,6 +411,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             const existingIndex = newItems.findIndex(i => 
                 i.id === cartItem.id && 
                 i.isTakeaway === cartItem.isTakeaway && 
+                !!i.isAutoPromo === !!cartItem.isAutoPromo &&
                 JSON.stringify(i.detalles || {}) === detailStr1
             );
             if (existingIndex >= 0) {
@@ -676,7 +582,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             
             const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
             
-            const cartQty = cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
+            // Verificamos el stock directamente sin considerar regalos
+            const cartQty = cart.filter(item => item.id === product.id && !item.isAutoPromo).reduce((acc, item) => acc + item.qty, 0);
             const isLimitReached = product.controlarStock && cartQty >= product.stock && product.stock > 0;
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
@@ -784,7 +691,16 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>{selectedProduct && <ClientProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onConfirm={async (customizations) => await handleAddDirectly(selectedProduct, customizations)} />}</AnimatePresence>
+      <AnimatePresence>
+        {selectedProduct && (
+          <ClientProductModal 
+            product={selectedProduct} 
+            cart={cart} 
+            onClose={() => setSelectedProduct(null)} 
+            onConfirm={async (customizations) => await handleAddDirectly(selectedProduct, customizations)} 
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>{showCheckout && <ClientCheckoutModal cart={cart} totalCart={totalCart} isSubmitting={isSubmitting} onClose={() => setShowCheckout(false)} onConfirmOrder={handleConfirmOrder} removeFromCart={removeFromCart} incrementInCart={incrementInCart} />}</AnimatePresence>
       <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
       <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>

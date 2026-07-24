@@ -86,12 +86,16 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
 
+    // 🔥 BLINDAJE: Mapeo estricto incluyendo banderas de promoción
     const itemsToInsert = items.map(item => ({ 
       ...item, 
       orderId, 
       cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
       kitchenStatus: 'PENDING',
-      isTakeaway: item.isTakeaway || false 
+      isTakeaway: item.isTakeaway || false,
+      isAutoPromo: item.isAutoPromo || false,
+      promoLabel: item.promoLabel || null,
+      precioOriginal: item.precioOriginal || null
     }));
 
     await OrderItem.bulkCreate(itemsToInsert);
@@ -231,6 +235,8 @@ export const moveItemAccount = async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
     
     const unitPrice = Number(item.subtotal) / item.quantity;
+    
+    // 🔥 BLINDAJE: Evitar agrupar regalos con productos cobrados
     const existingItems = await OrderItem.findAll({
         where: {
             orderId: item.orderId,
@@ -238,7 +244,9 @@ export const moveItemAccount = async (req, res) => {
             cuenta: targetCuenta,
             kitchenStatus: item.kitchenStatus,
             isTakeaway: item.isTakeaway,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            isAutoPromo: item.isAutoPromo || false, 
+            promoLabel: item.promoLabel || null
         }
     });
 
@@ -267,9 +275,11 @@ export const moveItemAccount = async (req, res) => {
     } else {
         if (qtyToMove < item.quantity) {
            await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
+           // 🔥 BLINDAJE: Heredar banderas de promoción al nuevo registro
            await OrderItem.create({
              orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove,
-             cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE'
+             cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE',
+             isAutoPromo: item.isAutoPromo, promoLabel: item.promoLabel, precioOriginal: item.precioOriginal
            });
         } else {
            await item.update({ cuenta: targetCuenta });

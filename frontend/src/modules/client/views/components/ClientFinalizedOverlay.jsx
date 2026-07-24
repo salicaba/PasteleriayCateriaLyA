@@ -12,6 +12,7 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // Inicialización inteligente que evalúa la diferencia de tiempo al vuelo
   const [timeLeft, setTimeLeft] = useState(() => {
     let storedTime = localStorage.getItem('lya_client_finalized_at');
     if (!storedTime) {
@@ -22,36 +23,36 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
     return Math.max(0, 60 - elapsed);
   });
 
+  // 🔥 MOTOR DE TIEMPO ABSOLUTO (Anti-Throttling)
   useEffect(() => {
     const storedTime = localStorage.getItem('lya_client_finalized_at');
     const finalizedAt = storedTime ? parseInt(storedTime, 10) : Date.now();
 
-    const tickTimer = () => {
+    const checkTimeExact = () => {
+      // Calculamos la hora de la vida real, sin importar si la app se durmió
       const elapsedSeconds = Math.floor((Date.now() - finalizedAt) / 1000);
       const remaining = Math.max(0, 60 - elapsedSeconds);
-      setTimeLeft(remaining);
       
       if (remaining <= 0) {
+        setTimeLeft(0);
         if (logoutRef.current) logoutRef.current();
-        return false;
+        return false; // Tiempo expirado, cortar ciclo
       }
-      return true;
+      
+      setTimeLeft(remaining);
+      return true; // Sigue corriendo
     };
 
-    const shouldContinue = tickTimer();
-    if (!shouldContinue) return;
+    // Revisión ultra-rápida de seguridad en el primer milisegundo del montaje
+    if (!checkTimeExact()) return;
 
-    const timerId = setInterval(() => {
-      const active = tickTimer();
-      if (!active) {
-        clearInterval(timerId);
-      }
-    }, 1000);
+    // Aumentamos la precisión a 500ms para que al desbloquear la pantalla responda el doble de rápido
+    const timerId = setInterval(checkTimeExact, 500);
     
-    // 🔥 BLINDAJE: Si el navegador durmió el setInterval, re-evaluamos inmediatamente al volver a la pestaña
+    // Obligamos al navegador a recalcular al regresar a la pestaña
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        tickTimer();
+        checkTimeExact();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);

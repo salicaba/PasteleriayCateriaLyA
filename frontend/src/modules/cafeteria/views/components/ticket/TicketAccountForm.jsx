@@ -111,7 +111,7 @@ export const TicketAccountForm = ({
                     placeholder="Nueva Cuenta..."
                     value={newCuentaName}
                     onChange={(e) => setNewCuentaName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-gray-900 dark:text-white lya:text-lya-text rounded-xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all placeholder-gray-400 dark:placeholder-gray-500 shadow-inner"
+                    className="focus:ring-inset w-full pl-9 pr-3 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-gray-900 dark:text-white lya:text-lya-text rounded-xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all placeholder-gray-400 dark:placeholder-gray-500 shadow-inner"
                   />
                 </div>
                 <div className="relative flex-1">
@@ -123,7 +123,7 @@ export const TicketAccountForm = ({
                     placeholder="Celular (Opcional)"
                     value={newCuentaPhone}
                     onChange={handlePhoneChange} // Blindaje activo
-                    className="w-full pl-9 pr-3 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-gray-900 dark:text-white lya:text-lya-text rounded-xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all placeholder-gray-400 dark:placeholder-gray-500 shadow-inner"
+                    className="focus:ring-inset w-full pl-9 pr-3 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 text-gray-900 dark:text-white lya:text-lya-text rounded-xl font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all placeholder-gray-400 dark:placeholder-gray-500 shadow-inner"
                   />
                 </div>
               </div>

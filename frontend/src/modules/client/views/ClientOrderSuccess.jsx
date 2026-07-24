@@ -1,7 +1,7 @@
 // src/modules/client/views/ClientOrderSuccess.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, HelpCircle, ReceiptText, Check, PowerOff, Settings, Phone } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Gift } from 'lucide-react';
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
@@ -32,25 +32,25 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         exit={{ opacity: 0, y: 15 }}
         className="flex-1 flex flex-col w-full h-full pb-10"
       >
-        <header className="px-6 pt-6 pb-4 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 transition-colors z-30 flex items-center justify-between shadow-sm">
+        <header className="px-6 pt-6 pb-4 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] border-b border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] transition-colors z-30 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowReadOnlyMenu(false)}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text outline-none md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] outline-none md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
             >
               <ArrowLeft size={20} strokeWidth={2.5} />
             </motion.button>
             <div>
-              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text leading-tight">Menú de Consulta</h3>
-              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 uppercase tracking-wider mt-0.5">Modo Solo Lectura</p>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] leading-tight">Menú de Consulta</h3>
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] uppercase tracking-wider mt-0.5">Modo Solo Lectura</p>
             </div>
           </div>
 
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={onOpenSettings} 
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text outline-none md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] outline-none md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
           >
              <Settings size={20} strokeWidth={2.5} />
           </motion.button>
@@ -63,19 +63,19 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             products.map(product => {
               const hasImage = product.imagen && !product.imagen.includes('default-product');
               return (
-                <div key={product.id} className="flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm">
-                  <div className="w-20 h-20 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex items-center justify-center shadow-inner pointer-events-none">
+                <div key={product.id} className="flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm">
+                  <div className="w-20 h-20 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-[#EADCC9] border border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] flex items-center justify-center shadow-inner pointer-events-none">
                     {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <span className="text-2xl opacity-30">🍽️</span>}
                   </div>
                   
                   <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
-                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-lya-secondary block truncate mb-0.5 text-left">
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate mb-0.5 text-left">
                       {getCategoryName(product.categoria)}
                     </span>
-                    <h4 className="font-extrabold text-base text-gray-900 dark:text-white lya:text-lya-text leading-tight truncate text-left">
+                    <h4 className="font-extrabold text-base text-gray-900 dark:text-white lya:text-[#3E2723] leading-tight truncate text-left">
                       {product.nombre}
                     </h4>
-                    <span className="font-black text-base text-gray-900 dark:text-white lya:text-lya-text tracking-tight mt-1.5 block text-left">
+                    <span className="font-black text-base text-gray-900 dark:text-white lya:text-[#5D4037] tracking-tight mt-1.5 block text-left">
                       ${product.precio}
                     </span>
                   </div>
@@ -89,7 +89,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowReadOnlyMenu(false)}
-            className="w-full py-4 rounded-2xl font-black bg-gray-900 md:hover:bg-gray-800 dark:bg-white dark:md:hover:bg-gray-100 lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg shadow-xl outline-none transition-transform text-sm uppercase tracking-wider flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl font-black bg-gray-900 md:hover:bg-gray-800 dark:bg-white dark:md:hover:bg-gray-100 lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-white shadow-xl outline-none transition-transform text-sm uppercase tracking-wider flex items-center justify-center gap-2"
           >
             <ReceiptText size={18} strokeWidth={2.5} /> <span>Volver a mi Nota</span>
           </motion.button>
@@ -110,7 +110,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       <motion.button 
         whileTap={{ scale: 0.95 }} 
         onClick={onOpenSettings}
-        className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-50 outline-none"
+        className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-50 outline-none"
       >
         <Settings size={20} strokeWidth={2.5} />
       </motion.button>
@@ -127,7 +127,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 200, damping: 15 }}
-          className="relative z-10 w-24 h-24 mx-auto bg-gradient-to-tr from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-xl border-4 border-white dark:border-gray-900 lya:border-lya-bg"
+          className="relative z-10 w-24 h-24 mx-auto bg-gradient-to-tr from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-xl border-4 border-white dark:border-gray-900 lya:border-[#FAF6F0]"
         >
           <motion.div
             animate={{ scale: [1, 1.15, 1] }}
@@ -139,19 +139,19 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       </div>
 
       <div className="space-y-1.5">
-        <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white lya:text-lya-text leading-none text-center">
+        <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white lya:text-[#3E2723] leading-none text-center">
           ¡Listo, {primerNombre}!
         </h2>
-        <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 px-4 text-center">
+        <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] px-4 text-center">
           Tu orden está siendo preparada en cocina con mucho amor.
         </p>
       </div>
 
       {/* Tarjeta Minimalista tipo Apple Pay / Fintech */}
-      <div className="w-full bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-lya-border/40 relative overflow-hidden shrink-0">
+      <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-[#EADCC9] relative overflow-hidden shrink-0">
         
         {/* Barra de color superior */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-lya-primary lya:to-lya-secondary" />
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
 
         {/* 🔥 SELLO GIGANTE DE MARCA DE AGUA */}
         <AnimatePresence>
@@ -170,13 +170,13 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         </AnimatePresence>
 
         {/* Encabezado del Recibo */}
-        <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20 pb-4 mb-4 mt-2 relative z-10">
+        <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]/50 pb-4 mb-4 mt-2 relative z-10">
           <div className="text-left flex flex-col gap-1">
-            <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-lya-text/40">
+            <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">
               Comprobante
             </span>
             <div className="flex flex-col">
-               <span className="text-sm font-bold text-gray-900 dark:text-white lya:text-lya-text capitalize">
+               <span className="text-sm font-bold text-gray-900 dark:text-white lya:text-[#3E2723] capitalize">
                  {displayName}
                </span>
                {displayPhone && (
@@ -187,67 +187,100 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </div>
           </div>
           <div className="flex flex-col gap-1.5 items-end">
-             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text">
-               {type === 'mesa' ? <Utensils size={14} className="text-orange-500" /> : <ShoppingBag size={14} className="text-orange-500" />}
+             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-xl border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#3E2723]">
+               {type === 'mesa' ? <Utensils size={14} className="text-orange-500 lya:text-[#78350F]" /> : <ShoppingBag size={14} className="text-orange-500 lya:text-[#78350F]" />}
                <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
              </div>
           </div>
         </div>
 
-        {/* Lista de Productos */}
+        {/* Lista de Productos BLINDADA ANTI-AMNESIA */}
         <div className="space-y-4 max-h-[25vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
-          {cart.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-start text-sm font-medium text-gray-800 dark:text-gray-200 lya:text-lya-text pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-lya-border/10 last:border-0 last:pb-0">
-              
-              <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
-                <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-lya-secondary bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-secondary/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                  x{item.qty}
-                </span>
+          {cart.map((item, idx) => {
+            const isGhost = item.isAutoPromo && item.precioUnitario === 0;
+
+            return (
+              <div key={idx} className="flex justify-between items-start text-sm font-medium text-gray-800 dark:text-gray-200 lya:text-[#3E2723] pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0">
                 
-                <div className="flex-1 min-w-0 text-left">
-                  <span className="font-bold block text-gray-900 dark:text-white lya:text-lya-text leading-tight">
-                    {item.nombre}
-                  </span>
-                  
-                  {item.detalles && (
-                    <div className="text-[10px] opacity-70 mt-1 leading-snug font-semibold text-gray-500 dark:text-gray-400">
-                      {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
-                      {item.detalles.leche && <span> • {item.detalles.leche}</span>}
-                      {item.detalles.extras && item.detalles.extras.length > 0 && <span> • +{item.detalles.extras.join(', ')}</span>}
-                      {item.isTakeaway && <span className="block text-orange-500 dark:text-orange-400 lya:text-lya-secondary font-bold mt-1">Empaque P/Llevar</span>}
-                    </div>
+                <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
+                  {isGhost ? (
+                     <div className="flex flex-col items-center justify-center bg-orange-50 dark:bg-orange-900/20 lya:bg-[#EADCC9]/50 rounded-lg px-2 py-1 shrink-0 border border-orange-100 dark:border-orange-800/30 lya:border-[#EADCC9] mt-0.5">
+                       <Gift size={14} className="text-orange-500 lya:text-[#78350F] mb-0.5" />
+                       <span className="font-black text-center text-[10px] text-orange-600 dark:text-orange-400 lya:text-[#78350F] tracking-wider">x{item.qty}</span>
+                     </div>
+                  ) : (
+                     <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                       x{item.qty}
+                     </span>
                   )}
                   
-                  {item.qty > 1 && (
-                    <span className="inline-block mt-1.5 text-[9px] font-extrabold text-gray-400 dark:text-gray-500 lya:text-lya-text/40 tracking-wide uppercase">
-                      Precio Unitario: ${item.precioUnitario.toFixed(2)}
+                  <div className="flex-1 min-w-0 text-left">
+                    <span className="font-bold block text-gray-900 dark:text-white lya:text-[#3E2723] leading-tight">
+                      {item.nombre}
                     </span>
+                    
+                    {item.detalles && !isGhost && (
+                      <div className="text-[10px] opacity-70 mt-1 leading-snug font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
+                        {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
+                        {item.detalles.leche && <span> • {item.detalles.leche}</span>}
+                        {item.detalles.extras && item.detalles.extras.length > 0 && <span> • +{item.detalles.extras.join(', ')}</span>}
+                        {item.isTakeaway && <span className="block text-orange-500 dark:text-orange-400 lya:text-[#78350F] font-bold mt-1">Empaque P/Llevar</span>}
+                      </div>
+                    )}
+                    
+                    {/* MEMORIA VISUAL ANTI-AMNESIA EN RECIBO */}
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      {item.promoLabel && (
+                        <span className="bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-600 dark:text-orange-400 lya:text-[#78350F] px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-wider uppercase shrink-0 border border-orange-200 dark:border-orange-800/30 lya:border-transparent">
+                          {item.promoLabel}
+                        </span>
+                      )}
+                      
+                      {item.qty > 1 && !isGhost && (
+                        <span className="inline-block text-[9px] font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] tracking-wide uppercase">
+                          Unit: ${item.precioUnitario.toFixed(2)}
+                        </span>
+                      )}
+                      
+                      {item.precioOriginal && !isGhost && (
+                        <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through shrink-0">
+                          Normal: ${(item.precioOriginal).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end shrink-0">
+                  <span className="font-black text-[15px] text-gray-900 dark:text-white lya:text-[#3E2723]">
+                    ${(item.precioUnitario * item.qty).toFixed(2)}
+                  </span>
+                  {item.precioOriginal && item.qty > 1 && !isGhost && (
+                     <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
+                       ${(item.precioOriginal * item.qty).toFixed(2)}
+                     </span>
                   )}
                 </div>
               </div>
-              
-              <span className="font-black text-[15px] shrink-0 text-gray-900 dark:text-white lya:text-lya-text">
-                ${(item.precioUnitario * item.qty).toFixed(2)}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Zona del Total */}
-        <div className="mt-5 pt-5 border-t border-gray-200 dark:border-gray-700 lya:border-lya-border/40 flex flex-col items-center justify-center gap-1 relative z-10">
-          <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-lya-text/50">
+        <div className="mt-5 pt-5 border-t border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex flex-col items-center justify-center gap-1 relative z-10">
+          <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/80">
             Total a Pagar
           </span>
-          <span className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tighter">
+          <span className="text-4xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tighter">
             ${totalCart.toFixed(2)}
           </span>
         </div>
       </div>
 
       {/* Mensaje Informativo Común */}
-      <div className="w-full text-xs font-semibold text-gray-600 dark:text-gray-300 lya:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg/50 px-5 py-4 rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-sm shrink-0 text-center">
-        <p className="flex items-center justify-center gap-2 mb-1.5 text-gray-900 dark:text-white font-black text-sm">
-          <span className="text-orange-500 lya:text-lya-secondary">🛎️</span> ¿Necesitas tu cuenta?
+      <div className="w-full text-xs font-semibold text-gray-600 dark:text-gray-300 lya:text-[#7A6353] bg-gray-100 dark:bg-gray-800 lya:bg-white px-5 py-4 rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm shrink-0 text-center">
+        <p className="flex items-center justify-center gap-2 mb-1.5 text-gray-900 dark:text-white lya:text-[#3E2723] font-black text-sm">
+          <span className="text-orange-500">🛎️</span> ¿Necesitas tu cuenta?
         </p>
         <p className="leading-relaxed opacity-80 text-[11.5px] text-justify">
           Para solicitar tu cuenta final, realizar modificaciones al pedido o resolver cualquier duda, <b>por favor solicita asistencia a nuestro personal</b>.
@@ -296,38 +329,38 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                   <motion.button 
                     whileTap={{ scale: 0.95 }}
                     onClick={onReset} 
-                    className="w-full py-4 rounded-2xl font-black text-sm bg-gray-900 md:hover:bg-gray-800 dark:bg-white dark:md:hover:bg-gray-100 lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-surface shadow-xl outline-none transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-2xl font-black text-sm bg-gray-900 md:hover:bg-gray-800 dark:bg-white dark:md:hover:bg-gray-100 lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-white shadow-xl outline-none transition-all flex items-center justify-center gap-2"
                   >
                     <span>Quiero pedir algo más</span>
                     <ChevronRight size={16} strokeWidth={3} />
                   </motion.button>
-                  <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/50 text-center px-4">
+                  <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 lya:text-[#7A6353] text-center px-4">
                     Puedes seguir agregando bebidas o postres a tu cuenta de forma autónoma.
                   </p>
                 </div>
               ) : (
-                <div className="w-full bg-gray-200/50 dark:bg-gray-800/50 lya:bg-lya-bg/50 p-5 rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shrink-0 text-center">
-                   <p className="flex items-center justify-center gap-2 mb-2 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 font-black text-sm">
+                <div className="w-full bg-gray-200/50 dark:bg-gray-800/50 lya:bg-[#EADCC9]/50 p-5 rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shrink-0 text-center">
+                   <p className="flex items-center justify-center gap-2 mb-2 text-gray-500 dark:text-gray-400 lya:text-[#78350F] font-black text-sm">
                      <PowerOff size={16} strokeWidth={2.5} /> Servicio Pausado
                    </p>
-                   <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-[11.5px] font-medium leading-relaxed px-2 text-justify">
+                   <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-[11.5px] font-medium leading-relaxed px-2 text-justify">
                      Los pedidos digitales se han apagado temporalmente. Si deseas ordenar algo más, por favor habla directamente con nuestro personal en mostrador o en tu mesa.
                    </p>
                 </div>
               )}
 
-              <div className="border-t border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-3/4 mx-auto my-4"></div>
+              <div className="border-t border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] w-3/4 mx-auto my-4"></div>
 
               <div className="space-y-2">
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowReadOnlyMenu(true)} 
-                  className="w-full py-3.5 rounded-2xl font-bold text-sm bg-white dark:bg-gray-800 lya:bg-white text-gray-600 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border shadow-sm md:hover:bg-gray-50 dark:md:hover:bg-gray-700/50 outline-none transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-2xl font-bold text-sm bg-white dark:bg-gray-800 lya:bg-white text-gray-600 dark:text-gray-300 lya:text-[#7A6353] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm md:hover:bg-gray-50 dark:md:hover:bg-gray-700/50 outline-none transition-all flex items-center justify-center gap-2"
                 >
                   <Eye size={16} strokeWidth={2.5} />
                   <span>Ver menú solo de lectura</span>
                 </motion.button>
-                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/50 text-center px-2">
+                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/80 text-center px-2">
                   Si prefieres, revisa el catálogo aquí y pídele a un empleado que tome tu nueva orden.
                 </p>
               </div>
