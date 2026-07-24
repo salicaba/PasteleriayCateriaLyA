@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  PowerOff, Clock, Phone, Flame, Lock, Tag
+  PowerOff, Clock, Phone, Flame, Lock, Tag, Gift
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -59,13 +59,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
   });
 
-  // Notificador Global para inyectar en el hook
   const triggerNotification = (msg, notifType = 'success') => {
     setNotification({ msg, type: notifType });
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🚀 INICIALIZACIÓN DEL CEREBRO MATEMÁTICO
   const { 
     cart, 
     setCart, 
@@ -588,6 +586,20 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
             const promoData = getPromoBadge(product.id);
 
+            // 🔥 NUEVO: POKA-YOKE FINANCIERO VISUAL
+            const defaultMods = getDefaultCustomizations(product);
+            const baseOriginal = Number(product.precio);
+            const finalPriceWithDefaults = defaultMods ? defaultMods.precioFinal : baseOriginal;
+            const costoExtras = finalPriceWithDefaults - baseOriginal;
+
+            let displayOriginalPrice = null;
+            let displayFinalPrice = finalPriceWithDefaults;
+
+            if (promoData?.type === 'FIXED') {
+              displayOriginalPrice = finalPriceWithDefaults;
+              displayFinalPrice = promoData.discountValue + (costoExtras > 0 ? costoExtras : 0);
+            }
+
             return (
               <motion.div 
                 key={product.id} 
@@ -634,11 +646,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
                     <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
                     
-                    {/* 🔥 INSIGNIAS DE PROMOCIÓN CON ICONO TIPO ETIQUETA (TAG) */}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {promoData && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-500 dark:bg-rose-600 px-2.5 py-1 rounded-full border border-transparent shadow-sm">
-                          <Tag size={10} strokeWidth={3} />
+                          {promoData.type === 'NxM' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
                           <span>{promoData.text}</span>
                         </span>
                       )}
@@ -660,15 +671,15 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                       {promoData?.type === 'FIXED' ? (
                         <>
                           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none block -mb-0.5">
-                            ${Number(product.precio).toFixed(2)}
+                            ${displayOriginalPrice.toFixed(2)}
                           </span>
                           <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600' : 'text-rose-500 dark:text-rose-400 lya:text-[#78350F]'}`}>
-                            ${promoData.discountValue.toFixed(2)}
+                            ${displayFinalPrice.toFixed(2)}
                           </span>
                         </>
                       ) : (
                         <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-gray-900 dark:text-white lya:text-[#5D4037]'}`}>
-                          ${Number(product.precio).toFixed(2)}
+                          ${displayFinalPrice.toFixed(2)}
                         </span>
                       )}
                     </div>
@@ -682,7 +693,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                           triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
                           return;
                         }
-                        const defaultMods = getDefaultCustomizations(product); 
                         handleAddDirectly(product, defaultMods, e); 
                       }} 
                       className={`w-10 h-10 rounded-[1rem] flex items-center justify-center shadow transition-all outline-none touch-manipulation ${
