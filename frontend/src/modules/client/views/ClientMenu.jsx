@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  PowerOff, Clock, Phone, Flame, Lock
+  PowerOff, Clock, Phone, Flame, Lock, Tag
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -457,18 +457,18 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] backdrop-blur-md transition-opacity duration-300">
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] backdrop-blur-md transition-opacity duration-300">
          <div className="relative w-28 h-28 mb-6">
-            <div className="absolute inset-0 rounded-full border-[6px] border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9]" />
+            <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-[#EADCC9]" />
             <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-600 lya:border-[#78350F] border-t-transparent animate-spin" />
             <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
               <img src={logoLyA} alt="Logo 𝓛𝔂α" className="w-full h-full object-cover animate-pulse" />
             </div>
          </div>
-         <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] tracking-tight mb-2 animate-pulse text-center">
+         <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight mb-2 animate-pulse text-center">
             {isLoggingOut ? "Cerrando sesión..." : (type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
          </h2>
-         <p className="text-neutral-500 dark:text-neutral-400 lya:text-[#7A6353] font-medium text-sm flex items-center gap-2 justify-center">
+         <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm flex items-center gap-2 justify-center">
             {isLoggingOut ? <Loader2 size={16} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F] animate-spin" /> : <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400" />}
             {isLoggingOut ? (type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") : "Cargando el menú más fresco"}
          </p>
@@ -489,13 +489,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   if (sessionExpired) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] p-6 overflow-hidden">
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9]">
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] p-6 overflow-hidden">
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]">
           <div className="w-20 h-20 bg-orange-50 dark:bg-orange-900/20 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-[#78350F]">
              <Clock size={40} />
           </div>
-          <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] mb-4 tracking-tight text-center">Sesión Expirada</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify px-2">
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-4 tracking-tight text-center">Sesión Expirada</h2>
+          <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify px-2">
              {type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
           </p>
           <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-lg">Entendido</motion.button>
@@ -506,12 +506,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
 
   if (!isQrActive && !isConfirmed) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] p-6 overflow-hidden">
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-2xl max-w-[400px] w-full flex flex-col items-center border border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9]">
-          <div className="w-20 h-20 bg-neutral-100 dark:bg-neutral-800 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner"><PowerOff size={40} className="text-neutral-400 dark:text-neutral-500 lya:text-[#78350F]" /></div>
-          <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] mb-4 tracking-tight text-center">Servicio Suspendido</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify">El servicio de pedidos digitales por código QR se encuentra deshabilitado temporalmente.</p>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-xl">Entendido, cerrar menú</motion.button>
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] p-6 overflow-hidden">
+        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]">
+          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner"><PowerOff size={40} className="text-gray-400 dark:text-gray-500 lya:text-[#78350F]" /></div>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-4 tracking-tight text-center">Servicio Suspendido</h2>
+          <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify">El servicio de pedidos digitales por código QR se encuentra deshabilitado temporalmente.</p>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-gray-900 dark:bg-gray-700 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-xl">Entendido, cerrar menú</motion.button>
         </motion.div>
       </div>
     );
@@ -530,12 +530,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   }
 
   return (
-    <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] relative">
+    <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative">
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-neutral-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200 dark:border-emerald-900/50 lya:border-emerald-200/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]' : 'border-amber-200 dark:border-amber-900/50 lya:border-amber-400/50 text-neutral-800 dark:text-neutral-100 lya:text-[#3E2723]'}`}>
-              <div className={`p-1.5 rounded-full ${notification.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-gray-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${notification.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-emerald-200/50 text-gray-800 dark:text-white lya:text-[#3E2723]' : 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-400/50 text-gray-800 dark:text-white lya:text-[#3E2723]'}`}>
+              <div className={`p-1.5 rounded-full ${notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600'}`}>
                 {notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
               </div>
               <span className="text-sm tracking-wide text-center">{notification.msg}</span>
@@ -544,11 +544,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         )}
       </AnimatePresence>
 
-      <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-neutral-50 dark:bg-neutral-950 lya:bg-[#FAF6F0] border-b border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] transition-colors">
+      <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] border-b border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] transition-colors">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 lya:text-[#7A6353] uppercase tracking-wider text-left">Menú Digital</p>
-            <h2 className="text-2xl font-black text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] truncate text-left leading-tight">Hola, {displayName}</h2>
+            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] uppercase tracking-wider text-left">Menú Digital</p>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] truncate text-left leading-tight">Hola, {displayName}</h2>
             {displayPhone && (
               <div className="flex items-center gap-1 mt-1.5 w-fit px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-50/50 rounded-md border border-emerald-100 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-black tracking-widest">
                 <Phone size={12} /><span>{displayPhone}</span>
@@ -556,8 +556,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353] transition-colors md:hover:bg-gray-100"><Settings size={18} /></motion.button>
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] shadow-sm text-[10px] font-bold text-neutral-700 dark:text-neutral-300 lya:text-[#7A6353] rounded-full">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-400 lya:text-[#7A6353] transition-colors md:hover:bg-gray-100 outline-none"><Settings size={18} /></motion.button>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-[10px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#7A6353] rounded-full">
               {type === 'mesa' ? <Utensils size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /> : <ShoppingBag size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" />}
               <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
             </div>
@@ -565,14 +565,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
         </div>
         <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 pt-0.5 -mx-6 px-6">
           {categories.map(cat => (
-            <motion.button whileTap={{ scale: 0.95 }} key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors border ${activeCategory === cat.id ? 'bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white border-transparent' : 'bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] text-neutral-600 dark:text-neutral-400 lya:text-[#7A6353]'}`}>{cat.name}</motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-4 py-2 rounded-xl font-bold text-xs transition-colors border outline-none select-none touch-manipulation ${activeCategory === cat.id ? 'bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white border-transparent shadow-md' : 'bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] text-gray-600 dark:text-gray-400 lya:text-[#7A6353] shadow-sm'}`}>{cat.name}</motion.button>
           ))}
         </div>
       </header>
 
       <motion.div key={activeCategory} variants={containerVariants} initial="hidden" animate="show" className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar">
         {visibleProducts.length === 0 ? (
-          <div className="text-center py-12 text-neutral-400 dark:text-neutral-500 lya:text-[#7A6353] font-medium text-sm">No se encontraron productos en esta categoría.</div>
+          <div className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-[#7A6353] font-medium text-sm">No se encontraron productos en esta categoría.</div>
         ) : (
           visibleProducts.map(product => {
             const hasImage = product.imagen && !product.imagen.includes('default-product');
@@ -602,12 +602,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   }
                   if (isCustomizable) setSelectedProduct(product);
                 }} 
-                className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] border shadow-sm transition-all overflow-hidden ${
+                className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border shadow-sm transition-all overflow-hidden outline-none touch-manipulation ${
                   isAgotado 
-                    ? 'border-gray-200 dark:border-neutral-800 opacity-60 grayscale-[50%]' 
+                    ? 'border-gray-200 dark:border-gray-700 opacity-60 grayscale-[50%]' 
                     : isLimitReached
                       ? 'border-amber-200 dark:border-amber-900/40 opacity-80' 
-                      : `border-neutral-100 dark:border-neutral-800 lya:border-[#EADCC9] ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] md:hover:shadow-md dark:md:hover:bg-neutral-800/80 lya:md:hover:bg-[#EADCC9]/30' : ''}`
+                      : `border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] md:hover:shadow-md dark:md:hover:bg-gray-700/80 lya:md:hover:bg-[#EADCC9]/30' : ''}`
                 }`}
               >
                 
@@ -619,26 +619,26 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   </div>
                 )}
 
-                <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-neutral-100 dark:bg-neutral-950 lya:bg-[#EADCC9] border border-neutral-100 dark:border-neutral-800 lya:border-[#D9C4A9] flex items-center justify-center shadow-inner relative">
+                <div className="w-24 h-24 shrink-0 rounded-[1.25rem] overflow-hidden bg-gray-100 dark:bg-gray-900 lya:bg-[#EADCC9] border border-gray-100 dark:border-gray-700 lya:border-[#D9C4A9] flex items-center justify-center shadow-inner relative pointer-events-none">
                   {showScarcity && (
                     <div className="absolute top-1.5 right-1.5 z-10 bg-amber-500/95 dark:bg-amber-600/95 backdrop-blur-md text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-lg border border-amber-400/50 flex items-center gap-0.5 animate-pulse">
                       <Flame size={8} /> ¡Quedan {product.stock}!
                     </div>
                   )}
 
-                  {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-neutral-300 dark:text-neutral-700 lya:text-[#C4B29A]" size={28} />}
+                  {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={28} />}
                 </div>
                 
                 <div className="flex-1 min-w-0 flex flex-col justify-between h-full min-h-[6rem] py-1">
                   <div className="min-w-0 mb-1">
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
-                    <h3 className="font-extrabold text-[15px] sm:text-base text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
+                    <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
                     
-                    {/* 🔥 INSIGNIAS DE PROMOCIÓN CON LÓGICA CONDICIONAL */}
+                    {/* 🔥 INSIGNIAS DE PROMOCIÓN CON ICONO TIPO ETIQUETA (TAG) */}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {promoData && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-fuchsia-700 dark:text-fuchsia-300 bg-fuchsia-100 dark:bg-fuchsia-900/30 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-fuchsia-200 dark:border-fuchsia-800/40 lya:border-transparent">
-                          <span>{promoData.type === 'NxM' ? '🎁' : '✨'}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-500 dark:bg-rose-600 px-2.5 py-1 rounded-full border border-transparent shadow-sm">
+                          {promoData.type === 'NxM' ? <span>🎁</span> : <Tag size={10} strokeWidth={3} />}
                           <span>{promoData.text}</span>
                         </span>
                       )}
@@ -662,12 +662,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none block -mb-0.5">
                             ${Number(product.precio).toFixed(2)}
                           </span>
-                          <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-neutral-400 dark:text-neutral-600' : 'text-fuchsia-600 dark:text-fuchsia-400 lya:text-[#78350F]'}`}>
+                          <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600' : 'text-rose-500 dark:text-rose-400 lya:text-[#78350F]'}`}>
                             ${promoData.discountValue.toFixed(2)}
                           </span>
                         </>
                       ) : (
-                        <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-neutral-400 dark:text-neutral-600 lya:text-lya-text/40' : 'text-neutral-900 dark:text-neutral-100 lya:text-[#5D4037]'}`}>
+                        <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-gray-900 dark:text-white lya:text-[#5D4037]'}`}>
                           ${Number(product.precio).toFixed(2)}
                         </span>
                       )}
@@ -685,12 +685,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                         const defaultMods = getDefaultCustomizations(product); 
                         handleAddDirectly(product, defaultMods, e); 
                       }} 
-                      className={`w-10 h-10 rounded-[1rem] flex items-center justify-center shadow transition-all outline-none ${
+                      className={`w-10 h-10 rounded-[1rem] flex items-center justify-center shadow transition-all outline-none touch-manipulation ${
                         isAgotado 
-                          ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed'
+                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                           : isLimitReached
-                            ? 'bg-neutral-200 dark:bg-neutral-800 text-amber-500' 
-                            : 'bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white md:hover:bg-neutral-800 dark:md:hover:bg-neutral-700 lya:md:hover:bg-[#5C240A] active:scale-90 disabled:opacity-50'
+                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500 dark:text-amber-500' 
+                            : 'bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 md:hover:bg-gray-800 dark:md:hover:bg-gray-200 lya:md:hover:bg-[#5C240A] active:scale-90 disabled:opacity-50'
                       }`}
                     >
                       {isAdding ? <Loader2 size={20} className="animate-spin" /> : (isLimitReached ? <Lock size={20} strokeWidth={3} /> : <Plus size={20} strokeWidth={3} />)}
@@ -706,7 +706,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {confirmedSnapshot.items.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", cart.length > 0 ? "bottom-28" : "bottom-6")} style={{ width: 'calc(100% - 3rem)' }}>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-neutral-900 lya:bg-[#F3EBE0] shadow-md border border-neutral-200 dark:border-neutral-800 lya:border-[#EADCC9] text-neutral-800 dark:text-neutral-200 lya:text-[#3E2723] font-black text-sm md:hover:scale-105"><ReceiptText size={20} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /><span>Mi Nota</span></motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] shadow-md border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] text-gray-800 dark:text-white lya:text-[#3E2723] font-black text-sm md:hover:scale-105 outline-none select-none touch-manipulation"><ReceiptText size={20} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /><span>Mi Nota</span></motion.button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -714,9 +714,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-neutral-900 dark:bg-neutral-800 lya:bg-[#78350F] text-white py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-neutral-800 dark:md:hover:bg-neutral-700 lya:md:hover:bg-[#5C240A] transition-colors">
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-gray-800 dark:md:hover:bg-gray-100 lya:md:hover:bg-[#5C240A] transition-colors outline-none select-none touch-manipulation">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/20 flex items-center justify-center font-black text-sm">{totalItems}</div>
+                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 flex items-center justify-center font-black text-sm">{totalItems}</div>
                 <span className="text-base font-black">Revisar Pedido</span>
               </div>
               {addingToCartId !== null ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${totalCart.toFixed(2)}</span>}
