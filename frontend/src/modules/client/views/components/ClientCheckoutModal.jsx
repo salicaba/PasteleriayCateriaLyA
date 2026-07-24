@@ -1,8 +1,6 @@
-// frontend/src/modules/client/views/components/ClientCheckoutModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-// 🔥 Asegúrate de agregar 'Tag' al final de esta lista:
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Gift, Tag } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
@@ -80,7 +78,9 @@ export default function ClientCheckoutModal({
             const qty = item.qty || 0;
             const precioTotalItem = precioUnitario * qty;
             
-            const isGhost = item.isAutoPromo && precioUnitario === 0;
+            // 🔥 LÓGICA DE BLOQUEO UI UNIFICADA
+            const isGhost = item.isAutoPromo && precioUnitario === 0; // Para ocultar detalles del GRATIS
+            const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA'; // Para bloquear botones +/-
 
             const currentTotalQty = cart.filter(i => i.id === item.id && !i.isAutoPromo).reduce((acc, i) => acc + i.qty, 0);
             const isLimitReached = item.controlarStock && currentTotalQty >= item.stock && item.stock > 0;
@@ -92,6 +92,7 @@ export default function ClientCheckoutModal({
                     {item.nombre || 'Producto'}
                   </h4>
                   
+                  {/* Detalles: Se muestran para la "Unidad Adicional" pero no para el "GRATIS" */}
                   {item.detalles && !isGhost && (
                     <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-0.5 leading-tight text-justify">
                       {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
@@ -101,7 +102,6 @@ export default function ClientCheckoutModal({
                     </div>
                   )}
                   
-                  {/* MEMORIA VISUAL ANTI-AMNESIA (Precios e Insignias) */}
                   <div className="mt-1.5 flex items-baseline gap-2 h-5 relative overflow-hidden">
                     {isThisItemLoading && (
                       <div className="absolute inset-0 bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] z-10 flex items-center gap-1.5">
@@ -136,8 +136,8 @@ export default function ClientCheckoutModal({
                   </div>
                 </div>
                 
-                {/* BOTONES DE ACCIÓN BLINDADOS (Perro Guardián anti-ghosts) */}
-                {isGhost ? (
+                {/* 🔥 BOTONES DE ACCIÓN BLINDADOS PARA PROMOS BLOQUEADAS */}
+                {isLockedPromo ? (
                    <div className="flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-900/20 rounded-[1.25rem] px-3.5 py-1.5 shrink-0 border border-rose-100 dark:border-rose-800/30">
                      <Tag size={16} className="text-rose-500 mb-0.5" strokeWidth={2.5} />
                      <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 tracking-wider">x{qty}</span>
@@ -164,7 +164,7 @@ export default function ClientCheckoutModal({
                         if (isLimitReached) {
                           e.preventDefault();
                           e.stopPropagation();
-                          incrementInCart(item.cartItemId); // Dispara la notificación del warning
+                          incrementInCart(item.cartItemId); // Dispara el warning
                           return;
                         }
                         handleAction(e, item.cartItemId, 'increment');
