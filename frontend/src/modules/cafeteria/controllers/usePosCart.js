@@ -1,4 +1,3 @@
-// src/modules/cafeteria/controllers/usePosCart.js
 import { useState, useMemo, useEffect } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
@@ -18,7 +17,6 @@ const parseValidDays = (daysData) => {
 };
 
 export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotification) => {
-  // 🔥 INTERCEPTOR: Renombramos el estado original para que el Auto-Balanceador lo controle
   const [_cart, _setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
 
@@ -92,7 +90,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       .reduce((acc, item) => acc + item.qty, 0);
   };
 
-  // 🔥 AUTO-BALANCEADOR: Limpia basura Y auto-rellena premios si se mueven entre cuentas
   const syncPromotions = (cartState) => {
     let cleanCart = [...cartState];
     const normalQtys = {};
@@ -140,7 +137,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
       const currentGhosts = ghostQtys[key] || 0;
 
-      // ELIMINAR BASURA FLOTANTE
+      // ELIMINAR BASURA FLOTANTE Y AGRUPAR RETORNO AL ESTADO NORMAL
       if (currentGhosts > expectedGhosts) {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
@@ -148,19 +145,32 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           if ((item.isAutoPromo || Number(item.precio) === 0) && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
             
             if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('Promo #'))) {
-               // NTH_FIXED: Restauramos su precio original
                const originalPrice = item.precioOriginal || item.precioBase || item.precio;
+               const prepsToRestore = item.preparaciones.slice(0, toRemove);
+               const prepStr = JSON.stringify(prepsToRestore[0] || {});
+               
+               const existingNormalIdx = cleanCart.findIndex(p => String(p.id) === String(productId) && String(p.cuenta) === String(cuenta) && !p.isAutoPromo && p.precio === originalPrice && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
+
                if (toRemove >= item.qty) {
-                  cleanCart[i] = { ...item, precio: originalPrice, isAutoPromo: false, promoLabel: undefined };
                   toRemove -= item.qty;
+                  if (existingNormalIdx !== -1 && existingNormalIdx !== i) {
+                      cleanCart[existingNormalIdx] = { ...cleanCart[existingNormalIdx], qty: cleanCart[existingNormalIdx].qty + item.qty, preparaciones: [...cleanCart[existingNormalIdx].preparaciones, ...item.preparaciones] };
+                      cleanCart.splice(i, 1);
+                  } else {
+                      cleanCart[i] = { ...item, precio: originalPrice, isAutoPromo: false, promoLabel: undefined };
+                  }
                } else {
-                  const revertedItem = { ...item, qty: toRemove, precio: originalPrice, isAutoPromo: false, promoLabel: undefined, preparaciones: item.preparaciones.slice(0, toRemove) };
-                  cleanCart[i] = { ...item, qty: item.qty - toRemove, preparaciones: item.preparaciones.slice(toRemove) };
-                  cleanCart.push(revertedItem);
+                  const prepsToKeep = item.preparaciones.slice(toRemove);
+                  cleanCart[i] = { ...item, qty: item.qty - toRemove, preparaciones: prepsToKeep };
+                  if (existingNormalIdx !== -1) {
+                      cleanCart[existingNormalIdx] = { ...cleanCart[existingNormalIdx], qty: cleanCart[existingNormalIdx].qty + toRemove, preparaciones: [...cleanCart[existingNormalIdx].preparaciones, ...prepsToRestore] };
+                  } else {
+                      const revertedItem = { ...item, qty: toRemove, precio: originalPrice, isAutoPromo: false, promoLabel: undefined, preparaciones: prepsToRestore };
+                      cleanCart.push(revertedItem);
+                  }
                   toRemove = 0;
                }
             } else {
-               // NxM: Desaparecemos el regalo
                if (toRemove >= item.qty) {
                   toRemove -= item.qty;
                   cleanCart.splice(i, 1);
@@ -173,7 +183,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           }
         }
       } 
-      // AUTO-RELLENAR SI SE MOVIÓ A OTRA CUENTA Y CALIFICA
+      // AUTO-RELLENAR SI CALIFICA Y AGRUPAR
       else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
          let missing = expectedGhosts - currentGhosts;
          
@@ -185,13 +195,30 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                   const costoExtras = parseFloat(item.precio) - baseOriginal;
                   const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
 
+                  const qtyToConvert = Math.min(missing, item.qty);
+                  const prepsToConvert = item.preparaciones.slice(0, qtyToConvert);
+                  const prepStr = JSON.stringify(prepsToConvert[0] || {});
+
+                  const existingPromoIdx = cleanCart.findIndex(p => String(p.id) === String(productId) && String(p.cuenta) === String(cuenta) && p.isAutoPromo === true && p.promoLabel === ghostLabel && p.precio === finalGhostPrice && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
+
                   if (item.qty <= missing) {
-                     cleanCart[i] = { ...item, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel };
                      missing -= item.qty;
+                     if (existingPromoIdx !== -1 && existingPromoIdx !== i) {
+                         cleanCart[existingPromoIdx] = { ...cleanCart[existingPromoIdx], qty: cleanCart[existingPromoIdx].qty + item.qty, preparaciones: [...cleanCart[existingPromoIdx].preparaciones, ...item.preparaciones] };
+                         cleanCart.splice(i, 1);
+                     } else {
+                         cleanCart[i] = { ...item, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel };
+                     }
                   } else {
-                     const convertedItem = { ...item, qty: missing, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, preparaciones: item.preparaciones.slice(0, missing) };
-                     cleanCart[i] = { ...item, qty: item.qty - missing, preparaciones: item.preparaciones.slice(missing) };
-                     cleanCart.push(convertedItem);
+                     const prepsToKeep = item.preparaciones.slice(missing);
+                     cleanCart[i] = { ...item, qty: item.qty - missing, preparaciones: prepsToKeep };
+                     
+                     if (existingPromoIdx !== -1) {
+                         cleanCart[existingPromoIdx] = { ...cleanCart[existingPromoIdx], qty: cleanCart[existingPromoIdx].qty + missing, preparaciones: [...cleanCart[existingPromoIdx].preparaciones, ...prepsToConvert] };
+                     } else {
+                         const convertedItem = { ...item, qty: missing, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, preparaciones: prepsToConvert };
+                         cleanCart.push(convertedItem);
+                     }
                      missing = 0;
                   }
                   if (missing === 0) break;
@@ -214,15 +241,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                ghostOriginalPrice = defaultCustoms.precioFinal;
             }
 
-            // 🔥 BLINDAJE POKA-YOKE: Agrupar regalos NxM en una sola línea
-            const existingGhostIdx = cleanCart.findIndex(i => 
-              String(i.id) === String(productId) && 
-              String(i.cuenta) === String(cuenta) &&
-              i.isAutoPromo === true && 
-              i.promoLabel === ghostLabel &&
-              i.status !== 'CANCELLED' &&
-              !i.enviadoCocina
-            );
+            const existingGhostIdx = cleanCart.findIndex(i => String(i.id) === String(productId) && String(i.cuenta) === String(cuenta) && i.isAutoPromo === true && i.promoLabel === ghostLabel && i.status !== 'CANCELLED' && !i.enviadoCocina);
 
             if (existingGhostIdx !== -1) {
               const updatedGhost = { ...cleanCart[existingGhostIdx] };
@@ -249,20 +268,35 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
          }
       }
     });
+
+    cleanCart = cleanCart.map(item => {
+      if (item.isAutoPromo && item.promoLabel !== 'OFERTA') return item; 
+      const activePromo = getActivePromo(item.id, item.stock, item.controlarStock);
+      
+      if (activePromo && activePromo.type === 'FIXED') {
+        const baseOriginal = parseFloat(item.precioBase || item.precioOriginal || item.precio || 0);
+        const discountFixed = Number(activePromo.discountValue || 0);
+        const costoExtras = parseFloat(item.precioOriginal || item.precio) - baseOriginal;
+        const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
+
+        if (item.precio !== expectedPrice) {
+          return { ...item, precioOriginal: item.precioOriginal || item.precio, precio: expectedPrice, promoLabel: 'OFERTA', isAutoPromo: true };
+        }
+      } else if (item.promoLabel === 'OFERTA' && (!activePromo || activePromo.type !== 'FIXED')) {
+        return { ...item, precio: item.precioOriginal || item.precio, precioOriginal: undefined, promoLabel: undefined, isAutoPromo: false };
+      }
+      return item;
+    });
+
     return cleanCart;
   };
 
-  // 🔥 INTERCEPTOR ABSOLUTO: Todas tus funciones nativas pasan por aquí ahora
   const setCart = (action) => {
     _setCart(prev => {
        const nextCart = typeof action === 'function' ? action(prev) : action;
-       return syncPromotions(nextCart); // Evalúa la matemática automáticamente
+       return syncPromotions(nextCart);
     });
   };
-
-  // =========================================================
-  // LAS FUNCIONES EXACTAS DE TU ARCHIVO A PARTIR DE AQUÍ
-  // =========================================================
 
   const checkRuptureAndExecute = (actionToCalculateNextCart) => {
     setCart(prev => {
@@ -453,11 +487,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
            ghostOriginalPrice = defaultCustoms.precioFinal;
         }
 
-        // 🔥 BLINDAJE POKA-YOKE: Agrupar regalos inmediatos al dar clic
         const existingGhostIdx = newCart.findIndex(p => 
-          p.id === productWithDetails.id && p.cuenta === targetCuenta && 
-          p.isAutoPromo === true && p.promoLabel === ghostLabel && 
-          p.status !== 'CANCELLED' && !p.enviadoCocina
+           p.id === productWithDetails.id && p.cuenta === targetCuenta && 
+           p.isAutoPromo === true && p.promoLabel === ghostLabel && 
+           p.status !== 'CANCELLED' && !p.enviadoCocina
         );
 
         if (existingGhostIdx !== -1) {
