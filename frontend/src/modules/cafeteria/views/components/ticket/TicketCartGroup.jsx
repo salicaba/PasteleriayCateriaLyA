@@ -258,10 +258,10 @@ export const TicketCartGroup = ({
                     <h5 className="text-xs font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
                       {item.nombre}
                     </h5>
-                    {/* 🔥 ETIQUETA DE PROMOCIÓN VISUAL (CÁPSULA CON ÍCONOS LUCIDE) */}
+                    {/* 🔥 ETIQUETA DE PROMOCIÓN VISUAL UNIFICADA (TAG) */}
                     {isAnyPromo && (
-                       <span className="text-[8px] font-black text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 border border-rose-200 dark:border-rose-800/50 shadow-sm">
-                         {isGhostPromo ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={2.5} />} 
+                       <span className="text-[8px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 shadow-sm">
+                         <Tag size={10} strokeWidth={3} /> 
                          <span>{promoText}</span>
                        </span>
                     )}

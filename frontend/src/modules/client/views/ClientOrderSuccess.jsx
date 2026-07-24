@@ -204,9 +204,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                 
                 <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
                   {isGhost ? (
-                     <div className="flex flex-col items-center justify-center bg-orange-50 dark:bg-orange-900/20 lya:bg-[#EADCC9]/50 rounded-lg px-2 py-1 shrink-0 border border-orange-100 dark:border-orange-800/30 lya:border-[#EADCC9] mt-0.5">
-                       <Gift size={14} className="text-orange-500 lya:text-[#78350F] mb-0.5" />
-                       <span className="font-black text-center text-[10px] text-orange-600 dark:text-orange-400 lya:text-[#78350F] tracking-wider">x{item.qty}</span>
+                     <div className="flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 rounded-lg px-2 py-1 shrink-0 border border-rose-100 dark:border-rose-800/30 lya:border-rose-200 mt-0.5">
+                       <Tag size={14} className="text-rose-500 lya:text-rose-600 mb-0.5" strokeWidth={2.5} />
+                       <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 lya:text-rose-600 tracking-wider">x{item.qty}</span>
                      </div>
                   ) : (
                      <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
@@ -231,8 +231,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     {/* MEMORIA VISUAL ANTI-AMNESIA EN RECIBO */}
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       {item.promoLabel && (
-                        <span className="bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-600 dark:text-orange-400 lya:text-[#78350F] px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-wider uppercase shrink-0 border border-orange-200 dark:border-orange-800/30 lya:border-transparent">
-                          {item.promoLabel}
+                        <span className="inline-flex items-center gap-1 bg-rose-500 dark:bg-rose-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm">
+                          <Tag size={10} strokeWidth={3} />
+                          <span>{item.promoLabel}</span>
                         </span>
                       )}
                       

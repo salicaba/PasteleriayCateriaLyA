@@ -110,8 +110,9 @@ export default function ClientCheckoutModal({
                     )}
                     
                     {item.promoLabel && (
-                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-wider uppercase shrink-0">
-                        {item.promoLabel}
+                      <span className="inline-flex items-center gap-1 bg-rose-500 dark:bg-rose-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm">
+                        <Tag size={10} strokeWidth={3} />
+                        <span>{item.promoLabel}</span>
                       </span>
                     )}
 
@@ -136,9 +137,9 @@ export default function ClientCheckoutModal({
                 
                 {/* BOTONES DE ACCIÓN BLINDADOS (Perro Guardián anti-ghosts) */}
                 {isGhost ? (
-                   <div className="flex flex-col items-center justify-center bg-orange-50 dark:bg-orange-900/20 rounded-[1.25rem] px-3.5 py-1.5 shrink-0 border border-orange-100 dark:border-orange-800/30">
-                     <Gift size={16} className="text-orange-500 mb-0.5" />
-                     <span className="font-black text-center text-[10px] text-orange-600 dark:text-orange-400 tracking-wider">x{qty}</span>
+                   <div className="flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-900/20 rounded-[1.25rem] px-3.5 py-1.5 shrink-0 border border-rose-100 dark:border-rose-800/30">
+                     <Tag size={16} className="text-rose-500 mb-0.5" strokeWidth={2.5} />
+                     <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 tracking-wider">x{qty}</span>
                    </div>
                 ) : (
                   <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-[1.25rem] p-1.5 shrink-0">
