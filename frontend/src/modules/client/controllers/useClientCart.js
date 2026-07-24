@@ -125,13 +125,13 @@ export const useClientCart = (triggerNotification) => {
           const buy = Number(activePromo.buyQty || 2);
           const pay = Number(activePromo.payQty || 1);
           expectedGhosts = Math.floor((normalQtys[productId] || 0) / pay) * (buy - pay);
-          ghostLabel = '🎁 GRATIS';
+          ghostLabel = 'GRATIS';
         } else if (activePromo.type === 'NTH_FIXED') {
           const nth = Number(activePromo.buyQty || 2);
           const totalItems = (normalQtys[productId] || 0) + (ghostQtys[productId] || 0);
           expectedGhosts = Math.floor(totalItems / nth);
           ghostPrice = Number(activePromo.discountValue || 0);
-          ghostLabel = `✨ Promo #${nth}`;
+          ghostLabel = `Promo #${nth}`;
         }
       }
 
@@ -218,7 +218,7 @@ export const useClientCart = (triggerNotification) => {
         const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
 
         if (item.precioUnitario !== expectedPrice) {
-          return { ...item, precioOriginal: item.precioOriginal || item.precioUnitario, precioUnitario: expectedPrice, promoLabel: '✨ OFERTA', isAutoPromo: true };
+          return { ...item, precioOriginal: item.precioOriginal || item.precioUnitario, precioUnitario: expectedPrice, promoLabel: 'OFERTA', isAutoPromo: true };
         }
       } else if (item.promoLabel === '✨ OFERTA' && (!activePromo || activePromo.type !== 'FIXED')) {
         return { ...item, precioUnitario: item.precioOriginal || item.precioUnitario, precioOriginal: undefined, promoLabel: undefined, isAutoPromo: false };

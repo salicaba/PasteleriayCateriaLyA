@@ -128,13 +128,13 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           const buy = Number(activePromo.buyQty || activePromo.buy_qty || 2);
           const pay = Number(activePromo.payQty || activePromo.pay_qty || 1);
           expectedGhosts = Math.floor((normalQtys[key] || 0) / pay) * (buy - pay);
-          ghostLabel = '🎁 GRATIS';
+          ghostLabel = 'GRATIS';
         } else if (activePromo.type === 'NTH_FIXED') {
           const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
           const totalItems = (normalQtys[key] || 0) + (ghostQtys[key] || 0);
           expectedGhosts = Math.floor(totalItems / nth);
           ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-          ghostLabel = `✨ Promo #${nth}`;
+          ghostLabel = `Promo #${nth}`;
         }
       }
 
@@ -336,7 +336,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           extraGhostQty = buy - pay;
           qtyToAdd += extraGhostQty; 
           ghostPrice = 0;
-          ghostLabel = '🎁 GRATIS';
+          ghostLabel = 'GRATIS';
         }
       } else if (activePromo.type === 'NTH_FIXED') {
         const totalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
@@ -345,7 +345,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         if ((totalQtyInAccount + 1) % nth === 0) {
           isSubstitutingWithGhost = true;
           ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-          ghostLabel = `✨ Promo #${nth}`;
+          ghostLabel = `Promo #${nth}`;
         }
       }
     }
@@ -378,7 +378,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       const costoExtras = finalPrice - baseOriginal;
       precioOriginalParaTachar = finalPrice; 
       finalPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
-      mainPromoLabel = '✨ OFERTA';
+      mainPromoLabel = 'OFERTA';
     } else if (!productWithDetails.detalles) {
       const defaultCustoms = getDefaultCustomizations(productWithDetails);
       if (defaultCustoms) {

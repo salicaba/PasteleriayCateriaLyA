@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag } from 'lucide-react';
+import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Gift, Image as ImageIcon } from 'lucide-react';
 import clsx from 'clsx';
 
 export const TicketCartGroup = ({
@@ -182,7 +182,8 @@ export const TicketCartGroup = ({
           const isDiscountedPromo = !isGhostPromo && (item.promoLabel || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)));
           const isAnyPromo = isGhostPromo || isDiscountedPromo;
           
-          const promoText = item.promoLabel || (isGhostPromo ? '🎁 GRATIS' : '✨ OFERTA');
+          // 🔥 ELIMINAMOS EMOJIS NATIVOS DE LOS FALLBACKS
+          const promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
           const pOriginal = item.precioOriginal || (isGhostPromo ? (item.basePrice || item.precioBase || null) : null);
 
           const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}-${isGhostPromo}`;
@@ -232,7 +233,12 @@ export const TicketCartGroup = ({
                 "w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
                 isGhostPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
               )}>
-                {item.imagen || item.image ? <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" /> : <span className="text-lg opacity-80">🧁</span>}
+                {item.imagen || item.image ? (
+                  <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={20} />
+                )}
+                
                 {/* 🔥 NO MOSTRAR GRIP VERTICAL EN ÍTEMS FANTASMAS */}
                 {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isGhostPromo && (
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
@@ -252,10 +258,11 @@ export const TicketCartGroup = ({
                     <h5 className="text-xs font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
                       {item.nombre}
                     </h5>
-                    {/* 🔥 ETIQUETA DE PROMOCIÓN VISUAL */}
+                    {/* 🔥 ETIQUETA DE PROMOCIÓN VISUAL (CÁPSULA CON ÍCONOS LUCIDE) */}
                     {isAnyPromo && (
-                       <span className="text-[8px] font-black text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 border border-rose-200 dark:border-rose-800/50 shadow-sm">
-                         <Tag size={8} strokeWidth={3} /> {promoText}
+                       <span className="text-[8px] font-black text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 border border-rose-200 dark:border-rose-800/50 shadow-sm">
+                         {isGhostPromo ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={2.5} />} 
+                         <span>{promoText}</span>
                        </span>
                     )}
                   </div>
