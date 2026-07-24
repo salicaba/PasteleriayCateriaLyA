@@ -1,3 +1,4 @@
+// frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -59,13 +60,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
   });
 
-  // Notificador Global para inyectar en el hook
   const triggerNotification = (msg, notifType = 'success') => {
     setNotification({ msg, type: notifType });
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🚀 INICIALIZACIÓN DEL CEREBRO MATEMÁTICO
+  // 🚀 CEREBRO MATEMÁTICO: Ahora importamos getPromoBadge
   const { 
     cart, 
     setCart, 
@@ -73,7 +73,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     removeFromCart, 
     incrementInCart, 
     totalCart, 
-    totalItems 
+    totalItems,
+    getPromoBadge
   } = useClientCart(triggerNotification);
 
   useEffect(() => {
@@ -294,7 +295,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     }
   }, [sessionExpired]);
 
-  // 🚀 ACTUALIZACIÓN EN TIEMPO REAL (Solo visual. El carrito lo maneja el custom hook)
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
       setProducts(prevProducts => prevProducts.map(p => {
@@ -331,7 +331,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
   const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 
-  // 🚀 Wrapper visual para la inyección de items al carrito
   const handleAddDirectly = async (product, customizations = null, e = null) => {
     if (e) {
       e.preventDefault();
@@ -582,11 +581,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             
             const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
             
-            // Verificamos el stock directamente sin considerar regalos
             const cartQty = cart.filter(item => item.id === product.id && !item.isAutoPromo).reduce((acc, item) => acc + item.qty, 0);
             const isLimitReached = product.controlarStock && cartQty >= product.stock && product.stock > 0;
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
+
+            // 🔥 SE OBTIENE LA INFO DE LA PROMOCIÓN
+            const promoData = getPromoBadge(product.id);
 
             return (
               <motion.div 
@@ -633,11 +634,45 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   <div className="min-w-0 mb-1">
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
                     <h3 className="font-extrabold text-[15px] sm:text-base text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
-                    {isCustomizable && !isLimitReached && <span className="inline-flex mt-1.5 text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800/30 lya:border-transparent">✨ Personalizable</span>}
-                    {isLimitReached && <span className="inline-flex mt-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800/30"><Lock size={10} className="mr-1 inline" /> Límite: {product.stock}</span>}
+                    
+                    {/* 🔥 INSIGNIAS DE PROMOCIÓN Y PERSONALIZABLE EN LA TARJETA */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {promoData && (
+                        <span className="inline-flex text-[10px] font-bold text-fuchsia-700 dark:text-fuchsia-300 bg-fuchsia-100 dark:bg-fuchsia-900/30 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-fuchsia-200 dark:border-fuchsia-800/40 lya:border-fuchsia-400/50">
+                          🎁 {promoData.text}
+                        </span>
+                      )}
+                      {isCustomizable && !isLimitReached && (
+                        <span className="inline-flex text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800/30 lya:border-transparent">
+                          ✨ Personalizable
+                        </span>
+                      )}
+                      {isLimitReached && (
+                        <span className="inline-flex text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800/30">
+                          <Lock size={10} className="mr-1 inline" /> Límite: {product.stock}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  
                   <div className="flex items-end justify-between mt-auto">
-                    <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-neutral-400 dark:text-neutral-600 lya:text-lya-text/40' : 'text-neutral-900 dark:text-neutral-100 lya:text-[#5D4037]'}`}>${product.precio}</span>
+                    {/* 🔥 RENDERIZADO DEL PRECIO (TACHADO SI ES FIXED) */}
+                    <div className="flex flex-col items-start justify-end">
+                      {promoData?.type === 'FIXED' ? (
+                        <>
+                          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none block -mb-0.5">
+                            ${Number(product.precio).toFixed(2)}
+                          </span>
+                          <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-neutral-400 dark:text-neutral-600' : 'text-fuchsia-600 dark:text-fuchsia-400 lya:text-[#78350F]'}`}>
+                            ${promoData.discountValue.toFixed(2)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-neutral-400 dark:text-neutral-600 lya:text-lya-text/40' : 'text-neutral-900 dark:text-neutral-100 lya:text-[#5D4037]'}`}>
+                          ${Number(product.precio).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
                     
                     <button 
                       disabled={isAdding || addingToCartId !== null || isAgotado} 

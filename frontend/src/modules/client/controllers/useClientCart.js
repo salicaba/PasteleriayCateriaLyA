@@ -3,7 +3,6 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js';
 
-// Helper local para decodificar días válidos
 const parseValidDays = (daysData) => {
   if (!daysData) return [];
   if (Array.isArray(daysData)) return daysData.map(Number);
@@ -22,7 +21,6 @@ export const useClientCart = (triggerNotification) => {
   const [promotions, setPromotions] = useState([]);
   const isProcessingRef = useRef(false);
 
-  // 1. CARGA DE PROMOCIONES Y WEBSOCKETS
   useEffect(() => {
     const fetchPromos = async () => {
       try {
@@ -51,7 +49,6 @@ export const useClientCart = (triggerNotification) => {
     };
   }, []);
 
-  // 2. BUSCADOR DE PROMOS ACTIVAS
   const getActivePromo = (productId, currentStock = null, controlarStock = false, promosList) => {
     if (!promosList || promosList.length === 0) return null;
 
@@ -80,14 +77,29 @@ export const useClientCart = (triggerNotification) => {
     return promo;
   };
 
-  // 3. AUTO-BALANCEADOR: Motor Matemático Poka-Yoke
+  // 🔥 NUEVO: Función consultora para que el UI muestre las etiquetas
+  const getPromoBadge = (productId) => {
+    const activePromo = getActivePromo(productId, null, false, promotions);
+    if (!activePromo) return null;
+    
+    let text = 'OFERTA';
+    if (activePromo.type === 'NxM') text = `${activePromo.buyQty}x${activePromo.payQty}`;
+    if (activePromo.type === 'NTH_FIXED') text = `${activePromo.buyQty}º a $${activePromo.discountValue}`;
+    if (activePromo.type === 'FIXED') text = `A $${activePromo.discountValue}`;
+    
+    return {
+      text,
+      type: activePromo.type,
+      discountValue: Number(activePromo.discountValue || 0)
+    };
+  };
+
   const syncPromotions = (cartState, promosList) => {
     let cleanCart = [...cartState];
     const normalQtys = {};
     const ghostQtys = {};
     const normalItemsMap = {};
 
-    // Mapear el carrito
     cleanCart.forEach(item => {
       const key = String(item.id);
       if (item.isAutoPromo || Number(item.precioUnitario) === 0) {
@@ -125,7 +137,6 @@ export const useClientCart = (triggerNotification) => {
 
       const currentGhosts = ghostQtys[productId] || 0;
 
-      // ELIMINAR BASURA FLOTANTE
       if (currentGhosts > expectedGhosts) {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
@@ -155,7 +166,6 @@ export const useClientCart = (triggerNotification) => {
           }
         }
       } 
-      // AUTO-RELLENAR PREMIOS
       else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
         let missing = expectedGhosts - currentGhosts;
 
@@ -197,7 +207,6 @@ export const useClientCart = (triggerNotification) => {
       }
     });
 
-    // Rebajas Directas (FIXED)
     cleanCart = cleanCart.map(item => {
       if (item.isAutoPromo && item.promoLabel !== '✨ OFERTA') return item; 
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock, promosList);
@@ -220,7 +229,6 @@ export const useClientCart = (triggerNotification) => {
     return cleanCart;
   };
 
-  // INTERCEPTOR ABSOLUTO
   const setCart = (action) => {
     _setCart(prev => {
       const nextCart = typeof action === 'function' ? action(prev) : action;
@@ -228,7 +236,6 @@ export const useClientCart = (triggerNotification) => {
     });
   };
 
-  // 4. FUNCIONES DE INTERFAZ DEL CARRITO
   const addToCart = (product, customizations = null) => {
     if (isProcessingRef.current) return false;
     isProcessingRef.current = true;
@@ -269,7 +276,7 @@ export const useClientCart = (triggerNotification) => {
   const removeFromCart = (cartItemId) => {
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
-      if (!existing || existing.isAutoPromo) return prev; // Protegido contra manipulación
+      if (!existing || existing.isAutoPromo) return prev; 
       if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
       return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
     });
@@ -277,7 +284,7 @@ export const useClientCart = (triggerNotification) => {
 
   const incrementInCart = (cartItemId) => {
     const existing = _cart.find(item => item.cartItemId === cartItemId);
-    if (!existing || existing.isAutoPromo) return; // Protegido contra manipulación
+    if (!existing || existing.isAutoPromo) return; 
 
     const currentTotalQty = _cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
     if (existing.controlarStock && currentTotalQty >= existing.stock) {
@@ -288,14 +295,12 @@ export const useClientCart = (triggerNotification) => {
     setCart(prev => prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + 1 } : item));
   };
 
-  // 5. PERRO GUARDIÁN (WebSockets)
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
       setCart(prevCart => {
         let modifiedCart = [...prevCart];
         let notificationsToFire = new Set();
 
-        // Actualizamos stock localmente
         modifiedCart = modifiedCart.map(item => {
           const update = updates.find(u => u.id === item.id);
           return update ? { ...item, stock: update.stock } : item;
@@ -344,7 +349,6 @@ export const useClientCart = (triggerNotification) => {
     return () => socket.off('stock:update', handleStockAdjustment);
   }, [triggerNotification, promotions]); 
 
-  // 6. TOTALES
   const totalCart = useMemo(() => 
     _cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0), 
   [_cart]);
@@ -360,6 +364,7 @@ export const useClientCart = (triggerNotification) => {
     removeFromCart,
     incrementInCart,
     totalCart,
-    totalItems
+    totalItems,
+    getPromoBadge // 🔥 Se exporta para usarlo en ClientMenu
   };
 };
