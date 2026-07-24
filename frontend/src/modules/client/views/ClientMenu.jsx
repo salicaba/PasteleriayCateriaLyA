@@ -1,4 +1,3 @@
-// frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -60,12 +59,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
   });
 
+  // Notificador Global para inyectar en el hook
   const triggerNotification = (msg, notifType = 'success') => {
     setNotification({ msg, type: notifType });
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🚀 CEREBRO MATEMÁTICO: Ahora importamos getPromoBadge
+  // 🚀 INICIALIZACIÓN DEL CEREBRO MATEMÁTICO
   const { 
     cart, 
     setCart, 
@@ -586,7 +586,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
 
-            // 🔥 SE OBTIENE LA INFO DE LA PROMOCIÓN
             const promoData = getPromoBadge(product.id);
 
             return (
@@ -635,11 +634,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
                     <h3 className="font-extrabold text-[15px] sm:text-base text-neutral-900 dark:text-neutral-100 lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
                     
-                    {/* 🔥 INSIGNIAS DE PROMOCIÓN Y PERSONALIZABLE EN LA TARJETA */}
+                    {/* 🔥 INSIGNIAS DE PROMOCIÓN CON LÓGICA CONDICIONAL */}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {promoData && (
-                        <span className="inline-flex text-[10px] font-bold text-fuchsia-700 dark:text-fuchsia-300 bg-fuchsia-100 dark:bg-fuchsia-900/30 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-fuchsia-200 dark:border-fuchsia-800/40 lya:border-fuchsia-400/50">
-                          🎁 {promoData.text}
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-fuchsia-700 dark:text-fuchsia-300 bg-fuchsia-100 dark:bg-fuchsia-900/30 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-fuchsia-200 dark:border-fuchsia-800/40 lya:border-transparent">
+                          <span>{promoData.type === 'NxM' ? '🎁' : '✨'}</span>
+                          <span>{promoData.text}</span>
                         </span>
                       )}
                       {isCustomizable && !isLimitReached && (
@@ -656,7 +656,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                   </div>
                   
                   <div className="flex items-end justify-between mt-auto">
-                    {/* 🔥 RENDERIZADO DEL PRECIO (TACHADO SI ES FIXED) */}
                     <div className="flex flex-col items-start justify-end">
                       {promoData?.type === 'FIXED' ? (
                         <>
