@@ -1,3 +1,4 @@
+// src/modules/admin/views/PromotionListModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Plus, Power, CheckCircle2, AlertCircle, AlertTriangle, X, Tag, Edit2, Trash2, Info } from 'lucide-react';
@@ -16,12 +17,59 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
     }
   }, [isOpen, product]);
 
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
   const fetchPromotions = async () => {
     setIsLoading(true);
     try {
       const res = await api.get('/promotions');
       if (res.data.success) {
-        const productPromos = res.data.data.filter(p => p.productId === product.id);
+        let productPromos = res.data.data.filter(p => String(p.productId || p.product_id) === String(product.id));
+        
+        // 🔥 1. SISTEMA DE AUTO-APAGADO INTELIGENTE POR QUIEBRE DE STOCK
+        if (product && product.controlarStock) {
+          const currentStock = Number(product.stockQuantity ?? product.stock ?? 0);
+          let didAutoDisable = false;
+          
+          productPromos = await Promise.all(productPromos.map(async (promo) => {
+            const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
+            const isReallyActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+            
+            let reqQty = 1;
+            if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
+              reqQty = Number(promo.buyQty || promo.buy_qty || 2);
+            }
+            
+            if (isReallyActive && currentStock < reqQty) {
+              try {
+                // Disparamos el apagado automático a la API
+                await api.patch(`/promotions/${promo.id}/toggle`);
+                didAutoDisable = true;
+                return { ...promo, isActive: false };
+              } catch (e) {
+                console.error("Fallo al auto-apagar la promoción:", e);
+                return promo;
+              }
+            }
+            return promo;
+          }));
+
+          if (didAutoDisable) {
+            showNotification('warning', `Stock insuficiente: El sistema apagó automáticamente promociones que no podían cumplirse.`);
+          }
+        }
+
+        // 🔥 2. ORDENAMIENTO INTELIGENTE (Las ACTIVAS siempre van primero)
+        productPromos.sort((a, b) => {
+          const aActive = a.isActive === true || a.isActive === 1 || a.isActive === 'true' || a.isActive === '1';
+          const bActive = b.isActive === true || b.isActive === 1 || b.isActive === 'true' || b.isActive === '1';
+          if (aActive === bActive) return 0;
+          return aActive ? -1 : 1;
+        });
+
         setPromotions(productPromos);
       }
     } catch (error) {
@@ -31,19 +79,43 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
     }
   };
 
-  const showNotification = (type, message) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 3500);
-  };
-
   const handleToggle = async (promo) => {
     if (processingId) return; 
+
+    // Validación de seguridad al intentar encender manualmente
+    const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
+    const isCurrentlyActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+    
+    if (!isCurrentlyActive && product?.controlarStock) {
+      const currentStock = Number(product.stockQuantity ?? product.stock ?? 0);
+      let reqQty = 1;
+      
+      if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
+        reqQty = Number(promo.buyQty || promo.buy_qty || 2);
+      }
+      
+      if (currentStock < reqQty) {
+        showNotification('warning', `Stock insuficiente (${currentStock}). La promoción requiere al menos ${reqQty} en inventario.`);
+        return; 
+      }
+    }
+
     setProcessingId(promo.id);
     try {
       const res = await api.patch(`/promotions/${promo.id}/toggle`);
       if (res.data.success) {
          const updatedPromo = res.data.data;
-         setPromotions(prev => prev.map(p => p.id === promo.id ? { ...p, isActive: updatedPromo.isActive } : p));
+         
+         setPromotions(prev => {
+           // Actualizamos el estado y volvemos a ordenar para que la lista se reorganice sola
+           const newList = prev.map(p => p.id === promo.id ? { ...p, isActive: updatedPromo.isActive } : p);
+           return newList.sort((a, b) => {
+             const aActive = a.isActive === true || a.isActive === 1 || a.isActive === 'true' || a.isActive === '1';
+             const bActive = b.isActive === true || b.isActive === 1 || b.isActive === 'true' || b.isActive === '1';
+             if (aActive === bActive) return 0;
+             return aActive ? -1 : 1;
+           });
+         });
          showNotification('success', res.data.message);
       }
     } catch (error) {
@@ -81,7 +153,6 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
       
-      {/* CÁPSULA NEO-BENTO PARA NOTIFICACIONES */}
       <AnimatePresence>
         {notification && (
           <motion.div
@@ -120,7 +191,6 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
         className="w-full max-w-4xl h-[85vh] bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-lya-border/40"
       >
         
-        {/* Header Fijo */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shrink-0 bg-white dark:bg-gray-900 lya:bg-lya-surface z-10 relative">
           <div className="flex items-center gap-5 min-w-0 pr-10 sm:pr-0">
             <div className="h-14 w-14 rounded-[1.25rem] bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-500 dark:text-orange-400 lya:text-lya-primary flex items-center justify-center shrink-0 border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30">
@@ -142,7 +212,6 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
           </motion.button>
         </div>
 
-        {/* Área de Scroll */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
           {isLoading ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
@@ -161,135 +230,133 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
             </div>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {promotions.map((promo) => (
-                <div 
-                  key={promo.id} 
-                  className={`relative flex flex-col p-6 rounded-[2rem] border transition-all duration-300 md:hover:shadow-lg md:hover:-translate-y-1 overflow-hidden ${
-                    promo.isActive 
-                      ? 'bg-white dark:bg-gray-900 lya:bg-lya-surface border-orange-200 dark:border-orange-900/50 lya:border-lya-primary/30 shadow-sm' 
-                      : 'bg-gray-100/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 opacity-75 grayscale-[0.3]'
-                  }`}
-                >
-                  
-                  {/* 🔥 OVERLAY NEO-BENTO PARA ELIMINAR */}
-                  <AnimatePresence>
-                    {confirmDeleteId === promo.id && (
-                      <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }} 
-                        exit={{ opacity: 0 }} 
-                        className="absolute inset-0 bg-white/95 dark:bg-gray-950/95 lya:bg-lya-surface/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 border border-red-100 dark:border-red-900/50 rounded-[2rem]"
-                      >
-                        <AlertTriangle size={36} className="text-red-500 mb-3" />
-                        <h4 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text text-center tracking-tight leading-tight">¿Eliminar esta promoción?</h4>
-                        <div className="flex gap-3 mt-6 w-full">
-                          <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl font-bold text-gray-600 dark:text-gray-300 transition-colors md:hover:bg-gray-200 outline-none">Cancelar</button>
-                          <button disabled={processingId === promo.id} onClick={() => handleDelete(promo.id)} className="flex-1 py-3 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold flex justify-center items-center shadow-lg shadow-red-500/20 transition-colors outline-none">
-                            {processingId === promo.id ? <Loader2 className="animate-spin" size={20}/> : 'Eliminar'}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+              {promotions.map((promo) => {
+                const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
+                const isPromoActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
 
-                  {/* HEADER DE LA TARJETA: BADGES */}
-                  <div className="flex justify-between items-center mb-5">
-                    <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
-                      {promo.type === 'NxM' ? '📦 VOLUMEN (NxM)' : promo.type === 'FIXED' ? '🏷️ REBAJA DIRECTA' : '✨ UNIDAD ADICIONAL'}
-                    </span>
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
-                        promo.isActive 
-                          ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50' 
-                          : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full ${promo.isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-gray-400'}`}></span>
-                      {promo.isActive ? 'Activa' : 'Pausada'}
-                    </span>
-                  </div>
-
-                  {/* CUERPO DE LA TARJETA: TÍTULO Y DESCRIPCIÓN */}
-                  <div className="mb-6 flex-1">
-                    <h4 className="text-[1.35rem] font-black text-gray-800 dark:text-gray-100 lya:text-lya-text leading-tight mb-2.5 tracking-tight">
-                      {promo.type === 'NxM' && `Lleva ${promo.buyQty}, Paga ${promo.payQty}`}
-                      {promo.type === 'FIXED' && `Precio Especial $${parseFloat(promo.discountValue).toFixed(2)}`}
-                      {promo.type === 'NTH_FIXED' && `Unidad #${promo.buyQty} a $${parseFloat(promo.discountValue).toFixed(2)}`}
-                    </h4>
+                return (
+                  <motion.div 
+                    layout
+                    key={promo.id} 
+                    className={`relative flex flex-col p-6 rounded-[2rem] border transition-all duration-300 md:hover:shadow-lg md:hover:-translate-y-1 overflow-hidden ${
+                      isPromoActive 
+                        ? 'bg-white dark:bg-gray-900 lya:bg-lya-surface border-orange-200 dark:border-orange-900/50 lya:border-lya-primary/30 shadow-sm' 
+                        : 'bg-gray-100/50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 opacity-75 grayscale-[0.3]'
+                    }`}
+                  >
                     
-                    {/* TEXTO INFORMATIVO (Rellena el espacio vacío inteligentemente) */}
-                    <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 leading-relaxed text-justify">
-                      {promo.type === 'NxM' && `El sistema descontará automáticamente el precio de ${promo.buyQty - promo.payQty} unidad(es) por cada múltiplo de ${promo.buyQty} en la misma cuenta.`}
-                      {promo.type === 'FIXED' && `Se aplicará un descuento directo para que el precio final de cada unidad añadida sea de $${parseFloat(promo.discountValue).toFixed(2)}.`}
-                      {promo.type === 'NTH_FIXED' && `Cuando el cliente acumule ${promo.buyQty} unidades exactas, el sistema aplicará un descuento para que la última cueste $${parseFloat(promo.discountValue).toFixed(2)}.`}
-                    </p>
-                  </div>
+                    <AnimatePresence>
+                      {confirmDeleteId === promo.id && (
+                        <motion.div 
+                          initial={{ opacity: 0 }} 
+                          animate={{ opacity: 1 }} 
+                          exit={{ opacity: 0 }} 
+                          className="absolute inset-0 bg-white/95 dark:bg-gray-950/95 lya:bg-lya-surface/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 border border-red-100 dark:border-red-900/50 rounded-[2rem]"
+                        >
+                          <AlertTriangle size={36} className="text-red-500 mb-3" />
+                          <h4 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text text-center tracking-tight leading-tight">¿Eliminar esta promoción?</h4>
+                          <div className="flex gap-3 mt-6 w-full">
+                            <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 rounded-xl font-bold text-gray-600 dark:text-gray-300 transition-colors md:hover:bg-gray-200 outline-none">Cancelar</button>
+                            <button disabled={processingId === promo.id} onClick={() => handleDelete(promo.id)} className="flex-1 py-3 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold flex justify-center items-center shadow-lg shadow-red-500/20 transition-colors outline-none">
+                              {processingId === promo.id ? <Loader2 className="animate-spin" size={20}/> : 'Eliminar'}
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                  {/* FOOTER DE LA TARJETA: DÍAS Y BOTONES HORIZONTALES */}
-                  <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mt-auto pt-5 border-t border-gray-100 dark:border-gray-800">
-                    
-                    {/* Días */}
-                    <div className="flex flex-wrap gap-1.5 w-full lg:w-auto">
-                      {[1, 2, 3, 4, 5, 6, 0].map(dayId => {
-                        const isActiveDay = promo.validDays.includes(dayId);
-                        return (
-                          <span 
-                            key={dayId}
-                            className={`px-2.5 py-1 text-[9px] font-black rounded-lg tracking-wider ${
-                              isActiveDay 
-                                ? (promo.isActive ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-gray-500 text-white')
-                                : 'bg-transparent text-gray-300 dark:text-gray-700 border border-gray-200 dark:border-gray-800'
-                            }`}
-                          >
-                            {dayNames[dayId]}
-                          </span>
-                        );
-                      })}
+                    <div className="flex justify-between items-center mb-5">
+                      <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                        {promo.type === 'NxM' ? '📦 VOLUMEN (NxM)' : promo.type === 'FIXED' ? '🏷️ REBAJA DIRECTA' : '✨ UNIDAD ADICIONAL'}
+                      </span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                          isPromoActive 
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50' 
+                            : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${isPromoActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-gray-400'}`}></span>
+                        {isPromoActive ? 'Activa' : 'Pausada'}
+                      </span>
                     </div>
 
-                    {/* Botones Horizontales */}
-                    <div className="flex items-center gap-2 shrink-0 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
-                      <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        disabled={processingId !== null}
-                        onClick={() => handleToggle(promo)}
-                        title={promo.isActive ? "Pausar Promoción" : "Reanudar Promoción"}
-                        className={`relative p-2.5 rounded-xl flex items-center justify-center transition-all outline-none ${
-                          processingId === promo.id 
-                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-wait'
-                            : promo.isActive 
-                              ? 'bg-white border border-gray-200 text-orange-500 shadow-sm md:hover:bg-orange-50' 
-                              : 'bg-white border border-gray-200 text-gray-400 md:hover:bg-gray-100'
-                        }`}
-                      >
-                        {processingId === promo.id ? <Loader2 className="animate-spin" size={18} /> : <Power size={18} strokeWidth={2.5} />}
-                      </motion.button>
+                    <div className="mb-6 flex-1">
+                      <h4 className="text-[1.35rem] font-black text-gray-800 dark:text-gray-100 lya:text-lya-text leading-tight mb-2.5 tracking-tight">
+                        {promo.type === 'NxM' && `Lleva ${promo.buyQty}, Paga ${promo.payQty}`}
+                        {promo.type === 'FIXED' && `Precio Especial $${parseFloat(promo.discountValue).toFixed(2)}`}
+                        {promo.type === 'NTH_FIXED' && `Unidad #${promo.buyQty} a $${parseFloat(promo.discountValue).toFixed(2)}`}
+                      </h4>
                       
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }} 
-                        onClick={() => onOpenWizard(promo)} 
-                        title="Editar Reglas"
-                        className="p-2.5 rounded-xl bg-white text-blue-500 border border-gray-200 shadow-sm md:hover:bg-blue-50 transition-colors flex items-center justify-center outline-none"
-                      >
-                        <Edit2 size={18} strokeWidth={2.5} />
-                      </motion.button>
-                      
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }} 
-                        onClick={() => setConfirmDeleteId(promo.id)} 
-                        title="Eliminar Promoción"
-                        className="p-2.5 rounded-xl bg-white text-red-500 border border-gray-200 shadow-sm md:hover:bg-red-50 transition-colors flex items-center justify-center outline-none"
-                      >
-                        <Trash2 size={18} strokeWidth={2.5} />
-                      </motion.button>
+                      <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 leading-relaxed text-justify">
+                        {promo.type === 'NxM' && `El sistema descontará automáticamente el precio de ${promo.buyQty - promo.payQty} unidad(es) por cada múltiplo de ${promo.buyQty} en la misma cuenta.`}
+                        {promo.type === 'FIXED' && `Se aplicará un descuento directo para que el precio final de cada unidad añadida sea de $${parseFloat(promo.discountValue).toFixed(2)}.`}
+                        {promo.type === 'NTH_FIXED' && `Cuando el cliente acumule ${promo.buyQty} unidades exactas, el sistema aplicará un descuento para que la última cueste $${parseFloat(promo.discountValue).toFixed(2)}.`}
+                      </p>
                     </div>
-                    
-                  </div>
-                </div>
-              ))}
+
+                    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mt-auto pt-5 border-t border-gray-100 dark:border-gray-800">
+                      
+                      <div className="flex flex-wrap gap-1.5 w-full lg:w-auto">
+                        {[1, 2, 3, 4, 5, 6, 0].map(dayId => {
+                          const isActiveDay = promo.validDays.includes(dayId);
+                          return (
+                            <span 
+                              key={dayId}
+                              className={`px-2.5 py-1 text-[9px] font-black rounded-lg tracking-wider ${
+                                isActiveDay 
+                                  ? (isPromoActive ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-gray-500 text-white')
+                                  : 'bg-transparent text-gray-300 dark:text-gray-700 border border-gray-200 dark:border-gray-800'
+                              }`}
+                            >
+                              {dayNames[dayId]}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
+                        <motion.button
+                          whileTap={{ scale: 0.9 }}
+                          disabled={processingId !== null}
+                          onClick={() => handleToggle(promo)}
+                          title={isPromoActive ? "Pausar Promoción" : "Reanudar Promoción"}
+                          className={`relative p-2.5 rounded-xl flex items-center justify-center transition-all outline-none ${
+                            processingId === promo.id 
+                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-wait'
+                              : isPromoActive 
+                                ? 'bg-white border border-gray-200 text-orange-500 shadow-sm md:hover:bg-orange-50' 
+                                : 'bg-white border border-gray-200 text-gray-400 md:hover:bg-gray-100'
+                          }`}
+                        >
+                          {processingId === promo.id ? <Loader2 className="animate-spin" size={18} /> : <Power size={18} strokeWidth={2.5} />}
+                        </motion.button>
+                        
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }} 
+                          onClick={() => onOpenWizard(promo)} 
+                          title="Editar Reglas"
+                          className="p-2.5 rounded-xl bg-white text-blue-500 border border-gray-200 shadow-sm md:hover:bg-blue-50 transition-colors flex items-center justify-center outline-none"
+                        >
+                          <Edit2 size={18} strokeWidth={2.5} />
+                        </motion.button>
+                        
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }} 
+                          onClick={() => setConfirmDeleteId(promo.id)} 
+                          title="Eliminar Promoción"
+                          className="p-2.5 rounded-xl bg-white text-red-500 border border-gray-200 shadow-sm md:hover:bg-red-50 transition-colors flex items-center justify-center outline-none"
+                        >
+                          <Trash2 size={18} strokeWidth={2.5} />
+                        </motion.button>
+                      </div>
+                      
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Footer Fijo */}
         <div className="p-6 md:p-8 border-t border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shrink-0 bg-white dark:bg-gray-900 lya:bg-lya-surface">
           <motion.button
             whileTap={{ scale: 0.98 }}

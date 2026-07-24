@@ -42,33 +42,63 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return base;
   }, [product.precioBase, product.precio, parsedOptions]);
 
-  // 🔥 PARSER SEGURO INYECTADO
+  // 🔥 FILTRADO ESTRICTO + ESCUDO ANTI-QUIEBRE DE STOCK
   const activePromo = useMemo(() => {
-    const promo = activePromotions.find(p => p.productId === product.id);
-    if (!promo || !promo.isActive) return null;
+    const promosArray = Array.isArray(activePromotions) 
+      ? activePromotions 
+      : (activePromotions?.data || activePromotions?.promotions || []);
+
+    if (promosArray.length === 0) return null;
+
+    const promo = promosArray.find(p => {
+      const matchesProduct = String(p.productId || p.product_id) === String(product.id);
+      if (!matchesProduct) return false;
+
+      const rawActive = p.isActive ?? p.is_active ?? p.status;
+      return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+    });
+
+    if (!promo) return null;
     
-    const today = new Date().getDay();
-    
-    let validDaysAsNumbers = [];
-    if (Array.isArray(promo.validDays)) {
-      validDaysAsNumbers = promo.validDays.map(Number);
-    } else if (typeof promo.validDays === 'string') {
-      try { 
-        validDaysAsNumbers = JSON.parse(promo.validDays).map(Number); 
-      } catch (e) { 
-        validDaysAsNumbers = promo.validDays.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+    // 🛡️ VALIDACIÓN DE STOCK: ¿Alcanza para cumplir la promoción?
+    if (product.controlarStock) {
+      let requiredQty = 1;
+      if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
+        requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
+      }
+      if (product.stock < requiredQty) {
+        console.log(`❌ Promo Oculta: Stock insuficiente (${product.stock}) para la oferta que exige ${requiredQty}.`);
+        return null; // Se autodestruye visualmente
       }
     }
 
-    if (!validDaysAsNumbers.includes(today)) return null;
+    const today = new Date().getDay(); 
+    let validDaysAsNumbers = [];
+    const daysRaw = promo.validDays || promo.valid_days;
+
+    if (Array.isArray(daysRaw)) {
+      validDaysAsNumbers = daysRaw.map(Number);
+    } else if (typeof daysRaw === 'string') {
+      try { 
+        validDaysAsNumbers = JSON.parse(daysRaw).map(Number); 
+      } catch (e) { 
+        validDaysAsNumbers = daysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+      }
+    }
+
+    if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) {
+      return null;
+    }
+
     return promo;
-  }, [activePromotions, product.id]);
+  }, [activePromotions, product.id, product.stock, product.controlarStock]);
 
   const promoFixedPrice = useMemo(() => {
     if (!activePromo || activePromo.type !== 'FIXED') return 0;
     const originalDbPrice = Number(product.precioBase || product.precio || 0);
     const costoExtras = realBasePrice - originalDbPrice;
-    return Number(activePromo.discountValue) + costoExtras;
+    const discountVal = Number(activePromo.discountValue || activePromo.discount_value || 0);
+    return discountVal + costoExtras;
   }, [activePromo, realBasePrice, product.precioBase, product.precio]);
 
   const discountPercent = useMemo(() => {
@@ -78,6 +108,35 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     }
     return 0;
   }, [activePromo, realBasePrice, promoFixedPrice]);
+
+  const promoBadgeText = useMemo(() => {
+    if (!activePromo) return '';
+    const type = activePromo.type;
+    
+    if (type === 'NxM') {
+      const buy = activePromo.buyQty || activePromo.buy_qty || 3;
+      const pay = activePromo.payQty || activePromo.pay_qty || 2;
+      return `${buy}x${pay}`;
+    }
+    
+    if (type === 'FIXED') {
+      return `-${discountPercent}% OFF`;
+    }
+    
+    if (type === 'NTH_FIXED') {
+      const nth = activePromo.buyQty || activePromo.buy_qty || 2;
+      const rawDiscountPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
+      
+      const originalDbPrice = Number(product.precioBase || product.precio || 0);
+      const costoExtras = realBasePrice - originalDbPrice;
+      const finalPromoPrice = rawDiscountPrice + (costoExtras > 0 ? costoExtras : 0);
+      
+      const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
+      return `${nth}ª a $${formattedPrice}`;
+    }
+    
+    return activePromo.name || 'Promo';
+  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
@@ -142,9 +201,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         {activePromo && !isAgotado && (
           <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg border border-rose-400 flex items-center gap-1 uppercase tracking-widest">
             <Tag size={10} strokeWidth={3} />
-            {activePromo.type === 'NxM' && `${activePromo.buyQty}x${activePromo.payQty}`}
-            {activePromo.type === 'FIXED' && `-${discountPercent}% OFF`}
-            {activePromo.type === 'NTH_FIXED' && `Promo #${activePromo.buyQty}`}
+            {promoBadgeText}
           </div>
         )}
 

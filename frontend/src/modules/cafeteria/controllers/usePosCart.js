@@ -4,7 +4,6 @@ import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js'; 
 
-// 🔥 PARSER INDESTRUCTIBLE PARA LOS DÍAS
 const parseValidDays = (daysData) => {
   if (!daysData) return [];
   if (Array.isArray(daysData)) return daysData.map(Number);
@@ -19,7 +18,8 @@ const parseValidDays = (daysData) => {
 };
 
 export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotification) => {
-  const [cart, setCart] = useState([]);
+  // 🔥 INTERCEPTOR: Renombramos el estado original para que el Auto-Balanceador lo controle
+  const [_cart, _setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
 
   const [promoWarning, setPromoWarning] = useState({
@@ -33,33 +33,56 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const fetchPromos = async () => {
       try {
         const res = await api.get('/promotions');
-        if (res.data.success) setPromotions(res.data.data);
+        const raw = res.data;
+        const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
+        setPromotions(list);
       } catch (error) {
-        console.error("Error cargando promociones:", error);
+        console.error("Error cargando promociones en el carrito:", error);
       }
     };
+    
     fetchPromos();
-
-    const handlePromoUpdate = (data) => {
-      setPromotions(prev => {
-        const filtered = prev.filter(p => p.productId !== data.productId);
-        if (data.promotion) filtered.push(data.promotion);
-        return filtered;
-      });
-    };
+    const handlePromoUpdate = () => fetchPromos(); 
     
     socket.on('menu:promotions_updated', handlePromoUpdate);
-    return () => socket.off('menu:promotions_updated', handlePromoUpdate);
+    socket.on('promotion_created', handlePromoUpdate);
+    socket.on('promotion_updated', handlePromoUpdate);
+    socket.on('promotion_deleted', handlePromoUpdate);
+    
+    return () => {
+      socket.off('menu:promotions_updated', handlePromoUpdate);
+      socket.off('promotion_created', handlePromoUpdate);
+      socket.off('promotion_updated', handlePromoUpdate);
+      socket.off('promotion_deleted', handlePromoUpdate);
+    };
   }, []);
 
-  const getActivePromo = (productId) => {
-    const promo = promotions.find(p => p.productId === productId);
-    if (!promo || !promo.isActive) return null;
+  const getActivePromo = (productId, currentStock = null, controlarStock = false) => {
+    if (!promotions || promotions.length === 0) return null;
+
+    const promo = promotions.find(p => {
+      const matchesProduct = String(p.productId || p.product_id) === String(productId);
+      if (!matchesProduct) return false;
+
+      const rawActive = p.isActive ?? p.is_active ?? p.status;
+      return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+    });
+
+    if (!promo) return null;
     
+    if (controlarStock && currentStock !== null) {
+      let requiredQty = 1;
+      if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
+        requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
+      }
+      if (currentStock < requiredQty) return null; 
+    }
+
     const today = new Date().getDay();
-    const validDaysAsNumbers = parseValidDays(promo.validDays);
+    const daysRaw = promo.validDays || promo.valid_days;
+    const validDaysAsNumbers = parseValidDays(daysRaw);
     
-    if (!validDaysAsNumbers.includes(today)) return null;
+    if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) return null;
     return promo;
   };
 
@@ -69,60 +92,172 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       .reduce((acc, item) => acc + item.qty, 0);
   };
 
-  const cleanupGhosts = (cartState) => {
+  // 🔥 AUTO-BALANCEADOR: Limpia basura Y auto-rellena premios si se mueven entre cuentas
+  const syncPromotions = (cartState) => {
     let cleanCart = [...cartState];
     const normalQtys = {};
     const ghostQtys = {};
+    const normalItemsMap = {};
 
     cleanCart.forEach(item => {
       if (item.status === 'CANCELLED') return;
-      const key = `${item.id}-${item.cuenta}`;
-      if (item.isAutoPromo) ghostQtys[key] = (ghostQtys[key] || 0) + item.qty;
-      else normalQtys[key] = (normalQtys[key] || 0) + item.qty;
+      const key = `${item.id}::${item.cuenta}`;
+      if (item.isAutoPromo || Number(item.precio) === 0) {
+        ghostQtys[key] = (ghostQtys[key] || 0) + item.qty;
+      } else {
+        normalQtys[key] = (normalQtys[key] || 0) + item.qty;
+        if (!normalItemsMap[key]) normalItemsMap[key] = item;
+      }
     });
 
-    Object.keys(ghostQtys).forEach(key => {
-      const [productId, cuenta] = key.split('-');
-      const activePromo = getActivePromo(productId);
-      let expectedGhosts = 0;
+    const allKeys = new Set([...Object.keys(normalQtys), ...Object.keys(ghostQtys)]);
 
-      if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'NTH_FIXED')) {
-        const triggerQty = activePromo.type === 'NxM' ? activePromo.payQty : (activePromo.buyQty - 1);
-        const ghostQtyPerBundle = activePromo.type === 'NxM' ? (activePromo.buyQty - activePromo.payQty) : 1;
-        expectedGhosts = Math.floor((normalQtys[key] || 0) / triggerQty) * ghostQtyPerBundle;
+    allKeys.forEach(key => {
+      const [productId, ...cuentaParts] = key.split('::');
+      const cuenta = cuentaParts.join('::');
+      
+      const sampleItem = normalItemsMap[key] || cleanCart.find(p => String(p.id) === String(productId));
+      const activePromo = getActivePromo(productId, sampleItem?.stock, sampleItem?.controlarStock);
+      
+      let expectedGhosts = 0;
+      let ghostPrice = 0;
+      let ghostLabel = '';
+
+      if (activePromo) {
+        if (activePromo.type === 'NxM') {
+          const buy = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+          const pay = Number(activePromo.payQty || activePromo.pay_qty || 1);
+          expectedGhosts = Math.floor((normalQtys[key] || 0) / pay) * (buy - pay);
+          ghostLabel = '🎁 GRATIS';
+        } else if (activePromo.type === 'NTH_FIXED') {
+          const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+          const totalItems = (normalQtys[key] || 0) + (ghostQtys[key] || 0);
+          expectedGhosts = Math.floor(totalItems / nth);
+          ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
+          ghostLabel = `✨ Promo #${nth}`;
+        }
       }
 
-      if (ghostQtys[key] > expectedGhosts) {
-        let toRemove = ghostQtys[key] - expectedGhosts;
+      const currentGhosts = ghostQtys[key] || 0;
+
+      // ELIMINAR BASURA FLOTANTE
+      if (currentGhosts > expectedGhosts) {
+        let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
           const item = cleanCart[i];
-          if (item.isAutoPromo && item.id === productId && item.cuenta === cuenta) {
-            if (toRemove >= item.qty) {
-              toRemove -= item.qty;
-              cleanCart.splice(i, 1);
+          if ((item.isAutoPromo || Number(item.precio) === 0) && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
+            
+            if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('Promo #'))) {
+               // NTH_FIXED: Restauramos su precio original
+               const originalPrice = item.precioOriginal || item.precioBase || item.precio;
+               if (toRemove >= item.qty) {
+                  cleanCart[i] = { ...item, precio: originalPrice, isAutoPromo: false, promoLabel: undefined };
+                  toRemove -= item.qty;
+               } else {
+                  const revertedItem = { ...item, qty: toRemove, precio: originalPrice, isAutoPromo: false, promoLabel: undefined, preparaciones: item.preparaciones.slice(0, toRemove) };
+                  cleanCart[i] = { ...item, qty: item.qty - toRemove, preparaciones: item.preparaciones.slice(toRemove) };
+                  cleanCart.push(revertedItem);
+                  toRemove = 0;
+               }
             } else {
-              cleanCart[i] = { ...item, qty: item.qty - toRemove, preparaciones: item.preparaciones.slice(0, item.qty - toRemove) };
-              toRemove = 0;
+               // NxM: Desaparecemos el regalo
+               if (toRemove >= item.qty) {
+                  toRemove -= item.qty;
+                  cleanCart.splice(i, 1);
+               } else {
+                  cleanCart[i] = { ...item, qty: item.qty - toRemove, preparaciones: item.preparaciones.slice(0, item.qty - toRemove) };
+                  toRemove = 0;
+               }
             }
             if (toRemove === 0) break;
           }
         }
+      } 
+      // AUTO-RELLENAR SI SE MOVIÓ A OTRA CUENTA Y CALIFICA
+      else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
+         let missing = expectedGhosts - currentGhosts;
+         
+         if (activePromo.type === 'NTH_FIXED') {
+            for (let i = cleanCart.length - 1; i >= 0; i--) {
+               const item = cleanCart[i];
+               if (!item.isAutoPromo && Number(item.precio) > 0 && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
+                  const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
+                  const costoExtras = parseFloat(item.precio) - baseOriginal;
+                  const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
+
+                  if (item.qty <= missing) {
+                     cleanCart[i] = { ...item, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel };
+                     missing -= item.qty;
+                  } else {
+                     const convertedItem = { ...item, qty: missing, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, preparaciones: item.preparaciones.slice(0, missing) };
+                     cleanCart[i] = { ...item, qty: item.qty - missing, preparaciones: item.preparaciones.slice(missing) };
+                     cleanCart.push(convertedItem);
+                     missing = 0;
+                  }
+                  if (missing === 0) break;
+               }
+            }
+         } else if (activePromo.type === 'NxM') {
+            let ops = sampleItem.opciones;
+            if (typeof ops === 'string') { try { ops = JSON.parse(ops); } catch (e) { ops = null; } }
+            
+            let ghostDetails = {};
+            if (ops && typeof ops === 'object') {
+               if (ops.defaults?.tamano) ghostDetails.tamano = ops.defaults.tamano;
+               if (ops.defaults?.leche) ghostDetails.leche = ops.defaults.leche;
+               ghostDetails.extras = []; 
+            }
+
+            let ghostOriginalPrice = parseFloat(sampleItem.precioBase || sampleItem.precio || 0);
+            const defaultCustoms = getDefaultCustomizations(sampleItem);
+            if (defaultCustoms && defaultCustoms.precioFinal) {
+               ghostOriginalPrice = defaultCustoms.precioFinal;
+            }
+
+            cleanCart.push({
+              ...sampleItem,
+              nombre: sampleItem.nombre, 
+              precioOriginal: ghostOriginalPrice, 
+              promoLabel: ghostLabel,            
+              precio: 0, 
+              qty: missing,
+              preparaciones: Array(missing).fill(ghostDetails), 
+              enviadoCocina: false,
+              status: 'ACTIVE',
+              cuenta: cuenta,
+              isAutoPromo: true,
+              requiereCocina: sampleItem.requiereCocina !== false,
+              backendItemId: undefined
+            });
+         }
       }
     });
     return cleanCart;
   };
 
+  // 🔥 INTERCEPTOR ABSOLUTO: Todas tus funciones nativas pasan por aquí ahora
+  const setCart = (action) => {
+    _setCart(prev => {
+       const nextCart = typeof action === 'function' ? action(prev) : action;
+       return syncPromotions(nextCart); // Evalúa la matemática automáticamente
+    });
+  };
+
+  // =========================================================
+  // LAS FUNCIONES EXACTAS DE TU ARCHIVO A PARTIR DE AQUÍ
+  // =========================================================
+
   const checkRuptureAndExecute = (actionToCalculateNextCart) => {
     setCart(prev => {
       const nextCart = actionToCalculateNextCart(prev);
-      let ruptureDetected = false;
+      let needsWarning = false;
       let ruptureProductName = '';
 
       const getNormalQtys = (cartState) => {
         const qtys = {};
         cartState.forEach(item => {
-          if (item.status === 'CANCELLED' || item.isAutoPromo) return;
-          const key = `${item.id}-${item.cuenta}`;
+          if (item.status === 'CANCELLED' || item.isAutoPromo || Number(item.precio) === 0) return;
+          const key = `${item.id}::${item.cuenta}`;
           qtys[key] = (qtys[key] || 0) + item.qty;
         });
         return qtys;
@@ -132,40 +267,43 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       const nextQtys = getNormalQtys(nextCart);
 
       for (const key of Object.keys(prevQtys)) {
-        const [productId, cuenta] = key.split('-');
-        const activePromo = getActivePromo(productId);
+        const [productId, ...cuentaParts] = key.split('::');
+        const cuenta = cuentaParts.join('::');
         
-        if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'NTH_FIXED')) {
-          const triggerQty = activePromo.type === 'NxM' ? activePromo.payQty : (activePromo.buyQty - 1);
-          const ghostQtyPerBundle = activePromo.type === 'NxM' ? (activePromo.buyQty - activePromo.payQty) : 1;
-
+        const sampleItem = prev.find(p => String(p.id) === String(productId));
+        const activePromo = getActivePromo(productId, sampleItem?.stock, sampleItem?.controlarStock);
+        
+        if (activePromo && activePromo.type === 'NTH_FIXED') {
+          const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+          
           const prevNormalQty = prevQtys[key] || 0;
           const nextNormalQty = nextQtys[key] || 0;
 
-          const prevExpectedGhosts = Math.floor(prevNormalQty / triggerQty) * ghostQtyPerBundle;
-          const nextExpectedGhosts = Math.floor(nextNormalQty / triggerQty) * ghostQtyPerBundle;
-          const currentGhosts = prev.filter(p => p.id === productId && p.cuenta === cuenta && p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+          const prevExpectedGhosts = Math.floor(prevNormalQty / (nth - 1));
+          const nextExpectedGhosts = Math.floor(nextNormalQty / (nth - 1));
+          const currentGhosts = prev.filter(p => String(p.id) === String(productId) && String(p.cuenta) === String(cuenta) && (p.isAutoPromo || Number(p.precio) === 0) && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
 
           if (nextExpectedGhosts < currentGhosts && nextExpectedGhosts < prevExpectedGhosts) {
-            ruptureDetected = true;
-            ruptureProductName = prev.find(p => p.id === productId)?.nombre || 'Producto';
+            needsWarning = true;
+            ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
             break;
           }
         }
       }
 
-      if (ruptureDetected) {
+      if (needsWarning) {
         setPromoWarning({
           isOpen: true,
-          message: `Al modificar esta cuenta, perderás la promoción vigente en "${ruptureProductName}". Los artículos volverán a su precio normal. ¿Deseas continuar?`,
+          message: `Al modificar esta cantidad, perderás la promoción vigente en "${ruptureProductName}". El artículo volverá a su precio normal. ¿Deseas continuar?`,
           onConfirm: () => {
-            setCart(currentCart => cleanupGhosts(actionToCalculateNextCart(currentCart)));
+            setCart(currentCart => actionToCalculateNextCart(currentCart));
             setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
           },
           onCancel: () => setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null })
         });
         return prev; 
       }
+      
       return nextCart;
     });
   };
@@ -178,29 +316,44 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         return false; 
     }
 
-    const activePromo = getActivePromo(productWithDetails.id);
-    let qtyToAdd = 1;
-    let willAddGhost = false;
+    const activePromo = getActivePromo(productWithDetails.id, productWithDetails.stock, productWithDetails.controlarStock);
+    
+    let qtyToAdd = 1; 
+    let willAddExtraGhost = false; 
+    let isSubstitutingWithGhost = false; 
     let ghostPrice = 0;
     let ghostLabel = '';
+    let extraGhostQty = 0;
 
-    if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'NTH_FIXED')) {
-      const normalQtyInAccount = cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-      const triggerQty = activePromo.type === 'NxM' ? activePromo.payQty : (activePromo.buyQty - 1);
-      
-      if ((normalQtyInAccount + 1) % triggerQty === 0) {
-        willAddGhost = true;
-        const ghostQtyPerBundle = activePromo.type === 'NxM' ? (activePromo.buyQty - activePromo.payQty) : 1;
-        qtyToAdd += ghostQtyPerBundle;
-        ghostPrice = activePromo.type === 'NxM' ? 0 : parseFloat(activePromo.discountValue);
-        ghostLabel = activePromo.type === 'NxM' ? '🎁 GRATIS' : '✨ OFERTA';
+    if (activePromo) {
+      if (activePromo.type === 'NxM') {
+        const normalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && !p.isAutoPromo && Number(p.precio) > 0 && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+        const buy = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+        const pay = Number(activePromo.payQty || activePromo.pay_qty || 1);
+        
+        if ((normalQtyInAccount + 1) % pay === 0) {
+          willAddExtraGhost = true;
+          extraGhostQty = buy - pay;
+          qtyToAdd += extraGhostQty; 
+          ghostPrice = 0;
+          ghostLabel = '🎁 GRATIS';
+        }
+      } else if (activePromo.type === 'NTH_FIXED') {
+        const totalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+        const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+        
+        if ((totalQtyInAccount + 1) % nth === 0) {
+          isSubstitutingWithGhost = true;
+          ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
+          ghostLabel = `✨ Promo #${nth}`;
+        }
       }
     }
 
     if (productWithDetails.controlarStock) {
-      const currentUnsent = getUnsentQtyOfProduct(cart, productWithDetails.id);
+      const currentUnsent = getUnsentQtyOfProduct(_cart, productWithDetails.id);
       if (currentUnsent + qtyToAdd > productWithDetails.stock) {
-         triggerNotification(`Stock insuficiente. Intentas añadir ${qtyToAdd} (incluyendo promociones) pero quedan ${productWithDetails.stock - currentUnsent}.`, 'warning');
+         triggerNotification(`Stock insuficiente. Intentas añadir ${qtyToAdd} (incluyendo promo) pero quedan ${productWithDetails.stock - currentUnsent}.`, 'warning');
          return false; 
       }
     }
@@ -208,20 +361,30 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     let finalDetails = productWithDetails.detalles || {};
     let finalPrice = parseFloat(productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0);
     
-    // GUARDADO DEL PRECIO ORIGINAL (PARA LA UI)
     let precioOriginalParaTachar = null; 
+    let isAutoPromoFlag = false;
+    let mainPromoLabel = undefined;
 
-    if (activePromo && activePromo.type === 'FIXED') {
+    if (isSubstitutingWithGhost) {
       const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
       const costoExtras = finalPrice - baseOriginal;
+      precioOriginalParaTachar = finalPrice;
+      finalPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
+      isAutoPromoFlag = true;
+      mainPromoLabel = ghostLabel;
+    } else if (activePromo && activePromo.type === 'FIXED') {
+      const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
+      const discountFixed = Number(activePromo.discountValue || activePromo.discount_value || 0);
+      const costoExtras = finalPrice - baseOriginal;
       precioOriginalParaTachar = finalPrice; 
-      finalPrice = parseFloat(activePromo.discountValue) + (costoExtras > 0 ? costoExtras : 0);
+      finalPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
+      mainPromoLabel = '✨ OFERTA';
     } else if (!productWithDetails.detalles) {
-        const defaultCustoms = getDefaultCustomizations(productWithDetails);
-        if (defaultCustoms) {
-            finalDetails = defaultCustoms.detalles;
-            finalPrice = defaultCustoms.precioFinal;
-        }
+      const defaultCustoms = getDefaultCustomizations(productWithDetails);
+      if (defaultCustoms) {
+          finalDetails = defaultCustoms.detalles;
+          finalPrice = defaultCustoms.precioFinal;
+      }
     }
 
     setCart(prev => {
@@ -230,7 +393,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       
       const index = newCart.findIndex(p => 
          p.id === productWithDetails.id && p.precio === finalPrice && !p.enviadoCocina && 
-         p.cuenta === targetCuenta && !!p.isTakeaway === !!productWithDetails.isTakeaway && !p.isAutoPromo &&
+         p.cuenta === targetCuenta && !!p.isTakeaway === !!productWithDetails.isTakeaway && 
+         !!p.isAutoPromo === isAutoPromoFlag && 
          p.preparaciones.every(prep => JSON.stringify(prep) === detailStr)
       );
 
@@ -241,6 +405,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             ...productWithDetails, 
             precio: finalPrice, 
             precioOriginal: precioOriginalParaTachar,
+            promoLabel: mainPromoLabel,
             qty: 1, 
             preparaciones: [finalDetails], 
             enviadoCocina: false, 
@@ -248,14 +413,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             cuenta: targetCuenta, 
             isTakeaway: productWithDetails.isTakeaway || false, 
             requiereCocina: productWithDetails.requiereCocina !== false, 
-            isAutoPromo: false
+            isAutoPromo: isAutoPromoFlag
           });
       }
 
-      if (willAddGhost) {
-        const ghostQtyToAdd = qtyToAdd - 1;
-        const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
-
+      if (willAddExtraGhost) {
         let ops = productWithDetails.opciones;
         if (typeof ops === 'string') {
           try { ops = JSON.parse(ops); } catch (e) { ops = null; }
@@ -268,27 +430,37 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
            ghostDetails.extras = []; 
         }
 
+        let ghostOriginalPrice = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
+        const defaultCustoms = getDefaultCustomizations(productWithDetails);
+        if (defaultCustoms && defaultCustoms.precioFinal) {
+           ghostOriginalPrice = defaultCustoms.precioFinal;
+        }
+
         newCart.push({
           ...productWithDetails,
           nombre: productWithDetails.nombre, 
-          precioOriginal: baseOriginal,      
+          precioOriginal: ghostOriginalPrice, 
           promoLabel: ghostLabel,            
-          precio: ghostPrice,
-          qty: ghostQtyToAdd,
-          preparaciones: Array(ghostQtyToAdd).fill(ghostDetails), 
+          precio: 0, 
+          qty: extraGhostQty,
+          preparaciones: Array(extraGhostQty).fill(ghostDetails), 
           enviadoCocina: false,
           status: 'ACTIVE',
           cuenta: targetCuenta,
           isAutoPromo: true,
           requiereCocina: productWithDetails.requiereCocina !== false
         });
-        setTimeout(() => triggerNotification(`¡Promo Activada! +${ghostQtyToAdd} ${productWithDetails.nombre} (${ghostLabel})`, 'success'), 50);
+        setTimeout(() => triggerNotification(`¡Promo Activada! +${extraGhostQty} ${productWithDetails.nombre} (${ghostLabel})`, 'success'), 50);
       }
 
       return newCart;
     });
 
-    if (!willAddGhost) triggerNotification(`¡${productWithDetails.nombre} agregado!`, 'success');
+    if (!willAddExtraGhost && !isSubstitutingWithGhost) {
+      triggerNotification(`¡${productWithDetails.nombre} agregado!`, 'success');
+    } else if (isSubstitutingWithGhost) {
+      setTimeout(() => triggerNotification(`¡Aplicaste la Promo #${activePromo.buyQty || 2} para ${productWithDetails.nombre}!`, 'success'), 50);
+    }
     return true; 
   };
 
@@ -324,7 +496,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           }
         }
         notificationsToFire.forEach(notif => triggerNotification(notif.msg, notif.type));
-        return cleanupGhosts(modifiedCart); 
+        return modifiedCart; 
       });
     };
 
@@ -339,7 +511,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
         const idx = newCart.findIndex(p => 
           p.id === itemToRemove.id && p.precio === itemToRemove.precio && p.cuenta === itemToRemove.cuenta && 
-          !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && !!p.isAutoPromo === !!itemToRemove.isAutoPromo &&
+          !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && 
+          (p.isAutoPromo || Number(p.precio) === 0) === (itemToRemove.isAutoPromo || Number(itemToRemove.precio) === 0) &&
           JSON.stringify(p.preparaciones[0] || {}) === prepStr
         );
         
@@ -357,7 +530,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
       return prev.filter(p => !(
         p.id === itemToRemove.id && p.precio === itemToRemove.precio && p.cuenta === itemToRemove.cuenta && 
-        !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && !!p.isAutoPromo === !!itemToRemove.isAutoPromo &&
+        !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && 
+        (p.isAutoPromo || Number(p.precio) === 0) === (itemToRemove.isAutoPromo || Number(itemToRemove.precio) === 0) &&
         JSON.stringify(p.preparaciones[0] || {}) === prepStr
       ));
     });
@@ -370,7 +544,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       const prepStr = JSON.stringify(itemToToggle.preparaciones[0] || {});
       const idx = newCart.findIndex(p => 
         p.id === itemToToggle.id && p.precio === itemToToggle.precio && p.cuenta === itemToToggle.cuenta && 
-        !!p.isTakeaway === !!itemToToggle.isTakeaway && !p.enviadoCocina && !!p.isAutoPromo === !!itemToToggle.isAutoPromo &&
+        !!p.isTakeaway === !!itemToToggle.isTakeaway && !p.enviadoCocina && 
+        (p.isAutoPromo || Number(p.precio) === 0) === (itemToToggle.isAutoPromo || Number(itemToToggle.precio) === 0) &&
         JSON.stringify(p.preparaciones[0] || {}) === prepStr
       );
 
@@ -386,7 +561,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           
           const existingTargetIdx = newCart.findIndex(p => 
             p.id === currentItem.id && p.precio === currentItem.precio && p.cuenta === currentItem.cuenta && 
-            !!p.isTakeaway === targetTakeawayState && !p.enviadoCocina && !!p.isAutoPromo === !!currentItem.isAutoPromo &&
+            !!p.isTakeaway === targetTakeawayState && !p.enviadoCocina && 
+            (p.isAutoPromo || Number(p.precio) === 0) === (currentItem.isAutoPromo || Number(currentItem.precio) === 0) &&
             JSON.stringify(p.preparaciones[0] || {}) === prepStr
           );
           
@@ -402,29 +578,29 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   };
 
   const total = useMemo(() => 
-    cart.filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED')
+    _cart.filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), 
-  [cart, cuentasPagadasReales]);
+  [_cart, cuentasPagadasReales]);
 
   const unsentTotal = useMemo(() => 
-    cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED')
+    _cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), 
-  [cart]);
+  [_cart]);
 
-  const hasUnsentItems = useMemo(() => cart.some(p => !p.enviadoCocina), [cart]);
+  const hasUnsentItems = useMemo(() => _cart.some(p => !p.enviadoCocina), [_cart]);
 
   const getSubtotalByCuenta = (nombreCuenta) => {
     if (cuentasPagadasReales.includes(nombreCuenta)) return 0;
-    return cart.filter(item => item.cuenta === nombreCuenta && item.status !== 'CANCELLED')
+    return _cart.filter(item => item.cuenta === nombreCuenta && item.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
   };
 
   const getProductQty = (id) => 
-    cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva && p.status !== 'CANCELLED' && !p.isAutoPromo)
+    _cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva && p.status !== 'CANCELLED' && (!p.isAutoPromo && Number(p.precio) > 0))
         .reduce((acc, item) => acc + item.qty, 0);
 
   return {
-    cart, setCart,
+    cart: _cart, setCart,
     addToCart, removeFromCart, deleteLine, toggleItemTakeaway,
     total, unsentTotal, hasUnsentItems,
     getSubtotalByCuenta, getProductQty,

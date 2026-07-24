@@ -51,7 +51,6 @@ export const TicketSidebar = ({
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
 
-  // 🔥 MAPA GLOBAL DE STOCK SIN ENVIAR
   const globalUnsentQtyMap = activeCart
     .filter(item => !item.enviadoCocina)
     .reduce((acc, item) => {
@@ -80,17 +79,21 @@ export const TicketSidebar = ({
     return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
   };
 
+  // 🔥 AGRUPADOR BLINDADO
   const groupedCart = availableAccs.map(cuentaName => {
     const rawItems = activeCart.filter(item => (item.cuenta || 'General') === cuentaName);
     const displayItems = [];
     
     rawItems.forEach(item => {
+        const isGhost = item.isAutoPromo || Number(item.precio) === 0;
+
         const existing = displayItems.find(d => 
             d.id === item.id && 
             Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
             d.enviadoCocina === item.enviadoCocina && 
             d.kitchenStatus === item.kitchenStatus &&
             !!d.isTakeaway === !!item.isTakeaway && 
+            (d.isAutoPromo || Number(d.precio) === 0) === isGhost && 
             getPrepStr(d) === getPrepStr(item)
         );
         if (existing) { 
@@ -351,6 +354,10 @@ export const TicketSidebar = ({
   const handleDropOnCuenta = async (cuentaName) => {
     setDragOverCuenta(null);
     if (draggedItem && draggedItem.cuentaName !== cuentaName && !cuentasPagadasReales.includes(cuentaName) && !isLlevar && !isVitrina) {
+      
+      // 🔥 BLOQUEO DE SEGURIDAD: Evita que el usuario suelte un producto fantasma/gratis en otra cuenta.
+      if (draggedItem.item.isAutoPromo || Number(draggedItem.item.precio) === 0) return;
+
       let qtyToMove = draggedItem.item.qty;
       const itemIdToProcess = draggedItem.item.backendItemId || draggedItem.item.id;
 
@@ -400,7 +407,6 @@ export const TicketSidebar = ({
   const showDeliverAllBtn = !isVitrina && itemsNeedingDelivery.length > 0;
 
   return (
-    // 🔥 ESTRUCTURA RAIZ ESTRICTA FLEXBOX
     <div className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors relative overflow-hidden">
       
       {!(isLlevar || isVitrina) && (
@@ -412,7 +418,6 @@ export const TicketSidebar = ({
         />
       )}
 
-      {/* 🔥 CONTENEDOR DE LISTAS SCROLL */}
       <div ref={scrollContainerRef} onDragOver={handleContainerDragOver} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar relative z-10">
         
         {activeCart.length === 0 && availableAccs.length === 1 && !isLlevar ? (
@@ -489,7 +494,6 @@ export const TicketSidebar = ({
       <AnimatePresence>
         {showReleaseModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
-            {/* 🔥 MODAL CON BORDES REDONDEADOS Y TEXTOS CENTRADOS */}
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col">
               
               <div className="p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 text-center">

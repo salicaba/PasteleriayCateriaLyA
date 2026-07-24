@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag } from 'lucide-react';
@@ -175,7 +176,16 @@ export const TicketCartGroup = ({
       {/* LISTA DE ITEMS */}
       <div className="px-2 pb-2 space-y-1.5">
         {items.map((item, idx) => {
-          const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}-${item.isAutoPromo}`;
+          // 🔥 1. MEMORIA VISUAL: Reconstruimos los flags de promoción si el backend los borró al enviar a cocina
+          const isCero = Number(item.precio) === 0;
+          const isGhostPromo = item.isAutoPromo || isCero;
+          const isDiscountedPromo = !isGhostPromo && (item.promoLabel || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)));
+          const isAnyPromo = isGhostPromo || isDiscountedPromo;
+          
+          const promoText = item.promoLabel || (isGhostPromo ? '🎁 GRATIS' : '✨ OFERTA');
+          const pOriginal = item.precioOriginal || (isGhostPromo ? (item.basePrice || item.precioBase || null) : null);
+
+          const currentItemKey = `group-${item.id}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}-${isGhostPromo}`;
           const isProcessing = processingItems[item.backendItemId || item.id];
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
 
@@ -191,19 +201,20 @@ export const TicketCartGroup = ({
           return (
           <motion.div 
             key={currentItemKey} layout
-            draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isProcessing}
+            // 🔥 BLOQUEO DE DRAG: Si es un ítem regalado (isGhostPromo) no se puede arrastrar manualmente
+            draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isProcessing && !isGhostPromo}
             onDragStart={(e) => { 
-                if (isCuentaPagada || isLlevar || isVitrina || isProcessing) return; 
+                if (isCuentaPagada || isLlevar || isVitrina || isProcessing || isGhostPromo) return; 
                 onDragStart(item, cuentaName); 
                 e.dataTransfer.effectAllowed = 'move'; 
             }}
             onDragEnd={onDragEnd}
             className={clsx(
                 "relative group flex flex-col p-2.5 rounded-xl transition-all overflow-hidden border", 
-                (!isCuentaPagada && !isLlevar && !isVitrina && !isProcessing) ? "cursor-grab active:cursor-grabbing" : "", 
+                (!isCuentaPagada && !isLlevar && !isVitrina && !isProcessing && !isGhostPromo) ? "cursor-grab active:cursor-grabbing" : "", 
                 draggedItem?.item === item ? "opacity-40 scale-95" : "opacity-100", 
                 // 🔥 RESALTE DE PROMOCIONES EN EL CARRITO
-                item.isAutoPromo ? "bg-rose-50/80 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/30" 
+                isGhostPromo ? "bg-rose-50/80 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/30" 
                 : item.enviadoCocina ? "bg-gray-50/80 dark:bg-gray-800/50 lya:bg-lya-bg/50 border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20" 
                 : "bg-white dark:bg-gray-800 lya:bg-lya-bg border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-sm",
                 isProcessing && "pointer-events-none opacity-60"
@@ -219,10 +230,11 @@ export const TicketCartGroup = ({
             <div className="flex gap-2.5">
               <div className={clsx(
                 "w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
-                item.isAutoPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+                isGhostPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
               )}>
                 {item.imagen || item.image ? <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" /> : <span className="text-lg opacity-80">🧁</span>}
-                {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && (
+                {/* 🔥 NO MOSTRAR GRIP VERTICAL EN ÍTEMS FANTASMAS */}
+                {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isGhostPromo && (
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
                         <GripVertical size={16} className="text-white drop-shadow-md" />
                     </div>
@@ -241,28 +253,28 @@ export const TicketCartGroup = ({
                       {item.nombre}
                     </h5>
                     {/* 🔥 ETIQUETA DE PROMOCIÓN VISUAL */}
-                    {item.isAutoPromo && (
+                    {isAnyPromo && (
                        <span className="text-[8px] font-black text-rose-500 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 border border-rose-200 dark:border-rose-800/50 shadow-sm">
-                         <Tag size={8} strokeWidth={3} /> {item.promoLabel || 'OFERTA'}
+                         <Tag size={8} strokeWidth={3} /> {promoText}
                        </span>
                     )}
                   </div>
                   
                   <div className="flex flex-col items-end">
-                    {/* 🔥 ANCLAJE DE PRECIO ORIGINAL TACHADO PARA OFERTAS FIJAS */}
-                    {item.precioOriginal && Number(item.precioOriginal) > Number(item.precio) && (
+                    {/* 🔥 ANCLAJE DE PRECIO ORIGINAL TACHADO */}
+                    {pOriginal && Number(pOriginal) > Number(item.precio) && (
                       <span className="text-[10px] md:text-[11px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none mb-0.5">
-                        ${(Number(item.precioOriginal) * item.qty).toFixed(2)}
+                        ${(Number(pOriginal) * item.qty).toFixed(2)}
                       </span>
                     )}
-                    <span className={clsx("text-xs font-black", item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
+                    <span className={clsx("text-xs font-black", isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
                       ${(Number(item.precio) * item.qty).toFixed(2)}
                     </span>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5 mt-1">
-                    {item.qty > 1 && <span className={clsx("px-1 py-0.5 rounded border", item.isAutoPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
+                    {item.qty > 1 && <span className={clsx("px-1 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
                     {item.isTakeaway && item.enviadoCocina && !isVitrina && (
                         <span className="text-[8px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
                             <ShoppingBag size={8} /> Empacar
@@ -286,8 +298,8 @@ export const TicketCartGroup = ({
               </div>
             </div>
 
-            {/* CONTROLES: Los ítems de Auto-Promo NO se pueden sumar ni restar ni ocultar manualmente. */}
-            {!item.isAutoPromo && (!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
+            {/* 🔥 LOS ÍTEMS FANTASMAS NO TIENEN CONTROLES DE +/-/OCULTAR */}
+            {!isGhostPromo && (!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
               <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 
                 {!isVitrina && (

@@ -1,12 +1,12 @@
 // src/modules/cafeteria/views/PosModal.jsx
-import { socket } from '../../../api/socket.js';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Phone, User, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
+import { X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
 import { usePosController } from '../controllers/usePosController';
+import { usePosMenu } from '../controllers/usePosMenu'; 
 import { ProductCard } from './ProductCard';
 import { TicketSidebar } from './TicketSidebar'; 
 import { CategoryBar } from './CategoryBar';
@@ -69,41 +69,33 @@ export const PosModal = ({
     }
   };
 
+  const rawNumeroStr = String(mesa?.numero || mesa?.id || '').trim();
+  const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumeroStr);
+  const isLlevar = (mesa?.zona === 'llevar' || mesa?.orderType === 'LLEVAR') && !esMesaFisica;
+  const isVitrina = mesa?.zona === 'vitrina' || mesa?.id === 'VITRINA-EXPRESS';
+
   const { 
-    cart, total, addToCart, removeFromCart, deleteLine, filtroTexto, setFiltroTexto, 
-    categoriaActiva, setCategoriaActiva, filteredProducts, 
+    dbCategories, 
+    activePromotions, 
+    filtroTexto, 
+    setFiltroTexto, 
+    categoriaActiva, 
+    setCategoriaActiva, 
+    filteredProducts 
+  } = usePosMenu(isVitrina);
+
+  const { 
+    cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    moveItemToCuenta, dbCategories, orderStatus, paidAccounts, validateAllDelivered,
+    moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
     promoWarning, confirmPromoRupture, cancelPromoRupture
   } = usePosController(mesa, isOpen, todasLasMesas); 
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
-
-  // 🔥 FETCH Y SINCRONIZACIÓN EN TIEMPO REAL DE PROMOCIONES PARA EL MENÚ
-  const [activePromotions, setActivePromotions] = useState([]);
-  useEffect(() => {
-    if (isOpen) {
-      client.get('/promotions').then(res => {
-        if (res.data.success) setActivePromotions(res.data.data);
-      }).catch(err => console.error("Error al cargar promociones en POS", err));
-    }
-
-    // Escuchar el socket para que si activas una promo en otra ventana, el cajero la vea al instante
-    const handlePromoUpdate = (data) => {
-      setActivePromotions(prev => {
-        const filtered = prev.filter(p => p.productId !== data.productId);
-        if (data.promotion) filtered.push(data.promotion);
-        return filtered;
-      });
-    };
-    
-    socket.on('menu:promotions_updated', handlePromoUpdate);
-    return () => socket.off('menu:promotions_updated', handlePromoUpdate);
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -117,11 +109,56 @@ export const PosModal = ({
     }
   }, [isOpen, dbCategories]);
 
-  const rawNumeroStr = String(mesa?.numero || mesa?.id || '').trim();
-  const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumeroStr);
+  let numeroReal = 'Pedido';
+  let nombreParaSidebar = '';
 
-  const isLlevar = (mesa?.zona === 'llevar' || mesa?.orderType === 'LLEVAR') && !esMesaFisica;
-  const isVitrina = mesa?.zona === 'vitrina' || mesa?.id === 'VITRINA-EXPRESS';
+  if (rawNumeroStr.includes(' - ')) {
+     const partes = rawNumeroStr.split(' - ');
+     numeroReal = partes[0].trim();
+     nombreParaSidebar = partes.slice(1).join(' - ').trim();
+  } else {
+     numeroReal = rawNumeroStr.trim();
+  }
+
+  if (!isLlevar && !isVitrina) {
+    numeroReal = numeroReal.replace(/#/g, '').trim();
+  }
+
+  const loaderTitle = isVitrina 
+    ? "Preparando el mostrador..." 
+    : isLlevar 
+      ? "Preparando pedido para llevar..." 
+      : "Preparando tu mesa...";
+
+  const HeaderTitle = () => {
+    if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
+    if (isLlevar) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">{numeroReal}</h3>;
+    return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mesa #{numeroReal}</h3>;
+  };
+
+  const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
+    const orderId = mesa?.orderId || mesa?.id;
+
+    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
+    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
+      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
+    }
+    
+    const shortId = orderId.split('-')[0];
+    let shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
+    
+    if (cuentaName && cuentaName !== 'Todas') {
+      shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
+    }
+
+    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
+    const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cuentaName}*` : '';
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+
+    const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
+    window.open(urlApiWhatsApp, '_blank');
+    showToast('Redirigiendo a WhatsApp...', 'success');
+  };
 
   const handleConfirmOption = (productWithOptions) => { 
     addToCart(productWithOptions); 
@@ -224,57 +261,6 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
-  let numeroReal = 'Pedido';
-  let nombreParaSidebar = '';
-
-  if (rawNumeroStr.includes(' - ')) {
-     const partes = rawNumeroStr.split(' - ');
-     numeroReal = partes[0].trim();
-     nombreParaSidebar = partes.slice(1).join(' - ').trim();
-  } else {
-     numeroReal = rawNumeroStr.trim();
-  }
-
-  if (!isLlevar && !isVitrina) {
-    numeroReal = numeroReal.replace(/#/g, '').trim();
-  }
-
-  const loaderTitle = isVitrina 
-    ? "Preparando el mostrador..." 
-    : isLlevar 
-      ? "Preparando pedido para llevar..." 
-      : "Preparando tu mesa...";
-
-  const HeaderTitle = () => {
-    if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
-    if (isLlevar) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">{numeroReal}</h3>;
-    return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mesa #{numeroReal}</h3>;
-  };
-
-  const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
-    const orderId = mesa?.orderId || mesa?.id;
-
-    let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
-    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
-      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
-    }
-    
-    const shortId = orderId.split('-')[0];
-    let shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
-    
-    if (cuentaName && cuentaName !== 'Todas') {
-      shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
-    }
-
-    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
-    const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cuentaName}*` : '';
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
-
-    const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, '_blank');
-    showToast('Redirigiendo a WhatsApp...', 'success');
-  };
-
   const sidebarProps = {
     cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -296,7 +282,7 @@ export const PosModal = ({
     isLlevar: (isLlevar || isVitrina), 
     isVitrina, 
     toggleItemTakeaway, cuentasTelefonos,
-    onDeliverAll: deliverAllActiveItems,        
+    onDeliverAll: deliverAllActiveItems,          
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
@@ -470,7 +456,6 @@ export const PosModal = ({
 
             <div className="relative z-[9999]">
                 
-                {/* 🔥 ESCUDO POKA-YOKE NEO-BENTO PARA RUPTURA DE PROMOCIONES */}
                 <AnimatePresence>
                   {promoWarning?.isOpen && (
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">

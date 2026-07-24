@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// src/modules/admin/views/MenuManagerPage.jsx
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
@@ -8,9 +9,11 @@ import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
 
-// 🔥 IMPORTAMOS LOS DOS MODALES DEL MOTOR DE PROMOCIONES
-import PromotionManagerModal from './PromotionManagerModal'; // El Wizard
-import PromotionListModal from './PromotionListModal';       // El Mini-Dashboard
+import api from '../../../api/client';
+import { socket } from '../../../api/socket';
+
+import PromotionManagerModal from './PromotionManagerModal'; 
+import PromotionListModal from './PromotionListModal';       
 
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
@@ -31,11 +34,11 @@ export const MenuManagerPage = () => {
   const [toast, setToast] = useState(null);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   
-  // 🔥 ESTADOS DIVIDIDOS PARA EL FLUJO DE PROMOCIONES
   const [isPromoListOpen, setIsPromoListOpen] = useState(false);
   const [isPromoWizardOpen, setIsPromoWizardOpen] = useState(false);
   const [selectedProductForPromo, setSelectedProductForPromo] = useState(null);
-  const [editingPromoData, setEditingPromoData] = useState(null); // 🔥 NUEVO: Guarda la promo a editar
+  const [editingPromoData, setEditingPromoData] = useState(null); 
+  const [allPromotions, setAllPromotions] = useState([]); 
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -62,12 +65,89 @@ export const MenuManagerPage = () => {
     else setNewCategoryName('');
   }, [categoryToEdit, isCategoryManagerOpen]);
 
+  // Carga inicial y escucha de WebSockets
+  useEffect(() => {
+    const fetchGlobalPromos = async () => {
+      try {
+        const res = await api.get('/promotions');
+        const raw = res.data;
+        const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
+        setAllPromotions(list);
+      } catch (error) {
+        console.error("Error cargando promociones globales:", error);
+      }
+    };
+
+    fetchGlobalPromos();
+    const handlePromoUpdate = () => fetchGlobalPromos();
+    
+    socket.on('menu:promotions_updated', handlePromoUpdate);
+    socket.on('promotion_created', handlePromoUpdate);
+    socket.on('promotion_updated', handlePromoUpdate);
+    socket.on('promotion_deleted', handlePromoUpdate);
+
+    return () => {
+      socket.off('menu:promotions_updated', handlePromoUpdate);
+      socket.off('promotion_created', handlePromoUpdate);
+      socket.off('promotion_updated', handlePromoUpdate);
+      socket.off('promotion_deleted', handlePromoUpdate);
+    };
+  }, []);
+
+  // 🔥 PERRO GUARDIÁN (Watchdog): Auto-Apagado en 2do Plano
+  const processingAutoDisable = useRef(new Set());
+
+  useEffect(() => {
+    if (products.length === 0 || allPromotions.length === 0) return;
+
+    const runWatchdog = async () => {
+      let didAutoDisable = false;
+      
+      for (const promo of allPromotions) {
+        const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
+        const isReallyActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+
+        // Si ya está apagada o ya la estamos procesando, la saltamos
+        if (!isReallyActive || processingAutoDisable.current.has(promo.id)) continue;
+
+        const product = products.find(p => String(p.id) === String(promo.productId || promo.product_id));
+        
+        if (product && product.controlarStock) {
+          const currentStock = Number(product.stockQuantity ?? product.stock ?? 0);
+          let reqQty = 1;
+          
+          if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
+            reqQty = Number(promo.buyQty || promo.buy_qty || 2);
+          }
+
+          // CONDICIÓN DE RUPTURA: La promo exige más de lo que hay en inventario
+          if (currentStock < reqQty) {
+            processingAutoDisable.current.add(promo.id); // Bloqueamos para evitar bucles
+            try {
+              // Apagamos la promoción directo en el backend
+              await api.patch(`/promotions/${promo.id}/toggle`);
+              didAutoDisable = true;
+            } catch (e) {
+              console.error("Fallo el perro guardián al apagar promo:", e);
+              processingAutoDisable.current.delete(promo.id);
+            }
+          }
+        }
+      }
+
+      if (didAutoDisable) {
+        showToast('El sistema detectó quiebre de stock y apagó promociones en riesgo automáticamente.', 'warning');
+      }
+    };
+
+    runWatchdog();
+  }, [products, allPromotions, showToast]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // 🔥 Función para abrir PRIMERO el Mini-Dashboard (Lista)
   const handleOpenPromoList = (product) => {
     setSelectedProductForPromo(product);
     setIsPromoListOpen(true);
@@ -140,7 +220,6 @@ export const MenuManagerPage = () => {
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
-      {/* 💊 NOTIFICACIÓN NATIVA NEO-BENTO */}
       <AnimatePresence>
         {toast && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -167,7 +246,6 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* HEADER PRINCIPAL */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
@@ -194,7 +272,6 @@ export const MenuManagerPage = () => {
         </div>
       </header>
 
-      {/* 🔥 FILA DE TARJETAS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-8 shrink-0 z-10 relative">
         <StatCard 
           title="Total en Catálogo" 
@@ -221,7 +298,6 @@ export const MenuManagerPage = () => {
         />
       </div>
 
-      {/* CUERPO: LISTA DE CATEGORÍAS Y PRODUCTOS VISIBLES */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
         <div className="space-y-10">
           {categories.map((category) => {
@@ -252,6 +328,13 @@ export const MenuManagerPage = () => {
                         const isProcessingAgotado = currentAction === 'agotado';
                         const isProcessingAny = !!currentAction;
 
+                        const hasActivePromo = allPromotions.some(p => {
+                          const matches = String(p.productId || p.product_id) === String(product.id);
+                          if (!matches) return false;
+                          const rawActive = p.isActive ?? p.is_active ?? p.status;
+                          return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+                        });
+
                         return (
                         <motion.div 
                           key={product.id} 
@@ -264,16 +347,23 @@ export const MenuManagerPage = () => {
                           className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden ${
                             isAgotado 
                               ? 'border-gray-200 dark:border-neutral-800 opacity-70 grayscale-[40%]' 
-                              : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-300 lya:md:hover:border-lya-secondary/40'
+                              : hasActivePromo 
+                                ? 'border-rose-200 dark:border-rose-900/50 lya:border-lya-primary/40 md:hover:border-rose-300 shadow-[0_5px_15px_rgba(244,63,94,0.08)]' 
+                                : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-300 lya:md:hover:border-lya-secondary/40'
                           }`}
                         >
 
-                          {/* ⚠️ CINTA DE AGOTADO FLOTANTE */}
                           {isAgotado && (
                             <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[120%] pointer-events-none">
                               <div className="bg-red-500/95 dark:bg-red-600/95 lya:bg-red-500/95 backdrop-blur-md text-white text-center py-1.5 font-black tracking-widest uppercase transform -rotate-12 shadow-2xl border-y border-red-400/50 text-[11px]">
                                 {isMathematicallyAgotado ? 'Sin Stock' : 'Agotado'}
                               </div>
+                            </div>
+                          )}
+
+                          {hasActivePromo && !isAgotado && (
+                            <div className="absolute top-3 right-3 z-20 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-lg shadow-rose-500/30 border border-rose-400 flex items-center gap-1 uppercase tracking-widest animate-pulse pointer-events-none">
+                              <Tag size={10} strokeWidth={3} /> Oferta
                             </div>
                           )}
 
@@ -285,13 +375,12 @@ export const MenuManagerPage = () => {
                                 <div className="text-3xl opacity-80">{product.imagen || <ImageIcon size={24} className="text-gray-300 dark:text-gray-600 lya:text-lya-text/30" />}</div>
                               )}
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 pr-8">
                               <h3 className={`font-black text-base leading-tight truncate tracking-tight ${isAgotado ? 'text-amber-800 dark:text-amber-400' : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'}`}>{product.nombre || product.name}</h3>
                               
                               <div className="flex flex-col items-start gap-1.5 mt-1.5">
                                 <p className="text-orange-500 dark:text-orange-400 lya:text-lya-primary font-black leading-none">${Number(product.precioBase || product.basePrice || 0).toFixed(2)}</p>
                                 
-                                {/* 🔥 INDICADOR DE STOCK */}
                                 {hasStockControl && (
                                   <div className={`text-[10px] font-black px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
                                       stockActual <= 0 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800/50' :
@@ -308,7 +397,6 @@ export const MenuManagerPage = () => {
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto relative z-10">
                             
                             <div className="flex flex-col gap-1.5 w-full mr-2">
-                              {/* 🔥 LÓGICA DE BOTÓN INTELIGENTE */}
                               {isMathematicallyAgotado ? (
                                 <button 
                                   onClick={() => openModal(product)} 
@@ -337,10 +425,13 @@ export const MenuManagerPage = () => {
                             </div>
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
-                              {/* 🔥 BOTÓN PARA ABRIR LISTA DE PROMOCIONES */}
                               <button 
                                 onClick={() => handleOpenPromoList(product)} 
-                                className="p-2.5 text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400 md:hover:bg-rose-100 dark:md:hover:bg-rose-900/40 rounded-xl transition-colors active:scale-90 outline-none" 
+                                className={`p-2.5 rounded-xl transition-colors active:scale-90 outline-none ${
+                                  hasActivePromo 
+                                    ? 'text-rose-600 bg-rose-100 dark:bg-rose-900/40 dark:text-rose-300 md:hover:bg-rose-200 shadow-inner' 
+                                    : 'text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400 md:hover:bg-rose-100'
+                                }`}
                                 title="Configurar Promociones (Motor de Ofertas)"
                               >
                                 <Tag size={16} />
@@ -379,12 +470,10 @@ export const MenuManagerPage = () => {
         </div>
       </div>
 
-      {/* FORMULARIO DE CREAR/EDITAR PRODUCTO */}
       <AnimatePresence>
         {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} globalOptions={globalOptions} />}
       </AnimatePresence>
 
-      {/* MODAL DE LA PAPELERA */}
       <AnimatePresence>
         {isTrashModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 lya:bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
@@ -458,7 +547,6 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE GESTIÓN DE CATEGORÍAS */}
       <AnimatePresence>
         {isCategoryManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 lya:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -503,7 +591,6 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL PARA ELIMINAR CATEGORÍA */}
       <AnimatePresence>
         {categoryToDelete && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -534,7 +621,6 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE OPCIONES GLOBALES */}
       <AnimatePresence>
         {isOptionsManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
@@ -627,11 +713,6 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* =========================================================================
-          🔥 ECOSISTEMA DE PROMOCIONES (MODAL 1: LISTA | MODAL 2: WIZARD)
-          ========================================================================= */}
-          
-      {/* 1. Dashboard de Promociones (La Lista) */}
       <PromotionListModal
         isOpen={isPromoListOpen}
         onClose={() => {
@@ -641,22 +722,21 @@ export const MenuManagerPage = () => {
         }}
         product={selectedProductForPromo}
         onOpenWizard={(promoToEdit = null) => {
-          setEditingPromoData(promoToEdit); // 🔥 Recibimos la promo a editar (o null si es nueva)
-          setIsPromoListOpen(false); // Cerramos temporalmente la lista
-          setIsPromoWizardOpen(true); // Abrimos el Wizard
+          setEditingPromoData(promoToEdit); 
+          setIsPromoListOpen(false); 
+          setIsPromoWizardOpen(true); 
         }}
       />
 
-      {/* 2. Wizard de Creación/Edición de Promociones */}
       <PromotionManagerModal 
         isOpen={isPromoWizardOpen}
         onClose={() => {
           setIsPromoWizardOpen(false);
-          setIsPromoListOpen(true); // Regresamos a la lista
-          setEditingPromoData(null); // Limpiamos la caché de edición
+          setIsPromoListOpen(true); 
+          setEditingPromoData(null); 
         }}
         product={selectedProductForPromo}
-        editData={editingPromoData} // 🔥 Pasamos los datos al Wizard
+        editData={editingPromoData} 
         onPromotionSaved={(promoInfo) => {
           showToast(`¡Promoción guardada exitosamente!`, 'success');
         }}
