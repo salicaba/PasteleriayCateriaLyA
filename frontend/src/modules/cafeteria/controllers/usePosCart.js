@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+// frontend/src/modules/pos/controllers/usePosCart.js
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js'; 
@@ -19,6 +20,12 @@ const parseValidDays = (daysData) => {
 export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotification) => {
   const [_cart, _setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
+
+  // 🔥 PILAR 3: Prevención Anti-Doble Clic
+  const isProcessingRef = useRef(false);
+
+  // 🔥 TRACKING: Evita doble notificación de promo en la misma cuenta
+  const notifiedPromos = useRef(new Set());
 
   const [promoWarning, setPromoWarning] = useState({
     isOpen: false,
@@ -137,7 +144,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
       const currentGhosts = ghostQtys[key] || 0;
 
-      // ELIMINAR BASURA FLOTANTE Y AGRUPAR RETORNO AL ESTADO NORMAL
+      // --- CASO 1: ELIMINAR BASURA FLOTANTE Y RETORNAR AL ESTADO NORMAL ---
       if (currentGhosts > expectedGhosts) {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
@@ -157,7 +164,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                       cleanCart[existingNormalIdx] = { ...cleanCart[existingNormalIdx], qty: cleanCart[existingNormalIdx].qty + item.qty, preparaciones: [...cleanCart[existingNormalIdx].preparaciones, ...item.preparaciones] };
                       cleanCart.splice(i, 1);
                   } else {
-                      cleanCart[i] = { ...item, precio: originalPrice, isAutoPromo: false, promoLabel: undefined };
+                      cleanCart[i] = { ...item, precio: originalPrice, isAutoPromo: false, promoLabel: undefined, promoId: undefined, promoType: undefined };
                   }
                } else {
                   const prepsToKeep = item.preparaciones.slice(toRemove);
@@ -165,7 +172,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                   if (existingNormalIdx !== -1) {
                       cleanCart[existingNormalIdx] = { ...cleanCart[existingNormalIdx], qty: cleanCart[existingNormalIdx].qty + toRemove, preparaciones: [...cleanCart[existingNormalIdx].preparaciones, ...prepsToRestore] };
                   } else {
-                      const revertedItem = { ...item, qty: toRemove, precio: originalPrice, isAutoPromo: false, promoLabel: undefined, preparaciones: prepsToRestore };
+                      const revertedItem = { ...item, qty: toRemove, precio: originalPrice, isAutoPromo: false, promoLabel: undefined, preparaciones: prepsToRestore, promoId: undefined, promoType: undefined };
                       cleanCart.push(revertedItem);
                   }
                   toRemove = 0;
@@ -183,14 +190,17 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           }
         }
       } 
-      // AUTO-RELLENAR SI CALIFICA Y AGRUPAR
+      // --- CASO 2: AUTO-RELLENAR SI CALIFICA ---
       else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
          let missing = expectedGhosts - currentGhosts;
+         const promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
          
          if (activePromo.type === 'NTH_FIXED') {
             for (let i = cleanCart.length - 1; i >= 0; i--) {
                const item = cleanCart[i];
                if (!item.isAutoPromo && Number(item.precio) > 0 && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
+                  
+                  // 🔥 BLINDAJE DE COSTO OCULTO (Extras)
                   const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
                   const costoExtras = parseFloat(item.precio) - baseOriginal;
                   const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
@@ -207,7 +217,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                          cleanCart[existingPromoIdx] = { ...cleanCart[existingPromoIdx], qty: cleanCart[existingPromoIdx].qty + item.qty, preparaciones: [...cleanCart[existingPromoIdx].preparaciones, ...item.preparaciones] };
                          cleanCart.splice(i, 1);
                      } else {
-                         cleanCart[i] = { ...item, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel };
+                         cleanCart[i] = { ...item, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, ...promoMetadata };
                      }
                   } else {
                      const prepsToKeep = item.preparaciones.slice(missing);
@@ -216,7 +226,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                      if (existingPromoIdx !== -1) {
                          cleanCart[existingPromoIdx] = { ...cleanCart[existingPromoIdx], qty: cleanCart[existingPromoIdx].qty + missing, preparaciones: [...cleanCart[existingPromoIdx].preparaciones, ...prepsToConvert] };
                      } else {
-                         const convertedItem = { ...item, qty: missing, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, preparaciones: prepsToConvert };
+                         const convertedItem = { ...item, qty: missing, precioOriginal: item.precio, precio: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, preparaciones: prepsToConvert, ...promoMetadata };
                          cleanCart.push(convertedItem);
                      }
                      missing = 0;
@@ -262,13 +272,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 cuenta: cuenta,
                 isAutoPromo: true,
                 requiereCocina: sampleItem.requiereCocina !== false,
-                backendItemId: undefined
+                backendItemId: undefined,
+                ...promoMetadata
               });
             }
          }
       }
     });
 
+    // --- CASO 3: REBAJA DIRECTA (FIXED) ---
     cleanCart = cleanCart.map(item => {
       if (item.isAutoPromo && item.promoLabel !== 'OFERTA') return item; 
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock);
@@ -276,17 +288,71 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       if (activePromo && activePromo.type === 'FIXED') {
         const baseOriginal = parseFloat(item.precioBase || item.precioOriginal || item.precio || 0);
         const discountFixed = Number(activePromo.discountValue || 0);
+        
+        // 🔥 BLINDAJE DE COSTO OCULTO (Extras)
         const costoExtras = parseFloat(item.precioOriginal || item.precio) - baseOriginal;
         const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
 
         if (item.precio !== expectedPrice) {
-          return { ...item, precioOriginal: item.precioOriginal || item.precio, precio: expectedPrice, promoLabel: 'OFERTA', isAutoPromo: true };
+          return { 
+            ...item, 
+            precioOriginal: item.precioOriginal || item.precio, 
+            precio: expectedPrice, 
+            promoLabel: 'OFERTA', 
+            isAutoPromo: true,
+            promoId: activePromo.id,
+            promoType: activePromo.type 
+          };
         }
       } else if (item.promoLabel === 'OFERTA' && (!activePromo || activePromo.type !== 'FIXED')) {
-        return { ...item, precio: item.precioOriginal || item.precio, precioOriginal: undefined, promoLabel: undefined, isAutoPromo: false };
+        return { 
+          ...item, 
+          precio: item.precioOriginal || item.precio, 
+          precioOriginal: undefined, 
+          promoLabel: undefined, 
+          isAutoPromo: false,
+          promoId: undefined,
+          promoType: undefined 
+        };
       }
       return item;
     });
+
+    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING MULTI-CUENTA) ---
+    const currentActivePromoKeys = new Set();
+    cleanCart.forEach(item => {
+      if (item.isAutoPromo && item.promoId) {
+        currentActivePromoKeys.add(`${item.promoId}::${item.cuenta}`);
+      }
+    });
+
+    if (triggerNotification) {
+      currentActivePromoKeys.forEach(promoKey => {
+        if (!notifiedPromos.current.has(promoKey)) {
+          const [promoId, cuenta] = promoKey.split('::');
+          const promoItem = cleanCart.find(item => String(item.promoId) === promoId && String(item.cuenta) === cuenta);
+          
+          if (promoItem) {
+            setTimeout(() => {
+              const baseMsg = promoItem.cuenta !== 'General' ? `en ${promoItem.cuenta}` : '';
+              if (promoItem.promoType === 'NxM') {
+                triggerNotification(`Promo Automática: ¡${promoItem.nombre} GRATIS ${baseMsg}!`, 'success');
+              } else if (promoItem.promoType === 'NTH_FIXED') {
+                triggerNotification(`Descuento aplicado en ${promoItem.nombre} ${baseMsg}`, 'success');
+              } else if (promoItem.promoType === 'FIXED') {
+                triggerNotification(`Rebaja directa en ${promoItem.nombre} ${baseMsg}`, 'success');
+              }
+            }, 50);
+            notifiedPromos.current.add(promoKey);
+          }
+        }
+      });
+
+      // Limpieza de memoria (Garantiza que si cancelan el producto y lo vuelven a pedir, notifique de nuevo)
+      notifiedPromos.current = new Set(
+        [...notifiedPromos.current].filter(key => currentActivePromoKeys.has(key))
+      );
+    }
 
     return cleanCart;
   };
@@ -359,174 +425,183 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
   };
 
+  // 🔥 PILAR 3: Wrappers con Locks Asíncronos
   const addToCart = (productWithDetails, forceCuenta = null) => {
-    const targetCuenta = forceCuenta || cuentaActiva;
+    if (isProcessingRef.current) return false;
+    isProcessingRef.current = true;
 
-    if (cuentasPagadasReales.includes(targetCuenta)) {
-        triggerNotification(`La cuenta "${targetCuenta}" está sellada. Selecciona una nueva.`, 'error');
-        return false; 
-    }
+    try {
+      const targetCuenta = forceCuenta || cuentaActiva;
 
-    const activePromo = getActivePromo(productWithDetails.id, productWithDetails.stock, productWithDetails.controlarStock);
-    
-    let qtyToAdd = 1; 
-    let willAddExtraGhost = false; 
-    let isSubstitutingWithGhost = false; 
-    let ghostPrice = 0;
-    let ghostLabel = '';
-    let extraGhostQty = 0;
-
-    if (activePromo) {
-      if (activePromo.type === 'NxM') {
-        const normalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && !p.isAutoPromo && Number(p.precio) > 0 && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-        const buy = Number(activePromo.buyQty || activePromo.buy_qty || 2);
-        const pay = Number(activePromo.payQty || activePromo.pay_qty || 1);
-        
-        if ((normalQtyInAccount + 1) % pay === 0) {
-          willAddExtraGhost = true;
-          extraGhostQty = buy - pay;
-          qtyToAdd += extraGhostQty; 
-          ghostPrice = 0;
-          ghostLabel = 'GRATIS';
-        }
-      } else if (activePromo.type === 'NTH_FIXED') {
-        const totalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-        const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
-        
-        if ((totalQtyInAccount + 1) % nth === 0) {
-          isSubstitutingWithGhost = true;
-          ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-          ghostLabel = `${nth}º REBAJADO`;
-        }
+      if (cuentasPagadasReales.includes(targetCuenta)) {
+          triggerNotification(`La cuenta "${targetCuenta}" está sellada. Selecciona una nueva.`, 'error');
+          return false; 
       }
-    }
 
-    if (productWithDetails.controlarStock) {
-      const currentUnsent = getUnsentQtyOfProduct(_cart, productWithDetails.id);
-      if (currentUnsent + qtyToAdd > productWithDetails.stock) {
-         triggerNotification(`Stock insuficiente. Intentas añadir ${qtyToAdd} (incluyendo promo) pero quedan ${productWithDetails.stock - currentUnsent}.`, 'warning');
-         return false; 
-      }
-    }
-    
-    let finalDetails = productWithDetails.detalles || {};
-    let finalPrice = parseFloat(productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0);
-    
-    let precioOriginalParaTachar = null; 
-    let isAutoPromoFlag = false;
-    let mainPromoLabel = undefined;
-
-    if (isSubstitutingWithGhost) {
-      const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
-      const costoExtras = finalPrice - baseOriginal;
-      precioOriginalParaTachar = finalPrice;
-      finalPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
-      isAutoPromoFlag = true;
-      mainPromoLabel = ghostLabel;
-    } else if (activePromo && activePromo.type === 'FIXED') {
-      const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
-      const discountFixed = Number(activePromo.discountValue || activePromo.discount_value || 0);
-      const costoExtras = finalPrice - baseOriginal;
-      precioOriginalParaTachar = finalPrice; 
-      finalPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
-      mainPromoLabel = 'OFERTA';
-    } else if (!productWithDetails.detalles) {
-      const defaultCustoms = getDefaultCustomizations(productWithDetails);
-      if (defaultCustoms) {
-          finalDetails = defaultCustoms.detalles;
-          finalPrice = defaultCustoms.precioFinal;
-      }
-    }
-
-    setCart(prev => {
-      const detailStr = JSON.stringify(finalDetails);
-      let newCart = [...prev];
+      const activePromo = getActivePromo(productWithDetails.id, productWithDetails.stock, productWithDetails.controlarStock);
       
-      const index = newCart.findIndex(p => 
-         p.id === productWithDetails.id && p.precio === finalPrice && !p.enviadoCocina && 
-         p.cuenta === targetCuenta && !!p.isTakeaway === !!productWithDetails.isTakeaway && 
-         !!p.isAutoPromo === isAutoPromoFlag && 
-         p.preparaciones.every(prep => JSON.stringify(prep) === detailStr)
-      );
+      let qtyToAdd = 1; 
+      let willAddExtraGhost = false; 
+      let isSubstitutingWithGhost = false; 
+      let ghostPrice = 0;
+      let ghostLabel = '';
+      let extraGhostQty = 0;
 
-      if (index !== -1) {
-          newCart[index] = { ...newCart[index], qty: newCart[index].qty + 1, preparaciones: [...newCart[index].preparaciones, finalDetails] };
-      } else {
-          newCart.push({ 
-            ...productWithDetails, 
-            precio: finalPrice, 
-            precioOriginal: precioOriginalParaTachar,
-            promoLabel: mainPromoLabel,
-            qty: 1, 
-            preparaciones: [finalDetails], 
-            enviadoCocina: false, 
-            status: 'ACTIVE', 
-            cuenta: targetCuenta, 
-            isTakeaway: productWithDetails.isTakeaway || false, 
-            requiereCocina: productWithDetails.requiereCocina !== false, 
-            isAutoPromo: isAutoPromoFlag
-          });
+      if (activePromo) {
+        if (activePromo.type === 'NxM') {
+          const normalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && !p.isAutoPromo && Number(p.precio) > 0 && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+          const buy = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+          const pay = Number(activePromo.payQty || activePromo.pay_qty || 1);
+          
+          if ((normalQtyInAccount + 1) % pay === 0) {
+            willAddExtraGhost = true;
+            extraGhostQty = buy - pay;
+            qtyToAdd += extraGhostQty; 
+            ghostPrice = 0;
+            ghostLabel = 'GRATIS';
+          }
+        } else if (activePromo.type === 'NTH_FIXED') {
+          const totalQtyInAccount = _cart.filter(p => p.id === productWithDetails.id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+          const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
+          
+          if ((totalQtyInAccount + 1) % nth === 0) {
+            isSubstitutingWithGhost = true;
+            ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
+            ghostLabel = `${nth}º REBAJADO`;
+          }
+        }
       }
 
-      if (willAddExtraGhost) {
-        let ops = productWithDetails.opciones;
-        if (typeof ops === 'string') {
-          try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+      if (productWithDetails.controlarStock) {
+        const currentUnsent = getUnsentQtyOfProduct(_cart, productWithDetails.id);
+        if (currentUnsent + qtyToAdd > productWithDetails.stock) {
+            triggerNotification(`Stock insuficiente. Intentas añadir ${qtyToAdd} (incluyendo promo) pero quedan ${productWithDetails.stock - currentUnsent}.`, 'warning');
+            return false; 
         }
-        
-        let ghostDetails = {};
-        if (ops && typeof ops === 'object') {
-           if (ops.defaults?.tamano) ghostDetails.tamano = ops.defaults.tamano;
-           if (ops.defaults?.leche) ghostDetails.leche = ops.defaults.leche;
-           ghostDetails.extras = []; 
-        }
+      }
+      
+      let finalDetails = productWithDetails.detalles || {};
+      let finalPrice = parseFloat(productWithDetails.precioFinal || productWithDetails.precioBase || productWithDetails.precio || 0);
+      
+      let precioOriginalParaTachar = null; 
+      let isAutoPromoFlag = false;
+      let mainPromoLabel = undefined;
+      let promoMetadata = {};
 
-        let ghostOriginalPrice = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
+      if (isSubstitutingWithGhost) {
+        const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
+        const costoExtras = finalPrice - baseOriginal;
+        precioOriginalParaTachar = finalPrice;
+        finalPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
+        isAutoPromoFlag = true;
+        mainPromoLabel = ghostLabel;
+        promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
+      } else if (activePromo && activePromo.type === 'FIXED') {
+        const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
+        const discountFixed = Number(activePromo.discountValue || activePromo.discount_value || 0);
+        const costoExtras = finalPrice - baseOriginal;
+        precioOriginalParaTachar = finalPrice; 
+        finalPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
+        mainPromoLabel = 'OFERTA';
+        isAutoPromoFlag = true;
+        promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
+      } else if (!productWithDetails.detalles) {
         const defaultCustoms = getDefaultCustomizations(productWithDetails);
-        if (defaultCustoms && defaultCustoms.precioFinal) {
-           ghostOriginalPrice = defaultCustoms.precioFinal;
+        if (defaultCustoms) {
+            finalDetails = defaultCustoms.detalles;
+            finalPrice = defaultCustoms.precioFinal;
         }
+      }
 
-        const existingGhostIdx = newCart.findIndex(p => 
-           p.id === productWithDetails.id && p.cuenta === targetCuenta && 
-           p.isAutoPromo === true && p.promoLabel === ghostLabel && 
-           p.status !== 'CANCELLED' && !p.enviadoCocina
+      setCart(prev => {
+        const detailStr = JSON.stringify(finalDetails);
+        let newCart = [...prev];
+        
+        const index = newCart.findIndex(p => 
+            p.id === productWithDetails.id && p.precio === finalPrice && !p.enviadoCocina && 
+            p.cuenta === targetCuenta && !!p.isTakeaway === !!productWithDetails.isTakeaway && 
+            !!p.isAutoPromo === isAutoPromoFlag && 
+            p.preparaciones.every(prep => JSON.stringify(prep) === detailStr)
         );
 
-        if (existingGhostIdx !== -1) {
-            newCart[existingGhostIdx] = { 
-                ...newCart[existingGhostIdx], 
-                qty: newCart[existingGhostIdx].qty + extraGhostQty,
-                preparaciones: [...newCart[existingGhostIdx].preparaciones, ...Array(extraGhostQty).fill(ghostDetails)]
-            };
+        if (index !== -1) {
+            newCart[index] = { ...newCart[index], qty: newCart[index].qty + 1, preparaciones: [...newCart[index].preparaciones, finalDetails] };
         } else {
-            newCart.push({
-              ...productWithDetails,
-              nombre: productWithDetails.nombre, 
-              precioOriginal: ghostOriginalPrice, 
-              promoLabel: ghostLabel,            
-              precio: 0, 
-              qty: extraGhostQty,
-              preparaciones: Array(extraGhostQty).fill(ghostDetails), 
-              enviadoCocina: false,
-              status: 'ACTIVE',
-              cuenta: targetCuenta,
-              isAutoPromo: true,
-              requiereCocina: productWithDetails.requiereCocina !== false
+            newCart.push({ 
+              ...productWithDetails, 
+              precio: finalPrice, 
+              precioOriginal: precioOriginalParaTachar,
+              promoLabel: mainPromoLabel,
+              qty: 1, 
+              preparaciones: [finalDetails], 
+              enviadoCocina: false, 
+              status: 'ACTIVE', 
+              cuenta: targetCuenta, 
+              isTakeaway: productWithDetails.isTakeaway || false, 
+              requiereCocina: productWithDetails.requiereCocina !== false, 
+              isAutoPromo: isAutoPromoFlag,
+              ...promoMetadata
             });
         }
-        setTimeout(() => triggerNotification(`¡Promo Activada! +${extraGhostQty} ${productWithDetails.nombre} (${ghostLabel})`, 'success'), 50);
-      }
 
-      return newCart;
-    });
+        if (willAddExtraGhost) {
+          let ops = productWithDetails.opciones;
+          if (typeof ops === 'string') {
+            try { ops = JSON.parse(ops); } catch (e) { ops = null; }
+          }
+          
+          let ghostDetails = {};
+          if (ops && typeof ops === 'object') {
+              if (ops.defaults?.tamano) ghostDetails.tamano = ops.defaults.tamano;
+              if (ops.defaults?.leche) ghostDetails.leche = ops.defaults.leche;
+              ghostDetails.extras = []; 
+          }
 
-    if (!willAddExtraGhost && !isSubstitutingWithGhost) {
-      triggerNotification(`¡${productWithDetails.nombre} agregado!`, 'success');
-    } else if (isSubstitutingWithGhost) {
-      setTimeout(() => triggerNotification(`¡Aplicaste la Promo #${activePromo.buyQty || 2} para ${productWithDetails.nombre}!`, 'success'), 50);
+          let ghostOriginalPrice = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
+          const defaultCustoms = getDefaultCustomizations(productWithDetails);
+          if (defaultCustoms && defaultCustoms.precioFinal) {
+              ghostOriginalPrice = defaultCustoms.precioFinal;
+          }
+
+          const existingGhostIdx = newCart.findIndex(p => 
+              p.id === productWithDetails.id && p.cuenta === targetCuenta && 
+              p.isAutoPromo === true && p.promoLabel === ghostLabel && 
+              p.status !== 'CANCELLED' && !p.enviadoCocina
+          );
+
+          if (existingGhostIdx !== -1) {
+              newCart[existingGhostIdx] = { 
+                  ...newCart[existingGhostIdx], 
+                  qty: newCart[existingGhostIdx].qty + extraGhostQty,
+                  preparaciones: [...newCart[existingGhostIdx].preparaciones, ...Array(extraGhostQty).fill(ghostDetails)]
+              };
+          } else {
+              newCart.push({
+                ...productWithDetails,
+                nombre: productWithDetails.nombre, 
+                precioOriginal: ghostOriginalPrice, 
+                promoLabel: ghostLabel,            
+                precio: 0, 
+                qty: extraGhostQty,
+                preparaciones: Array(extraGhostQty).fill(ghostDetails), 
+                enviadoCocina: false,
+                status: 'ACTIVE',
+                cuenta: targetCuenta,
+                isAutoPromo: true,
+                requiereCocina: productWithDetails.requiereCocina !== false,
+                promoId: activePromo.id,
+                promoType: activePromo.type
+              });
+          }
+        }
+
+        return newCart;
+      });
+
+      return true; 
+    } finally {
+      isProcessingRef.current = false;
     }
-    return true; 
   };
 
   useEffect(() => {
@@ -570,76 +645,94 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   }, [triggerNotification, promotions]); 
 
   const removeFromCart = (itemToRemove) => { 
-    if(itemToRemove.enviadoCocina) return;
-    checkRuptureAndExecute((prev) => {
-        const newCart = [...prev];
+    if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
+    isProcessingRef.current = true;
+
+    try {
+      checkRuptureAndExecute((prev) => {
+          const newCart = [...prev];
+          const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
+          const idx = newCart.findIndex(p => 
+            p.id === itemToRemove.id && p.precio === itemToRemove.precio && p.cuenta === itemToRemove.cuenta && 
+            !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && 
+            (p.isAutoPromo || Number(p.precio) === 0) === (itemToRemove.isAutoPromo || Number(itemToRemove.precio) === 0) &&
+            JSON.stringify(p.preparaciones[0] || {}) === prepStr
+          );
+          
+          if (idx !== -1) {
+              newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - 1, preparaciones: newCart[idx].preparaciones.slice(0, -1) };
+              if (newCart[idx].qty <= 0) newCart.splice(idx, 1);
+          }
+          return newCart;
+      });
+    } finally {
+      isProcessingRef.current = false;
+    }
+  };
+
+  const deleteLine = (itemToRemove) => { 
+    if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
+    isProcessingRef.current = true;
+
+    try {
+      checkRuptureAndExecute((prev) => {
         const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
-        const idx = newCart.findIndex(p => 
+        return prev.filter(p => !(
           p.id === itemToRemove.id && p.precio === itemToRemove.precio && p.cuenta === itemToRemove.cuenta && 
           !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && 
           (p.isAutoPromo || Number(p.precio) === 0) === (itemToRemove.isAutoPromo || Number(itemToRemove.precio) === 0) &&
           JSON.stringify(p.preparaciones[0] || {}) === prepStr
-        );
-        
-        if (idx !== -1) {
-            newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - 1, preparaciones: newCart[idx].preparaciones.slice(0, -1) };
-            if (newCart[idx].qty <= 0) newCart.splice(idx, 1);
-        }
-        return newCart;
-    });
-  };
-
-  const deleteLine = (itemToRemove) => { 
-    if(itemToRemove.enviadoCocina) return;
-    checkRuptureAndExecute((prev) => {
-      const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
-      return prev.filter(p => !(
-        p.id === itemToRemove.id && p.precio === itemToRemove.precio && p.cuenta === itemToRemove.cuenta && 
-        !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && 
-        (p.isAutoPromo || Number(p.precio) === 0) === (itemToRemove.isAutoPromo || Number(itemToRemove.precio) === 0) &&
-        JSON.stringify(p.preparaciones[0] || {}) === prepStr
-      ));
-    });
+        ));
+      });
+    } finally {
+      isProcessingRef.current = false;
+    }
   };
 
   const toggleItemTakeaway = (itemToToggle) => {
-    if (itemToToggle.enviadoCocina) return;
-    setCart(prev => {
-      const newCart = [...prev];
-      const prepStr = JSON.stringify(itemToToggle.preparaciones[0] || {});
-      const idx = newCart.findIndex(p => 
-        p.id === itemToToggle.id && p.precio === itemToToggle.precio && p.cuenta === itemToToggle.cuenta && 
-        !!p.isTakeaway === !!itemToToggle.isTakeaway && !p.enviadoCocina && 
-        (p.isAutoPromo || Number(p.precio) === 0) === (itemToToggle.isAutoPromo || Number(itemToToggle.precio) === 0) &&
-        JSON.stringify(p.preparaciones[0] || {}) === prepStr
-      );
+    if (isProcessingRef.current || itemToToggle.enviadoCocina) return;
+    isProcessingRef.current = true;
 
-      if (idx !== -1) {
-        const currentItem = newCart[idx];
-        const targetTakeawayState = !currentItem.isTakeaway;
-        
-        if (currentItem.qty === 1) { 
-          newCart[idx] = { ...currentItem, isTakeaway: targetTakeawayState }; 
-        } else {
-          const prepToMove = currentItem.preparaciones[currentItem.preparaciones.length - 1];
-          newCart[idx] = { ...currentItem, qty: currentItem.qty - 1, preparaciones: currentItem.preparaciones.slice(0, -1) };
+    try {
+      setCart(prev => {
+        const newCart = [...prev];
+        const prepStr = JSON.stringify(itemToToggle.preparaciones[0] || {});
+        const idx = newCart.findIndex(p => 
+          p.id === itemToToggle.id && p.precio === itemToToggle.precio && p.cuenta === itemToToggle.cuenta && 
+          !!p.isTakeaway === !!itemToToggle.isTakeaway && !p.enviadoCocina && 
+          (p.isAutoPromo || Number(p.precio) === 0) === (itemToToggle.isAutoPromo || Number(itemToToggle.precio) === 0) &&
+          JSON.stringify(p.preparaciones[0] || {}) === prepStr
+        );
+
+        if (idx !== -1) {
+          const currentItem = newCart[idx];
+          const targetTakeawayState = !currentItem.isTakeaway;
           
-          const existingTargetIdx = newCart.findIndex(p => 
-            p.id === currentItem.id && p.precio === currentItem.precio && p.cuenta === currentItem.cuenta && 
-            !!p.isTakeaway === targetTakeawayState && !p.enviadoCocina && 
-            (p.isAutoPromo || Number(p.precio) === 0) === (currentItem.isAutoPromo || Number(currentItem.precio) === 0) &&
-            JSON.stringify(p.preparaciones[0] || {}) === prepStr
-          );
-          
-          if (existingTargetIdx !== -1) { 
-            newCart[existingTargetIdx] = { ...newCart[existingTargetIdx], qty: newCart[existingTargetIdx].qty + 1, preparaciones: [...newCart[existingTargetIdx].preparaciones, prepToMove] }; 
-          } else { 
-            newCart.push({ ...currentItem, qty: 1, preparaciones: [prepToMove], isTakeaway: targetTakeawayState }); 
+          if (currentItem.qty === 1) { 
+            newCart[idx] = { ...currentItem, isTakeaway: targetTakeawayState }; 
+          } else {
+            const prepToMove = currentItem.preparaciones[currentItem.preparaciones.length - 1];
+            newCart[idx] = { ...currentItem, qty: currentItem.qty - 1, preparaciones: currentItem.preparaciones.slice(0, -1) };
+            
+            const existingTargetIdx = newCart.findIndex(p => 
+              p.id === currentItem.id && p.precio === currentItem.precio && p.cuenta === currentItem.cuenta && 
+              !!p.isTakeaway === targetTakeawayState && !p.enviadoCocina && 
+              (p.isAutoPromo || Number(p.precio) === 0) === (currentItem.isAutoPromo || Number(currentItem.precio) === 0) &&
+              JSON.stringify(p.preparaciones[0] || {}) === prepStr
+            );
+            
+            if (existingTargetIdx !== -1) { 
+              newCart[existingTargetIdx] = { ...newCart[existingTargetIdx], qty: newCart[existingTargetIdx].qty + 1, preparaciones: [...newCart[existingTargetIdx].preparaciones, prepToMove] }; 
+            } else { 
+              newCart.push({ ...currentItem, qty: 1, preparaciones: [prepToMove], isTakeaway: targetTakeawayState }); 
+            }
           }
         }
-      }
-      return newCart;
-    });
+        return newCart;
+      });
+    } finally {
+      isProcessingRef.current = false;
+    }
   };
 
   const total = useMemo(() => 
