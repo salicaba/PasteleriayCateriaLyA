@@ -638,7 +638,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {promoData && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-500 dark:bg-rose-600 px-2.5 py-1 rounded-full border border-transparent shadow-sm">
-                          {promoData.type === 'NxM' ? <span>🎁</span> : <Tag size={10} strokeWidth={3} />}
+                          <Tag size={10} strokeWidth={3} />
                           <span>{promoData.text}</span>
                         </span>
                       )}
