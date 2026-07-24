@@ -214,21 +214,38 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                ghostOriginalPrice = defaultCustoms.precioFinal;
             }
 
-            cleanCart.push({
-              ...sampleItem,
-              nombre: sampleItem.nombre, 
-              precioOriginal: ghostOriginalPrice, 
-              promoLabel: ghostLabel,            
-              precio: 0, 
-              qty: missing,
-              preparaciones: Array(missing).fill(ghostDetails), 
-              enviadoCocina: false,
-              status: 'ACTIVE',
-              cuenta: cuenta,
-              isAutoPromo: true,
-              requiereCocina: sampleItem.requiereCocina !== false,
-              backendItemId: undefined
-            });
+            // 🔥 BLINDAJE POKA-YOKE: Agrupar regalos NxM en una sola línea
+            const existingGhostIdx = cleanCart.findIndex(i => 
+              String(i.id) === String(productId) && 
+              String(i.cuenta) === String(cuenta) &&
+              i.isAutoPromo === true && 
+              i.promoLabel === ghostLabel &&
+              i.status !== 'CANCELLED' &&
+              !i.enviadoCocina
+            );
+
+            if (existingGhostIdx !== -1) {
+              const updatedGhost = { ...cleanCart[existingGhostIdx] };
+              updatedGhost.qty += missing;
+              updatedGhost.preparaciones = [...updatedGhost.preparaciones, ...Array(missing).fill(ghostDetails)];
+              cleanCart[existingGhostIdx] = updatedGhost;
+            } else {
+              cleanCart.push({
+                ...sampleItem,
+                nombre: sampleItem.nombre, 
+                precioOriginal: ghostOriginalPrice, 
+                promoLabel: ghostLabel,            
+                precio: 0, 
+                qty: missing,
+                preparaciones: Array(missing).fill(ghostDetails), 
+                enviadoCocina: false,
+                status: 'ACTIVE',
+                cuenta: cuenta,
+                isAutoPromo: true,
+                requiereCocina: sampleItem.requiereCocina !== false,
+                backendItemId: undefined
+              });
+            }
          }
       }
     });
@@ -436,20 +453,35 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
            ghostOriginalPrice = defaultCustoms.precioFinal;
         }
 
-        newCart.push({
-          ...productWithDetails,
-          nombre: productWithDetails.nombre, 
-          precioOriginal: ghostOriginalPrice, 
-          promoLabel: ghostLabel,            
-          precio: 0, 
-          qty: extraGhostQty,
-          preparaciones: Array(extraGhostQty).fill(ghostDetails), 
-          enviadoCocina: false,
-          status: 'ACTIVE',
-          cuenta: targetCuenta,
-          isAutoPromo: true,
-          requiereCocina: productWithDetails.requiereCocina !== false
-        });
+        // 🔥 BLINDAJE POKA-YOKE: Agrupar regalos inmediatos al dar clic
+        const existingGhostIdx = newCart.findIndex(p => 
+          p.id === productWithDetails.id && p.cuenta === targetCuenta && 
+          p.isAutoPromo === true && p.promoLabel === ghostLabel && 
+          p.status !== 'CANCELLED' && !p.enviadoCocina
+        );
+
+        if (existingGhostIdx !== -1) {
+            newCart[existingGhostIdx] = { 
+                ...newCart[existingGhostIdx], 
+                qty: newCart[existingGhostIdx].qty + extraGhostQty,
+                preparaciones: [...newCart[existingGhostIdx].preparaciones, ...Array(extraGhostQty).fill(ghostDetails)]
+            };
+        } else {
+            newCart.push({
+              ...productWithDetails,
+              nombre: productWithDetails.nombre, 
+              precioOriginal: ghostOriginalPrice, 
+              promoLabel: ghostLabel,            
+              precio: 0, 
+              qty: extraGhostQty,
+              preparaciones: Array(extraGhostQty).fill(ghostDetails), 
+              enviadoCocina: false,
+              status: 'ACTIVE',
+              cuenta: targetCuenta,
+              isAutoPromo: true,
+              requiereCocina: productWithDetails.requiereCocina !== false
+            });
+        }
         setTimeout(() => triggerNotification(`¡Promo Activada! +${extraGhostQty} ${productWithDetails.nombre} (${ghostLabel})`, 'success'), 50);
       }
 

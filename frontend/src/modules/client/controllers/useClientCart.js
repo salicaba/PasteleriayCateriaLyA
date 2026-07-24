@@ -191,15 +191,34 @@ export const useClientCart = (triggerNotification) => {
           }
         } else if (activePromo.type === 'NxM') {
           let ghostOriginalPrice = parseFloat(sampleItem.precioBase || sampleItem.precioUnitario || 0);
-          cleanCart.push({
-            ...sampleItem,
-            cartItemId: `${sampleItem.id}-ghost-${Date.now()}-${Math.random()}`,
-            precioOriginal: ghostOriginalPrice,
-            precioUnitario: 0,
-            promoLabel: ghostLabel,
-            qty: missing,
-            isAutoPromo: true
-          });
+          
+          // 🔥 BLINDAJE POKA-YOKE: Agrupar los regalos en una sola línea
+          const existingGhostIdx = cleanCart.findIndex(i => 
+            String(i.id) === String(productId) && 
+            i.isAutoPromo === true && 
+            i.promoLabel === ghostLabel
+          );
+
+          if (existingGhostIdx !== -1) {
+            // Si ya existe la línea de regalo, solo sumamos la cantidad faltante
+            cleanCart[existingGhostIdx] = {
+              ...cleanCart[existingGhostIdx],
+              qty: cleanCart[existingGhostIdx].qty + missing
+            };
+          } else {
+            // Si no existe, la creamos por primera vez
+            cleanCart.push({
+              ...sampleItem,
+              cartItemId: `${sampleItem.id}-ghost-promo`, // ID estático para forzar la agrupación
+              precioOriginal: ghostOriginalPrice,
+              precioUnitario: 0,
+              promoLabel: ghostLabel,
+              qty: missing,
+              isAutoPromo: true,
+              detalles: null // Los regalos genéricos no llevan personalización
+            });
+          }
+
           if (triggerNotification) {
             setTimeout(() => triggerNotification(`¡Promo Activada! +${missing} ${sampleItem.nombre} (${ghostLabel})`, 'success'), 50);
           }
@@ -207,8 +226,9 @@ export const useClientCart = (triggerNotification) => {
       }
     });
 
+    // 🔥 Limpiamos los emojis que quedaban aquí
     cleanCart = cleanCart.map(item => {
-      if (item.isAutoPromo && item.promoLabel !== '✨ OFERTA') return item; 
+      if (item.isAutoPromo && item.promoLabel !== 'OFERTA') return item; 
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock, promosList);
       
       if (activePromo && activePromo.type === 'FIXED') {
@@ -220,7 +240,7 @@ export const useClientCart = (triggerNotification) => {
         if (item.precioUnitario !== expectedPrice) {
           return { ...item, precioOriginal: item.precioOriginal || item.precioUnitario, precioUnitario: expectedPrice, promoLabel: 'OFERTA', isAutoPromo: true };
         }
-      } else if (item.promoLabel === '✨ OFERTA' && (!activePromo || activePromo.type !== 'FIXED')) {
+      } else if (item.promoLabel === 'OFERTA' && (!activePromo || activePromo.type !== 'FIXED')) {
         return { ...item, precioUnitario: item.precioOriginal || item.precioUnitario, precioOriginal: undefined, promoLabel: undefined, isAutoPromo: false };
       }
       return item;
@@ -365,6 +385,6 @@ export const useClientCart = (triggerNotification) => {
     incrementInCart,
     totalCart,
     totalItems,
-    getPromoBadge // 🔥 Se exporta para usarlo en ClientMenu
+    getPromoBadge
   };
 };
