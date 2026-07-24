@@ -3,6 +3,9 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js';
 
+// 🔥 Inyectamos el helper para obtener los detalles base del Gestor de Menú
+import { getDefaultCustomizations } from '../views/utils/clientMenuUtils';
+
 const parseValidDays = (daysData) => {
   if (!daysData) return [];
   if (Array.isArray(daysData)) return daysData.map(Number);
@@ -188,7 +191,6 @@ export const useClientCart = (triggerNotification) => {
             const item = cleanCart[i];
             if (!item.isAutoPromo && Number(item.precioUnitario) > 0 && String(item.id) === String(productId)) {
               
-              // 🔥 BLINDAJE FINANCIERO: Respetar costo de extras en NTH_FIXED para clientes
               const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
               const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
               const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
@@ -220,7 +222,17 @@ export const useClientCart = (triggerNotification) => {
             }
           }
         } else if (activePromo.type === 'NxM') {
-          let ghostOriginalPrice = parseFloat(sampleItem.precioOriginal || sampleItem.precioUnitario || sampleItem.precio || 0);
+          let ghostOriginalPrice = parseFloat(sampleItem.precioBase || sampleItem.precioOriginal || sampleItem.precioUnitario || sampleItem.precio || 0);
+          let ghostDetails = null;
+
+          // 🔥 BLINDAJE: Obtenemos los valores BASE desde el gestor para los productos de regalo
+          const defaultCustoms = getDefaultCustomizations(sampleItem);
+          if (defaultCustoms) {
+              ghostDetails = defaultCustoms.detalles;
+              if (defaultCustoms.precioFinal) {
+                  ghostOriginalPrice = defaultCustoms.precioFinal;
+              }
+          }
           
           const existingGhostIdx = cleanCart.findIndex(i => 
             String(i.id) === String(productId) && 
@@ -242,7 +254,7 @@ export const useClientCart = (triggerNotification) => {
               promoLabel: ghostLabel,
               qty: missing,
               isAutoPromo: true,
-              detalles: null 
+              detalles: ghostDetails // 🔥 Se inyectan las configuraciones por defecto
             });
           }
 
@@ -258,7 +270,6 @@ export const useClientCart = (triggerNotification) => {
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock, promosList);
       
       if (activePromo && activePromo.type === 'FIXED') {
-        // 🔥 BLINDAJE FINANCIERO: Respetar costo de extras en Rebaja Directa para clientes
         const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
         const discountFixed = Number(activePromo.discountValue || 0);
         const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
@@ -296,7 +307,6 @@ export const useClientCart = (triggerNotification) => {
       }
 
       setCart(prev => {
-        // Aseguramos guardar el precioBase intacto
         let newItem = { ...product, qty: 1, precioUnitario: product.precio, precioBase: product.precio, isAutoPromo: false };
         let uniqueCartId = product.id.toString();
 
