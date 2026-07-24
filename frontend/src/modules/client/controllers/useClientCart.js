@@ -129,7 +129,7 @@ export const useClientCart = (triggerNotification) => {
           const totalItems = (normalQtys[productId] || 0) + (ghostQtys[productId] || 0);
           expectedGhosts = Math.floor(totalItems / nth);
           ghostPrice = Number(activePromo.discountValue || 0);
-          ghostLabel = `Promo #${nth}`;
+          ghostLabel = `${nth}º REBAJADO`;
         }
       }
 

@@ -131,7 +131,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           const totalItems = (normalQtys[key] || 0) + (ghostQtys[key] || 0);
           expectedGhosts = Math.floor(totalItems / nth);
           ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-          ghostLabel = `Promo #${nth}`;
+          ghostLabel = `${nth}º REBAJADO`;
         }
       }
 
@@ -396,7 +396,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         if ((totalQtyInAccount + 1) % nth === 0) {
           isSubstitutingWithGhost = true;
           ghostPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-          ghostLabel = `Promo #${nth}`;
+          ghostLabel = `${nth}º REBAJADO`;
         }
       }
     }
