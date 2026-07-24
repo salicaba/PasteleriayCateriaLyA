@@ -1,3 +1,4 @@
+// frontend/src/modules/client/controllers/useClientCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js';
@@ -135,14 +136,13 @@ export const useClientCart = (triggerNotification) => {
 
       const currentGhosts = ghostQtys[productId] || 0;
 
-      // ELIMINAR BASURA FLOTANTE Y AGRUPAR RETORNO
       if (currentGhosts > expectedGhosts) {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
           const item = cleanCart[i];
           if ((item.isAutoPromo || Number(item.precioUnitario) === 0) && String(item.id) === String(productId)) {
             
-            if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('Promo #'))) {
+            if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('º REBAJADO'))) {
               const originalPrice = item.precioOriginal || item.precioUnitario;
               const detailStr = JSON.stringify(item.detalles || {});
               const takeawayStr = item.isTakeaway ? '-llevar' : '';
@@ -180,7 +180,6 @@ export const useClientCart = (triggerNotification) => {
           }
         }
       } 
-      // AUTO-RELLENAR SI CALIFICA Y AGRUPAR
       else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
         let missing = expectedGhosts - currentGhosts;
 
@@ -188,8 +187,10 @@ export const useClientCart = (triggerNotification) => {
           for (let i = cleanCart.length - 1; i >= 0; i--) {
             const item = cleanCart[i];
             if (!item.isAutoPromo && Number(item.precioUnitario) > 0 && String(item.id) === String(productId)) {
-              const baseOriginal = parseFloat(item.precioBase || item.precioUnitario || 0);
-              const costoExtras = parseFloat(item.precioUnitario) - baseOriginal;
+              
+              // 🔥 BLINDAJE FINANCIERO: Respetar costo de extras en NTH_FIXED para clientes
+              const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
+              const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
               const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
 
               const detailStr = JSON.stringify(item.detalles || {});
@@ -219,12 +220,19 @@ export const useClientCart = (triggerNotification) => {
             }
           }
         } else if (activePromo.type === 'NxM') {
-          let ghostOriginalPrice = parseFloat(sampleItem.precioBase || sampleItem.precioUnitario || 0);
+          let ghostOriginalPrice = parseFloat(sampleItem.precioOriginal || sampleItem.precioUnitario || sampleItem.precio || 0);
           
-          const existingGhostIdx = cleanCart.findIndex(i => String(i.id) === String(productId) && i.isAutoPromo === true && i.promoLabel === ghostLabel);
+          const existingGhostIdx = cleanCart.findIndex(i => 
+            String(i.id) === String(productId) && 
+            i.isAutoPromo === true && 
+            i.promoLabel === ghostLabel
+          );
 
           if (existingGhostIdx !== -1) {
-            cleanCart[existingGhostIdx] = { ...cleanCart[existingGhostIdx], qty: cleanCart[existingGhostIdx].qty + missing };
+            cleanCart[existingGhostIdx] = {
+              ...cleanCart[existingGhostIdx],
+              qty: cleanCart[existingGhostIdx].qty + missing
+            };
           } else {
             cleanCart.push({
               ...sampleItem,
@@ -250,7 +258,8 @@ export const useClientCart = (triggerNotification) => {
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock, promosList);
       
       if (activePromo && activePromo.type === 'FIXED') {
-        const baseOriginal = parseFloat(item.precioBase || item.precioOriginal || item.precioUnitario || 0);
+        // 🔥 BLINDAJE FINANCIERO: Respetar costo de extras en Rebaja Directa para clientes
+        const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
         const discountFixed = Number(activePromo.discountValue || 0);
         const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
         const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
@@ -287,7 +296,8 @@ export const useClientCart = (triggerNotification) => {
       }
 
       setCart(prev => {
-        let newItem = { ...product, qty: 1, precioUnitario: product.precio, isAutoPromo: false };
+        // Aseguramos guardar el precioBase intacto
+        let newItem = { ...product, qty: 1, precioUnitario: product.precio, precioBase: product.precio, isAutoPromo: false };
         let uniqueCartId = product.id.toString();
 
         if (customizations) {
