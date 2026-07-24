@@ -1,7 +1,8 @@
 // frontend/src/modules/client/views/components/ClientCheckoutModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Gift } from 'lucide-react';
+// 🔥 Asegúrate de agregar 'Tag' al final de esta lista:
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Gift, Tag } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
