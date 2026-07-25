@@ -246,6 +246,33 @@ function App() {
     }
   ];
 
+  // 🚀 OBSERVADOR GLOBAL DE TÍTULO CON TIPOGRAFÍA OFICIAL
+  useEffect(() => {
+    if (!user) {
+      document.title = '𝓛𝔂𝓪 | Login';
+      return;
+    }
+
+    let currentTitle = '𝓛𝔂𝓪 | POS';
+
+    for (const group of menuConfig) {
+      if (group.id === activeTab) {
+        currentTitle = `𝓛𝔂𝓪 | ${group.label}`;
+        break;
+      }
+      if (group.children) {
+        const child = group.children.find(c => c.id === activeTab);
+        if (child) {
+          const cleanLabel = child.label.split(' / ')[0];
+          currentTitle = `𝓛𝔂𝓪 | ${cleanLabel}`;
+          break;
+        }
+      }
+    }
+
+    document.title = currentTitle;
+  }, [activeTab, user]);
+
   const visibleMenuConfig = menuConfig.filter(group => {
     if (group.id === 'sistema_group' && user?.role === 'Empleado') {
       return false;

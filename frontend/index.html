@@ -1,14 +1,19 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
-    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <!-- 1. Favicon enrutado a la carpeta public -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    
+    <!-- 2. Prevención Poka-Yoke Anti-Ghost Scroll y Zoom en móviles -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- 3. Título Fallback (será sobrescrito por nuestro Hook) -->
+    <title>Lya | Ecosistema</title>
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="overflow-hidden bg-gray-50 text-gray-900">
+    <!-- Pilar 1: Bloqueo de overflow en el body nativo -->
+    <div id="root" class="h-full w-full flex-1 flex flex-col overflow-hidden"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
