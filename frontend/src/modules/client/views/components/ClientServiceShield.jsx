@@ -2,33 +2,52 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Coffee } from 'lucide-react';
 import { socket } from '../../../../api/socket';
+import client from '../../../../api/client';
 
-export const ClientServiceShield = ({ 
-  initialQrStatus, 
-  activeOrdersCount = 0 
-}) => {
-  const [isQrActive, setIsQrActive] = useState(initialQrStatus);
+export const ClientServiceShield = ({ activeOrdersCount = 0 }) => {
+  // Asumimos true inicialmente para evitar parpadeos, pero en 0.1s buscará la verdad
+  const [isQrActive, setIsQrActive] = useState(true);
 
   useEffect(() => {
-    // 1. Escuchar el evento de socket cuando el admin apaga/enciende el QR
-    // NOTA: Ajusta 'config:update' o 'qr:status_changed' al nombre exacto del evento que emite tu backend.
+    // 1. CEREBRO AUTÓNOMO: Consultar estado real al montar (¡Esto repara el fallo en el Login!)
+    const fetchQrStatus = async () => {
+      try {
+        const res = await client.get('/settings/qr-status');
+        setIsQrActive(res.data.active);
+      } catch (error) {
+        console.error("Error al consultar estado del QR", error);
+      }
+    };
+
+    // Lo ejecutamos inmediatamente al aparecer en pantalla
+    fetchQrStatus();
+
+    // 2. RED DE SEGURIDAD (Polling rápido): Repara la falta de tiempo real del backend
+    // Le preguntará al servidor cada 5 segundos de forma silenciosa
+    const intervalId = setInterval(fetchQrStatus, 5000); 
+
+    // 3. TIEMPO REAL (WebSockets): Por si en el futuro arreglamos el req.app.get('io')
     const handleConfigUpdate = (newConfig) => {
-      if (newConfig.qrService !== undefined) {
+      if (newConfig && newConfig.qrService !== undefined) {
         setIsQrActive(newConfig.qrService);
       }
     };
 
     socket.on('config:update', handleConfigUpdate);
-    socket.on('qr:status_changed', (status) => setIsQrActive(status)); // Por si tienes un evento específico
+    socket.on('qr:status_changed', (status) => setIsQrActive(status));
+    
+    // Si tu POS actualiza la caja, aprovechamos para revisar el QR
+    socket.on('pos:update', fetchQrStatus); 
 
     return () => {
+      clearInterval(intervalId);
       socket.off('config:update', handleConfigUpdate);
       socket.off('qr:status_changed');
+      socket.off('pos:update', fetchQrStatus);
     };
   }, []);
 
-  // 2. Condición inquebrantable: 
-  // Si el QR está APAGADO y el cliente NO tiene pedidos activos -> Mostrar Escudo
+  // Condición inquebrantable: QR apagado Y sin pedidos activos
   const shouldShowShield = !isQrActive && activeOrdersCount === 0;
 
   return (
@@ -39,17 +58,14 @@ export const ClientServiceShield = ({
           animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
           exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: "easeInOut" }}
-          // Pilar 1 y 4: Bloqueo total de pantalla, z-index supremo
           className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 p-6"
         >
           <motion.div 
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300, delay: 0.1 }}
-            // Pilar 4: Geometría Premium (rounded-[2.5rem])
             className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-8 max-w-sm w-full border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center text-center overflow-hidden relative"
           >
-            {/* Elemento decorativo de fondo */}
             <div className="absolute top-0 left-0 right-0 h-24 bg-orange-500/10 lya:bg-lya-primary/10 rounded-t-[2.5rem]" />
 
             <div className="w-20 h-20 bg-orange-100 dark:bg-orange-500/20 lya:bg-lya-primary/20 text-orange-600 lya:text-lya-primary rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
@@ -60,7 +76,6 @@ export const ClientServiceShield = ({
               Servicio Digital Pausado
             </h2>
             
-            {/* Pilar 4: Textos de alertas y modales SIEMPRE centrados */}
             <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed font-medium mb-8 relative z-10 text-center">
               El menú QR se encuentra temporalmente inactivo. Si nuestra sucursal está abierta, te invitamos a pasar directamente al mostrador para realizar tu pedido sin compromiso. 
               <br/><br/>
@@ -71,7 +86,6 @@ export const ClientServiceShield = ({
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}
-                // Pilar 2: Efectos hover solo en md
                 className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold py-4 rounded-2xl md:hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
               >
                 <Coffee size={18} />
