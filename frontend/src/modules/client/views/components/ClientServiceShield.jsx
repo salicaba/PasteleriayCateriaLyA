@@ -4,12 +4,14 @@ import { Store, Coffee } from 'lucide-react';
 import { socket } from '../../../../api/socket';
 import client from '../../../../api/client';
 
-export const ClientServiceShield = ({ activeOrdersCount = 0 }) => {
-  // Asumimos true inicialmente para evitar parpadeos, pero en 0.1s buscará la verdad
+export const ClientServiceShield = ({ 
+  activeOrdersCount = 0, 
+  hasActiveSession = false, 
+  onForceLogout 
+}) => {
   const [isQrActive, setIsQrActive] = useState(true);
 
   useEffect(() => {
-    // 1. CEREBRO AUTÓNOMO: Consultar estado real al montar (¡Esto repara el fallo en el Login!)
     const fetchQrStatus = async () => {
       try {
         const res = await client.get('/settings/qr-status');
@@ -19,14 +21,9 @@ export const ClientServiceShield = ({ activeOrdersCount = 0 }) => {
       }
     };
 
-    // Lo ejecutamos inmediatamente al aparecer en pantalla
     fetchQrStatus();
-
-    // 2. RED DE SEGURIDAD (Polling rápido): Repara la falta de tiempo real del backend
-    // Le preguntará al servidor cada 5 segundos de forma silenciosa
     const intervalId = setInterval(fetchQrStatus, 5000); 
 
-    // 3. TIEMPO REAL (WebSockets): Por si en el futuro arreglamos el req.app.get('io')
     const handleConfigUpdate = (newConfig) => {
       if (newConfig && newConfig.qrService !== undefined) {
         setIsQrActive(newConfig.qrService);
@@ -35,8 +32,6 @@ export const ClientServiceShield = ({ activeOrdersCount = 0 }) => {
 
     socket.on('config:update', handleConfigUpdate);
     socket.on('qr:status_changed', (status) => setIsQrActive(status));
-    
-    // Si tu POS actualiza la caja, aprovechamos para revisar el QR
     socket.on('pos:update', fetchQrStatus); 
 
     return () => {
@@ -49,6 +44,13 @@ export const ClientServiceShield = ({ activeOrdersCount = 0 }) => {
 
   // Condición inquebrantable: QR apagado Y sin pedidos activos
   const shouldShowShield = !isQrActive && activeOrdersCount === 0;
+
+  // 🔥 CEREBRO DE EXPULSIÓN: Si debe mostrar el escudo y hay sesión, la destruye instantáneamente
+  useEffect(() => {
+    if (shouldShowShield && hasActiveSession && typeof onForceLogout === 'function') {
+      onForceLogout();
+    }
+  }, [shouldShowShield, hasActiveSession, onForceLogout]);
 
   return (
     <AnimatePresence>
