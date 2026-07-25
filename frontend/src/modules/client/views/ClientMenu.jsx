@@ -584,13 +584,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
 
-            const promoData = getPromoBadge(product.id);
-
-            // 🔥 NUEVO: POKA-YOKE FINANCIERO VISUAL
+            // 🔥 1. CALCULAMOS EL PRECIO ANTES (Poka-Yoke Financiero)
             const defaultMods = getDefaultCustomizations(product);
             const baseOriginal = Number(product.precio);
             const finalPriceWithDefaults = defaultMods ? defaultMods.precioFinal : baseOriginal;
             const costoExtras = finalPriceWithDefaults - baseOriginal;
+
+            // 🔥 2. LE PASAMOS EL PRECIO A LA ETIQUETA PARA EL % OFF
+            const promoData = getPromoBadge(product.id, finalPriceWithDefaults);
 
             let displayOriginalPrice = null;
             let displayFinalPrice = finalPriceWithDefaults;
@@ -670,7 +671,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
                     <div className="flex flex-col items-start justify-end">
                       {promoData?.type === 'FIXED' ? (
                         <>
-                          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none block -mb-0.5">
+                          {/* 🔥 TOQUE VISUAL: Tachado ligeramente decorado */}
+                          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through decoration-rose-500/40 decoration-[1.5px] leading-none block -mb-0.5">
                             ${displayOriginalPrice.toFixed(2)}
                           </span>
                           <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600' : 'text-rose-500 dark:text-rose-400 lya:text-[#78350F]'}`}>
