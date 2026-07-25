@@ -519,12 +519,12 @@ export const useClientCart = (triggerNotification) => {
   [_cart]);
 
   return {
-    cart,
+    cart: _cart, // 🔥 ¡AQUÍ ESTABA EL DETALLE! 
     setCart,
     addToCart,
     removeFromCart,
     incrementInCart,
-    deleteLine, // 🔥 AÑADE ESTO AQUÍ
+    deleteLine,
     totalCart,
     totalItems,
     getPromoBadge
