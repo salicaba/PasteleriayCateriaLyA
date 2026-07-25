@@ -418,6 +418,24 @@ export const useClientCart = (triggerNotification) => {
     }
   };
 
+  const deleteLine = (cartItemId) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
+    try {
+      setCart(prev => {
+        const existing = prev.find(item => item.cartItemId === cartItemId);
+        // Protegemos que no se eliminen promociones fantasma directamente
+        if (!existing || existing.isAutoPromo) return prev; 
+        
+        // Filtramos para eliminar toda la línea sin importar la cantidad
+        return prev.filter(item => item.cartItemId !== cartItemId);
+      });
+    } finally {
+      isProcessingRef.current = false;
+    }
+  };
+
   const incrementInCart = (cartItemId) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
@@ -501,11 +519,12 @@ export const useClientCart = (triggerNotification) => {
   [_cart]);
 
   return {
-    cart: _cart,
+    cart,
     setCart,
     addToCart,
     removeFromCart,
     incrementInCart,
+    deleteLine, // 🔥 AÑADE ESTO AQUÍ
     totalCart,
     totalItems,
     getPromoBadge

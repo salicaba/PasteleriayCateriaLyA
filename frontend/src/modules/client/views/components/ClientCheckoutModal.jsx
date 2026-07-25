@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag } from 'lucide-react';
+// 🔥 1. Importamos Trash2
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
@@ -10,7 +11,8 @@ export default function ClientCheckoutModal({
   onClose,
   onConfirmOrder,
   removeFromCart,
-  incrementInCart
+  incrementInCart,
+  deleteLine // 🔥 2. Recibimos la nueva función como Prop
 }) {
   const [actionLoading, setActionLoading] = useState(null);
   
@@ -33,10 +35,13 @@ export default function ClientCheckoutModal({
       isProcessingRef.current = true;
       if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
       
+      // 🔥 3. Manejamos el nuevo tipo de acción 'delete'
       if (actionType === 'increment') {
         incrementInCart(cartItemId);
-      } else {
+      } else if (actionType === 'decrement') {
         removeFromCart(cartItemId);
+      } else if (actionType === 'delete') {
+        deleteLine(cartItemId);
       }
 
       setTimeout(() => {
@@ -78,9 +83,8 @@ export default function ClientCheckoutModal({
             const qty = item.qty || 0;
             const precioTotalItem = precioUnitario * qty;
             
-            // 🔥 LÓGICA DE BLOQUEO UI UNIFICADA
-            const isGhost = item.isAutoPromo && precioUnitario === 0; // Para ocultar detalles del GRATIS
-            const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA'; // Para bloquear botones +/-
+            const isGhost = item.isAutoPromo && precioUnitario === 0; 
+            const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA'; 
 
             const currentTotalQty = cart.filter(i => i.id === item.id && !i.isAutoPromo).reduce((acc, i) => acc + i.qty, 0);
             const isLimitReached = item.controlarStock && currentTotalQty >= item.stock && item.stock > 0;
@@ -92,7 +96,6 @@ export default function ClientCheckoutModal({
                     {item.nombre || 'Producto'}
                   </h4>
                   
-                  {/* Detalles: Se muestran para la "Unidad Adicional" pero no para el "GRATIS" */}
                   {item.detalles && !isGhost && (
                     <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-0.5 leading-tight text-justify">
                       {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
@@ -136,18 +139,34 @@ export default function ClientCheckoutModal({
                   </div>
                 </div>
                 
-                {/* 🔥 BOTONES DE ACCIÓN BLINDADOS PARA PROMOS BLOQUEADAS */}
                 {isLockedPromo ? (
                    <div className="flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-900/20 rounded-[1.25rem] px-3.5 py-1.5 shrink-0 border border-rose-100 dark:border-rose-800/30">
                      <Tag size={16} className="text-rose-500 mb-0.5" strokeWidth={2.5} />
                      <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 tracking-wider">x{qty}</span>
                    </div>
                 ) : (
-                  <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-[1.25rem] p-1.5 shrink-0">
+                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-[1.25rem] p-1.5 shrink-0">
+                    
+                    {/* 🔥 4. BOTÓN DE ELIMINAR (Basurero) */}
+                    <motion.button 
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => handleAction(e, item.cartItemId, 'delete')} 
+                      className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 md:hover:bg-red-100 shadow-sm font-bold border border-red-100 dark:border-red-900/30 outline-none select-none touch-manipulation transition-colors relative overflow-hidden"
+                    >
+                      {isThisItemLoading && actionLoading?.action === 'delete' ? (
+                        <Loader2 size={16} className="animate-spin text-red-500 absolute" />
+                      ) : (
+                        <Trash2 size={16} strokeWidth={2.5} className="absolute" />
+                      )}
+                    </motion.button>
+
+                    {/* Separador Visual Pequeño */}
+                    <div className="w-px h-5 bg-gray-300 dark:bg-gray-700 lya:bg-[#EADCC9]" />
+
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
                       onClick={(e) => handleAction(e, item.cartItemId, 'decrement')} 
-                      className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-red-50 md:hover:text-red-500 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] outline-none select-none touch-manipulation transition-colors relative overflow-hidden"
+                      className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-50 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] outline-none select-none touch-manipulation transition-colors relative overflow-hidden"
                     >
                       {isThisItemLoading && actionLoading?.action === 'decrement' ? (
                         <Loader2 size={16} className="animate-spin text-orange-500 absolute" />

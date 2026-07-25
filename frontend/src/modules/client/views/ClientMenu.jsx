@@ -70,6 +70,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     addToCart, 
     removeFromCart, 
     incrementInCart, 
+    deleteLine, // 🔥 1. EXTRAER AQUÍ
     totalCart, 
     totalItems,
     getPromoBadge
@@ -747,7 +748,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           />
         )}
       </AnimatePresence>
-      <AnimatePresence>{showCheckout && <ClientCheckoutModal cart={cart} totalCart={totalCart} isSubmitting={isSubmitting} onClose={() => setShowCheckout(false)} onConfirmOrder={handleConfirmOrder} removeFromCart={removeFromCart} incrementInCart={incrementInCart} />}</AnimatePresence>
+      <AnimatePresence>{showCheckout && <ClientCheckoutModal cart={cart} totalCart={totalCart} isSubmitting={isSubmitting} onClose={() => setShowCheckout(false)} onConfirmOrder={handleConfirmOrder} removeFromCart={removeFromCart} incrementInCart={incrementInCart} deleteLine={deleteLine} />}</AnimatePresence>
       <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
       <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
     </div>
