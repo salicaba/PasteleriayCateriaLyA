@@ -22,8 +22,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const [promotions, setPromotions] = useState([]);
 
   const isProcessingRef = useRef(false);
-
-  // 🔥 NUEVO: Diccionario matemático para saber cuántas veces se aplicó en cada cuenta
   const notifiedPromos = useRef({});
 
   const [promoWarning, setPromoWarning] = useState({
@@ -102,7 +100,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     cleanCart.forEach(item => {
       if (item.status === 'CANCELLED') return;
       const key = `${item.id}::${item.cuenta}`;
-      if (item.isAutoPromo || Number(item.precio) === 0) {
+      
+      // 🔥 CORRECCIÓN: La rebaja directa no es un fantasma
+      const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
+      
+      if (isTrueGhost || Number(item.precio) === 0) {
         ghostQtys[key] = (ghostQtys[key] || 0) + item.qty;
       } else {
         normalQtys[key] = (normalQtys[key] || 0) + item.qty;
@@ -144,7 +146,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
           const item = cleanCart[i];
-          if ((item.isAutoPromo || Number(item.precio) === 0) && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
+          const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
+
+          if ((isTrueGhost || Number(item.precio) === 0) && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
             
             if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('Promo #'))) {
                const originalPrice = item.precioOriginal || item.precioBase || item.precio;
@@ -309,7 +313,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       return item;
     });
 
-    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING MATEMÁTICO x2, x3) ---
     const currentPromoQtys = {};
     cleanCart.forEach(item => {
       if (item.isAutoPromo && item.promoId) {
@@ -328,7 +331,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           const promoItem = cleanCart.find(item => String(item.promoId) === promoId && String(item.cuenta) === cuenta);
           
           if (promoItem) {
-            // Si hay más de 1 cantidad aplicada de esta promo, agregamos el texto "x2", "x3", etc.
             const multiplierText = newQty > 1 ? ` x${newQty}` : '';
             const baseMsg = promoItem.cuenta !== 'General' ? ` en ${promoItem.cuenta}` : '';
 
@@ -345,7 +347,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
       });
 
-      // Actualizamos la memoria
       notifiedPromos.current = currentPromoQtys;
     }
 
@@ -368,7 +369,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       const getNormalQtys = (cartState) => {
         const qtys = {};
         cartState.forEach(item => {
-          if (item.status === 'CANCELLED' || item.isAutoPromo || Number(item.precio) === 0) return;
+          const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
+          if (item.status === 'CANCELLED' || isTrueGhost || Number(item.precio) === 0) return;
           const key = `${item.id}::${item.cuenta}`;
           qtys[key] = (qtys[key] || 0) + item.qty;
         });
@@ -392,7 +394,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
            const currentGhosts = prev.filter(p => 
              String(p.id) === String(productId) && 
              String(p.cuenta) === String(cuenta) && 
-             (p.isAutoPromo || Number(p.precio) === 0) && 
+             (p.isAutoPromo && p.promoLabel !== 'OFERTA') && 
              p.status !== 'CANCELLED'
            ).reduce((a, b) => a + b.qty, 0);
 
@@ -668,6 +670,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           );
           
           if (idx !== -1) {
+              // 🔥 CORRECCIÓN: Los verdaderos fantasmas no se pueden restar manualmente
+              const isTrueGhost = newCart[idx].isAutoPromo && newCart[idx].promoLabel !== 'OFERTA';
+              if (isTrueGhost) return prev;
+
               newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - 1, preparaciones: newCart[idx].preparaciones.slice(0, -1) };
               if (newCart[idx].qty <= 0) newCart.splice(idx, 1);
           }
@@ -684,11 +690,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
     try {
       checkRuptureAndExecute((prev) => {
+        const isTrueGhost = itemToRemove.isAutoPromo && itemToRemove.promoLabel !== 'OFERTA';
+        if (isTrueGhost) return prev;
+
         const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
+        
+        // 🔥 CORRECCIÓN: Borrar línea se lleva TODO (Promos y Normales) con la misma configuración
         return prev.filter(p => !(
-          p.id === itemToRemove.id && p.precio === itemToRemove.precio && p.cuenta === itemToRemove.cuenta && 
+          p.id === itemToRemove.id && p.cuenta === itemToRemove.cuenta && 
           !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && 
-          (p.isAutoPromo || Number(p.precio) === 0) === (itemToRemove.isAutoPromo || Number(itemToRemove.precio) === 0) &&
           JSON.stringify(p.preparaciones[0] || {}) === prepStr
         ));
       });
@@ -699,6 +709,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
   const toggleItemTakeaway = (itemToToggle) => {
     if (isProcessingRef.current || itemToToggle.enviadoCocina) return;
+    
+    // Evitamos aplicar "Para llevar" directo a los fantasmas
+    const isTrueGhost = itemToToggle.isAutoPromo && itemToToggle.promoLabel !== 'OFERTA';
+    if (isTrueGhost) return;
+
     isProcessingRef.current = true;
 
     try {

@@ -24,8 +24,6 @@ export const useClientCart = (triggerNotification) => {
   const [promotions, setPromotions] = useState([]);
   
   const isProcessingRef = useRef(false);
-  
-  // 🔥 NUEVO: Diccionario matemático para saber cuántas veces se aplicó (x2, x3, etc.)
   const notifiedPromos = useRef({});
 
   const [promoWarning, setPromoWarning] = useState({
@@ -122,7 +120,10 @@ export const useClientCart = (triggerNotification) => {
 
     cleanCart.forEach(item => {
       const key = String(item.id);
-      if (item.isAutoPromo || Number(item.precioUnitario) === 0) {
+      // 🔥 CORRECCIÓN: Evitamos que la Rebaja Directa (FIXED) sea considerada un "Fantasma"
+      const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
+      
+      if (isTrueGhost || Number(item.precioUnitario) === 0) {
         ghostQtys[key] = (ghostQtys[key] || 0) + item.qty;
       } else {
         normalQtys[key] = (normalQtys[key] || 0) + item.qty;
@@ -161,7 +162,9 @@ export const useClientCart = (triggerNotification) => {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
           const item = cleanCart[i];
-          if ((item.isAutoPromo || Number(item.precioUnitario) === 0) && String(item.id) === String(productId)) {
+          const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
+
+          if ((isTrueGhost || Number(item.precioUnitario) === 0) && String(item.id) === String(productId)) {
             
             if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('º REBAJADO'))) {
               const originalPrice = item.precioOriginal || item.precioUnitario;
@@ -318,7 +321,6 @@ export const useClientCart = (triggerNotification) => {
       return item;
     });
 
-    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING MATEMÁTICO x2, x3) ---
     const currentPromoQtys = {};
     cleanCart.forEach(item => {
       if (item.isAutoPromo && item.promoId) {
@@ -333,7 +335,6 @@ export const useClientCart = (triggerNotification) => {
 
         if (newQty > oldQty) {
           const promoItem = cleanCart.find(item => item.promoId === promoId);
-          // Si hay más de 1 cantidad aplicada de esta promo, agregamos el texto "x2", "x3", etc.
           const multiplierText = newQty > 1 ? ` x${newQty}` : '';
           
           setTimeout(() => {
@@ -347,8 +348,6 @@ export const useClientCart = (triggerNotification) => {
           }, 50);
         }
       });
-
-      // Actualizamos la memoria
       notifiedPromos.current = currentPromoQtys;
     }
 
@@ -371,7 +370,10 @@ export const useClientCart = (triggerNotification) => {
       const getNormalQtys = (cartState) => {
         const qtys = {};
         cartState.forEach(item => {
-          if (item.isAutoPromo || Number(item.precioUnitario) === 0) return;
+          // 🔥 CORRECCIÓN: Las FIXED no se cuentan como fantasmas, solo las NxM o NTH_FIXED
+          const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
+          if (isTrueGhost || Number(item.precioUnitario) === 0) return;
+          
           const key = String(item.id);
           qtys[key] = (qtys[key] || 0) + item.qty;
         });
@@ -389,7 +391,7 @@ export const useClientCart = (triggerNotification) => {
         if (activePromo) {
            let prevExpectedGhosts = 0;
            let nextExpectedGhosts = 0;
-           const currentGhosts = prev.filter(p => String(p.id) === String(productId) && (p.isAutoPromo || Number(p.precioUnitario) === 0)).reduce((a, b) => a + b.qty, 0);
+           const currentGhosts = prev.filter(p => String(p.id) === String(productId) && (p.isAutoPromo && p.promoLabel !== 'OFERTA')).reduce((a, b) => a + b.qty, 0);
 
            if (activePromo.type === 'NTH_FIXED') {
               const nth = Number(activePromo.buyQty || 2);
@@ -473,7 +475,9 @@ export const useClientCart = (triggerNotification) => {
     try {
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
-        if (!existing || existing.isAutoPromo) return prev; 
+        // 🔥 CORRECCIÓN: Solo bloqueamos si es un fantasma "real" (GRATIS o NTH), pero permitimos restar las OFERTAS Directas
+        if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
+        
         if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
         return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
       });
@@ -489,8 +493,11 @@ export const useClientCart = (triggerNotification) => {
     try {
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
-        if (!existing || existing.isAutoPromo) return prev; 
-        return prev.filter(item => item.cartItemId !== cartItemId);
+        if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
+        
+        // 🔥 CORRECCIÓN EXTREMA: Borrar la línea principal BORRA TODOS sus fantasmas también
+        const baseId = String(cartItemId).replace('-promo', '');
+        return prev.filter(item => String(item.cartItemId).replace('-promo', '') !== baseId);
       });
     } finally {
       isProcessingRef.current = false;
@@ -503,7 +510,8 @@ export const useClientCart = (triggerNotification) => {
 
     try {
       const existing = _cart.find(item => item.cartItemId === cartItemId);
-      if (!existing || existing.isAutoPromo) return; 
+      // 🔥 CORRECCIÓN: Permitimos sumar Rebajas Directas (FIXED)
+      if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return; 
 
       const currentTotalQty = _cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
       if (existing.controlarStock && currentTotalQty >= existing.stock) {
