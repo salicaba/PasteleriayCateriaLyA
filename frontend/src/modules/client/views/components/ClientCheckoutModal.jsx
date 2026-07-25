@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-// 🔥 1. Importamos Trash2
+import { motion, AnimatePresence } from 'framer-motion'; // 🔥 Importamos AnimatePresence
 import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -12,7 +11,10 @@ export default function ClientCheckoutModal({
   onConfirmOrder,
   removeFromCart,
   incrementInCart,
-  deleteLine // 🔥 2. Recibimos la nueva función como Prop
+  deleteLine,
+  promoWarning,          // 🔥 1. Recibimos prop
+  confirmPromoRupture,   // 🔥 2. Recibimos prop
+  cancelPromoRupture     // 🔥 3. Recibimos prop
 }) {
   const [actionLoading, setActionLoading] = useState(null);
   
@@ -35,7 +37,6 @@ export default function ClientCheckoutModal({
       isProcessingRef.current = true;
       if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
       
-      // 🔥 3. Manejamos el nuevo tipo de acción 'delete'
       if (actionType === 'increment') {
         incrementInCart(cartItemId);
       } else if (actionType === 'decrement') {
@@ -147,7 +148,6 @@ export default function ClientCheckoutModal({
                 ) : (
                   <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-[1.25rem] p-1.5 shrink-0">
                     
-                    {/* 🔥 4. BOTÓN DE ELIMINAR (Basurero) */}
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
                       onClick={(e) => handleAction(e, item.cartItemId, 'delete')} 
@@ -160,7 +160,6 @@ export default function ClientCheckoutModal({
                       )}
                     </motion.button>
 
-                    {/* Separador Visual Pequeño */}
                     <div className="w-px h-5 bg-gray-300 dark:bg-gray-700 lya:bg-[#EADCC9]" />
 
                     <motion.button 
@@ -250,6 +249,39 @@ export default function ClientCheckoutModal({
           )}
         </motion.button>
       </motion.div>
+
+      {/* 🔥 MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN */}
+      <AnimatePresence>
+        {promoWarning?.isOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-800 lya:bg-[#FAF6F0] rounded-[2rem] p-6 max-w-sm w-full shadow-2xl border border-rose-100 dark:border-rose-900/30 text-center relative overflow-hidden">
+              
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-rose-500"></div>
+              
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <AlertTriangle size={32} />
+              </div>
+              
+              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-2 tracking-tight">¿Perder Promoción?</h3>
+              
+              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium mb-8 leading-relaxed px-2 text-justify">
+                {promoWarning.message}
+              </p>
+              
+              <div className="flex gap-3">
+                <button onClick={cancelPromoRupture} className="flex-1 py-3.5 rounded-xl font-bold bg-gray-100 dark:bg-gray-700 lya:bg-[#EADCC9] text-gray-700 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 transition-colors outline-none touch-manipulation">
+                  Mantenerla
+                </button>
+                <button onClick={confirmPromoRupture} className="flex-1 py-3.5 rounded-xl font-bold bg-rose-500 text-white md:hover:bg-rose-600 shadow-lg shadow-rose-500/30 transition-colors outline-none touch-manipulation">
+                  Sí, quitar
+                </button>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

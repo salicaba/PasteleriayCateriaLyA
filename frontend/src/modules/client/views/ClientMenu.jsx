@@ -70,10 +70,13 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     addToCart, 
     removeFromCart, 
     incrementInCart, 
-    deleteLine, // 🔥 1. EXTRAER AQUÍ
+    deleteLine, 
     totalCart, 
     totalItems,
-    getPromoBadge
+    getPromoBadge,
+    promoWarning,         // 🔥 1. Extraemos el estado de advertencia
+    confirmPromoRupture,  // 🔥 2. Extraemos la función de confirmar
+    cancelPromoRupture    // 🔥 3. Extraemos la función de cancelar
   } = useClientCart(triggerNotification);
 
   useEffect(() => {
@@ -748,7 +751,23 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
           />
         )}
       </AnimatePresence>
-      <AnimatePresence>{showCheckout && <ClientCheckoutModal cart={cart} totalCart={totalCart} isSubmitting={isSubmitting} onClose={() => setShowCheckout(false)} onConfirmOrder={handleConfirmOrder} removeFromCart={removeFromCart} incrementInCart={incrementInCart} deleteLine={deleteLine} />}</AnimatePresence>
+      <AnimatePresence>
+        {showCheckout && (
+          <ClientCheckoutModal 
+            cart={cart} 
+            totalCart={totalCart} 
+            isSubmitting={isSubmitting} 
+            onClose={() => setShowCheckout(false)} 
+            onConfirmOrder={handleConfirmOrder} 
+            removeFromCart={removeFromCart} 
+            incrementInCart={incrementInCart} 
+            deleteLine={deleteLine} 
+            promoWarning={promoWarning}                // 🔥 PASAMOS LAS 3 PROPS AL MODAL
+            confirmPromoRupture={confirmPromoRupture} 
+            cancelPromoRupture={cancelPromoRupture} 
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
       <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
     </div>

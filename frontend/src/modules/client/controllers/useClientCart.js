@@ -26,8 +26,13 @@ export const useClientCart = (triggerNotification) => {
   // 🔥 PILAR 3: Prevención Anti-Doble Clic (Locks)
   const isProcessingRef = useRef(false);
   
-  // 🔥 NUEVO: Tracking para asegurar que una promo notifique SOLO UNA VEZ mientras esté activa
+  // 🔥 Tracking para asegurar que una promo notifique SOLO UNA VEZ mientras esté activa
   const notifiedPromos = useRef(new Set());
+
+  // 🔥 NUEVO ESTADO: Controla el modal de advertencia de ruptura
+  const [promoWarning, setPromoWarning] = useState({
+    isOpen: false, message: '', onConfirm: null, onCancel: null
+  });
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -93,7 +98,7 @@ export const useClientCart = (triggerNotification) => {
     if (activePromo.type === 'NxM') text = `${activePromo.buyQty}x${activePromo.payQty}`;
     if (activePromo.type === 'NTH_FIXED') text = `${activePromo.buyQty}º a $${activePromo.discountValue}`;
     
-    // 🔥 NUEVO: Cálculo matemático del porcentaje para Rebaja Directa
+    // Cálculo matemático del porcentaje para Rebaja Directa
     if (activePromo.type === 'FIXED') {
       const discountVal = Number(activePromo.discountValue || 0);
       
@@ -211,7 +216,6 @@ export const useClientCart = (triggerNotification) => {
             const item = cleanCart[i];
             if (!item.isAutoPromo && Number(item.precioUnitario) > 0 && String(item.id) === String(productId)) {
               
-              // 🔥 BLINDAJE DE COSTO OCULTO (Extras)
               const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
               const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
               const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
@@ -294,7 +298,6 @@ export const useClientCart = (triggerNotification) => {
         const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
         const discountFixed = Number(activePromo.discountValue || 0);
         
-        // 🔥 BLINDAJE DE COSTO OCULTO (Extras)
         const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
         const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
 
@@ -333,7 +336,6 @@ export const useClientCart = (triggerNotification) => {
         if (!notifiedPromos.current.has(promoId)) {
           const promoItem = cleanCart.find(item => item.promoId === promoId);
           
-          // Disparamos la notificación nativa sin emojis nativos (Pilar 5)
           setTimeout(() => {
             if (promoItem.promoType === 'NxM') {
               triggerNotification(`Promo Activada: ¡${promoItem.nombre} GRATIS!`, 'success');
@@ -348,8 +350,6 @@ export const useClientCart = (triggerNotification) => {
         }
       });
 
-      // Limpieza de memoria: Si el cliente remueve los productos y pierde la promo, la olvidamos
-      // para que vuelva a notificar si la alcanza de nuevo más tarde.
       notifiedPromos.current = new Set(
         [...notifiedPromos.current].filter(id => currentActivePromoIds.has(id))
       );
@@ -362,6 +362,74 @@ export const useClientCart = (triggerNotification) => {
     _setCart(prev => {
       const nextCart = typeof action === 'function' ? action(prev) : action;
       return syncPromotions(nextCart, promotions);
+    });
+  };
+
+  // 🔥 NUEVO INTERCEPTOR: Detecta si la acción romperá una promoción
+  const checkRuptureAndExecute = (actionToCalculateNextCart) => {
+    setCart(prev => {
+      const nextCart = actionToCalculateNextCart(prev);
+      let needsWarning = false;
+      let ruptureProductName = '';
+
+      const getNormalQtys = (cartState) => {
+        const qtys = {};
+        cartState.forEach(item => {
+          if (item.isAutoPromo || Number(item.precioUnitario) === 0) return;
+          const key = String(item.id);
+          qtys[key] = (qtys[key] || 0) + item.qty;
+        });
+        return qtys;
+      };
+
+      const prevQtys = getNormalQtys(prev);
+      const nextQtys = getNormalQtys(nextCart);
+
+      for (const key of Object.keys(prevQtys)) {
+        const productId = key;
+        const sampleItem = prev.find(p => String(p.id) === String(productId));
+        const activePromo = getActivePromo(productId, sampleItem?.stock, sampleItem?.controlarStock, promotions);
+
+        if (activePromo) {
+           let prevExpectedGhosts = 0;
+           let nextExpectedGhosts = 0;
+           const currentGhosts = prev.filter(p => String(p.id) === String(productId) && (p.isAutoPromo || Number(p.precioUnitario) === 0)).reduce((a, b) => a + b.qty, 0);
+
+           if (activePromo.type === 'NTH_FIXED') {
+              const nth = Number(activePromo.buyQty || 2);
+              prevExpectedGhosts = Math.floor((prevQtys[key] || 0) / (nth - 1));
+              nextExpectedGhosts = Math.floor((nextQtys[key] || 0) / (nth - 1));
+           } else if (activePromo.type === 'NxM') {
+              const buy = Number(activePromo.buyQty || 2);
+              const pay = Number(activePromo.payQty || 1);
+              prevExpectedGhosts = Math.floor((prevQtys[key] || 0) / pay) * (buy - pay);
+              nextExpectedGhosts = Math.floor((nextQtys[key] || 0) / pay) * (buy - pay);
+           }
+
+           if (activePromo.type === 'NTH_FIXED' || activePromo.type === 'NxM') {
+               if (nextExpectedGhosts < currentGhosts && nextExpectedGhosts < prevExpectedGhosts) {
+                 needsWarning = true;
+                 ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
+                 break;
+               }
+           }
+        }
+      }
+
+      if (needsWarning) {
+        setPromoWarning({
+          isOpen: true,
+          message: `Al reducir esta cantidad, perderás la promoción vigente en "${ruptureProductName}". El artículo de regalo/descuento será eliminado. ¿Deseas continuar?`,
+          onConfirm: () => {
+            setCart(currentCart => actionToCalculateNextCart(currentCart));
+            setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
+          },
+          onCancel: () => setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null })
+        });
+        return prev; 
+      }
+      
+      return nextCart;
     });
   };
 
@@ -407,7 +475,7 @@ export const useClientCart = (triggerNotification) => {
     isProcessingRef.current = true;
 
     try {
-      setCart(prev => {
+      checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || existing.isAutoPromo) return prev; 
         if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
@@ -423,12 +491,9 @@ export const useClientCart = (triggerNotification) => {
     isProcessingRef.current = true;
 
     try {
-      setCart(prev => {
+      checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
-        // Protegemos que no se eliminen promociones fantasma directamente
         if (!existing || existing.isAutoPromo) return prev; 
-        
-        // Filtramos para eliminar toda la línea sin importar la cantidad
         return prev.filter(item => item.cartItemId !== cartItemId);
       });
     } finally {
@@ -519,7 +584,7 @@ export const useClientCart = (triggerNotification) => {
   [_cart]);
 
   return {
-    cart: _cart, // 🔥 ¡AQUÍ ESTABA EL DETALLE! 
+    cart: _cart,
     setCart,
     addToCart,
     removeFromCart,
@@ -527,6 +592,9 @@ export const useClientCart = (triggerNotification) => {
     deleteLine,
     totalCart,
     totalItems,
-    getPromoBadge
+    getPromoBadge,
+    promoWarning,
+    confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(),
+    cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel()
   };
 };
