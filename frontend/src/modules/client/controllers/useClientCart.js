@@ -85,14 +85,26 @@ export const useClientCart = (triggerNotification) => {
     return promo;
   };
 
-  const getPromoBadge = (productId) => {
+  const getPromoBadge = (productId, originalPrice = 0) => {
     const activePromo = getActivePromo(productId, null, false, promotions);
     if (!activePromo) return null;
     
     let text = 'OFERTA';
     if (activePromo.type === 'NxM') text = `${activePromo.buyQty}x${activePromo.payQty}`;
     if (activePromo.type === 'NTH_FIXED') text = `${activePromo.buyQty}º a $${activePromo.discountValue}`;
-    if (activePromo.type === 'FIXED') text = `A $${activePromo.discountValue}`;
+    
+    // 🔥 NUEVO: Cálculo matemático del porcentaje para Rebaja Directa
+    if (activePromo.type === 'FIXED') {
+      const discountVal = Number(activePromo.discountValue || 0);
+      
+      if (originalPrice > 0 && discountVal < originalPrice) {
+        const discountPercentage = Math.round((1 - (discountVal / originalPrice)) * 100);
+        text = `-${discountPercentage}% OFF`;
+      } else {
+        // Fallback por si no envían el precio original o hay un error en los datos
+        text = `A $${discountVal}`;
+      }
+    }
     
     return {
       text,
