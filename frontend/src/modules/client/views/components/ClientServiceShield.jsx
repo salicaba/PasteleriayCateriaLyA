@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Coffee } from 'lucide-react';
-import { socket } from '../../../../../api/socket'; // Ajusta la ruta a tu socket
+import { socket } from '../../../../api/socket';
 
 export const ClientServiceShield = ({ 
   initialQrStatus, 
