@@ -75,12 +75,23 @@ export const setQrStatus = async (req, res) => {
             where: { key: 'qr_service_active' },
             defaults: { value: String(active) }
         });
+        
         if (!created) {
             config.value = String(active);
             await config.save();
         }
+
+        // 🚀 INYECCIÓN DE TIEMPO REAL: Emitimos la orden al Escudo del Cliente
+        const io = req.app.get('io');
+        if (io) {
+            // Disparamos la actualización global instantánea
+            io.emit('config:update', { qrService: active });
+            io.emit('qr:status_changed', active);
+        }
+
         res.json({ active: config.value === 'true' });
     } catch (error) {
+        console.error("Error al actualizar estado del QR:", error);
         res.status(500).json({ message: "Error al actualizar estado del QR" });
     }
 };

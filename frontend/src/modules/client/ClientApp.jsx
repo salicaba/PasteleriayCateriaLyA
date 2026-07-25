@@ -8,6 +8,8 @@ import clsx from 'clsx';
 import ClientLogin from './views/ClientLogin';
 import ClientMenu from './views/ClientMenu';
 import ClientConnectionShield from './views/components/ClientConnectionShield';
+// 🚀 INYECCIÓN DEL NUEVO ESCUDO EN TIEMPO REAL
+import { ClientServiceShield } from './views/components/ClientServiceShield';
 
 import { socket } from '../../api/socket'; 
 
@@ -31,6 +33,9 @@ export default function ClientApp({ type }) {
 
   const [themeIndex] = useState(getInitialTheme);
   const [isQrValid, setIsQrValid] = useState(true);
+
+  // 🔥 ESTADO PUENTE: Controla cuántos pedidos activos tiene el cliente actual
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -97,12 +102,21 @@ export default function ClientApp({ type }) {
   const handleClientLogout = () => {
     localStorage.removeItem('lya_client_session');
     setClientData(null);
+    setActiveOrdersCount(0); // Limpiamos los pedidos al salir
   };
 
   return (
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       
       <ClientConnectionShield>
+        
+        {/* 🚀 ESCUDO POKA-YOKE CONTRA APAGADO DE QR */}
+        {/* Asumimos true inicialmente para evitar un destello antes de que el socket responda */}
+        <ClientServiceShield 
+          initialQrStatus={true} 
+          activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
+        />
+
         <Toaster position="top-center" />
         
         <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10">
@@ -119,10 +133,11 @@ export default function ClientApp({ type }) {
           ) : (
             <ClientMenu 
               clientData={clientData} 
-              // 🔥 ESCUDO DE INTERFAZ: Si ya hay una sesión, la UI SIEMPRE muestra la mesa real guardada
               type={clientData.type || type} 
               tableId={clientData.tableId || tableId} 
               onLogout={handleClientLogout}
+              // 🔥 Pasamos el setter para que ClientMenu nos avise cuántos pedidos hay
+              setActiveOrdersCount={setActiveOrdersCount}
             />
           )}
         </main>

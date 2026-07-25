@@ -26,7 +26,8 @@ import { useClientCart } from '../controllers/useClientCart';
 import { socket } from '../../../api/socket';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
-export default function ClientMenu({ clientData, type, tableId, onLogout }) {
+// 🔥 1. Agregamos setActiveOrdersCount a las props
+export default function ClientMenu({ clientData, type, tableId, onLogout, setActiveOrdersCount }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,9 +75,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     totalCart, 
     totalItems,
     getPromoBadge,
-    promoWarning,         // 🔥 1. Extraemos el estado de advertencia
-    confirmPromoRupture,  // 🔥 2. Extraemos la función de confirmar
-    cancelPromoRupture    // 🔥 3. Extraemos la función de cancelar
+    promoWarning,        // 🔥 Extraemos el estado de advertencia
+    confirmPromoRupture, // 🔥 Extraemos la función de confirmar
+    cancelPromoRupture   // 🔥 Extraemos la función de cancelar
   } = useClientCart(triggerNotification);
 
   useEffect(() => {
@@ -93,6 +94,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout }) {
     const saved = localStorage.getItem('lya_client_snapshot');
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
+
+  // 🚀 2. EL PUENTE DE COMUNICACIÓN AL PADRE (ClientApp)
+  // Le avisamos al sistema cuántos pedidos confirmados tiene este cliente
+  useEffect(() => {
+    if (typeof setActiveOrdersCount === 'function') {
+      setActiveOrdersCount(confirmedSnapshot?.items?.length || 0);
+    }
+  }, [confirmedSnapshot, setActiveOrdersCount]);
 
   const parsedNameData = clientData?.name || 'Cliente';
   let displayName = parsedNameData;
