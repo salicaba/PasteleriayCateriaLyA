@@ -1,4 +1,3 @@
-// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
@@ -58,6 +57,8 @@ export const PosModal = ({
 
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  
+  // 🔥 MOVIMOS EL TOAST HACIA ARRIBA PARA PODER PASARLO AL HOOK
   const [localToast, setLocalToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -84,6 +85,7 @@ export const PosModal = ({
     filteredProducts 
   } = usePosMenu(isVitrina);
 
+  // 🔥 1. CONECTAMOS EL CABLE: Pasamos showToast como 4to parámetro
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
@@ -92,7 +94,7 @@ export const PosModal = ({
     moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
     promoWarning, confirmPromoRupture, cancelPromoRupture
-  } = usePosController(mesa, isOpen, todasLasMesas); 
+  } = usePosController(mesa, isOpen, todasLasMesas, showToast); 
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
@@ -509,29 +511,29 @@ export const PosModal = ({
                   cuentasTelefonos={cuentasTelefonos} 
                 />
 
+                {/* 🔥 PILAR 5: TOAST NATIVO ESTRICTO (Formato Píldora, Animación Suave) */}
                 <AnimatePresence>
                   {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
                       <motion.div 
-                        initial={{ opacity: 0, y: -50, scale: 0.9 }} 
-                        animate={{ opacity: 1, y: 0, scale: 1 }} 
-                        exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                        className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center justify-center gap-3 font-semibold tracking-tight border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
                           localToast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
                           localToast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
                           'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
                         }`}
                       >
-                        <div className={`p-1.5 rounded-full shrink-0 ${
+                        <div className={`p-1 rounded-full shrink-0 ${
                           localToast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
                           localToast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
                           'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
                         }`}>
                           {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
                         </div>
-                        <div className="flex flex-col items-center justify-center w-full">
-                          <span className="text-[15px] leading-tight text-center">{localToast.msg}</span>
-                        </div>
+                        <span className="text-sm">{localToast.msg}</span>
                       </motion.div>
                     </div>
                   )}

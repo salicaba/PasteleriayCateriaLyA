@@ -606,10 +606,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         return newCart;
       });
 
-      // 🔥 Eliminadas las notificaciones esparcidas, dejamos solo el "agregado" básico
-      if (!willAddExtraGhost && !isSubstitutingWithGhost) {
-        triggerNotification(`¡${productWithDetails.nombre} agregado!`, 'success');
-      }
       return true; 
     } finally {
       isProcessingRef.current = false;

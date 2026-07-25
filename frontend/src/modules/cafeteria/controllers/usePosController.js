@@ -8,7 +8,8 @@ import { usePosAccounts } from './usePosAccounts.js';
 import { usePosCart } from './usePosCart.js';
 import { usePosMutations } from './usePosMutations.js';
 
-export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
+// 🔥 1. Recibimos showToast como 4to parámetro
+export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showToast) => {
   // 1. Determinar Mesa Activa
   const mesaActual = useMemo(() => {
     if (!mesaInicial) return null;
@@ -25,7 +26,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
   const { notification, triggerNotification } = usePosNotifications();
   const menu = usePosMenu(isVitrina);
   const accounts = usePosAccounts();
-  const cartLogic = usePosCart(accounts.cuentaActiva, accounts.cuentasPagadasReales, triggerNotification);
+  
+  // 🔥 2. Conectamos showToast al Cerebro Matemático (Prioridad a la UI visual)
+  const cartLogic = usePosCart(accounts.cuentaActiva, accounts.cuentasPagadasReales, showToast || triggerNotification);
 
   const mutations = usePosMutations({
     cart: cartLogic.cart,
@@ -37,7 +40,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     setPaidAccounts: accounts.setPaidAccounts,
     setOrderStatus,
     cuentasPagadasReales: accounts.cuentasPagadasReales,
-    triggerNotification
+    // 🔥 3. Conectamos el Toast visual también a las mutaciones
+    triggerNotification: showToast || triggerNotification 
   });
 
   // 4. EL ORQUESTADOR DE SINCRONIZACIÓN (Base de Datos a UI)
@@ -148,7 +152,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     getProductQty: cartLogic.getProductQty,
     getSubtotalByCuenta: cartLogic.getSubtotalByCuenta,
     
-    // 🔥 NUEVO: Dominio del Escudo Poka-Yoke (Promociones)
+    // Dominio del Escudo Poka-Yoke (Promociones)
     promoWarning: cartLogic.promoWarning,
     confirmPromoRupture: cartLogic.confirmPromoRupture,
     cancelPromoRupture: cartLogic.cancelPromoRupture,
@@ -188,6 +192,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = []) => {
     
     // Dominio: Notificaciones UI
     notification, 
-    triggerNotification
+    triggerNotification: showToast || triggerNotification // Exportamos el correcto
   };
 };
