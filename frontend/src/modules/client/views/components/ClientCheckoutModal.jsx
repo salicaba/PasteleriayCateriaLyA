@@ -250,31 +250,45 @@ export default function ClientCheckoutModal({
         </motion.button>
       </motion.div>
 
-      {/* 🔥 MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN */}
+      {/* 🔥 MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN (100% PILARES APLICADOS) */}
       <AnimatePresence>
         {promoWarning?.isOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-800 lya:bg-[#FAF6F0] rounded-[2rem] p-6 max-w-sm w-full shadow-2xl border border-rose-100 dark:border-rose-900/30 text-center relative overflow-hidden">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="bg-white dark:bg-gray-800 lya:bg-[#FAF6F0] rounded-[2.5rem] p-6 max-w-sm w-full shadow-2xl border border-rose-100 dark:border-rose-900/30 flex flex-col items-center relative overflow-hidden">
               
               <div className="absolute top-0 left-0 right-0 h-1.5 bg-rose-500"></div>
               
-              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-full flex items-center justify-center mb-4 shadow-inner">
                 <AlertTriangle size={32} />
               </div>
               
-              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-2 tracking-tight">¿Perder Promoción?</h3>
+              {/* PILAR 4: Textos en Modales SIEMPRE centrados */}
+              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-2 tracking-tight text-center">
+                ¿Perder Promoción?
+              </h3>
               
+              {/* PILAR 4: Textos descriptivos largos SIEMPRE justificados */}
               <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium mb-8 leading-relaxed px-2 text-justify">
                 {promoWarning.message}
               </p>
               
-              <div className="flex gap-3">
-                <button onClick={cancelPromoRupture} className="flex-1 py-3.5 rounded-xl font-bold bg-gray-100 dark:bg-gray-700 lya:bg-[#EADCC9] text-gray-700 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 transition-colors outline-none touch-manipulation">
+              <div className="flex gap-3 w-full">
+                {/* PILAR 2: Retroalimentación táctil ESTRICTA con Framer Motion */}
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={cancelPromoRupture} 
+                  className="flex-1 py-3.5 rounded-xl font-bold bg-gray-100 dark:bg-gray-700 lya:bg-[#EADCC9] text-gray-700 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 transition-colors outline-none touch-manipulation text-center"
+                >
                   Mantenerla
-                </button>
-                <button onClick={confirmPromoRupture} className="flex-1 py-3.5 rounded-xl font-bold bg-rose-500 text-white md:hover:bg-rose-600 shadow-lg shadow-rose-500/30 transition-colors outline-none touch-manipulation">
+                </motion.button>
+
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={confirmPromoRupture} 
+                  className="flex-1 py-3.5 rounded-xl font-bold bg-rose-500 text-white md:hover:bg-rose-600 shadow-lg shadow-rose-500/30 transition-colors outline-none touch-manipulation text-center"
+                >
                   Sí, quitar
-                </button>
+                </motion.button>
               </div>
 
             </motion.div>
