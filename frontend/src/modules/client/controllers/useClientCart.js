@@ -23,13 +23,11 @@ export const useClientCart = (triggerNotification) => {
   const [_cart, _setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
   
-  // 🔥 PILAR 3: Prevención Anti-Doble Clic (Locks)
   const isProcessingRef = useRef(false);
   
-  // 🔥 Tracking para asegurar que una promo notifique SOLO UNA VEZ mientras esté activa
-  const notifiedPromos = useRef(new Set());
+  // 🔥 NUEVO: Diccionario matemático para saber cuántas veces se aplicó (x2, x3, etc.)
+  const notifiedPromos = useRef({});
 
-  // 🔥 NUEVO ESTADO: Controla el modal de advertencia de ruptura
   const [promoWarning, setPromoWarning] = useState({
     isOpen: false, message: '', onConfirm: null, onCancel: null
   });
@@ -98,7 +96,6 @@ export const useClientCart = (triggerNotification) => {
     if (activePromo.type === 'NxM') text = `${activePromo.buyQty}x${activePromo.payQty}`;
     if (activePromo.type === 'NTH_FIXED') text = `${activePromo.buyQty}º a $${activePromo.discountValue}`;
     
-    // Cálculo matemático del porcentaje para Rebaja Directa
     if (activePromo.type === 'FIXED') {
       const discountVal = Number(activePromo.discountValue || 0);
       
@@ -106,7 +103,6 @@ export const useClientCart = (triggerNotification) => {
         const discountPercentage = Math.round((1 - (discountVal / originalPrice)) * 100);
         text = `-${discountPercentage}% OFF`;
       } else {
-        // Fallback por si no envían el precio original o hay un error en los datos
         text = `A $${discountVal}`;
       }
     }
@@ -161,7 +157,6 @@ export const useClientCart = (triggerNotification) => {
 
       const currentGhosts = ghostQtys[productId] || 0;
 
-      // --- CASO 1: REMOVER PROMOCIONES EXCEDENTES ---
       if (currentGhosts > expectedGhosts) {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
@@ -181,7 +176,6 @@ export const useClientCart = (triggerNotification) => {
                   cleanCart[existingNormalIdx] = { ...cleanCart[existingNormalIdx], qty: cleanCart[existingNormalIdx].qty + item.qty };
                   cleanCart.splice(i, 1);
                 } else {
-                  // Limpiamos los metadatos de promo al revertir
                   cleanCart[i] = { ...item, cartItemId: normalCartItemId, precioUnitario: originalPrice, isAutoPromo: false, promoLabel: undefined, precioOriginal: undefined, promoId: undefined, promoType: undefined };
                 }
               } else {
@@ -207,7 +201,6 @@ export const useClientCart = (triggerNotification) => {
           }
         }
       } 
-      // --- CASO 2: AGREGAR PROMOCIONES FALTANTES ---
       else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
         let missing = expectedGhosts - currentGhosts;
 
@@ -289,7 +282,6 @@ export const useClientCart = (triggerNotification) => {
       }
     });
 
-    // --- CASO 3: REBAJA DIRECTA (FIXED) ---
     cleanCart = cleanCart.map(item => {
       if (item.isAutoPromo && item.promoLabel !== 'OFERTA') return item; 
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock, promosList);
@@ -326,33 +318,38 @@ export const useClientCart = (triggerNotification) => {
       return item;
     });
 
-    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING) ---
-    const currentActivePromoIds = new Set(
-      cleanCart.filter(item => item.isAutoPromo && item.promoId).map(item => item.promoId)
-    );
+    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING MATEMÁTICO x2, x3) ---
+    const currentPromoQtys = {};
+    cleanCart.forEach(item => {
+      if (item.isAutoPromo && item.promoId) {
+        currentPromoQtys[item.promoId] = (currentPromoQtys[item.promoId] || 0) + item.qty;
+      }
+    });
 
     if (triggerNotification) {
-      currentActivePromoIds.forEach(promoId => {
-        if (!notifiedPromos.current.has(promoId)) {
+      Object.keys(currentPromoQtys).forEach(promoId => {
+        const newQty = currentPromoQtys[promoId];
+        const oldQty = notifiedPromos.current[promoId] || 0;
+
+        if (newQty > oldQty) {
           const promoItem = cleanCart.find(item => item.promoId === promoId);
+          // Si hay más de 1 cantidad aplicada de esta promo, agregamos el texto "x2", "x3", etc.
+          const multiplierText = newQty > 1 ? ` x${newQty}` : '';
           
           setTimeout(() => {
             if (promoItem.promoType === 'NxM') {
-              triggerNotification(`Promo Activada: ¡${promoItem.nombre} GRATIS!`, 'success');
+              triggerNotification(`Promo Activada: ¡${promoItem.nombre} GRATIS!${multiplierText}`, 'success');
             } else if (promoItem.promoType === 'NTH_FIXED') {
-              triggerNotification(`Descuento aplicado en ${promoItem.nombre}`, 'success');
+              triggerNotification(`Descuento aplicado en ${promoItem.nombre}${multiplierText}`, 'success');
             } else if (promoItem.promoType === 'FIXED') {
-              triggerNotification(`Rebaja directa en ${promoItem.nombre}`, 'success');
+              triggerNotification(`Rebaja directa en ${promoItem.nombre}${multiplierText}`, 'success');
             }
           }, 50);
-
-          notifiedPromos.current.add(promoId);
         }
       });
 
-      notifiedPromos.current = new Set(
-        [...notifiedPromos.current].filter(id => currentActivePromoIds.has(id))
-      );
+      // Actualizamos la memoria
+      notifiedPromos.current = currentPromoQtys;
     }
 
     return cleanCart;
@@ -365,7 +362,6 @@ export const useClientCart = (triggerNotification) => {
     });
   };
 
-  // 🔥 NUEVO INTERCEPTOR: Detecta si la acción romperá una promoción
   const checkRuptureAndExecute = (actionToCalculateNextCart) => {
     setCart(prev => {
       const nextCart = actionToCalculateNextCart(prev);
@@ -435,7 +431,7 @@ export const useClientCart = (triggerNotification) => {
 
   const addToCart = (product, customizations = null) => {
     if (isProcessingRef.current) return false;
-    isProcessingRef.current = true; // Lock On
+    isProcessingRef.current = true;
 
     try {
       const currentTotalQty = _cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
@@ -466,7 +462,7 @@ export const useClientCart = (triggerNotification) => {
       
       return true;
     } finally {
-      isProcessingRef.current = false; // Lock Off
+      isProcessingRef.current = false;
     }
   };
 

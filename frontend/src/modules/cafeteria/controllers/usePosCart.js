@@ -21,17 +21,13 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const [_cart, _setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
 
-  // 🔥 PILAR 3: Prevención Anti-Doble Clic
   const isProcessingRef = useRef(false);
 
-  // 🔥 TRACKING: Evita doble notificación de promo en la misma cuenta
-  const notifiedPromos = useRef(new Set());
+  // 🔥 NUEVO: Diccionario matemático para saber cuántas veces se aplicó en cada cuenta
+  const notifiedPromos = useRef({});
 
   const [promoWarning, setPromoWarning] = useState({
-    isOpen: false,
-    message: '',
-    onConfirm: null,
-    onCancel: null
+    isOpen: false, message: '', onConfirm: null, onCancel: null
   });
 
   useEffect(() => {
@@ -144,7 +140,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
       const currentGhosts = ghostQtys[key] || 0;
 
-      // --- CASO 1: ELIMINAR BASURA FLOTANTE Y RETORNAR AL ESTADO NORMAL ---
       if (currentGhosts > expectedGhosts) {
         let toRemove = currentGhosts - expectedGhosts;
         for (let i = cleanCart.length - 1; i >= 0; i--) {
@@ -190,7 +185,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           }
         }
       } 
-      // --- CASO 2: AUTO-RELLENAR SI CALIFICA ---
       else if (currentGhosts < expectedGhosts && activePromo && sampleItem) {
          let missing = expectedGhosts - currentGhosts;
          const promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
@@ -200,7 +194,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                const item = cleanCart[i];
                if (!item.isAutoPromo && Number(item.precio) > 0 && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
                   
-                  // 🔥 BLINDAJE DE COSTO OCULTO (Extras)
                   const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
                   const costoExtras = parseFloat(item.precio) - baseOriginal;
                   const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
@@ -280,7 +273,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       }
     });
 
-    // --- CASO 3: REBAJA DIRECTA (FIXED) ---
     cleanCart = cleanCart.map(item => {
       if (item.isAutoPromo && item.promoLabel !== 'OFERTA') return item; 
       const activePromo = getActivePromo(item.id, item.stock, item.controlarStock);
@@ -289,7 +281,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         const baseOriginal = parseFloat(item.precioBase || item.precioOriginal || item.precio || 0);
         const discountFixed = Number(activePromo.discountValue || 0);
         
-        // 🔥 BLINDAJE DE COSTO OCULTO (Extras)
         const costoExtras = parseFloat(item.precioOriginal || item.precio) - baseOriginal;
         const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
 
@@ -318,40 +309,44 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       return item;
     });
 
-    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING MULTI-CUENTA) ---
-    const currentActivePromoKeys = new Set();
+    // --- 🔥 SISTEMA CENTRALIZADO DE NOTIFICACIONES (TRACKING MATEMÁTICO x2, x3) ---
+    const currentPromoQtys = {};
     cleanCart.forEach(item => {
       if (item.isAutoPromo && item.promoId) {
-        currentActivePromoKeys.add(`${item.promoId}::${item.cuenta}`);
+        const promoKey = `${item.promoId}::${item.cuenta}`;
+        currentPromoQtys[promoKey] = (currentPromoQtys[promoKey] || 0) + item.qty;
       }
     });
 
     if (triggerNotification) {
-      currentActivePromoKeys.forEach(promoKey => {
-        if (!notifiedPromos.current.has(promoKey)) {
+      Object.keys(currentPromoQtys).forEach(promoKey => {
+        const newQty = currentPromoQtys[promoKey];
+        const oldQty = notifiedPromos.current[promoKey] || 0;
+
+        if (newQty > oldQty) {
           const [promoId, cuenta] = promoKey.split('::');
           const promoItem = cleanCart.find(item => String(item.promoId) === promoId && String(item.cuenta) === cuenta);
           
           if (promoItem) {
+            // Si hay más de 1 cantidad aplicada de esta promo, agregamos el texto "x2", "x3", etc.
+            const multiplierText = newQty > 1 ? ` x${newQty}` : '';
+            const baseMsg = promoItem.cuenta !== 'General' ? ` en ${promoItem.cuenta}` : '';
+
             setTimeout(() => {
-              const baseMsg = promoItem.cuenta !== 'General' ? `en ${promoItem.cuenta}` : '';
               if (promoItem.promoType === 'NxM') {
-                triggerNotification(`Promo Automática: ¡${promoItem.nombre} GRATIS ${baseMsg}!`, 'success');
+                triggerNotification(`Promo Automática: ¡${promoItem.nombre} GRATIS${baseMsg}!${multiplierText}`, 'success');
               } else if (promoItem.promoType === 'NTH_FIXED') {
-                triggerNotification(`Descuento aplicado en ${promoItem.nombre} ${baseMsg}`, 'success');
+                triggerNotification(`Descuento aplicado en ${promoItem.nombre}${baseMsg}${multiplierText}`, 'success');
               } else if (promoItem.promoType === 'FIXED') {
-                triggerNotification(`Rebaja directa en ${promoItem.nombre} ${baseMsg}`, 'success');
+                triggerNotification(`Rebaja directa en ${promoItem.nombre}${baseMsg}${multiplierText}`, 'success');
               }
             }, 50);
-            notifiedPromos.current.add(promoKey);
           }
         }
       });
 
-      // Limpieza de memoria (Garantiza que si cancelan el producto y lo vuelven a pedir, notifique de nuevo)
-      notifiedPromos.current = new Set(
-        [...notifiedPromos.current].filter(key => currentActivePromoKeys.has(key))
-      );
+      // Actualizamos la memoria
+      notifiedPromos.current = currentPromoQtys;
     }
 
     return cleanCart;
@@ -364,7 +359,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
   };
 
-  // 🔥 INTERCEPTOR BLINDADO: Detecta rupturas tanto en NxM como en NTH_FIXED
   const checkRuptureAndExecute = (actionToCalculateNextCart) => {
     setCart(prev => {
       const nextCart = actionToCalculateNextCart(prev);
@@ -402,21 +396,17 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
              p.status !== 'CANCELLED'
            ).reduce((a, b) => a + b.qty, 0);
 
-           // 1. Evaluación de Unidad Adicional
            if (activePromo.type === 'NTH_FIXED') {
               const nth = Number(activePromo.buyQty || activePromo.buy_qty || 2);
               prevExpectedGhosts = Math.floor((prevQtys[key] || 0) / (nth - 1));
               nextExpectedGhosts = Math.floor((nextQtys[key] || 0) / (nth - 1));
-           } 
-           // 2. Evaluación de Volumen (NxM)
-           else if (activePromo.type === 'NxM') {
+           } else if (activePromo.type === 'NxM') {
               const buy = Number(activePromo.buyQty || activePromo.buy_qty || 2);
               const pay = Number(activePromo.payQty || activePromo.pay_qty || 1);
               prevExpectedGhosts = Math.floor((prevQtys[key] || 0) / pay) * (buy - pay);
               nextExpectedGhosts = Math.floor((nextQtys[key] || 0) / pay) * (buy - pay);
            }
 
-           // 3. Disparador de Alerta
            if (activePromo.type === 'NTH_FIXED' || activePromo.type === 'NxM') {
                if (nextExpectedGhosts < currentGhosts && nextExpectedGhosts < prevExpectedGhosts) {
                  needsWarning = true;
@@ -444,7 +434,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
   };
 
-  // 🔥 PILAR 3: Wrappers con Locks Asíncronos
   const addToCart = (productWithDetails, forceCuenta = null) => {
     if (isProcessingRef.current) return false;
     isProcessingRef.current = true;
@@ -617,6 +606,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         return newCart;
       });
 
+      // 🔥 Eliminadas las notificaciones esparcidas, dejamos solo el "agregado" básico
+      if (!willAddExtraGhost && !isSubstitutingWithGhost) {
+        triggerNotification(`¡${productWithDetails.nombre} agregado!`, 'success');
+      }
       return true; 
     } finally {
       isProcessingRef.current = false;
