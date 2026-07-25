@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  PowerOff, Clock, Phone, Flame, Lock, Tag, Gift
+  Clock, Phone, Flame, Lock, Tag, Gift
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -26,7 +26,6 @@ import { useClientCart } from '../controllers/useClientCart';
 import { socket } from '../../../api/socket';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
-// 🔥 1. Agregamos setActiveOrdersCount a las props
 export default function ClientMenu({ clientData, type, tableId, onLogout, setActiveOrdersCount }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -47,8 +46,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   const [diagnosticError, setDiagnosticError] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const [isQrActive, setIsQrActive] = useState(true);
-  
   const [sessionExpired, setSessionExpired] = useState(() => localStorage.getItem('lya_client_session_expired') === 'true');
 
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
@@ -75,9 +72,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     totalCart, 
     totalItems,
     getPromoBadge,
-    promoWarning,        // 🔥 Extraemos el estado de advertencia
-    confirmPromoRupture, // 🔥 Extraemos la función de confirmar
-    cancelPromoRupture   // 🔥 Extraemos la función de cancelar
+    promoWarning,
+    confirmPromoRupture,
+    cancelPromoRupture
   } = useClientCart(triggerNotification);
 
   useEffect(() => {
@@ -95,8 +92,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🚀 2. EL PUENTE DE COMUNICACIÓN AL PADRE (ClientApp)
-  // Le avisamos al sistema cuántos pedidos confirmados tiene este cliente
+  // El Puente al padre
   useEffect(() => {
     if (typeof setActiveOrdersCount === 'function') {
       setActiveOrdersCount(confirmedSnapshot?.items?.length || 0);
@@ -120,20 +116,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     if (!localStorage.getItem('lya_client_last_activity')) {
       localStorage.setItem('lya_client_last_activity', Date.now().toString());
     }
-  }, []);
-
-  useEffect(() => {
-    const checkQrStatus = async () => {
-      try {
-        const res = await client.get('/settings/qr-status');
-        setIsQrActive(res.data.active);
-      } catch (error) {
-        console.error("No se pudo verificar el estado del QR");
-      }
-    };
-    checkQrStatus(); 
-    const intervalId = setInterval(checkQrStatus, 15000); 
-    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -515,24 +497,23 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     );
   }
 
-  if (!isQrActive && !isConfirmed) {
-    return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] p-6 overflow-hidden">
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]">
-          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner"><PowerOff size={40} className="text-gray-400 dark:text-gray-500 lya:text-[#78350F]" /></div>
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-4 tracking-tight text-center">Servicio Suspendido</h2>
-          <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify">El servicio de pedidos digitales por código QR se encuentra deshabilitado temporalmente.</p>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-gray-900 dark:bg-gray-700 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-xl">Entendido, cerrar menú</motion.button>
-        </motion.div>
-      </div>
-    );
-  }
+  // 🔥 AQUÍ ES DONDE LIMPIAMOS: Se eliminó el "Servicio Suspendido" viejo 
 
   if (isConfirmed && !isReadOnly) {
     return (
       <>
         <ClientOrderSuccess 
-          cart={confirmedSnapshot.items} totalCart={confirmedSnapshot.total} clientData={clientData} type={type} tableId={tableId} products={products} categories={categories} getCategoryName={getCategoryName} isQrActive={isQrActive} isOrderPaid={isOrderPaid} onReset={() => { if (isQrActive && !isOrderPaid) setIsConfirmed(false); }} onOpenSettings={() => setShowSettings(true)}
+          cart={confirmedSnapshot.items} 
+          totalCart={confirmedSnapshot.total} 
+          clientData={clientData} 
+          type={type} 
+          tableId={tableId} 
+          products={products} 
+          categories={categories} 
+          getCategoryName={getCategoryName} 
+          isOrderPaid={isOrderPaid} 
+          onReset={() => { if (!isOrderPaid) setIsConfirmed(false); }} 
+          onOpenSettings={() => setShowSettings(true)}
         />
         <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
         <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
@@ -597,13 +578,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
 
-            // 🔥 1. CALCULAMOS EL PRECIO ANTES (Poka-Yoke Financiero)
             const defaultMods = getDefaultCustomizations(product);
             const baseOriginal = Number(product.precio);
             const finalPriceWithDefaults = defaultMods ? defaultMods.precioFinal : baseOriginal;
             const costoExtras = finalPriceWithDefaults - baseOriginal;
 
-            // 🔥 2. LE PASAMOS EL PRECIO A LA ETIQUETA PARA EL % OFF
             const promoData = getPromoBadge(product.id, finalPriceWithDefaults);
 
             let displayOriginalPrice = null;
@@ -684,7 +663,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
                     <div className="flex flex-col items-start justify-end">
                       {promoData?.type === 'FIXED' ? (
                         <>
-                          {/* 🔥 TOQUE VISUAL: Tachado ligeramente decorado */}
                           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through decoration-rose-500/40 decoration-[1.5px] leading-none block -mb-0.5">
                             ${displayOriginalPrice.toFixed(2)}
                           </span>
@@ -771,7 +749,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
             removeFromCart={removeFromCart} 
             incrementInCart={incrementInCart} 
             deleteLine={deleteLine} 
-            promoWarning={promoWarning}                // 🔥 PASAMOS LAS 3 PROPS AL MODAL
+            promoWarning={promoWarning}
             confirmPromoRupture={confirmPromoRupture} 
             cancelPromoRupture={cancelPromoRupture} 
           />
