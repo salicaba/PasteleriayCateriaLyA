@@ -1,20 +1,14 @@
-// frontend/src/modules/client/controllers/useClientCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js';
-
-// 🔥 Inyectamos el helper para obtener los detalles base del Gestor de Menú
 import { getDefaultCustomizations } from '../views/utils/clientMenuUtils';
 
 const parseValidDays = (daysData) => {
   if (!daysData) return [];
   if (Array.isArray(daysData)) return daysData.map(Number);
   if (typeof daysData === 'string') {
-    try {
-      return JSON.parse(daysData).map(Number);
-    } catch (e) {
-      return daysData.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim()));
-    }
+    try { return JSON.parse(daysData).map(Number); } 
+    catch (e) { return daysData.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
   }
   return [];
 };
@@ -41,15 +35,12 @@ export const useClientCart = (triggerNotification) => {
         console.error("Error cargando promociones en el carrito del cliente:", error);
       }
     };
-
     fetchPromos();
     const handlePromoUpdate = () => fetchPromos();
-
     socket.on('menu:promotions_updated', handlePromoUpdate);
     socket.on('promotion_created', handlePromoUpdate);
     socket.on('promotion_updated', handlePromoUpdate);
     socket.on('promotion_deleted', handlePromoUpdate);
-
     return () => {
       socket.off('menu:promotions_updated', handlePromoUpdate);
       socket.off('promotion_created', handlePromoUpdate);
@@ -60,28 +51,21 @@ export const useClientCart = (triggerNotification) => {
 
   const getActivePromo = (productId, currentStock = null, controlarStock = false, promosList) => {
     if (!promosList || promosList.length === 0) return null;
-
     const promo = promosList.find(p => {
       const matchesProduct = String(p.productId || p.product_id) === String(productId);
       if (!matchesProduct) return false;
       const rawActive = p.isActive ?? p.is_active ?? p.status;
       return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
     });
-
     if (!promo) return null;
-
     if (controlarStock && currentStock !== null) {
       let requiredQty = 1;
-      if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
-        requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
-      }
+      if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
       if (currentStock < requiredQty) return null;
     }
-
     const today = new Date().getDay();
     const daysRaw = promo.validDays || promo.valid_days;
     const validDaysAsNumbers = parseValidDays(daysRaw);
-
     if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) return null;
     return promo;
   };
@@ -96,7 +80,6 @@ export const useClientCart = (triggerNotification) => {
     
     if (activePromo.type === 'FIXED') {
       const discountVal = Number(activePromo.discountValue || 0);
-      
       if (originalPrice > 0 && discountVal < originalPrice) {
         const discountPercentage = Math.round((1 - (discountVal / originalPrice)) * 100);
         text = `-${discountPercentage}% OFF`;
@@ -104,12 +87,7 @@ export const useClientCart = (triggerNotification) => {
         text = `A $${discountVal}`;
       }
     }
-    
-    return {
-      text,
-      type: activePromo.type,
-      discountValue: Number(activePromo.discountValue || 0)
-    };
+    return { text, type: activePromo.type, discountValue: Number(activePromo.discountValue || 0) };
   };
 
   const syncPromotions = (cartState, promosList) => {
@@ -120,7 +98,6 @@ export const useClientCart = (triggerNotification) => {
 
     cleanCart.forEach(item => {
       const key = String(item.id);
-      // 🔥 CORRECCIÓN: Evitamos que la Rebaja Directa (FIXED) sea considerada un "Fantasma"
       const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
       
       if (isTrueGhost || Number(item.precioUnitario) === 0) {
@@ -165,7 +142,6 @@ export const useClientCart = (triggerNotification) => {
           const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
 
           if ((isTrueGhost || Number(item.precioUnitario) === 0) && String(item.id) === String(productId)) {
-            
             if (activePromo?.type === 'NTH_FIXED' || (item.promoLabel && item.promoLabel.includes('º REBAJADO'))) {
               const originalPrice = item.precioOriginal || item.precioUnitario;
               const detailStr = JSON.stringify(item.detalles || {});
@@ -211,16 +187,13 @@ export const useClientCart = (triggerNotification) => {
           for (let i = cleanCart.length - 1; i >= 0; i--) {
             const item = cleanCart[i];
             if (!item.isAutoPromo && Number(item.precioUnitario) > 0 && String(item.id) === String(productId)) {
-              
               const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
               const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
               const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
-
               const detailStr = JSON.stringify(item.detalles || {});
               const takeawayStr = item.isTakeaway ? '-llevar' : '';
               const promoCartItemId = `${item.id}-${detailStr}${takeawayStr}-promo`;
               const existingPromoIdx = cleanCart.findIndex(p => p.cartItemId === promoCartItemId && p.isAutoPromo);
-
               const promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
 
               if (item.qty <= missing) {
@@ -236,8 +209,7 @@ export const useClientCart = (triggerNotification) => {
                 if (existingPromoIdx !== -1) {
                   cleanCart[existingPromoIdx] = { ...cleanCart[existingPromoIdx], qty: cleanCart[existingPromoIdx].qty + missing };
                 } else {
-                  const convertedItem = { ...item, cartItemId: promoCartItemId, qty: missing, precioOriginal: item.precioUnitario, precioUnitario: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, ...promoMetadata };
-                  cleanCart.push(convertedItem);
+                  cleanCart.push({ ...item, cartItemId: promoCartItemId, qty: missing, precioOriginal: item.precioUnitario, precioUnitario: finalGhostPrice, isAutoPromo: true, promoLabel: ghostLabel, ...promoMetadata });
                 }
                 missing = 0;
               }
@@ -247,38 +219,22 @@ export const useClientCart = (triggerNotification) => {
         } else if (activePromo.type === 'NxM') {
           let ghostOriginalPrice = parseFloat(sampleItem.precioBase || sampleItem.precioOriginal || sampleItem.precioUnitario || sampleItem.precio || 0);
           let ghostDetails = null;
-
           const defaultCustoms = getDefaultCustomizations(sampleItem);
           if (defaultCustoms) {
               ghostDetails = defaultCustoms.detalles;
-              if (defaultCustoms.precioFinal) {
-                  ghostOriginalPrice = defaultCustoms.precioFinal;
-              }
+              if (defaultCustoms.precioFinal) ghostOriginalPrice = defaultCustoms.precioFinal;
           }
           
-          const existingGhostIdx = cleanCart.findIndex(i => 
-            String(i.id) === String(productId) && 
-            i.isAutoPromo === true && 
-            i.promoLabel === ghostLabel
-          );
-
+          const existingGhostIdx = cleanCart.findIndex(i => String(i.id) === String(productId) && i.isAutoPromo === true && i.promoLabel === ghostLabel);
           if (existingGhostIdx !== -1) {
-            cleanCart[existingGhostIdx] = {
-              ...cleanCart[existingGhostIdx],
-              qty: cleanCart[existingGhostIdx].qty + missing
-            };
+            cleanCart[existingGhostIdx] = { ...cleanCart[existingGhostIdx], qty: cleanCart[existingGhostIdx].qty + missing };
           } else {
             cleanCart.push({
               ...sampleItem,
               cartItemId: `${sampleItem.id}-ghost-promo`, 
-              precioOriginal: ghostOriginalPrice,
-              precioUnitario: 0,
-              promoLabel: ghostLabel,
-              qty: missing,
-              isAutoPromo: true,
-              detalles: ghostDetails,
-              promoId: activePromo.id,
-              promoType: activePromo.type
+              precioOriginal: ghostOriginalPrice, precioUnitario: 0, promoLabel: ghostLabel,
+              qty: missing, isAutoPromo: true, detalles: ghostDetails,
+              promoId: activePromo.id, promoType: activePromo.type
             });
           }
         }
@@ -292,31 +248,14 @@ export const useClientCart = (triggerNotification) => {
       if (activePromo && activePromo.type === 'FIXED') {
         const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
         const discountFixed = Number(activePromo.discountValue || 0);
-        
         const costoExtras = parseFloat(item.precioOriginal || item.precioUnitario) - baseOriginal;
         const expectedPrice = discountFixed + (costoExtras > 0 ? costoExtras : 0);
 
-        if (item.precioUnitario !== expectedPrice) {
-          return { 
-            ...item, 
-            precioOriginal: item.precioOriginal || item.precioUnitario, 
-            precioUnitario: expectedPrice, 
-            promoLabel: 'OFERTA', 
-            isAutoPromo: true,
-            promoId: activePromo.id,
-            promoType: activePromo.type 
-          };
+        if (Number(item.precioUnitario).toFixed(2) !== Number(expectedPrice).toFixed(2)) {
+          return { ...item, precioOriginal: item.precioOriginal || item.precioUnitario, precioUnitario: expectedPrice, promoLabel: 'OFERTA', isAutoPromo: true, promoId: activePromo.id, promoType: activePromo.type };
         }
       } else if (item.promoLabel === 'OFERTA' && (!activePromo || activePromo.type !== 'FIXED')) {
-        return { 
-          ...item, 
-          precioUnitario: item.precioOriginal || item.precioUnitario, 
-          precioOriginal: undefined, 
-          promoLabel: undefined, 
-          isAutoPromo: false,
-          promoId: undefined,
-          promoType: undefined 
-        };
+        return { ...item, precioUnitario: item.precioOriginal || item.precioUnitario, precioOriginal: undefined, promoLabel: undefined, isAutoPromo: false, promoId: undefined, promoType: undefined };
       }
       return item;
     });
@@ -332,25 +271,18 @@ export const useClientCart = (triggerNotification) => {
       Object.keys(currentPromoQtys).forEach(promoId => {
         const newQty = currentPromoQtys[promoId];
         const oldQty = notifiedPromos.current[promoId] || 0;
-
         if (newQty > oldQty) {
           const promoItem = cleanCart.find(item => item.promoId === promoId);
           const multiplierText = newQty > 1 ? ` x${newQty}` : '';
-          
           setTimeout(() => {
-            if (promoItem.promoType === 'NxM') {
-              triggerNotification(`Promo Activada: ¡${promoItem.nombre} GRATIS!${multiplierText}`, 'success');
-            } else if (promoItem.promoType === 'NTH_FIXED') {
-              triggerNotification(`Descuento aplicado en ${promoItem.nombre}${multiplierText}`, 'success');
-            } else if (promoItem.promoType === 'FIXED') {
-              triggerNotification(`Rebaja directa en ${promoItem.nombre}${multiplierText}`, 'success');
-            }
+            if (promoItem.promoType === 'NxM') triggerNotification(`Promo Activada: ¡${promoItem.nombre} GRATIS!${multiplierText}`, 'success');
+            else if (promoItem.promoType === 'NTH_FIXED') triggerNotification(`Descuento aplicado en ${promoItem.nombre}${multiplierText}`, 'success');
+            else if (promoItem.promoType === 'FIXED') triggerNotification(`Rebaja directa en ${promoItem.nombre}${multiplierText}`, 'success');
           }, 50);
         }
       });
       notifiedPromos.current = currentPromoQtys;
     }
-
     return cleanCart;
   };
 
@@ -370,10 +302,8 @@ export const useClientCart = (triggerNotification) => {
       const getNormalQtys = (cartState) => {
         const qtys = {};
         cartState.forEach(item => {
-          // 🔥 CORRECCIÓN: Las FIXED no se cuentan como fantasmas, solo las NxM o NTH_FIXED
           const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
           if (isTrueGhost || Number(item.precioUnitario) === 0) return;
-          
           const key = String(item.id);
           qtys[key] = (qtys[key] || 0) + item.qty;
         });
@@ -404,7 +334,7 @@ export const useClientCart = (triggerNotification) => {
               nextExpectedGhosts = Math.floor((nextQtys[key] || 0) / pay) * (buy - pay);
            }
 
-           if (activePromo.type === 'NTH_FIXED' || activePromo.type === 'NxM') {
+           if ((activePromo.type === 'NTH_FIXED' || activePromo.type === 'NxM') && currentGhosts > 0) {
                if (nextExpectedGhosts < currentGhosts && nextExpectedGhosts < prevExpectedGhosts) {
                  needsWarning = true;
                  ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
@@ -426,7 +356,6 @@ export const useClientCart = (triggerNotification) => {
         });
         return prev; 
       }
-      
       return nextCart;
     });
   };
@@ -437,7 +366,6 @@ export const useClientCart = (triggerNotification) => {
 
     try {
       const currentTotalQty = _cart.filter(item => item.id === product.id).reduce((acc, item) => acc + item.qty, 0);
-
       if (product.controlarStock && currentTotalQty >= product.stock) {
         if (triggerNotification) triggerNotification(`Límite alcanzado: Solo hay ${product.stock} en stock.`, 'warning');
         return false;
@@ -454,14 +382,15 @@ export const useClientCart = (triggerNotification) => {
         }
 
         newItem.cartItemId = uniqueCartId;
-        const existing = prev.find(item => item.cartItemId === uniqueCartId && !item.isAutoPromo);
+        
+        // 🔥 CORRECCIÓN: Permitimos que las "OFERTAS" (FIXED) se agrupen con los nuevos en lugar de duplicarse
+        const existing = prev.find(item => item.cartItemId === uniqueCartId && (!item.isAutoPromo || item.promoLabel === 'OFERTA'));
         
         if (existing) {
-          return prev.map(item => item.cartItemId === uniqueCartId && !item.isAutoPromo ? { ...item, qty: item.qty + 1 } : item);
+          return prev.map(item => item.cartItemId === uniqueCartId && (!item.isAutoPromo || item.promoLabel === 'OFERTA') ? { ...item, qty: item.qty + 1 } : item);
         }
         return [...prev, newItem];
       });
-      
       return true;
     } finally {
       isProcessingRef.current = false;
@@ -471,13 +400,11 @@ export const useClientCart = (triggerNotification) => {
   const removeFromCart = (cartItemId) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
-
     try {
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
-        // 🔥 CORRECCIÓN: Solo bloqueamos si es un fantasma "real" (GRATIS o NTH), pero permitimos restar las OFERTAS Directas
+        // 🔥 Permitimos restar OFERTAS Directas, solo bloqueamos verdaderos fantasmas
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
-        
         if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
         return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty - 1 } : item);
       });
@@ -489,15 +416,13 @@ export const useClientCart = (triggerNotification) => {
   const deleteLine = (cartItemId) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
-
     try {
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
-        
-        // 🔥 CORRECCIÓN EXTREMA: Borrar la línea principal BORRA TODOS sus fantasmas también
-        const baseId = String(cartItemId).replace('-promo', '');
-        return prev.filter(item => String(item.cartItemId).replace('-promo', '') !== baseId);
+        // 🔥 EL BASURERO SUPREMO: Borra todos los productos (Normales + Fantasmas) de esa línea
+        const baseId = String(cartItemId).split('-')[0];
+        return prev.filter(item => String(item.id) !== baseId);
       });
     } finally {
       isProcessingRef.current = false;
@@ -507,10 +432,9 @@ export const useClientCart = (triggerNotification) => {
   const incrementInCart = (cartItemId) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
-
     try {
       const existing = _cart.find(item => item.cartItemId === cartItemId);
-      // 🔥 CORRECCIÓN: Permitimos sumar Rebajas Directas (FIXED)
+      // 🔥 Permitimos sumar OFERTAS Directas
       if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return; 
 
       const currentTotalQty = _cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
@@ -518,86 +442,18 @@ export const useClientCart = (triggerNotification) => {
         if (triggerNotification) triggerNotification(`Límite alcanzado: Solo hay ${existing.stock} en stock.`, 'warning');
         return;
       }
-
       setCart(prev => prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + 1 } : item));
     } finally {
       isProcessingRef.current = false;
     }
   };
 
-  useEffect(() => {
-    const handleStockAdjustment = (updates) => {
-      setCart(prevCart => {
-        let modifiedCart = [...prevCart];
-        let notificationsToFire = new Set();
-
-        modifiedCart = modifiedCart.map(item => {
-          const update = updates.find(u => u.id === item.id);
-          return update ? { ...item, stock: update.stock } : item;
-        });
-
-        for (const update of updates) {
-          const itemsOfProduct = modifiedCart.filter(i => i.id === update.id);
-          if (itemsOfProduct.length === 0 || !itemsOfProduct[0].controlarStock) continue;
-
-          let currentTotalQty = itemsOfProduct.reduce((sum, i) => sum + i.qty, 0);
-          
-          if (currentTotalQty > update.stock) {
-            if (update.stock === 0) {
-              notificationsToFire.add({ msg: `Un producto de tu carrito se agotó y fue removido.`, type: 'error' });
-              modifiedCart = modifiedCart.filter(i => i.id !== update.id);
-            } else {
-              notificationsToFire.add({ msg: `Ajustamos la cantidad de un producto por disponibilidad.`, type: 'warning' });
-              for (let i = modifiedCart.length - 1; i >= 0; i--) {
-                const item = modifiedCart[i];
-                if (item.id === update.id) {
-                  const excess = currentTotalQty - update.stock;
-                  if (excess >= item.qty) {
-                    currentTotalQty -= item.qty;
-                    modifiedCart.splice(i, 1);
-                  } else {
-                    modifiedCart[i] = { ...item, qty: item.qty - excess };
-                    currentTotalQty -= excess;
-                  }
-                  if (currentTotalQty <= update.stock) break;
-                }
-              }
-            }
-          }
-        }
-
-        if (triggerNotification) {
-          setTimeout(() => {
-            notificationsToFire.forEach(notif => triggerNotification(notif.msg, notif.type));
-          }, 0);
-        }
-        return modifiedCart;
-      });
-    };
-
-    socket.on('stock:update', handleStockAdjustment);
-    return () => socket.off('stock:update', handleStockAdjustment);
-  }, [triggerNotification, promotions]); 
-
-  const totalCart = useMemo(() => 
-    _cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0), 
-  [_cart]);
-
-  const totalItems = useMemo(() => 
-    _cart.reduce((acc, item) => acc + (item.qty || 0), 0), 
-  [_cart]);
+  const totalCart = useMemo(() => _cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0), [_cart]);
+  const totalItems = useMemo(() => _cart.reduce((acc, item) => acc + (item.qty || 0), 0), [_cart]);
 
   return {
-    cart: _cart,
-    setCart,
-    addToCart,
-    removeFromCart,
-    incrementInCart,
-    deleteLine,
-    totalCart,
-    totalItems,
-    getPromoBadge,
-    promoWarning,
+    cart: _cart, setCart, addToCart, removeFromCart, incrementInCart, deleteLine,
+    totalCart, totalItems, getPromoBadge, promoWarning,
     confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(),
     cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel()
   };
