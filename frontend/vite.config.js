@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate', 
       includeAssets: ['favicon.png', 'logo.jpeg'],
       manifest: {
-        name: 'Pastelería y Cafetería Lya',
-        short_name: 'Menú Lya',
-        description: 'Menú digital inteligente y sistema de pedidos de LyA',
+        name: 'Ecosistema Lya', // 🔥 Nombre completo (se ve al instalar)
+        short_name: 'App Lya',  // 🔥 Nombre corto (se ve debajo del ícono en el celular)
+        description: 'Punto de Venta y Menú Digital Inteligente',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone', 

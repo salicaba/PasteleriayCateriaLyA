@@ -303,7 +303,7 @@ export default function ClientApp({ type }) {
                         <MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white dark:text-gray-900">App de LyA</h4>
+                        <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya</h4>
                         <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
                       </div>
                     </div>
