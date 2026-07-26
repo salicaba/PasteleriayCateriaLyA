@@ -5,8 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Vercel inyectará esta variable. Si no existe (como en tu local), será 'admin' por defecto.
 const appType = process.env.VITE_APP_TYPE || 'admin'; 
 
-const pwaName = appType === 'client' ? 'Menú LyA' : 'Sistema LyA';
-const pwaShortName = appType === 'client' ? 'Menú LyA' : 'POS LyA';
+const pwaName = appType === 'client' ? 'Menú LyA' : 'Sistema Lya';
+const pwaShortName = appType === 'client' ? 'Menú LyA' : 'POS Lya';
 
 export default defineConfig({
   plugins: [
