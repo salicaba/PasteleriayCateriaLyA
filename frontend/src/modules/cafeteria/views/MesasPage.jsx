@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/MesasPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2, AlertTriangle, PowerOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket'; 
@@ -35,6 +35,10 @@ export const MesasPage = ({ globalScroll }) => {
   const [restoringOrderId, setRestoringOrderId] = useState(null);
   const [restoringItemId, setRestoringItemId] = useState(null);
 
+  // 🚀 ESTADOS DEL CONTROL GRANULAR (MESAS APAGADAS)
+  const [disabledQrs, setDisabledQrs] = useState([]);
+  const [globalQrActive, setGlobalQrActive] = useState(true);
+
   // --- SISTEMA DE NOTIFICACIONES NEO-BENTO NATIVO ---
   const [toastMessage, setToastMessage] = useState(null);
   const [toastType, setToastType] = useState('success');
@@ -61,6 +65,46 @@ export const MesasPage = ({ globalScroll }) => {
       console.error("Error cargando el resumen del día:", error);
     }
   };
+
+  // 🚀 CEREBRO DE ESTADO GRANULAR PARA EL MESERO
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await client.get('/settings/config');
+        if (res.data.qr_service_active !== undefined) {
+          setGlobalQrActive(res.data.qr_service_active !== 'false');
+        }
+        if (res.data.disabled_qrs) {
+          const parsed = typeof res.data.disabled_qrs === 'string' ? JSON.parse(res.data.disabled_qrs) : res.data.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
+      } catch (error) {
+        console.error("Error al obtener config granular", error);
+      }
+    };
+    
+    fetchConfig();
+
+    const handleConfigUpdate = (updates) => {
+      if (updates) {
+        if (updates.qr_service_active !== undefined) {
+          setGlobalQrActive(updates.qr_service_active !== 'false');
+        }
+        if (updates.disabled_qrs !== undefined) {
+          const parsed = typeof updates.disabled_qrs === 'string' ? JSON.parse(updates.disabled_qrs) : updates.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
+      }
+    };
+
+    socket.on('config:update', handleConfigUpdate);
+    socket.on('qr:status_changed', (status) => setGlobalQrActive(status));
+    
+    return () => {
+      socket.off('config:update', handleConfigUpdate);
+      socket.off('qr:status_changed');
+    };
+  }, []);
 
   useEffect(() => {
     fetchSummary();
@@ -150,7 +194,7 @@ export const MesasPage = ({ globalScroll }) => {
 
   if (isLoading) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -169,6 +213,7 @@ export const MesasPage = ({ globalScroll }) => {
   }
 
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
+  const isLlevarDisabled = !globalQrActive || disabledQrs.includes('llevar');
 
   return (
     <motion.div 
@@ -178,7 +223,6 @@ export const MesasPage = ({ globalScroll }) => {
       className={`flex flex-col flex-1 w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-full' : 'h-full overflow-hidden'}`}
     >
       
-      {/* NOTIFICACIONES NATIVAS NEO-BENTO CORREGIDAS (Añadido soporte a 'warning') */}
       <AnimatePresence>
         {toastMessage && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -239,9 +283,35 @@ export const MesasPage = ({ globalScroll }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {mesasSalon.map(mesa => (
-                    <MesaCard key={mesa.id} mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
-                  ))}
+                  {mesasSalon.map(mesa => {
+                    const isMesaDisabled = !globalQrActive || disabledQrs.includes(`mesa-${mesa.number}`);
+                    const isEmpty = mesa.estado !== 'ocupada'; 
+                    // 🚀 BLOQUEO: Solo bloqueamos si la mesa está vacía y además está apagada.
+                    const isBlocked = isMesaDisabled && isEmpty;
+
+                    return (
+                      <div key={mesa.id} className="relative group">
+                        <div className={isBlocked ? 'opacity-60 pointer-events-none grayscale-[40%]' : ''}>
+                          <MesaCard mesa={mesa} onClick={() => {
+                            if (isBlocked) return;
+                            setSelectedMesa(mesa);
+                          }} />
+                        </div>
+                        
+                        {/* SELLO NEO-BENTO DE MESA PAUSADA PARA EL MESERO */}
+                        {isBlocked && (
+                          <div 
+                            className="absolute inset-0 z-10 flex items-center justify-center cursor-not-allowed"
+                            onClick={() => showToast(`Mesa ${mesa.number} está temporalmente fuera de servicio.`, 'warning')}
+                          >
+                             <div className="bg-red-500/90 dark:bg-red-600/90 backdrop-blur-sm text-white text-[11px] font-black tracking-widest uppercase px-4 py-1.5 rounded-full shadow-lg border border-red-400/50 transform -rotate-6">
+                               Pausada
+                             </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </motion.div>
@@ -254,12 +324,26 @@ export const MesasPage = ({ globalScroll }) => {
                   <ShoppingBag className="text-gray-400" size={20} />
                   <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Cuentas Para Llevar</h3>
                 </div>
-                <button 
-                  onClick={() => setShowLlevarModal(true)}
-                  className="flex items-center justify-center gap-1.5 bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface px-4 py-2 rounded-xl text-xs font-bold uppercase active:scale-95 transition-transform shadow-sm hover:shadow-md"
+                
+                {/* 🚀 BOTÓN NUEVA CUENTA (LLEVAR) - BLINDADO */}
+                <motion.button 
+                  whileTap={!isLlevarDisabled ? { scale: 0.95 } : {}}
+                  onClick={() => {
+                    if (isLlevarDisabled) {
+                      showToast('El servicio Para Llevar está pausado. No se pueden crear nuevas cuentas.', 'warning');
+                      return;
+                    }
+                    setShowLlevarModal(true);
+                  }}
+                  className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase transition-transform shadow-sm outline-none select-none ${
+                    isLlevarDisabled 
+                      ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface active:scale-95 md:hover:shadow-md'
+                  }`}
                 >
-                  <Plus size={14} /> Nueva Cuenta
-                </button>
+                  {isLlevarDisabled ? <PowerOff size={14} className="pointer-events-none"/> : <Plus size={14} className="pointer-events-none"/>} 
+                  <span className="pointer-events-none">{isLlevarDisabled ? 'Pausado' : 'Nueva Cuenta'}</span>
+                </motion.button>
               </div>
 
               {mesasLlevar.length === 0 ? (

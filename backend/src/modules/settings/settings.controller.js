@@ -40,8 +40,8 @@ export const updateConfig = async (req, res) => {
     for (const [key, value] of Object.entries(updates)) {
       let valueToSave = value;
       
-      // Aseguramos que objetos y arreglos se guarden como string JSON
-      if (key === 'bank_accounts' || key === 'printer_config' || key === 'barcode_config' || typeof value === 'object') {
+      // Aseguramos que objetos y arreglos se guarden como string JSON (Añadimos disabled_qrs)
+      if (key === 'bank_accounts' || key === 'printer_config' || key === 'barcode_config' || key === 'disabled_qrs' || typeof value === 'object') {
         valueToSave = JSON.stringify(value);
       }
       
@@ -49,6 +49,12 @@ export const updateConfig = async (req, res) => {
         key, 
         value: String(valueToSave) 
       });
+    }
+
+    // 🚀 INYECCIÓN TIEMPO REAL: Emitimos cualquier actualización genérica al socket
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('config:update', updates);
     }
 
     res.json({ message: "Configuración guardada exitosamente" });

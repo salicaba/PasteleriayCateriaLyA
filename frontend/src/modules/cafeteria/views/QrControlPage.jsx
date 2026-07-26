@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/QrControlPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, Trash2, Smartphone, 
@@ -9,6 +9,10 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 import { ToastNotification } from './components/ToastNotification';
+
+// 🚀 INYECCIONES PARA EL CONTROL GRANULAR EN TIEMPO REAL
+import client from '../../../api/client';
+import { socket } from '../../../api/socket';
 
 export const QrControlPage = () => {
   const { 
@@ -29,9 +33,74 @@ export const QrControlPage = () => {
 
   const [localToast, setLocalToast] = useState({ message: '', type: '' });
 
+  // 🚀 ESTADOS DEL CONTROL GRANULAR (MESAS APAGADAS)
+  const [disabledQrs, setDisabledQrs] = useState([]);
+  const [isTogglingLocal, setIsTogglingLocal] = useState(null);
+
   const showLocalToast = (message, type = 'success') => {
     setLocalToast({ message, type });
     setTimeout(() => setLocalToast({ message: '', type: '' }), 4000);
+  };
+
+  // 🚀 CEREBRO DE ESTADO GRANULAR: Sincronización en tiempo real
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await client.get('/settings/config');
+        if (res.data.disabled_qrs) {
+          const parsed = typeof res.data.disabled_qrs === 'string' ? JSON.parse(res.data.disabled_qrs) : res.data.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
+      } catch (error) {
+        console.error("Error al obtener config granular", error);
+      }
+    };
+    fetchConfig();
+
+    const handleConfigUpdate = (updates) => {
+      if (updates && updates.disabled_qrs !== undefined) {
+        const parsed = typeof updates.disabled_qrs === 'string' ? JSON.parse(updates.disabled_qrs) : updates.disabled_qrs;
+        setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+      }
+    };
+
+    socket.on('config:update', handleConfigUpdate);
+    return () => socket.off('config:update', handleConfigUpdate);
+  }, []);
+
+  // 🚀 FUNCIÓN POKA-YOKE PARA APAGAR/ENCENDER QR INDIVIDUAL
+  const toggleGranularQr = async (identifier) => {
+    setIsTogglingLocal(identifier);
+    try {
+      const isCurrentlyDisabled = disabledQrs.includes(identifier);
+      let newDisabledList;
+      
+      if (isCurrentlyDisabled) {
+        newDisabledList = disabledQrs.filter(id => id !== identifier);
+      } else {
+        newDisabledList = [...disabledQrs, identifier];
+      }
+      
+      // Guardamos en la base de datos (y el backend disparará el socket)
+      await client.post('/settings/config', { disabled_qrs: newDisabledList });
+      
+      // Actualización optimista
+      setDisabledQrs(newDisabledList);
+      
+      const isMesa = identifier.startsWith('mesa-');
+      const nombreServicio = isMesa ? `Mesa ${identifier.split('-')[1]}` : 'Para Llevar';
+      
+      showLocalToast(
+        isCurrentlyDisabled 
+          ? `Servicio reactivado en ${nombreServicio}` 
+          : `Servicio suspendido en ${nombreServicio}`, 
+        'success'
+      );
+    } catch (error) {
+      showLocalToast('Error de conexión al modificar el estado', 'error');
+    } finally {
+      setIsTogglingLocal(null);
+    }
   };
 
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
@@ -39,7 +108,6 @@ export const QrControlPage = () => {
   const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); 
 
   const handleOpenPrintModal = () => {
-    // Por defecto, preseleccionamos todos
     setSelectedToPrint(['llevar', ...mesas.map(m => m.id)]);
     setShowPrintModal(true);
   };
@@ -54,9 +122,9 @@ export const QrControlPage = () => {
 
   const toggleAllPrintSelection = () => {
     if (selectedToPrint.length === mesas.length + 1) {
-      setSelectedToPrint([]); // Deseleccionar todos
+      setSelectedToPrint([]); 
     } else {
-      setSelectedToPrint(['llevar', ...mesas.map(m => m.id)]); // Seleccionar todos
+      setSelectedToPrint(['llevar', ...mesas.map(m => m.id)]); 
     }
   };
 
@@ -64,7 +132,6 @@ export const QrControlPage = () => {
     if (isPrinting || selectedToPrint.length === 0) return;
     setIsPrinting(true);
     try {
-      // Pequeño delay para que React renderice los cambios antes de bloquear el hilo con window.print()
       await new Promise(resolve => setTimeout(resolve, 300));
       window.print();
       setShowPrintModal(false);
@@ -78,7 +145,7 @@ export const QrControlPage = () => {
 
   if (isPageLoading) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -105,7 +172,6 @@ export const QrControlPage = () => {
     >
       <ToastNotification message={activeMessage} type={activeType} />
 
-      {/* ESTILOS EXCLUSIVOS PARA IMPRESIÓN MASIVA NEO-BENTO (BLINDADOS) */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { margin: 1cm; size: A4 portrait; }
@@ -117,21 +183,15 @@ export const QrControlPage = () => {
             overflow: visible !important;
             height: auto !important;
           }
-          /* Ocultar interfaz del sistema */
           .no-print, header, nav, aside { display: none !important; }
-          /* Forzar impresión de bordes y sombras si es necesario */
           * {
             box-shadow: none !important;
           }
         }
       `}} />
 
-      {/* ========================================== */}
-      {/* GRID DE IMPRESIÓN OCULTO (MASIVO)          */}
-      {/* ========================================== */}
+      {/* GRID DE IMPRESIÓN OCULTO */}
       <div className="hidden print:grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-[21cm] mx-auto pb-10 print:!bg-white">
-        
-        {/* Etiqueta Pública / Mostrador (Solo si está seleccionada) */}
         {selectedToPrint.includes('llevar') && (
           <div className="flex flex-col items-center text-center p-6 border-2 border-dashed border-gray-400 rounded-3xl break-inside-avoid shadow-none !bg-white !text-black">
             <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mostrador 𝓛𝔂𝓪</h2>
@@ -150,7 +210,6 @@ export const QrControlPage = () => {
           </div>
         )}
 
-        {/* Etiquetas de Mesas (Solo las seleccionadas) */}
         {mesas.filter(m => selectedToPrint.includes(m.id)).map((mesa) => (
           <div key={mesa.id} className="flex flex-col items-center text-center p-6 border-2 border-dashed border-gray-400 rounded-3xl break-inside-avoid shadow-none !bg-white !text-black">
             <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mesa {mesa.number}</h2>
@@ -169,10 +228,7 @@ export const QrControlPage = () => {
           </div>
         ))}
       </div>
-      {/* FIN DEL GRID DE IMPRESIÓN */}
 
-
-      {/* ENCABEZADO */}
       <header className="no-print flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 dark:shadow-orange-900/30 lya:shadow-lya-primary/20">
@@ -189,8 +245,6 @@ export const QrControlPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto mt-2 xl:mt-0">
-          
-          {/* BOTÓN IMPRIMIR SELECCIÓN */}
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={handleOpenPrintModal}
@@ -200,27 +254,25 @@ export const QrControlPage = () => {
             <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Imprimir QRs</span>
           </motion.button>
 
-          {/* BOTÓN KILL-SWITCH */}
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowToggleModal(true)}
             className={`flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md select-none touch-manipulation outline-none ${
               isQrActive 
                 ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text' 
-                : 'bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/50 opacity-90'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800/30'
             }`}
           >
             <div className="relative flex items-center justify-center pointer-events-none mr-1">
-              <div className={`w-3 h-3 rounded-full ${isQrActive ? 'bg-green-500 dark:bg-green-400 lya:bg-lya-secondary' : 'bg-gray-400 dark:bg-gray-600 lya:bg-lya-text/30'}`}></div>
+              <div className={`w-3 h-3 rounded-full ${isQrActive ? 'bg-green-500 dark:bg-green-400 lya:bg-lya-secondary' : 'bg-red-500'}`}></div>
               {isQrActive && <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 lya:bg-lya-secondary animate-ping opacity-75"></div>}
             </div>
-            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">{isQrActive ? 'QR Activo' : 'QR Apagado'}</span>
+            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">{isQrActive ? 'Sistema Activo' : 'Sistema Apagado'}</span>
             {isQrActive ? <Power size={18} className="opacity-50 pointer-events-none" /> : <PowerOff size={18} className="opacity-50 pointer-events-none" />}
           </motion.button>
         </div>
       </header>
 
-      {/* CONTROLES DE PESTAÑAS */}
       <div className="no-print flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0 z-10">
         <div className="flex gap-2 bg-gray-200/50 dark:bg-gray-800/80 lya:bg-lya-border/20 p-1.5 rounded-[1.25rem] overflow-x-auto shadow-inner border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 custom-scrollbar w-full md:w-auto">
           {zonas.map(zona => {
@@ -256,84 +308,127 @@ export const QrControlPage = () => {
         )}
       </div>
 
-      {/* ÁREA DE CONTENIDO (CON SCROLL INTERNO BLINDADO) */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-24 relative no-print">
         <AnimatePresence mode='wait'>
           {zonaActiva === 'salon' ? (
             <motion.div 
               key="salon" 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3, ease: "easeOut" }}
               className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 items-start auto-rows-max"
             >
               <AnimatePresence mode='popLayout'>
-                {mesas.map((mesa) => (
-                  <motion.div 
-                    key={mesa.id}
-                    layout
-                    exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                    className="w-full max-w-[320px] mx-auto md:mx-0 bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 p-6 rounded-[2rem] shadow-sm relative group overflow-hidden flex flex-col transition-all md:hover:shadow-md md:hover:-translate-y-1 md:hover:border-gray-200 dark:md:hover:border-gray-700 lya:hover:border-lya-border/50"
-                  >
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-secondary/10 p-3 rounded-2xl border border-orange-100 dark:border-orange-800/50 lya:border-lya-secondary/20 shadow-sm">
-                          <Smartphone className="w-6 h-6 text-orange-600 dark:text-orange-400 lya:text-lya-secondary" />
-                        </div>
-                        <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">Mesa {mesa.number}</h3>
-                      </div>
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setMesaToDelete(mesa)}
-                        disabled={removingId === mesa.id}
-                        className="p-2.5 text-gray-400 md:hover:text-red-500 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
-                        title="Eliminar Mesa"
-                      >
-                        <Trash2 size={18} strokeWidth={2.5} className="pointer-events-none" />
-                      </motion.button>
-                    </div>
-                    
-                    <div className="w-full bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-6 mb-5 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors shadow-inner">
-                       <QRCodeSVG 
-                         value={`${baseUrl}/m/${mesa.number}`} 
-                         size={120} 
-                         bgColor="transparent" 
-                         fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
-                         level="Q"
-                         className={`drop-shadow-sm transition-opacity duration-300 ${isQrActive ? 'opacity-90' : 'opacity-20 grayscale'}`}
-                       />
-                    </div>
-                    
-                    <div className="bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-5 md:group-hover:border-orange-300 dark:md:group-hover:border-orange-700 lya:group-hover:border-lya-secondary/50 transition-colors shadow-inner">
-                      <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
-                      <a 
-                        href={`${baseUrl}/m/${mesa.number}`} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors font-bold outline-none tracking-wide"
-                      >
-                        {displayBaseUrl}/m/{mesa.number} 
-                      </a>
-                    </div>
-                    
-                    <motion.button 
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setPreviewMesa(mesa)}
-                      className="w-full mt-auto py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 md:hover:text-orange-600 dark:text-gray-400 dark:md:hover:text-orange-400 lya:text-lya-text/80 lya:hover:text-lya-primary rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 border border-transparent md:hover:border-orange-200 dark:md:hover:border-orange-800/50 lya:hover:border-lya-primary/30 outline-none select-none"
+                {mesas.map((mesa) => {
+                  const identifier = `mesa-${mesa.number}`;
+                  const isLocallyDisabled = disabledQrs.includes(identifier);
+                  // La mesa está activa solo si el global está encendido Y no está en la lista negra
+                  const isThisMesaActive = isQrActive && !isLocallyDisabled;
+
+                  return (
+                    <motion.div 
+                      key={mesa.id}
+                      layout
+                      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                      className={`w-full max-w-[320px] mx-auto md:mx-0 border-2 p-6 rounded-[2rem] shadow-sm relative overflow-hidden flex flex-col transition-all md:hover:shadow-md md:hover:-translate-y-1 ${
+                        !isThisMesaActive 
+                          ? 'bg-gray-50/80 dark:bg-gray-900/50 lya:bg-lya-bg/50 border-red-200 dark:border-red-900/30' 
+                          : 'bg-white dark:bg-gray-900 lya:bg-lya-surface border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-200 dark:md:hover:border-gray-700 lya:hover:border-lya-border/50'
+                      }`}
                     >
-                      <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 
-                      <span className="pointer-events-none">Pantalla Completa</span>
-                    </motion.button>
-                  </motion.div>
-                ))}
+                      <div className="flex justify-between items-start mb-6 relative z-10">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-3 rounded-2xl border shadow-sm ${!isThisMesaActive ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/30' : 'bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-secondary/10 border-orange-100 dark:border-orange-800/50 lya:border-lya-secondary/20'}`}>
+                            <Smartphone className={`w-6 h-6 ${!isThisMesaActive ? 'text-red-500' : 'text-orange-600 dark:text-orange-400 lya:text-lya-secondary'}`} />
+                          </div>
+                          <h3 className={`text-xl font-black tracking-tight truncate ${!isThisMesaActive ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>
+                            Mesa {mesa.number}
+                          </h3>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          {/* 🚀 BOTÓN DE CONTROL GRANULAR */}
+                          <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => toggleGranularQr(identifier)}
+                            disabled={isTogglingLocal === identifier || !isQrActive}
+                            title={!isQrActive ? 'Sistema Global Apagado' : (isLocallyDisabled ? 'Reactivar Mesa' : 'Suspender Mesa')}
+                            className={`p-2.5 rounded-xl transition-all outline-none select-none ${
+                              !isQrActive 
+                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed opacity-50' 
+                                : isLocallyDisabled
+                                  ? 'bg-red-50 dark:bg-red-900/20 text-red-500 md:hover:bg-red-100 dark:md:hover:bg-red-900/40'
+                                  : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 md:hover:bg-emerald-100 dark:md:hover:bg-emerald-900/40 lya:bg-lya-secondary/10 lya:text-lya-secondary'
+                            }`}
+                          >
+                            {isTogglingLocal === identifier ? (
+                              <Loader2 size={18} className="animate-spin pointer-events-none"/>
+                            ) : (
+                              isLocallyDisabled ? <PowerOff size={18} className="pointer-events-none"/> : <Power size={18} className="pointer-events-none"/>
+                            )}
+                          </motion.button>
+
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setMesaToDelete(mesa)}
+                            disabled={removingId === mesa.id}
+                            className="p-2.5 text-gray-400 md:hover:text-red-500 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:text-lya-text/40 lya:hover:text-red-500 lya:hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
+                            title="Eliminar Mesa Definitivamente"
+                          >
+                            <Trash2 size={18} strokeWidth={2.5} className="pointer-events-none" />
+                          </motion.button>
+                        </div>
+                      </div>
+                      
+                      <div className="w-full bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-6 mb-5 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors shadow-inner relative overflow-hidden">
+                         <QRCodeSVG 
+                           value={`${baseUrl}/m/${mesa.number}`} 
+                           size={120} 
+                           bgColor="transparent" 
+                           fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
+                           level="Q"
+                           className={`drop-shadow-sm transition-all duration-300 ${isThisMesaActive ? 'opacity-90' : 'opacity-10 grayscale blur-[1px]'}`}
+                         />
+                         
+                         {/* 🚀 SELLO VISUAL NEO-BENTO DE MESA APAGADA */}
+                         {!isThisMesaActive && (
+                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                             <div className="bg-red-500/90 dark:bg-red-600/90 backdrop-blur-sm text-white text-[11px] font-black tracking-widest uppercase px-4 py-1.5 rounded-full shadow-lg border border-red-400/50 transform -rotate-6">
+                               {isQrActive ? 'Pausada' : 'Sistema Off'}
+                             </div>
+                           </div>
+                         )}
+                      </div>
+                      
+                      <div className={`p-3 rounded-2xl flex items-center justify-center gap-2 border mb-5 transition-colors shadow-inner ${!isThisMesaActive ? 'bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-60' : 'bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg border-gray-200 dark:border-gray-700 lya:border-lya-border/30 md:group-hover:border-orange-300'}`}>
+                        <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
+                        <a 
+                          href={`${baseUrl}/m/${mesa.number}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors font-bold outline-none tracking-wide"
+                        >
+                          {displayBaseUrl}/m/{mesa.number} 
+                        </a>
+                      </div>
+                      
+                      <motion.button 
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setPreviewMesa(mesa)}
+                        className={`w-full mt-auto py-3.5 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 border outline-none select-none ${
+                          !isThisMesaActive 
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-transparent cursor-not-allowed'
+                            : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 md:hover:text-orange-600 border-transparent md:hover:border-orange-200'
+                        }`}
+                      >
+                        <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 
+                        <span className="pointer-events-none">Pantalla Completa</span>
+                      </motion.button>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
 
               {mesas.length === 0 && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  className="col-span-full py-24 flex flex-col items-center justify-center w-full text-gray-400 lya:text-lya-text/50"
-                >
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="col-span-full py-24 flex flex-col items-center justify-center w-full text-gray-400 lya:text-lya-text/50">
                   <div className="bg-gray-100 dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-full mb-5 shadow-inner">
                     <LayoutGrid size={48} className="opacity-30" />
                   </div>
@@ -347,62 +442,104 @@ export const QrControlPage = () => {
           ) : (
             <motion.div 
               key="llevar" 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3, ease: "easeOut" }}
               className="flex justify-center pt-4 w-full"
             >
-              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-10 max-w-[400px] w-full shadow-2xl flex flex-col items-center text-center transition-all md:hover:-translate-y-1 md:hover:shadow-3xl">
-                
-                <div className="bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-secondary/10 p-5 rounded-[2rem] mb-6 shadow-sm border border-orange-100 dark:border-orange-800/50 lya:border-lya-secondary/20">
-                  <Smartphone className="w-12 h-12 text-orange-500 dark:text-orange-400 lya:text-lya-secondary" />
-                </div>
-                
-                <h2 className="text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tighter truncate w-full">Mostrador 𝓛𝔂𝓪</h2>
-                
-                <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-8 font-medium px-4 text-justify">QR único para que los clientes en fila puedan escanear el menú digital desde sus dispositivos móviles.</p>
+              {(() => {
+                const isLlevarLocallyDisabled = disabledQrs.includes('llevar');
+                const isLlevarActive = isQrActive && !isLlevarLocallyDisabled;
 
-                <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-10 mb-6 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-inner">
-                   <QRCodeSVG 
-                     value={`${baseUrl}/llevar`} 
-                     size={160} 
-                     bgColor="transparent" 
-                     fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
-                     level="Q"
-                     className={`drop-shadow-sm transition-opacity duration-300 ${isQrActive ? 'opacity-90' : 'opacity-20 grayscale'}`}
-                   />
-                </div>
+                return (
+                  <div className={`border-2 rounded-[2.5rem] p-10 max-w-[400px] w-full shadow-2xl flex flex-col items-center text-center transition-all md:hover:-translate-y-1 relative overflow-hidden ${
+                    !isLlevarActive 
+                      ? 'bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg/50 border-red-200 dark:border-red-900/30' 
+                      : 'bg-white dark:bg-gray-900 lya:bg-lya-surface border-gray-100 dark:border-gray-800 lya:border-lya-border/40 md:hover:shadow-3xl'
+                  }`}>
+                    
+                    <div className="w-full flex justify-end mb-2">
+                      {/* 🚀 BOTÓN DE CONTROL GRANULAR (PARA LLEVAR) */}
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => toggleGranularQr('llevar')}
+                        disabled={isTogglingLocal === 'llevar' || !isQrActive}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all outline-none select-none border shadow-sm ${
+                          !isQrActive 
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-transparent cursor-not-allowed opacity-50' 
+                            : isLlevarLocallyDisabled
+                              ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/30 md:hover:bg-red-100 dark:md:hover:bg-red-900/40'
+                              : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30 md:hover:bg-emerald-100 dark:md:hover:bg-emerald-900/40 lya:bg-lya-secondary/10 lya:text-lya-secondary lya:border-lya-secondary/20'
+                        }`}
+                      >
+                        {isTogglingLocal === 'llevar' ? (
+                          <Loader2 size={16} className="animate-spin pointer-events-none"/>
+                        ) : (
+                          isLlevarLocallyDisabled ? <PowerOff size={16} className="pointer-events-none"/> : <Power size={16} className="pointer-events-none"/>
+                        )}
+                        <span className="pointer-events-none">{isLlevarLocallyDisabled ? 'Reactivar' : 'Pausar'}</span>
+                      </motion.button>
+                    </div>
 
-                <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-4 w-full rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 mb-8 shadow-sm">
-                  <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
-                  <a 
-                    href={`${baseUrl}/llevar`} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors outline-none text-center"
-                  >
-                    {displayBaseUrl}/llevar
-                  </a>
-                </div>
+                    <div className={`p-5 rounded-[2rem] mb-6 shadow-sm border transition-colors ${!isLlevarActive ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20' : 'bg-orange-50 dark:bg-orange-900/20 lya:bg-lya-secondary/10 border-orange-100 dark:border-orange-800/50 lya:border-lya-secondary/20'}`}>
+                      <Smartphone className={`w-12 h-12 ${!isLlevarActive ? 'text-red-500' : 'text-orange-500 dark:text-orange-400 lya:text-lya-secondary'}`} />
+                    </div>
+                    
+                    <h2 className={`text-3xl font-black mb-2 tracking-tighter truncate w-full ${!isLlevarActive ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>Mostrador 𝓛𝔂𝓪</h2>
+                    
+                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-8 font-medium px-4 text-justify">QR único para que los clientes en fila puedan escanear el menú digital desde sus dispositivos móviles.</p>
 
-                <motion.button 
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setPreviewMesa({ isLlevar: true })}
-                  className="w-full mt-auto py-4 bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none select-none"
-                >
-                  <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 
-                  <span className="pointer-events-none">Pantalla Completa</span>
-                </motion.button>
-              </div>
+                    <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-10 mb-6 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-inner relative overflow-hidden">
+                       <QRCodeSVG 
+                         value={`${baseUrl}/llevar`} 
+                         size={160} 
+                         bgColor="transparent" 
+                         fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
+                         level="Q"
+                         className={`drop-shadow-sm transition-all duration-300 ${isLlevarActive ? 'opacity-90' : 'opacity-10 grayscale blur-[1px]'}`}
+                       />
+                       
+                       {!isLlevarActive && (
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                           <div className="bg-red-500/90 dark:bg-red-600/90 backdrop-blur-sm text-white text-[12px] font-black tracking-widest uppercase px-5 py-2 rounded-full shadow-lg border border-red-400/50 transform -rotate-6">
+                             {isQrActive ? 'Pausado' : 'Sistema Off'}
+                           </div>
+                         </div>
+                       )}
+                    </div>
+
+                    <div className={`p-4 w-full rounded-2xl flex items-center justify-center gap-2 border mb-8 shadow-sm transition-colors ${!isLlevarActive ? 'bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-60' : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface border-gray-200 dark:border-gray-700 lya:border-lya-border/30'}`}>
+                      <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
+                      <a 
+                        href={`${baseUrl}/llevar`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors outline-none text-center"
+                      >
+                        {displayBaseUrl}/llevar
+                      </a>
+                    </div>
+
+                    <motion.button 
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setPreviewMesa({ isLlevar: true })}
+                      disabled={!isLlevarActive}
+                      className={`w-full mt-auto py-4 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg outline-none select-none ${
+                        !isLlevarActive 
+                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 shadow-none cursor-not-allowed'
+                          : 'bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface shadow-orange-500/30'
+                      }`}
+                    >
+                      <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 
+                      <span className="pointer-events-none">Pantalla Completa</span>
+                    </motion.button>
+                  </div>
+                );
+              })()}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* ========================================== */}
-      {/* MODAL DE SELECCIÓN DE IMPRESIÓN (NUEVO) */}
-      {/* ========================================== */}
+      {/* MODAL DE SELECCIÓN DE IMPRESIÓN */}
       <AnimatePresence>
         {showPrintModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">
@@ -451,9 +588,7 @@ export const QrControlPage = () => {
                 </button>
               </div>
 
-              {/* Lista Scrolleable */}
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 mb-6 min-h-[200px]">
-                {/* Mostrador */}
                 <motion.div 
                   whileTap={{ scale: 0.98 }}
                   onClick={() => togglePrintSelection('llevar')}
@@ -469,7 +604,6 @@ export const QrControlPage = () => {
                     : <Square className="text-gray-300 dark:text-gray-600 lya:text-lya-border" />}
                 </motion.div>
 
-                {/* Mesas */}
                 {mesas.map(mesa => (
                   <motion.div 
                     key={mesa.id}
@@ -512,9 +646,7 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-      {/* ========================================== */}
       {/* MODAL DE PANTALLA COMPLETA (PREVIEW) */}
-      {/* ========================================== */}
       <AnimatePresence>
         {previewMesa && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 no-print">
@@ -546,14 +678,14 @@ export const QrControlPage = () => {
                 {previewMesa.isLlevar ? 'Mostrador 𝓛𝔂𝓪' : `Mesa ${previewMesa.number}`}
               </h2>
 
-              <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full">
+              <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
                 <QRCodeSVG 
                    value={previewMesa.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa.number}`} 
                    size={220} 
                    bgColor="transparent" 
                    fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
                    level="Q"
-                   className={`transition-opacity duration-300 ${isQrActive ? 'opacity-90' : 'opacity-20 grayscale'}`}
+                   className={`transition-opacity duration-300 ${isQrActive && !disabledQrs.includes(previewMesa.isLlevar ? 'llevar' : `mesa-${previewMesa.number}`) ? 'opacity-90' : 'opacity-20 grayscale blur-[2px]'}`}
                 />
               </div>
 
@@ -568,9 +700,7 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-      {/* ========================================== */}
-      {/* MODAL ORIGINAL: CONFIRMAR KILL-SWITCH */}
-      {/* ========================================== */}
+      {/* MODAL ORIGINAL: CONFIRMAR KILL-SWITCH GLOBAL */}
       <AnimatePresence>
         {showToggleModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">
@@ -653,9 +783,7 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-      {/* ========================================== */}
       {/* MODAL ORIGINAL: ELIMINAR MESA */}
-      {/* ========================================== */}
       <AnimatePresence>
         {mesaToDelete && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">

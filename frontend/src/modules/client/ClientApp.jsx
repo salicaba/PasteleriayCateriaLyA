@@ -110,11 +110,13 @@ export default function ClientApp({ type }) {
       
       <ClientConnectionShield>
         
-        {/* 🚀 EL ESCUDO VERDUGO: Tiene la capacidad de destruir la sesión */}
+        {/* 🚀 EL ESCUDO VERDUGO CON CONTEXTO GRANULAR */}
         <ClientServiceShield 
           activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
           hasActiveSession={!!clientData}
           onForceLogout={handleClientLogout}
+          type={type}       // Le pasamos si es 'mesa' o 'llevar'
+          tableId={tableId} // Le pasamos el número de mesa (si aplica)
         />
 
         <Toaster position="top-center" />
