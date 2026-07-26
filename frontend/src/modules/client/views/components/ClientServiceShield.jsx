@@ -16,7 +16,7 @@ export const ClientServiceShield = ({
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await client.get('/settings/config'); // Obtenemos toda la config global
+      const res = await client.get('/settings'); // Usamos la raíz
       const data = res.data;
       
       // Verificamos el estado global

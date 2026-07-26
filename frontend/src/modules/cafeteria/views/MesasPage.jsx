@@ -70,7 +70,7 @@ export const MesasPage = ({ globalScroll }) => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const res = await client.get('/settings/config');
+        const res = await client.get('/settings'); // Usamos la raíz
         if (res.data.qr_service_active !== undefined) {
           setGlobalQrActive(res.data.qr_service_active !== 'false');
         }

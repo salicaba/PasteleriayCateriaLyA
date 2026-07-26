@@ -46,7 +46,7 @@ export const QrControlPage = () => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const res = await client.get('/settings/config');
+        const res = await client.get('/settings'); // Usamos la raíz
         if (res.data.disabled_qrs) {
           const parsed = typeof res.data.disabled_qrs === 'string' ? JSON.parse(res.data.disabled_qrs) : res.data.disabled_qrs;
           setDisabledQrs(Array.isArray(parsed) ? parsed : []);
@@ -81,8 +81,8 @@ export const QrControlPage = () => {
         newDisabledList = [...disabledQrs, identifier];
       }
       
-      // Guardamos en la base de datos (y el backend disparará el socket)
-      await client.post('/settings/config', { disabled_qrs: newDisabledList });
+      // Guardamos en la base de datos (Usando PUT como dicta tu router)
+      await client.put('/settings', { disabled_qrs: newDisabledList });
       
       // Actualización optimista
       setDisabledQrs(newDisabledList);
