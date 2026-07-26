@@ -104,8 +104,11 @@ export const QrControlPage = () => {
   };
 
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
-  const baseUrl = window.location.origin;
-  const displayBaseUrl = baseUrl.replace(/^https?:\/\//, ''); 
+  
+  // 🚀 CEREBRO DIVISOR: Usa el dominio de clientes de Vercel, si no existe usa el actual (localhost)
+  const baseUrl = import.meta.env.VITE_CLIENT_URL || window.location.origin;
+  
+  const displayBaseUrl = baseUrl.replace(/^https?:\/\//, '');
 
   const handleOpenPrintModal = () => {
     setSelectedToPrint(['llevar', ...mesas.map(m => m.id)]);

@@ -199,7 +199,7 @@ export default function ClientApp({ type }) {
               /* PANTALLA GRID PWA (Sin necesidad de QR físico) */
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
                 <header className="mb-8 mt-4 text-center">
-                  <h1 className="text-2xl font-black mb-1">Bienvenido a LyA</h1>
+                  <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
                 </header>
 
