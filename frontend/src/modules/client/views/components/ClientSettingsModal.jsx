@@ -1,8 +1,8 @@
-// src/modules/client/views/components/ClientSettingsModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Palette, Type, LogOut, Maximize, Minimize } from 'lucide-react';
 import { THEME_NAMES, SIZES } from '../utils/clientMenuUtils';
+import { usePWA } from '../../../../hooks/usePWA'; // 🔥 Inyectamos el cerebro de la PWA
 
 export default function ClientSettingsModal({
   themeIndex,
@@ -13,6 +13,9 @@ export default function ClientSettingsModal({
   onLogoutClick,
   showLogout = true // 🔥 Controla si se muestra el botón de Abandonar Mesa
 }) {
+  // 🔥 Evaluamos si estamos en la app instalada
+  const { isStandalone } = usePWA(); 
+
   // 🔥 SOLUCIÓN AQUÍ: En lugar de iniciar en false, revisa cómo está la pantalla al abrirse
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
 
@@ -65,14 +68,16 @@ export default function ClientSettingsModal({
             <span className="text-xs font-black bg-white dark:bg-gray-700 lya:bg-lya-bg px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 text-gray-700 dark:text-gray-200 lya:text-lya-text shadow-sm">{SIZES[sizeIndex].name}</span>
           </motion.button>
 
-          {/* BOTÓN PANTALLA COMPLETA */}
-          <motion.button whileTap={{ scale: 0.95 }} onClick={toggleFullscreen} className="w-full flex items-center justify-between p-4 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-surface border border-gray-200/60 dark:border-gray-700/60 lya:border-lya-border/40 md:hover:border-orange-500/50 transition-colors group shadow-sm outline-none">
-            <div className="flex items-center gap-3 text-gray-800 dark:text-gray-200 lya:text-lya-text">
-              {isFullscreen ? <Minimize size={20} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary transition-transform md:group-hover:scale-110" /> : <Maximize size={20} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary transition-transform md:group-hover:scale-110" />}
-              <span className="font-bold text-sm">Pantalla</span>
-            </div>
-            <span className="text-xs font-black bg-white dark:bg-gray-700 lya:bg-lya-bg px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 text-gray-700 dark:text-gray-200 lya:text-lya-text shadow-sm">{isFullscreen ? 'Min' : 'Max'}</span>
-          </motion.button>
+          {/* 🔥 BOTÓN PANTALLA COMPLETA PROTEGIDO (Sólo visible si NO es app instalada) */}
+          {!isStandalone && (
+            <motion.button whileTap={{ scale: 0.95 }} onClick={toggleFullscreen} className="w-full flex items-center justify-between p-4 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 lya:bg-lya-surface border border-gray-200/60 dark:border-gray-700/60 lya:border-lya-border/40 md:hover:border-orange-500/50 transition-colors group shadow-sm outline-none">
+              <div className="flex items-center gap-3 text-gray-800 dark:text-gray-200 lya:text-lya-text">
+                {isFullscreen ? <Minimize size={20} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary transition-transform md:group-hover:scale-110" /> : <Maximize size={20} className="text-orange-500 dark:text-orange-400 lya:text-lya-secondary transition-transform md:group-hover:scale-110" />}
+                <span className="font-bold text-sm">Pantalla</span>
+              </div>
+              <span className="text-xs font-black bg-white dark:bg-gray-700 lya:bg-lya-bg px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 lya:border-lya-border/30 text-gray-700 dark:text-gray-200 lya:text-lya-text shadow-sm">{isFullscreen ? 'Min' : 'Max'}</span>
+            </motion.button>
+          )}
         </div>
 
         {/* BOTÓN ABANDONAR MESA: Solo se muestra si showLogout es true */}

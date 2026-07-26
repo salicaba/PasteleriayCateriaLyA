@@ -1,10 +1,12 @@
-// src/modules/admin/views/settings-tabs/InterfaceTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Palette, Monitor, Maximize, Minimize, Layout, Save, Loader2, Pin, ArrowUpDown } from 'lucide-react';
 import { ThemeSelector } from '../../../../components/ThemeSelector';
+import { usePWA } from '../../../../hooks/usePWA'; // 🔥 Importamos el cerebro de la PWA
 
 export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll, showNotification }) => {
+  const { isStandalone } = usePWA(); // 🔥 Instanciamos el detector de entorno PWA
+  
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -141,20 +143,24 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
             </div>
             
             <div className="space-y-8 flex-1">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
-                  Expande el sistema a Pantalla Completa para obtener una experiencia inmersiva libre de distracciones del navegador.
-                </p>
-                <button 
-                  onClick={toggleFullscreen} 
-                  className="w-full py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 active:scale-95 border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-sm shadow-sm"
-                >
-                  {isFullscreen ? <Minimize size={20}/> : <Maximize size={20}/>} 
-                  {isFullscreen ? 'Contraer Pantalla' : 'Expandir Pantalla'}
-                </button>
-              </div>
+              
+              {/* 🔥 BOTÓN Y TEXTO DE PANTALLA COMPLETA PROTEGIDOS */}
+              {!isStandalone && (
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
+                    Expande el sistema a Pantalla Completa para obtener una experiencia inmersiva libre de distracciones del navegador.
+                  </p>
+                  <button 
+                    onClick={toggleFullscreen} 
+                    className="w-full py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text font-bold rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 active:scale-95 border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-sm shadow-sm"
+                  >
+                    {isFullscreen ? <Minimize size={20}/> : <Maximize size={20}/>} 
+                    {isFullscreen ? 'Contraer Pantalla' : 'Expandir Pantalla'}
+                  </button>
+                </div>
+              )}
 
-              <div className="pt-6 border-t border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
+              <div className={`pt-6 border-t border-gray-50 dark:border-gray-700 lya:border-lya-border/20 ${!isStandalone ? '' : 'border-t-0 pt-0'}`}>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
                   Libera el scroll global para ocultar encabezados al bajar. Recomendado para maximizar el área de visión en móviles.
                 </p>
