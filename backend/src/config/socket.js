@@ -4,11 +4,12 @@ let io;
 
 export const initSocket = (server) => {
   const allowedOrigins = [
-    process.env.FRONTEND_URL, 
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:4173'   // 🔥 AGREGAMOS EL PUERTO DE PREVIEW PWA
-  ];
+  process.env.FRONTEND_URL, 
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'https://pasteleriay-cateria-ly-a-q2rr.vercel.app' // 🔥 Agregamos la nueva PWA Cliente
+];
 
   io = new Server(server, {
     cors: {

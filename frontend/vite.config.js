@@ -2,6 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Vercel inyectará esta variable. Si no existe (como en tu local), será 'admin' por defecto.
+const appType = process.env.VITE_APP_TYPE || 'admin'; 
+
+const pwaName = appType === 'client' ? 'Menú LyA' : 'Sistema LyA';
+const pwaShortName = appType === 'client' ? 'Menú LyA' : 'POS LyA';
+
 export default defineConfig({
   plugins: [
     react(),
@@ -9,22 +15,22 @@ export default defineConfig({
       registerType: 'autoUpdate', 
       includeAssets: ['favicon.png', 'logo.jpeg'],
       manifest: {
-        name: 'Ecosistema Lya', // 🔥 Nombre completo (se ve al instalar)
-        short_name: 'App Lya',  // 🔥 Nombre corto (se ve debajo del ícono en el celular)
-        description: 'Punto de Venta y Menú Digital Inteligente',
+        name: pwaName,           // 🔥 Nombre dinámico
+        short_name: pwaShortName, // 🔥 Nombre corto dinámico
+        description: 'Ecosistema Inteligente LyA',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone', 
         orientation: 'portrait',
         icons: [
           {
-            src: '/logo.jpeg', // 🔥 Asegúrate de que tenga el '/' al inicio
+            src: '/logo.jpeg',
             sizes: '192x192',
             type: 'image/jpeg',
             purpose: 'any maskable'
           },
           {
-            src: '/logo.jpeg', // 🔥 Asegúrate de que tenga el '/' al inicio
+            src: '/logo.jpeg',
             sizes: '512x512',
             type: 'image/jpeg',
             purpose: 'any maskable'
@@ -33,7 +39,6 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpeg}'],
-        // 🔥 SOLUCIÓN: Elevamos el límite de caché a 5 MB (5242880 bytes)
         maximumFileSizeToCacheInBytes: 5242880 
       }
     })

@@ -18,10 +18,11 @@ const app = express();
 
 // --- NUEVA CONFIGURACIÓN CORS PARA PRODUCCIÓN ---
 const allowedOrigins = [
-  process.env.FRONTEND_URL, // Tu futura URL de Vercel
-  'http://localhost:5173',  // Entorno local Vite
+  process.env.FRONTEND_URL, 
+  'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://localhost:4173'   // 🔥 AGREGAMOS EL PUERTO DE PREVIEW PWA
+  'http://localhost:4173',
+  'https://pasteleriay-cateria-ly-a-q2rr.vercel.app' // 🔥 Agregamos la nueva PWA Cliente
 ];
 
 app.use(cors({
