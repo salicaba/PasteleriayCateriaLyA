@@ -5,6 +5,12 @@ import './index.css'
 import App from './App.jsx'
 import ClientApp from './modules/client/ClientApp.jsx'
 
+// 🔥 1. IMPORTAMOS EL MOTOR DE REGISTRO DEL SERVICE WORKER
+import { registerSW } from 'virtual:pwa-register'
+
+// 🔥 2. FORZAMOS EL REGISTRO INMEDIATO PARA ACTIVAR LA PWA
+registerSW({ immediate: true })
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>

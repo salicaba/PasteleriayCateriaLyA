@@ -18,13 +18,13 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: 'logo.jpeg',
+            src: '/logo.jpeg', // 🔥 Asegúrate de que tenga el '/' al inicio
             sizes: '192x192',
             type: 'image/jpeg',
             purpose: 'any maskable'
           },
           {
-            src: 'logo.jpeg',
+            src: '/logo.jpeg', // 🔥 Asegúrate de que tenga el '/' al inicio
             sizes: '512x512',
             type: 'image/jpeg',
             purpose: 'any maskable'
