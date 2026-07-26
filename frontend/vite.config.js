@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate', // Poka-Yoke: Actualización silenciosa sin romper la sesión
+      registerType: 'autoUpdate', 
       includeAssets: ['favicon.png', 'logo.jpeg'],
       manifest: {
         name: 'Pastelería y Cafetería Lya',
@@ -14,7 +14,7 @@ export default defineConfig({
         description: 'Menú digital inteligente y sistema de pedidos de LyA',
         theme_color: '#ffffff',
         background_color: '#ffffff',
-        display: 'standalone', // Obliga a ocultar la UI del navegador
+        display: 'standalone', 
         orientation: 'portrait',
         icons: [
           {
@@ -32,8 +32,9 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // Blindaje de cache para assets estáticos
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpeg}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpeg}'],
+        // 🔥 SOLUCIÓN: Elevamos el límite de caché a 5 MB (5242880 bytes)
+        maximumFileSizeToCacheInBytes: 5242880 
       }
     })
   ],
