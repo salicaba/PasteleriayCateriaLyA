@@ -1,9 +1,11 @@
-// src/App.jsx
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2 } from 'lucide-react';
+// 🔥 Agregamos el ícono Download
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
+// 🔥 Importamos el Cerebro PWA
+import { usePWA } from './hooks/usePWA';
 
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
@@ -35,6 +37,9 @@ const getInitials = (name) => {
 };
 
 function App() {
+  // 🔥 Extraemos el estado PWA
+  const { isInstallable, promptInstall, isStandalone } = usePWA();
+
   const [user, setUser] = useState(() => {
     const savedSession = localStorage.getItem('lya_pos_session');
     if (savedSession) {
@@ -445,7 +450,20 @@ function App() {
                 })}
               </nav>
 
-              <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-5">
+              <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-3">
+                
+                {/* 🔥 BOTÓN DE INSTALACIÓN PWA (Auto-ocultable) */}
+                {!isStandalone && isInstallable && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={promptInstall}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 transition-colors text-sm font-bold outline-none shadow-md"
+                  >
+                    <Download size={16} />
+                    Instalar App
+                  </motion.button>
+                )}
+
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowLogoutModal(true)}
