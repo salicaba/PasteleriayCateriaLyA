@@ -20,7 +20,8 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL, // Tu futura URL de Vercel
   'http://localhost:5173',  // Entorno local Vite
-  'http://127.0.0.1:5173'
+  'http://127.0.0.1:5173',
+  'http://localhost:4173'   // 🔥 AGREGAMOS EL PUERTO DE PREVIEW PWA
 ];
 
 app.use(cors({
