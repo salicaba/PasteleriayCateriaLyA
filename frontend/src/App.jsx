@@ -6,6 +6,8 @@ import { Toaster, toast } from 'react-hot-toast';
 import { useTheme } from './hooks/useTheme';
 // 🔥 Importamos el Cerebro PWA
 import { usePWA } from './hooks/usePWA';
+// 🔥 NUEVO: Importamos useNavigate para la redirección inteligente
+import { useNavigate } from 'react-router-dom';
 
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
@@ -39,6 +41,14 @@ const getInitials = (name) => {
 function App() {
   // 🔥 Extraemos el estado PWA
   const { isInstallable, promptInstall, isStandalone } = usePWA();
+  const navigate = useNavigate(); // 🔥 Inyectamos el hook de navegación
+
+  // 🔥 NUEVO: Redirección automática si la PWA instalada es la del Cliente
+  useEffect(() => {
+    if (isStandalone && localStorage.getItem('lya_pwa_mode') === 'client') {
+      navigate('/kiosko', { replace: true });
+    }
+  }, [isStandalone, navigate]);
 
   const [user, setUser] = useState(() => {
     const savedSession = localStorage.getItem('lya_pos_session');
@@ -452,11 +462,14 @@ function App() {
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-3">
                 
-                {/* 🔥 BOTÓN DE INSTALACIÓN PWA (Auto-ocultable) */}
+                {/* 🔥 BOTÓN DE INSTALACIÓN PWA (Auto-ocultable) con guardado de modo Admin */}
                 {!isStandalone && isInstallable && (
                   <motion.button
                     whileTap={{ scale: 0.95 }}
-                    onClick={promptInstall}
+                    onClick={() => {
+                      localStorage.setItem('lya_pwa_mode', 'admin'); // 🔥 Marcamos como Admin
+                      promptInstall();
+                    }}
                     className="w-full flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 transition-colors text-sm font-bold outline-none shadow-md"
                   >
                     <Download size={16} />

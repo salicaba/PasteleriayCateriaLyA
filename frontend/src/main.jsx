@@ -19,6 +19,9 @@ createRoot(document.getElementById('root')).render(
         <Route path="/m/:tableId" element={<ClientApp type="mesa" />} />
         <Route path="/llevar" element={<ClientApp type="llevar" />} />
         
+        {/* 🔥 NUEVO: Ruta dedicada para la App PWA Instalada del Cliente */}
+        <Route path="/kiosko" element={<ClientApp type="kiosko" />} />
+        
         {/* Sistema POS Administrativo (Fallback y Raíz) */}
         <Route path="/*" element={<App />} />
       </Routes>

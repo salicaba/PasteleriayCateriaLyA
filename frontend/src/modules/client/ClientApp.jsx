@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, Download, MonitorSmartphone, Utensils, Coffee, Loader2 } from 'lucide-react';
+// 🔥 Agregamos ArrowLeft
+import { QrCode, ShieldAlert, UserCheck, Download, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -10,8 +11,10 @@ import ClientMenu from './views/ClientMenu';
 import ClientConnectionShield from './views/components/ClientConnectionShield';
 import { ClientServiceShield } from './views/components/ClientServiceShield';
 import { socket } from '../../api/socket';
+// 🔥 Importamos la instancia de Axios para traer las mesas
+import api from '../../api/client'; 
 
-// IMPORTANTE: Asegúrate de tener este hook creado (Paso 3 de la instrucción anterior)
+// IMPORTANTE: Hook PWA
 import { usePWA } from '../../hooks/usePWA';
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
@@ -38,7 +41,11 @@ export default function ClientApp({ type }) {
   
   // Estado para manejar la selección manual en la App Instalada (Standalone)
   const [standaloneSelection, setStandaloneSelection] = useState(null); // { type, tableId }
-  const [isProcessingSelection, setIsProcessingSelection] = useState(null); // Bloqueo Anti-Doble Clic (Pilar 3)
+  const [isProcessingSelection, setIsProcessingSelection] = useState(null); // Bloqueo Anti-Doble Clic
+
+  // 🔥 Estados para las Mesas Dinámicas
+  const [activeTables, setActiveTables] = useState([]);
+  const [isLoadingTables, setIsLoadingTables] = useState(false);
 
   // Variables efectivas: Priorizamos la selección standalone, luego la URL
   const effectiveType = standaloneSelection?.type || type;
@@ -64,6 +71,29 @@ export default function ClientApp({ type }) {
     const saved = localStorage.getItem('lya_client_session');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // ============================================================================
+  // CARGA DINÁMICA DE MESAS (Solo en modo App Instalada)
+  // ============================================================================
+  useEffect(() => {
+    // Si estamos en la App Nativa, no hemos seleccionado mesa, y no hay sesión activa
+    if (isStandalone && !standaloneSelection && !clientData) {
+      const fetchTables = async () => {
+        setIsLoadingTables(true);
+        try {
+          // Asegúrate de que esta sea la ruta correcta en tu backend para traer las mesas
+          const response = await api.get('/pos/tables'); 
+          const tables = response.data?.data || response.data || [];
+          setActiveTables(tables);
+        } catch (error) {
+          console.error('Error al cargar mesas dinámicas:', error);
+        } finally {
+          setIsLoadingTables(false);
+        }
+      };
+      fetchTables();
+    }
+  }, [isStandalone, standaloneSelection, clientData]);
 
   // ============================================================================
   // VALIDACIONES DE SEGURIDAD (CONTAMINACIÓN CRUZADA & QR)
@@ -97,7 +127,6 @@ export default function ClientApp({ type }) {
 
   useEffect(() => {
     // Si la App está instalada nativamente, obviamos la validación del token QR
-    // ya que el cliente entra desde la pantalla de inicio del dispositivo.
     if (isStandalone) {
       setIsQrValid(true);
       return;
@@ -138,19 +167,10 @@ export default function ClientApp({ type }) {
       // Retardo asíncrono para UX de carga (previene flickering)
       await new Promise(resolve => setTimeout(resolve, 600));
       setStandaloneSelection({ type: selectedType, tableId: selectedTableId });
-      // Si se requiere enrutamiento para sincronizar la URL:
-      // if (selectedType === 'mesa') navigate(`/m/${selectedTableId}`);
     } finally {
       setIsProcessingSelection(null);
     }
   };
-
-  // Simulación de mesas activas (En producción debes mapear esto de tu backend/sockets)
-  const activeTables = [
-    { id: '1', name: 'Mesa 1', status: 'available' },
-    { id: '2', name: 'Mesa 2', status: 'available' },
-    { id: '3', name: 'Mesa 3', status: 'occupied' }, // status: occupied bloquea la selección
-  ];
 
   // ============================================================================
   // RENDER PRINCIPAL
@@ -210,32 +230,44 @@ export default function ClientApp({ type }) {
                   {/* En Mesa */}
                   <section>
                     <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
+                    
                     <div className="grid grid-cols-2 gap-4">
-                      {activeTables.map((table) => {
-                        const isOccupied = table.status === 'occupied';
-                        const isThisProcessing = isProcessingSelection === table.id;
+                      {isLoadingTables ? (
+                        <div className="col-span-2 flex justify-center py-8">
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                        </div>
+                      ) : activeTables.length === 0 ? (
+                        <div className="col-span-2 text-center py-4 text-gray-500 text-sm">
+                          No hay mesas configuradas.
+                        </div>
+                      ) : (
+                        activeTables.map((table) => {
+                          // 🔥 Verificamos el estado (Ajusta 'occupied' u 'Ocupada' según como venga de tu DB)
+                          const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
+                          const isThisProcessing = isProcessingSelection === table.id;
 
-                        return (
-                          <motion.button
-                            key={table.id}
-                            whileTap={isOccupied || isProcessingSelection ? {} : { scale: 0.95 }}
-                            disabled={isOccupied || isProcessingSelection !== null}
-                            onClick={() => handleStandaloneSelect('mesa', table.id)}
-                            className={`relative p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border ${
-                              isOccupied
-                                ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-50'
-                                : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm md:hover:shadow-md'
-                            }`}
-                          >
-                            {isThisProcessing ? (
-                              <Loader2 className="w-7 h-7 animate-spin" />
-                            ) : (
-                              <Utensils className={`w-7 h-7 ${isOccupied ? 'opacity-40' : ''}`} />
-                            )}
-                            <span className="font-bold text-sm">{table.name}</span>
-                          </motion.button>
-                        );
-                      })}
+                          return (
+                            <motion.button
+                              key={table.id}
+                              whileTap={isOccupied || isProcessingSelection ? {} : { scale: 0.95 }}
+                              disabled={isOccupied || isProcessingSelection !== null}
+                              onClick={() => handleStandaloneSelect('mesa', table.id)}
+                              className={`relative p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border ${
+                                isOccupied
+                                  ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-50'
+                                  : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm md:hover:shadow-md'
+                              }`}
+                            >
+                              {isThisProcessing ? (
+                                <Loader2 className="w-7 h-7 animate-spin" />
+                              ) : (
+                                <Utensils className={`w-7 h-7 ${isOccupied ? 'opacity-40' : ''}`} />
+                              )}
+                              <span className="font-bold text-sm">{table.name || `Mesa ${table.number}`}</span>
+                            </motion.button>
+                          );
+                        })
+                      )}
                     </div>
                   </section>
                 </motion.div>
@@ -246,6 +278,20 @@ export default function ClientApp({ type }) {
               /* LOGIN TRADICIONAL (Ya sea escaneado por QR o seleccionado en Grid Standalone) */
               <div className="w-full flex-1 flex flex-col overflow-y-auto custom-scrollbar relative">
                 
+                {/* 🔥 BOTÓN PARA VOLVER A LA SELECCIÓN DE MESAS (Solo PWA Standalone) */}
+                {isStandalone && standaloneSelection && (
+                  <div className="px-6 pt-6 pb-0 shrink-0 w-full max-w-sm mx-auto">
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setStandaloneSelection(null)}
+                      className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-bold transition-colors"
+                    >
+                      <ArrowLeft size={18} /> 
+                      <span>Volver al inicio</span>
+                    </motion.button>
+                  </div>
+                )}
+
                 {/* PROMPT INSTALACIÓN PWA (Sólo visible en Navegador) */}
                 {!isStandalone && isInstallable && (
                   <motion.div 
@@ -263,7 +309,10 @@ export default function ClientApp({ type }) {
                     </div>
                     <motion.button
                       whileTap={{ scale: 0.95 }}
-                      onClick={promptInstall}
+                      onClick={() => {
+                        localStorage.setItem('lya_pwa_mode', 'client'); // 🔥 Etiquetamos la App como Cliente
+                        promptInstall();
+                      }}
                       className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0"
                     >
                       Instalar
