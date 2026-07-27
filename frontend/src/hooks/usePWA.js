@@ -1,3 +1,4 @@
+// frontend/src/hooks/usePWA.js
 import { useState, useEffect } from 'react';
 
 export const usePWA = () => {
@@ -18,7 +19,7 @@ export const usePWA = () => {
 
     // 2. Captura del evento de instalación del navegador
     const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
+      e.preventDefault(); // ESTO EVITA CUALQUIER RECARGA O CAMBIO DE PANTALLA NATIVO
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
@@ -40,13 +41,19 @@ export const usePWA = () => {
   }, []);
 
   const promptInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) return null;
+    
+    // Disparamos el prompt nativo
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
+    
     if (outcome === 'accepted') {
       setIsInstallable(false);
+      setDeferredPrompt(null);
     }
-    setDeferredPrompt(null);
+    
+    // Retornamos el resultado sin forzar navegación
+    return outcome;
   };
 
   return { isInstallable, promptInstall, isStandalone };

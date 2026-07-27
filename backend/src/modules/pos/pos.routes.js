@@ -13,7 +13,8 @@ import {
   checkOrderStatus // 🔥 IMPORTAMOS LA NUEVA FUNCIÓN AQUÍ
 } from './pos.orders.controller.js';
 
-import { getTables, createTable, deleteTable } from './pos.tables.controller.js';
+// 🔥 AÑADIMOS getPublicTables A LA IMPORTACIÓN
+import { getTables, createTable, deleteTable, getPublicTables } from './pos.tables.controller.js';
 import { payOrder } from './pos.payments.controller.js';
 import { printOrderTicket, shareOrderTicket } from './pos.tickets.controller.js';
 import { cancelOrderItem, cancelOrder, getDailySummary, restoreOrderItem, restoreOrder } from './pos.cancellations.controller.js';
@@ -23,6 +24,10 @@ const router = Router();
 // =========================================================================
 // 🟢 RUTAS PÚBLICAS (No necesitan token, van antes del middleware)
 // =========================================================================
+
+// 🔥 NUEVA RUTA: El Kiosko del cliente usará esto para listar las mesas sin chocar con el login
+router.get('/public/tables', getPublicTables);
+
 router.get('/ticket/:orderId', shareOrderTicket); 
 router.get('/orders/:orderId/share', shareOrderTicket); 
 

@@ -413,13 +413,15 @@ export const QrControlPage = () => {
                         </a>
                       </div>
                       
+                      {/* 🔥 FIX APLICADO: Botón Pantalla Completa naranja cuando está activo */}
                       <motion.button 
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setPreviewMesa(mesa)}
-                        className={`w-full mt-auto py-3.5 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 border outline-none select-none ${
+                        disabled={!isThisMesaActive}
+                        className={`w-full mt-auto py-3.5 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg outline-none select-none ${
                           !isThisMesaActive 
-                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-transparent cursor-not-allowed'
-                            : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:hover:bg-lya-primary/10 text-gray-600 md:hover:text-orange-600 border-transparent md:hover:border-orange-200'
+                            ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 shadow-none cursor-not-allowed border-transparent'
+                            : 'bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface shadow-orange-500/30 border-transparent'
                         }`}
                       >
                         <QrCode size={18} strokeWidth={2.5} className="pointer-events-none" /> 

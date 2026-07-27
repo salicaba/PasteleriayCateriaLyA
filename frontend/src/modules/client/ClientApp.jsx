@@ -42,6 +42,9 @@ export default function ClientApp({ type }) {
   // Estado para manejar la selección manual en la App Instalada (Standalone)
   const [standaloneSelection, setStandaloneSelection] = useState(null); // { type, tableId }
   const [isProcessingSelection, setIsProcessingSelection] = useState(null); // Bloqueo Anti-Doble Clic
+  
+  // 🔥 Bloqueo Asíncrono para la instalación de la App (Regla 3)
+  const [isInstalling, setIsInstalling] = useState(false);
 
   // 🔥 Estados para las Mesas Dinámicas
   const [activeTables, setActiveTables] = useState([]);
@@ -82,7 +85,7 @@ export default function ClientApp({ type }) {
         setIsLoadingTables(true);
         try {
           // Asegúrate de que esta sea la ruta correcta en tu backend para traer las mesas
-          const response = await api.get('/pos/tables'); 
+          const response = await api.get('/pos/public/tables'); // Ajustado a la ruta pública
           const data = response.data?.data || response.data;
           
           // 🔥 EL ESCUDO ANTI-CRASHEOS: Verificamos estrictamente que sea un Array
@@ -316,15 +319,26 @@ export default function ClientApp({ type }) {
                         <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
                       </div>
                     </div>
+                    {/* 🔥 BOTÓN DE INSTALACIÓN BLINDADO (Reglas 2, 3 y 5) */}
                     <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        localStorage.setItem('lya_pwa_mode', 'client'); // 🔥 Etiquetamos la App como Cliente
-                        promptInstall();
+                      whileTap={isInstalling ? {} : { scale: 0.95 }}
+                      disabled={isInstalling}
+                      onClick={async (e) => {
+                        e.preventDefault(); // Evita recargas y saltos
+                        setIsInstalling(true);
+                        try {
+                          localStorage.setItem('lya_pwa_mode', 'client'); // Etiquetamos la App como Cliente
+                          await promptInstall(); // Esperamos el resultado del hook
+                        } finally {
+                          setIsInstalling(false);
+                        }
                       }}
-                      className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0"
+                      className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 md:hover:opacity-90 transition-all ${
+                        isInstalling ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
                     >
-                      Instalar
+                      {isInstalling && <Loader2 className="w-3 h-3 animate-spin" />}
+                      <span>Instalar</span>
                     </motion.button>
                   </motion.div>
                 )}

@@ -6,6 +6,7 @@ import Order from './Order.model.js'; // 🔥 Añadido para poder leer las órde
 // ==========================================
 // 🪑 GESTIÓN DE MESAS (CRUD)
 // ==========================================
+
 export const getTables = async (req, res) => {
   try {
     const tables = await Table.findAll({ 
@@ -15,6 +16,22 @@ export const getTables = async (req, res) => {
     res.json(tables);
   } catch (error) { 
     res.status(500).json({ message: 'Error al obtener mesas', error: error.message }); 
+  }
+};
+
+// 🔥 NUEVA RUTA PÚBLICA: Para el Kiosko/Clientes sin requerir Token
+export const getPublicTables = async (req, res) => {
+  try {
+    const tables = await Table.findAll({
+      where: { status: 'active' },
+      // Blindaje de datos: Exponemos solo lo necesario para el Kiosko
+      attributes: ['id', 'number', 'zone', 'qrToken', 'status'], 
+      order: [['id', 'ASC']]
+    });
+    res.status(200).json(tables);
+  } catch (error) {
+    console.error('Error al obtener mesas públicas:', error);
+    res.status(500).json({ message: 'Error interno del servidor al cargar el mapa de mesas.', error: error.message });
   }
 };
 
