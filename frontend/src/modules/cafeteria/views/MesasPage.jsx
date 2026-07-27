@@ -213,7 +213,8 @@ export const MesasPage = ({ globalScroll }) => {
   }
 
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
-  const isLlevarDisabled = !globalQrActive || disabledQrs.includes('llevar');
+  // Solo visual para el empleado
+  const isLlevarPaused = !globalQrActive || disabledQrs.includes('llevar');
 
   return (
     <motion.div 
@@ -284,29 +285,20 @@ export const MesasPage = ({ globalScroll }) => {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {mesasSalon.map(mesa => {
-                    const isMesaDisabled = !globalQrActive || disabledQrs.includes(`mesa-${mesa.number}`);
-                    const isEmpty = mesa.estado !== 'ocupada'; 
-                    // 🚀 BLOQUEO: Solo bloqueamos si la mesa está vacía y además está apagada.
-                    const isBlocked = isMesaDisabled && isEmpty;
+                    // 🔥 SELLO VISUAL: Si está apagada globalmente o individualmente
+                    const isQrPaused = !globalQrActive || disabledQrs.includes(`mesa-${mesa.number}`);
 
                     return (
                       <div key={mesa.id} className="relative group">
-                        <div className={isBlocked ? 'opacity-60 pointer-events-none grayscale-[40%]' : ''}>
-                          <MesaCard mesa={mesa} onClick={() => {
-                            if (isBlocked) return;
-                            setSelectedMesa(mesa);
-                          }} />
-                        </div>
+                        {/* 🚀 El empleado SIEMPRE puede clickear y abrir la mesa */}
+                        <MesaCard mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
                         
-                        {/* SELLO NEO-BENTO DE MESA PAUSADA PARA EL MESERO */}
-                        {isBlocked && (
-                          <div 
-                            className="absolute inset-0 z-10 flex items-center justify-center cursor-not-allowed"
-                            onClick={() => showToast(`Mesa ${mesa.number} está temporalmente fuera de servicio.`, 'warning')}
-                          >
-                             <div className="bg-red-500/90 dark:bg-red-600/90 backdrop-blur-sm text-white text-[11px] font-black tracking-widest uppercase px-4 py-1.5 rounded-full shadow-lg border border-red-400/50 transform -rotate-6">
-                               Pausada
-                             </div>
+                        {/* SELLO NEO-BENTO DE MESA PAUSADA PARA EL MESERO (No bloquea clics) */}
+                        {isQrPaused && (
+                          <div className="absolute -top-2 -right-2 z-10 pointer-events-none">
+                            <div className="bg-red-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md border border-red-400/50">
+                              QR Pausado
+                            </div>
                           </div>
                         )}
                       </div>
@@ -323,26 +315,22 @@ export const MesasPage = ({ globalScroll }) => {
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="text-gray-400" size={20} />
                   <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Cuentas Para Llevar</h3>
+                  {/* 🔥 SELLO VISUAL PARA LLEVAR */}
+                  {isLlevarPaused && (
+                    <span className="bg-red-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm ml-2 pointer-events-none">
+                      QR Pausado
+                    </span>
+                  )}
                 </div>
                 
-                {/* 🚀 BOTÓN NUEVA CUENTA (LLEVAR) - BLINDADO */}
+                {/* 🚀 BOTÓN NUEVA CUENTA (LLEVAR) - SIEMPRE ACTIVO PARA EL EMPLEADO */}
                 <motion.button 
-                  whileTap={!isLlevarDisabled ? { scale: 0.95 } : {}}
-                  onClick={() => {
-                    if (isLlevarDisabled) {
-                      showToast('El servicio Para Llevar está pausado. No se pueden crear nuevas cuentas.', 'warning');
-                      return;
-                    }
-                    setShowLlevarModal(true);
-                  }}
-                  className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase transition-transform shadow-sm outline-none select-none ${
-                    isLlevarDisabled 
-                      ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                      : 'bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface active:scale-95 md:hover:shadow-md'
-                  }`}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowLlevarModal(true)}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase transition-transform shadow-sm outline-none select-none bg-gray-900 dark:bg-white lya:bg-lya-secondary text-white dark:text-gray-900 lya:text-lya-surface active:scale-95 md:hover:shadow-md"
                 >
-                  {isLlevarDisabled ? <PowerOff size={14} className="pointer-events-none"/> : <Plus size={14} className="pointer-events-none"/>} 
-                  <span className="pointer-events-none">{isLlevarDisabled ? 'Pausado' : 'Nueva Cuenta'}</span>
+                  <Plus size={14} className="pointer-events-none"/> 
+                  <span className="pointer-events-none">Nueva Cuenta</span>
                 </motion.button>
               </div>
 

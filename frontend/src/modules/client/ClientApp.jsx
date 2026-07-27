@@ -1,7 +1,7 @@
+// frontend/src/modules/client/ClientApp.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-// 🔥 Agregamos ArrowLeft
 import { QrCode, ShieldAlert, UserCheck, Download, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -11,10 +11,7 @@ import ClientMenu from './views/ClientMenu';
 import ClientConnectionShield from './views/components/ClientConnectionShield';
 import { ClientServiceShield } from './views/components/ClientServiceShield';
 import { socket } from '../../api/socket';
-// 🔥 Importamos la instancia de Axios para traer las mesas
 import api from '../../api/client'; 
-
-// IMPORTANTE: Hook PWA
 import { usePWA } from '../../hooks/usePWA';
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
@@ -22,9 +19,7 @@ const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 const getInitialTheme = () => {
   const saved = localStorage.getItem('lya_client_theme');
   if (saved !== null) return Number(saved);
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 1;
-  }
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 1;
   return 2;
 };
 
@@ -34,31 +29,24 @@ export default function ClientApp({ type }) {
   const navigate = useNavigate();
   const qrTokenUrl = searchParams.get('token') || '';
 
+  // Detectamos si la URL viene de un escaneo de cámara
   const isScannedQr = searchParams.get('qr') === 'true';
 
-  // ============================================================================
-  // PWA & STANDALONE STATE
-  // ============================================================================
   const { isInstallable, promptInstall, isStandalone } = usePWA();
   
-  // Estado para manejar la selección manual en la App Instalada (Standalone)
-  const [standaloneSelection, setStandaloneSelection] = useState(null); // { type, tableId }
-  const [isProcessingSelection, setIsProcessingSelection] = useState(null); // Bloqueo Anti-Doble Clic
-  
-  // 🔥 Bloqueo Asíncrono para la instalación de la App (Regla 3)
+  const [standaloneSelection, setStandaloneSelection] = useState(null); 
+  const [isProcessingSelection, setIsProcessingSelection] = useState(null); 
   const [isInstalling, setIsInstalling] = useState(false);
 
-  // 🔥 Estados para las Mesas Dinámicas
+  // 🔥 NUEVO: Estado para el Sistema Granular
+  const [systemConfig, setSystemConfig] = useState({ isQrActive: true, disabledQrs: [] });
+
   const [activeTables, setActiveTables] = useState([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
 
-  // Variables efectivas: Priorizamos la selección standalone, luego la URL
   const effectiveType = standaloneSelection?.type || type;
   const effectiveTableId = standaloneSelection?.tableId || urlTableId;
 
-  // ============================================================================
-  // SESIÓN Y THEME STATE
-  // ============================================================================
   const [themeIndex] = useState(getInitialTheme);
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -78,28 +66,30 @@ export default function ClientApp({ type }) {
   });
 
   // ============================================================================
-  // CARGA DINÁMICA DE MESAS (Solo en modo App Instalada)
+  // CARGA DINÁMICA DE MESAS Y CONFIGURACIÓN
   // ============================================================================
   useEffect(() => {
-    // Si estamos en la App Nativa, no hemos seleccionado mesa, y no hay sesión activa
     if (isStandalone && !standaloneSelection && !clientData) {
       const fetchTables = async () => {
         setIsLoadingTables(true);
         try {
-          // Asegúrate de que esta sea la ruta correcta en tu backend para traer las mesas
-          const response = await api.get('/pos/public/tables'); // Ajustado a la ruta pública
-          const data = response.data?.data || response.data;
+          const response = await api.get('/pos/public/tables'); 
+          const payload = response.data;
           
-          // 🔥 EL ESCUDO ANTI-CRASHEOS: Verificamos estrictamente que sea un Array
-          if (Array.isArray(data)) {
-            setActiveTables(data);
-          } else {
-            console.warn('El servidor no devolvió una lista válida. Posible error de permisos.', data);
-            setActiveTables([]); // Evita el crasheo forzando un array vacío
+          // 🛡️ FIX AL BUG "No hay mesas": Extraemos el array venga como venga
+          const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
+          setActiveTables(tablesArray);
+
+          // 🛡️ Guardamos los candados granulares
+          if (payload?.disabled_qrs !== undefined) {
+            setSystemConfig({
+              isQrActive: payload.isQrActive ?? true,
+              disabledQrs: payload.disabled_qrs || []
+            });
           }
         } catch (error) {
-          console.error('Error al cargar mesas dinámicas (Posible bloqueo por permisos):', error);
-          setActiveTables([]); // Evita el crasheo en caso de error 404/401
+          console.error('Error al cargar mesas dinámicas:', error);
+          setActiveTables([]); 
         } finally {
           setIsLoadingTables(false);
         }
@@ -109,8 +99,26 @@ export default function ClientApp({ type }) {
   }, [isStandalone, standaloneSelection, clientData]);
 
   // ============================================================================
-  // VALIDACIONES DE SEGURIDAD (CONTAMINACIÓN CRUZADA & QR)
+  // ESCUCHA DE SOCKETS PARA APAGADOS EN TIEMPO REAL
   // ============================================================================
+  useEffect(() => {
+    const handleConfigUpdate = (updates) => {
+      setSystemConfig(prev => {
+        const newState = { ...prev };
+        if (updates.qr_service_active !== undefined) newState.isQrActive = updates.qr_service_active;
+        if (updates.disabled_qrs !== undefined) {
+          newState.disabledQrs = typeof updates.disabled_qrs === 'string' 
+            ? JSON.parse(updates.disabled_qrs) 
+            : updates.disabled_qrs;
+        }
+        return newState;
+      });
+    };
+
+    socket.on('config:update', handleConfigUpdate);
+    return () => socket.off('config:update', handleConfigUpdate);
+  }, []);
+
   useEffect(() => {
     if (clientData) {
       const { type: sessionType, tableId: sessionTableId } = clientData;
@@ -135,11 +143,10 @@ export default function ClientApp({ type }) {
     localStorage.removeItem('lya_client_session');
     setClientData(null);
     setActiveOrdersCount(0);
-    setStandaloneSelection(null); // Limpiamos la selección si es Standalone
+    setStandaloneSelection(null); 
   }, []);
 
   useEffect(() => {
-    // Si la App está instalada nativamente, obviamos la validación del token QR
     if (isStandalone) {
       setIsQrValid(true);
       return;
@@ -163,21 +170,14 @@ export default function ClientApp({ type }) {
     };
 
     socket.on('qr_security_update', handleSecurityUpdate);
-
-    return () => {
-      socket.off('qr_security_update', handleSecurityUpdate);
-    };
+    return () => socket.off('qr_security_update', handleSecurityUpdate);
   }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone]);
 
-  // ============================================================================
-  // LÓGICA DE GRID STANDALONE (PWA)
-  // ============================================================================
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
     setIsProcessingSelection(selectedTableId || 'takeaway');
     
     try {
-      // Retardo asíncrono para UX de carga (previene flickering)
       await new Promise(resolve => setTimeout(resolve, 600));
       setStandaloneSelection({ type: selectedType, tableId: selectedTableId });
     } finally {
@@ -185,14 +185,15 @@ export default function ClientApp({ type }) {
     }
   };
 
-  // ============================================================================
-  // RENDER PRINCIPAL
-  // ============================================================================
+  // 🔥 Variables lógicas visuales
+  const isGlobalOff = !systemConfig.isQrActive;
+  const isLlevarPaused = systemConfig.disabledQrs.includes('llevar');
+  const isLlevarDisabled = isGlobalOff || isLlevarPaused;
+
   return (
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       <ClientConnectionShield>
         
-        {/* 🚀 EL ESCUDO VERDUGO CON CONTEXTO GRANULAR */}
         <ClientServiceShield 
           activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
           hasActiveSession={!!clientData}
@@ -206,41 +207,60 @@ export default function ClientApp({ type }) {
         <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10">
           {!clientData ? (
             
-            // BIFURCACIÓN DE LOGIN: APP INSTALADA VS NAVEGADOR
             isStandalone && !standaloneSelection && !isScannedQr ? (
               
-              /* PANTALLA GRID PWA (Sin necesidad de QR físico) */
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
-                <header className="mb-8 mt-4 text-center">
+                <header className="mb-6 mt-4 text-center">
                   <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
                 </header>
 
+                {/* 🔥 BANNER GLOBAL (Si apagaron el Kiosko Maestro) */}
+                <AnimatePresence>
+                  {isGlobalOff && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3 mb-6">
+                      <ShieldAlert className="text-red-500 shrink-0 w-6 h-6" />
+                      <div>
+                        <h4 className="text-red-600 dark:text-red-400 font-black text-sm">Servicio Digital Suspendido</h4>
+                        <p className="text-red-500/80 text-xs font-bold mt-1 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. Por favor ordene en mostrador.</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6">
-                  {/* Para Llevar */}
+                  {/* Botón Para Llevar */}
                   <section>
                     <motion.button
-                      whileTap={isProcessingSelection ? {} : { scale: 0.95 }}
-                      disabled={isProcessingSelection !== null}
+                      whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
+                      disabled={isProcessingSelection !== null || isLlevarDisabled}
                       onClick={() => handleStandaloneSelect('llevar', null)}
-                      className={`w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all md:hover:shadow-2xl ${
-                        isProcessingSelection === 'takeaway' ? 'opacity-70' : 'opacity-100'
-                      }`}
+                      className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all ${
+                        isLlevarDisabled 
+                          ? 'bg-gray-300 dark:bg-gray-700 opacity-60 cursor-not-allowed shadow-none'
+                          : 'bg-gray-900 dark:bg-white md:hover:shadow-2xl'
+                      } ${isProcessingSelection === 'takeaway' ? 'opacity-70' : ''}`}
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="bg-white/10 dark:bg-gray-900/10 p-4 rounded-2xl">
+                      <div className="flex items-center gap-4 relative z-10">
+                        <div className={`p-4 rounded-2xl ${isLlevarDisabled ? 'bg-gray-400 dark:bg-gray-600' : 'bg-white/10 dark:bg-gray-900/10'}`}>
                           <Coffee className="w-7 h-7" />
                         </div>
                         <div className="text-left">
                           <h3 className="text-xl font-bold">Para Llevar</h3>
-                          <p className="text-sm opacity-80 mt-1">Recoge en mostrador</p>
+                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Temporalmente inactivo' : 'Recoge en mostrador'}</p>
                         </div>
                       </div>
-                      {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin" />}
+                      
+                      {isLlevarDisabled && !isProcessingSelection && (
+                        <div className="absolute inset-0 flex items-center justify-end pr-6 pointer-events-none">
+                          <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md">Pausado</span>
+                        </div>
+                      )}
+                      {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-10" />}
                     </motion.button>
                   </section>
 
-                  {/* En Mesa */}
+                  {/* Mesas */}
                   <section>
                     <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
                     
@@ -249,35 +269,42 @@ export default function ClientApp({ type }) {
                         <div className="col-span-2 flex justify-center py-8">
                           <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                         </div>
-                      ) : !Array.isArray(activeTables) || activeTables.length === 0 ? (
-                        /* 🔥 PROTECCIÓN EN HTML: Si no es Array o está vacío, muestra este mensaje amigable */
+                      ) : activeTables.length === 0 ? (
                         <div className="col-span-2 text-center py-6 bg-gray-100 dark:bg-gray-800/50 rounded-2xl text-gray-500 text-sm font-bold">
                           No hay mesas disponibles en este momento.
                         </div>
                       ) : (
                         activeTables.map((table) => {
-                          // 🔥 Verificamos el estado (Ajusta 'occupied' u 'Ocupada' según como venga de tu DB)
                           const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
+                          const isMesaPaused = systemConfig.disabledQrs.includes(`mesa-${table.number}`);
+                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied;
                           const isThisProcessing = isProcessingSelection === table.id;
 
                           return (
                             <motion.button
                               key={table.id}
-                              whileTap={isOccupied || isProcessingSelection ? {} : { scale: 0.95 }}
-                              disabled={isOccupied || isProcessingSelection !== null}
+                              whileTap={isMesaDisabled || isProcessingSelection ? {} : { scale: 0.95 }}
+                              disabled={isMesaDisabled || isProcessingSelection !== null}
                               onClick={() => handleStandaloneSelect('mesa', table.id)}
-                              className={`relative p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border ${
-                                isOccupied
-                                  ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-50'
+                              className={`relative overflow-hidden p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border ${
+                                isMesaDisabled
+                                  ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-60'
                                   : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm md:hover:shadow-md'
                               }`}
                             >
                               {isThisProcessing ? (
-                                <Loader2 className="w-7 h-7 animate-spin" />
+                                <Loader2 className="w-7 h-7 animate-spin z-10" />
                               ) : (
-                                <Utensils className={`w-7 h-7 ${isOccupied ? 'opacity-40' : ''}`} />
+                                <Utensils className={`w-7 h-7 z-10 ${isMesaDisabled ? 'opacity-40' : ''}`} />
                               )}
-                              <span className="font-bold text-sm">{table.name || `Mesa ${table.number}`}</span>
+                              <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
+                              
+                              {/* Sello de Pausada o Ocupada */}
+                              {(isMesaPaused || isGlobalOff) && !isOccupied && (
+                                <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center backdrop-blur-[1px]">
+                                   <span className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-md -rotate-6">Pausada</span>
+                                </div>
+                              )}
                             </motion.button>
                           );
                         })
@@ -289,10 +316,8 @@ export default function ClientApp({ type }) {
 
             ) : (
 
-              /* LOGIN TRADICIONAL (Ya sea escaneado por QR o seleccionado en Grid Standalone) */
               <div className="w-full flex-1 flex flex-col overflow-y-auto custom-scrollbar relative">
                 
-                {/* 🔥 BOTÓN PARA VOLVER A LA SELECCIÓN DE MESAS (Solo PWA Standalone) */}
                 {isStandalone && standaloneSelection && (
                   <div className="px-6 pt-6 pb-0 shrink-0 w-full max-w-sm mx-auto">
                     <motion.button
@@ -306,7 +331,6 @@ export default function ClientApp({ type }) {
                   </div>
                 )}
 
-                {/* PROMPT INSTALACIÓN PWA (Sólo visible en Navegador) */}
                 {!isStandalone && isInstallable && (
                   <motion.div 
                     initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
@@ -321,16 +345,15 @@ export default function ClientApp({ type }) {
                         <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
                       </div>
                     </div>
-                    {/* 🔥 BOTÓN DE INSTALACIÓN BLINDADO (Reglas 2, 3 y 5) */}
                     <motion.button
                       whileTap={isInstalling ? {} : { scale: 0.95 }}
                       disabled={isInstalling}
                       onClick={async (e) => {
-                        e.preventDefault(); // Evita recargas y saltos
+                        e.preventDefault(); 
                         setIsInstalling(true);
                         try {
-                          localStorage.setItem('lya_pwa_mode', 'client'); // Etiquetamos la App como Cliente
-                          await promptInstall(); // Esperamos el resultado del hook
+                          localStorage.setItem('lya_pwa_mode', 'client'); 
+                          await promptInstall(); 
                         } finally {
                           setIsInstalling(false);
                         }
@@ -367,6 +390,7 @@ export default function ClientApp({ type }) {
           )}
         </main>
 
+        {/* ... Modal "Código QR Expirado" (Mantenido intacto) ... */}
         <AnimatePresence>
           {!isQrValid && !isStandalone && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">

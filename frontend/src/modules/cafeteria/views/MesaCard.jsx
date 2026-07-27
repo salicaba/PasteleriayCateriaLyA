@@ -1,6 +1,7 @@
 // frontend/src/modules/cafeteria/views/MesaCard.jsx
 import React, { useMemo } from 'react';
 import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2, BellRing } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export const MesaCard = ({ mesa, onClick, onCancel }) => {
   const isOcupada = mesa.estado === 'ocupada';
@@ -120,9 +121,10 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
   }, [mesa.numero, mesa.ticketId, mesa.nombreCliente, isLlevar, rawNumero]);
 
   return (
-    <div 
+    <motion.div 
+      whileTap={{ scale: 0.96 }}
       onClick={() => onClick(mesa)}
-      className={`group relative rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-visible ${
+      className={`group relative rounded-2xl shadow-sm md:hover:shadow-lg md:hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-visible select-none outline-none ${
         hasReadyItems 
           ? 'bg-blue-50 border-2 border-blue-500 shadow-blue-500/20 dark:bg-blue-900/20 dark:border-blue-400 dark:shadow-blue-400/10 lya:bg-blue-50/80 lya:border-blue-500 lya:shadow-blue-500/20'
           : isOcupada 
@@ -132,14 +134,14 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
     >
       {/* ETIQUETA FLOTANTE DE NOTIFICACIÓN MULTI-TEMA */}
       {hasReadyItems && (
-        <div className="absolute -top-3 -right-2 bg-blue-600 dark:bg-blue-500 lya:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 dark:shadow-blue-900/60 lya:shadow-blue-600/30 animate-bounce z-50">
+        <div className="absolute -top-3 -right-2 bg-blue-600 dark:bg-blue-500 lya:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 dark:shadow-blue-900/60 lya:shadow-blue-600/30 animate-bounce z-50 pointer-events-none">
           <BellRing size={12} className="animate-pulse" />
           ¡LISTO PARA ENTREGAR!
         </div>
       )}
 
-      {/* BARRA LATERAL IZQUIERDA MULTI-TEMA */}
-      <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors rounded-l-xl ${
+      {/* BARRA LATERAL IZQUIERDA MULTI-TEMA (Actualizada a rounded-l-2xl) */}
+      <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors rounded-l-2xl ${
         hasReadyItems 
           ? 'bg-blue-500 dark:bg-blue-400 lya:bg-blue-500' 
           : isOcupada 
@@ -147,7 +149,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             : 'bg-gray-300 dark:bg-gray-600 lya:bg-lya-border/60'
       }`} />
 
-      <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full relative z-10">
+      <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full relative z-10 pointer-events-none">
         <div className="flex justify-between items-start">
           <div className="z-10">
             {/* TEXTO DE CABECERA MULTI-TEMA */}
@@ -163,27 +165,27 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             <h3 className={`text-lg font-black tracking-tight truncate max-w-[120px] ${
               isOcupada ? 'text-gray-800 dark:text-white lya:text-lya-text' : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/60'
             }`}>
-              {/* Aquí usamos nuestro id limpio (Ej: #1 en vez de #1 - Emmanuel) */}
               {idPrincipal === 'Mostrador' ? 'Express' : `#${idPrincipal}`}
             </h3>
           </div>
           
-          <div className="flex items-center gap-1.5 z-20">
+          <div className="flex items-center gap-1.5 z-20 pointer-events-auto">
             {isLlevar && onCancel && (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.85 }}
                 onClick={(e) => {
                   e.stopPropagation(); 
                   onCancel();
                 }}
-                className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/20 lya:hover:bg-red-900/20 transition-colors"
+                className="p-1.5 rounded-lg text-red-400 md:hover:text-red-600 md:hover:bg-red-50 dark:md:hover:bg-red-500/20 lya:hover:bg-red-900/20 transition-colors outline-none"
                 title="Eliminar pedido"
               >
                 <Trash2 size={18} strokeWidth={2} />
-              </button>
+              </motion.button>
             )}
 
             {/* ÍCONO MULTI-TEMA */}
-            <div className={`p-2 rounded-xl transition-colors ${
+            <div className={`p-2 rounded-xl transition-colors pointer-events-none ${
               hasReadyItems
                 ? 'bg-blue-500 dark:bg-blue-500 lya:bg-blue-500 text-white shadow-md shadow-blue-500/30 dark:shadow-blue-900/40 lya:shadow-blue-500/30'
                 : isOcupada 
@@ -195,14 +197,13 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
           </div>
         </div>
 
-        <div className="mt-2 mb-2 flex flex-col gap-1">
+        <div className="mt-2 mb-2 flex flex-col gap-1 pointer-events-none">
           {isOcupada ? (
             <>
               <span className="text-2xl font-bold text-gray-900 dark:text-gray-100 lya:text-lya-text">
                 ${Number(mesa.total || 0).toFixed(2)}
               </span>
               
-              {/* 🔥 AQUÍ CAE EL NOMBRE Y TELÉFONO PERFECTAMENTE AISLADOS 🔥 */}
               {nombreCliente && nombreCliente !== 'Mostrador' && (
                 <div className="flex flex-col text-left mt-0.5 bg-gray-50/80 dark:bg-gray-900/40 lya:bg-lya-bg/30 p-1.5 rounded-lg border border-gray-100 dark:border-gray-800/40 lya:border-lya-border/20">
                   <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text truncate flex items-center gap-1.5">
@@ -224,7 +225,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
         </div>
 
         {isOcupada && (
-          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-2 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20">
+          <div className="flex flex-wrap justify-between items-center gap-x-2 gap-y-2 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/20 pointer-events-none">
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/70 shrink-0">
               <span className="w-5 h-5 rounded flex items-center justify-center font-bold text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 lya:bg-lya-primary/20 lya:text-lya-primary">
                 {mesa.cuentasActivas || 1}
@@ -257,6 +258,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };

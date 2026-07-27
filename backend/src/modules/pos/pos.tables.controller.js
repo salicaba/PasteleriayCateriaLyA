@@ -1,7 +1,9 @@
 // backend/src/modules/pos/pos.tables.controller.js
 import { getIO } from '../../config/socket.js'; 
 import Table from './Table.model.js';
-import Order from './Order.model.js'; // 🔥 Añadido para poder leer las órdenes
+import Order from './Order.model.js'; 
+// 🔥 Importamos la configuración para leer los QRs apagados
+import BusinessConfig from '../settings/BusinessConfig.model.js'; 
 
 // ==========================================
 // 🪑 GESTIÓN DE MESAS (CRUD)
@@ -19,16 +21,29 @@ export const getTables = async (req, res) => {
   }
 };
 
-// 🔥 NUEVA RUTA PÚBLICA: Para el Kiosko/Clientes sin requerir Token
+// 🔥 RUTA PÚBLICA ACTUALIZADA: Ahora envía las Mesas + La Configuración Granular
 export const getPublicTables = async (req, res) => {
   try {
     const tables = await Table.findAll({
       where: { status: 'active' },
-      // Blindaje de datos: Exponemos solo lo necesario para el Kiosko
       attributes: ['id', 'number', 'zone', 'qrToken', 'status'], 
       order: [['id', 'ASC']]
     });
-    res.status(200).json(tables);
+    
+    // Obtenemos qué QRs están apagados y el estado global
+    const config = await BusinessConfig.findOne();
+    let disabled_qrs = [];
+    try {
+        if (config?.disabled_qrs) {
+            disabled_qrs = typeof config.disabled_qrs === 'string' ? JSON.parse(config.disabled_qrs) : config.disabled_qrs;
+        }
+    } catch(e) {}
+
+    res.status(200).json({
+      tables: tables, // Enviamos el array
+      disabled_qrs: Array.isArray(disabled_qrs) ? disabled_qrs : [],
+      isQrActive: config ? config.qr_service_active : true
+    });
   } catch (error) {
     console.error('Error al obtener mesas públicas:', error);
     res.status(500).json({ message: 'Error interno del servidor al cargar el mapa de mesas.', error: error.message });
@@ -57,17 +72,14 @@ export const createTable = async (req, res) => {
 export const deleteTable = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // 🔥 NUEVA VALIDACIÓN: Verificar si la mesa tiene una orden activa
     const activeOrder = await Order.findOne({
       where: {
         tableId: id,
-        status: ['OPEN', 'PAID'] // Si la orden está Abierta o Pagada (pero no liberada), se bloquea
+        status: ['OPEN', 'PAID'] 
       }
     });
 
     if (activeOrder) {
-      // Devolvemos el error 400 y tu mensaje personalizado
       return res.status(400).json({ 
         message: 'No se puede eliminar la mesa porque tiene productos o clientes activos.' 
       });
