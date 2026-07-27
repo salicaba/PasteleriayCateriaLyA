@@ -83,10 +83,18 @@ export default function ClientApp({ type }) {
         try {
           // Asegúrate de que esta sea la ruta correcta en tu backend para traer las mesas
           const response = await api.get('/pos/tables'); 
-          const tables = response.data?.data || response.data || [];
-          setActiveTables(tables);
+          const data = response.data?.data || response.data;
+          
+          // 🔥 EL ESCUDO ANTI-CRASHEOS: Verificamos estrictamente que sea un Array
+          if (Array.isArray(data)) {
+            setActiveTables(data);
+          } else {
+            console.warn('El servidor no devolvió una lista válida. Posible error de permisos.', data);
+            setActiveTables([]); // Evita el crasheo forzando un array vacío
+          }
         } catch (error) {
-          console.error('Error al cargar mesas dinámicas:', error);
+          console.error('Error al cargar mesas dinámicas (Posible bloqueo por permisos):', error);
+          setActiveTables([]); // Evita el crasheo en caso de error 404/401
         } finally {
           setIsLoadingTables(false);
         }
@@ -236,9 +244,10 @@ export default function ClientApp({ type }) {
                         <div className="col-span-2 flex justify-center py-8">
                           <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                         </div>
-                      ) : activeTables.length === 0 ? (
-                        <div className="col-span-2 text-center py-4 text-gray-500 text-sm">
-                          No hay mesas configuradas.
+                      ) : !Array.isArray(activeTables) || activeTables.length === 0 ? (
+                        /* 🔥 PROTECCIÓN EN HTML: Si no es Array o está vacío, muestra este mensaje amigable */
+                        <div className="col-span-2 text-center py-6 bg-gray-100 dark:bg-gray-800/50 rounded-2xl text-gray-500 text-sm font-bold">
+                          No hay mesas disponibles en este momento.
                         </div>
                       ) : (
                         activeTables.map((table) => {
