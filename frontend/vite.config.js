@@ -22,6 +22,8 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone', 
         orientation: 'portrait',
+        start_url: '/', // 🚀 CRÍTICO: Fuerza a la app a abrir siempre en la raíz (El Grid)
+        scope: '/',     // 🚀 CRÍTICO: Define que la PWA tiene control sobre todo tu dominio
         icons: [
           {
             src: '/logo.jpeg',

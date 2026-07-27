@@ -34,6 +34,8 @@ export default function ClientApp({ type }) {
   const navigate = useNavigate();
   const qrTokenUrl = searchParams.get('token') || '';
 
+  const isScannedQr = searchParams.get('qr') === 'true';
+
   // ============================================================================
   // PWA & STANDALONE STATE
   // ============================================================================
@@ -205,7 +207,7 @@ export default function ClientApp({ type }) {
           {!clientData ? (
             
             // BIFURCACIÓN DE LOGIN: APP INSTALADA VS NAVEGADOR
-            isStandalone && !standaloneSelection && !type ? (
+            isStandalone && !standaloneSelection && !isScannedQr ? (
               
               /* PANTALLA GRID PWA (Sin necesidad de QR físico) */
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">

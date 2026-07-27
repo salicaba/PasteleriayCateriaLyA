@@ -200,7 +200,7 @@ export const QrControlPage = () => {
             <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mostrador 𝓛𝔂𝓪</h2>
             <p className="text-sm font-bold text-gray-700 italic mb-4">"Ordena sin filas"</p>
             <QRCodeSVG 
-              value={`${baseUrl}/llevar`} 
+              value={`${baseUrl}/llevar?qr=true`} 
               size={140} 
               level="Q"
               className="mb-4 !opacity-100 !grayscale-0"
@@ -218,7 +218,7 @@ export const QrControlPage = () => {
             <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mesa {mesa.number}</h2>
             <p className="text-sm font-bold text-gray-700 italic mb-4">"Escanea para ordenar"</p>
             <QRCodeSVG 
-              value={`${baseUrl}/m/${mesa.number}`} 
+              value={`${baseUrl}/m/${mesa.number}?qr=true`}
               size={140} 
               level="Q"
               className="mb-4 !opacity-100 !grayscale-0"
@@ -404,7 +404,7 @@ export const QrControlPage = () => {
                       <div className={`p-3 rounded-2xl flex items-center justify-center gap-2 border mb-5 transition-colors shadow-inner ${!isThisMesaActive ? 'bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-60' : 'bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg border-gray-200 dark:border-gray-700 lya:border-lya-border/30 md:group-hover:border-orange-300'}`}>
                         <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
                         <a 
-                          href={`${baseUrl}/m/${mesa.number}`} 
+                          href={`${baseUrl}/m/${mesa.number}?qr=true`} 
                           target="_blank" 
                           rel="noreferrer" 
                           className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors font-bold outline-none tracking-wide"
@@ -514,7 +514,7 @@ export const QrControlPage = () => {
                     <div className={`p-4 w-full rounded-2xl flex items-center justify-center gap-2 border mb-8 shadow-sm transition-colors ${!isLlevarActive ? 'bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-60' : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface border-gray-200 dark:border-gray-700 lya:border-lya-border/30'}`}>
                       <LinkIcon className="w-4 h-4 text-gray-500 lya:text-lya-text/50 shrink-0" />
                       <a 
-                        href={`${baseUrl}/llevar`} 
+                        href={`${baseUrl}/llevar?qr=true`} 
                         target="_blank" 
                         rel="noreferrer" 
                         className="text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text/80 truncate font-black tracking-widest md:hover:text-orange-600 dark:md:hover:text-orange-400 lya:hover:text-lya-secondary transition-colors outline-none text-center"
