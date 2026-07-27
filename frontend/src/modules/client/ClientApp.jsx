@@ -2,9 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, Download, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft } from 'lucide-react';
+import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import clsx from 'clsx';
+
+// 🔥 IMPORTANTE: Hook oficial de Vite PWA para detectar actualizaciones
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import ClientLogin from './views/ClientLogin';
 import ClientMenu from './views/ClientMenu';
@@ -28,9 +30,24 @@ export default function ClientApp({ type }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const qrTokenUrl = searchParams.get('token') || '';
-
-  // Detectamos si la URL viene de un escaneo de cámara
   const isScannedQr = searchParams.get('qr') === 'true';
+
+  // ============================================================================
+  // 🚀 EL BOTÓN OBLIGATORIO DE ACTUALIZACIÓN
+  // ============================================================================
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      // Revisa si hay código nuevo en el servidor cada minuto en silencio
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 60 * 1000); 
+      }
+    }
+  });
 
   const { isInstallable, promptInstall, isStandalone } = usePWA();
   
@@ -38,9 +55,7 @@ export default function ClientApp({ type }) {
   const [isProcessingSelection, setIsProcessingSelection] = useState(null); 
   const [isInstalling, setIsInstalling] = useState(false);
 
-  // 🔥 NUEVO: Estado para el Sistema Granular
   const [systemConfig, setSystemConfig] = useState({ isQrActive: true, disabledQrs: [] });
-
   const [activeTables, setActiveTables] = useState([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
 
@@ -66,21 +81,20 @@ export default function ClientApp({ type }) {
   });
 
   // ============================================================================
-  // CARGA DINÁMICA DE MESAS Y CONFIGURACIÓN
+  // CARGA DINÁMICA DE MESAS - BLINDADA CONTRA RUTAS
   // ============================================================================
   useEffect(() => {
     if (isStandalone && !standaloneSelection && !clientData) {
       const fetchTables = async () => {
         setIsLoadingTables(true);
         try {
-          const response = await api.get('/pos/public/tables'); 
+          // 🔥 Buscador Indestructible: Intenta la ruta pública, si falla, intenta la normal
+          const response = await api.get('/pos/public/tables').catch(() => api.get('/pos/tables'));
           const payload = response.data;
           
-          // 🛡️ FIX AL BUG "No hay mesas": Extraemos el array venga como venga
           const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
           setActiveTables(tablesArray);
 
-          // 🛡️ Guardamos los candados granulares
           if (payload?.disabled_qrs !== undefined) {
             setSystemConfig({
               isQrActive: payload.isQrActive ?? true,
@@ -119,6 +133,32 @@ export default function ClientApp({ type }) {
     return () => socket.off('config:update', handleConfigUpdate);
   }, []);
 
+  // ============================================================================
+  // 🚀 LÓGICA DE EXPULSIÓN INMEDIATA (KILL-SWITCH EN ACCIÓN)
+  // ============================================================================
+  const handleClientLogout = React.useCallback(() => {
+    localStorage.removeItem('lya_client_session');
+    setClientData(null);
+    setActiveOrdersCount(0);
+    setStandaloneSelection(null); 
+  }, []);
+
+  useEffect(() => {
+    // Si el cliente está logueado, y NO TIENE ÓRDENES ACTIVAS
+    if (clientData && activeOrdersCount === 0) {
+      const isMesa = clientData.type === 'mesa';
+      const isLlevar = clientData.type === 'llevar';
+      
+      const isThisMesaPaused = isMesa && systemConfig.disabledQrs.includes(`mesa-${clientData.tableId}`);
+      const isThisLlevarPaused = isLlevar && systemConfig.disabledQrs.includes('llevar');
+
+      // Si apagaron todo globalmente, o apagaron SU QR específico -> ¡PUM! Expulsado.
+      if (!systemConfig.isQrActive || isThisMesaPaused || isThisLlevarPaused) {
+        handleClientLogout();
+      }
+    }
+  }, [systemConfig, clientData, activeOrdersCount, handleClientLogout]);
+
   useEffect(() => {
     if (clientData) {
       const { type: sessionType, tableId: sessionTableId } = clientData;
@@ -138,13 +178,6 @@ export default function ClientApp({ type }) {
       }
     }
   }, [clientData, type, urlTableId, navigate]);
-
-  const handleClientLogout = React.useCallback(() => {
-    localStorage.removeItem('lya_client_session');
-    setClientData(null);
-    setActiveOrdersCount(0);
-    setStandaloneSelection(null); 
-  }, []);
 
   useEffect(() => {
     if (isStandalone) {
@@ -185,13 +218,44 @@ export default function ClientApp({ type }) {
     }
   };
 
-  // 🔥 Variables lógicas visuales
   const isGlobalOff = !systemConfig.isQrActive;
   const isLlevarPaused = systemConfig.disabledQrs.includes('llevar');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
 
   return (
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
+      
+      {/* ========================================================= */}
+      {/* 🚀 EL ESCUDO VERDUGO: ACTUALIZACIÓN OBLIGATORIA (PWA) */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {needRefresh && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 h-[100dvh] w-full bg-black/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 max-w-sm w-full text-center flex flex-col items-center shadow-2xl border border-gray-100 dark:border-gray-800"
+            >
+              <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-inner animate-bounce">
+                <Download size={40} strokeWidth={2.5} />
+              </div>
+              <h2 className="text-2xl font-black mb-3 text-gray-900 dark:text-white lya:text-lya-text leading-tight">
+                Actualización Disponible
+              </h2>
+              <p className="text-gray-500 dark:text-gray-400 font-bold text-sm mb-8 text-justify px-2">
+                Se han detectado nuevas funciones y correcciones en el sistema. Debes actualizar la aplicación para continuar operando.
+              </p>
+              <button 
+                onClick={() => updateServiceWorker(true)} 
+                className="w-full bg-emerald-500 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform uppercase tracking-wider"
+              >
+                Actualizar Ahora
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <ClientConnectionShield>
         
         <ClientServiceShield 
@@ -215,7 +279,6 @@ export default function ClientApp({ type }) {
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
                 </header>
 
-                {/* 🔥 BANNER GLOBAL (Si apagaron el Kiosko Maestro) */}
                 <AnimatePresence>
                   {isGlobalOff && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3 mb-6">
@@ -299,7 +362,6 @@ export default function ClientApp({ type }) {
                               )}
                               <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
                               
-                              {/* Sello de Pausada o Ocupada */}
                               {(isMesaPaused || isGlobalOff) && !isOccupied && (
                                 <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center backdrop-blur-[1px]">
                                    <span className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-md -rotate-6">Pausada</span>
@@ -390,7 +452,7 @@ export default function ClientApp({ type }) {
           )}
         </main>
 
-        {/* ... Modal "Código QR Expirado" (Mantenido intacto) ... */}
+        {/* Modal "Código QR Expirado" */}
         <AnimatePresence>
           {!isQrValid && !isStandalone && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
