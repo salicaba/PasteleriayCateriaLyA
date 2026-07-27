@@ -205,7 +205,7 @@ export default function ClientApp({ type }) {
           {!clientData ? (
             
             // BIFURCACIÓN DE LOGIN: APP INSTALADA VS NAVEGADOR
-            isStandalone && !standaloneSelection ? (
+            isStandalone && !standaloneSelection && !type ? (
               
               /* PANTALLA GRID PWA (Sin necesidad de QR físico) */
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
