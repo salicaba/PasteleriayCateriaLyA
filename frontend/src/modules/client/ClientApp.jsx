@@ -34,10 +34,35 @@ export default function ClientApp({ type }) {
   const [isUpdating, setIsUpdating] = useState(false); 
   const [runtimeError, setRuntimeError] = useState(null);
   
-  // Estado para controlar la pantalla de carga inicial
   const [isAppReady, setIsAppReady] = useState(false);
 
-  // Capturador visual de errores de respaldo
+  // 🔥 SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
+  useEffect(() => {
+    const updateMetaColor = () => {
+      let metaThemeColor = document.querySelector("meta[name='theme-color']");
+      if (!metaThemeColor) {
+        metaThemeColor = document.createElement("meta");
+        metaThemeColor.name = "theme-color";
+        document.head.appendChild(metaThemeColor);
+      }
+      const root = document.documentElement;
+      if (root.classList.contains('dark')) {
+        metaThemeColor.content = '#111827';
+      } else if (root.classList.contains('theme-lya')) {
+        metaThemeColor.content = '#FAF6F0';
+      } else {
+        metaThemeColor.content = '#F9FAFB';
+      }
+    };
+
+    updateMetaColor(); 
+    
+    const observer = new MutationObserver(updateMetaColor);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const handleError = (event) => {
       setRuntimeError(event.message || String(event.error || 'Error desconocido de JavaScript'));
@@ -101,7 +126,6 @@ export default function ClientApp({ type }) {
     }
   }, [themeIndex]);
 
-  // Motor de carga en tiempo real y carga inicial
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     setIsLoadingTables(true);
     try {
@@ -134,12 +158,10 @@ export default function ClientApp({ type }) {
     }
   }, []);
 
-  // Primera carga al montar el componente
   useEffect(() => {
     fetchStoreData(true);
   }, [fetchStoreData]);
 
-  // Sincronización robusta en tiempo real vía WebSockets
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
 
@@ -265,7 +287,6 @@ export default function ClientApp({ type }) {
 
   return (
     <>
-      {/* PANTALLA DE CARGA INICIAL (Splash Screen) */}
       <AnimatePresence>
         {!isAppReady && (
           <motion.div
@@ -293,7 +314,6 @@ export default function ClientApp({ type }) {
 
       <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
         
-        {/* MODAL DE ACTUALIZACIÓN (SW) */}
         <AnimatePresence>
           {needRefresh && (
             <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 h-[100dvh] w-full bg-black/80 backdrop-blur-md">
@@ -323,7 +343,6 @@ export default function ClientApp({ type }) {
         </AnimatePresence>
 
         <ClientConnectionShield>
-          {/* 🔥 EL BLINDAJE ANTI-CRASHEO: Este key obliga al Shield a reiniciarse al entrar al Login */}
           <ClientServiceShield 
             key={`shield-mode-${isGridMode ? 'grid' : 'login'}`} 
             activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
@@ -337,11 +356,9 @@ export default function ClientApp({ type }) {
           <Toaster position="top-center" />
           
           <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10">
-            {/* LÓGICA DE TRANSICIONES MÁGICAS (Soluciona la pantalla negra) */}
             <AnimatePresence mode="wait">
               {!clientData ? (
                 isGridMode ? (
-                  /* --- VISTA MAPEO (GRID) --- */
                   <motion.div
                     key="grid"
                     initial={{ opacity: 0, x: -30 }}
@@ -368,7 +385,6 @@ export default function ClientApp({ type }) {
                     </AnimatePresence>
 
                     <div className="flex flex-col gap-6">
-                      {/* Botón Para Llevar */}
                       <section>
                         <motion.button
                           whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
@@ -396,7 +412,6 @@ export default function ClientApp({ type }) {
                         </motion.button>
                       </section>
 
-                      {/* Mesas */}
                       <section>
                         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
                         <div className="grid grid-cols-2 gap-4">
@@ -438,7 +453,6 @@ export default function ClientApp({ type }) {
                     </div>
                   </motion.div>
                 ) : (
-                  /* --- VISTA LOGIN --- */
                   <motion.div
                     key="login"
                     initial={{ opacity: 0, x: 30 }}
@@ -447,7 +461,6 @@ export default function ClientApp({ type }) {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex flex-col w-full h-full overflow-hidden"
                   >
-                    {/* Botón flotante para regresar al Grid */}
                     {standaloneSelection && (
                       <div className="absolute top-6 left-6 z-50">
                         <motion.button
@@ -470,7 +483,6 @@ export default function ClientApp({ type }) {
                       tableId={effectiveTableId} 
                     />
 
-                    {/* Banner Install PWA abajo del login */}
                     {!isStandalone && isInstallable && (
                       <div className="absolute bottom-6 left-6 right-6 z-50">
                         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-900 dark:bg-white rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4">
@@ -494,7 +506,6 @@ export default function ClientApp({ type }) {
                   </motion.div>
                 )
               ) : (
-                /* --- VISTA MENÚ DEL CLIENTE --- */
                 <motion.div
                   key="menu"
                   initial={{ opacity: 0, scale: 0.98 }}
@@ -515,7 +526,6 @@ export default function ClientApp({ type }) {
             </AnimatePresence>
           </main>
 
-          {/* Modal "Código QR Expirado" */}
           <AnimatePresence>
             {!isQrValid && !isStandalone && (
               <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">

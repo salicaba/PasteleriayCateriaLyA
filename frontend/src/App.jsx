@@ -1,12 +1,10 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
-// 🔥 Agregamos el ícono Download
 import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
-// 🔥 Importamos el Cerebro PWA
 import { usePWA } from './hooks/usePWA';
-// 🔥 NUEVO: Importamos useNavigate para la redirección inteligente
 import { useNavigate } from 'react-router-dom';
 
 // Vistas
@@ -39,11 +37,37 @@ const getInitials = (name) => {
 };
 
 function App() {
-  // 🔥 Extraemos el estado PWA
   const { isInstallable, promptInstall, isStandalone } = usePWA();
-  const navigate = useNavigate(); // 🔥 Inyectamos el hook de navegación
+  const navigate = useNavigate();
 
-  // 🔥 NUEVO: Redirección automática si la PWA instalada es la del Cliente
+  // 🔥 SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
+  useEffect(() => {
+    const updateMetaColor = () => {
+      let metaThemeColor = document.querySelector("meta[name='theme-color']");
+      if (!metaThemeColor) {
+        metaThemeColor = document.createElement("meta");
+        metaThemeColor.name = "theme-color";
+        document.head.appendChild(metaThemeColor);
+      }
+      const root = document.documentElement;
+      if (root.classList.contains('dark')) {
+        metaThemeColor.content = '#111827'; // Gris oscuro para tema Dark
+      } else if (root.classList.contains('theme-lya')) {
+        metaThemeColor.content = '#FAF6F0'; // Cremita para tema Lya
+      } else {
+        metaThemeColor.content = '#F9FAFB'; // Gris clarito para tema Light
+      }
+    };
+
+    updateMetaColor(); // Ejecutamos la primera vez
+    
+    // El observador detecta cualquier cambio de tema en tiempo real
+    const observer = new MutationObserver(updateMetaColor);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (isStandalone && localStorage.getItem('lya_pwa_mode') === 'client') {
       navigate('/kiosko', { replace: true });
@@ -95,7 +119,6 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
-  // Estados: Modal de confirmación y carga de cierre de sesión
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
@@ -127,7 +150,6 @@ function App() {
     if (uiSize === 'small') root.style.fontSize = '12px';  
   }, [uiSize]);
 
-  // Cierre automático al llegar la medianoche (Cierre de Turno)
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
@@ -148,7 +170,6 @@ function App() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // Escuchar evento de error 401 desde el Axios Client para evitar recargas completas (Flicker)
   useEffect(() => {
     const handleAuthError = () => {
       if (user) {
@@ -261,7 +282,6 @@ function App() {
     }
   ];
 
-  // 🚀 OBSERVADOR GLOBAL DE TÍTULO CON TIPOGRAFÍA OFICIAL
   useEffect(() => {
     if (!user) {
       document.title = '𝓛𝔂𝓪 | Login';
@@ -317,7 +337,6 @@ function App() {
           setActiveTab(item.id);
           if (window.innerWidth < 768) setIsSidebarOpen(false);
         }}
-        // 🔥 Pilar 2: Reemplazo de hover por md:hover
         className={`flex items-center gap-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none w-full ${isNested ? 'px-3 pl-11' : 'px-3'} ${
           isActive
             ? 'bg-orange-500/10 dark:bg-orange-500/20 lya:bg-lya-secondary/20 text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold'
@@ -340,7 +359,6 @@ function App() {
 
   return (
     <>
-      {/* 🔥 Pilar 5: Cápsulas Neo-Bento configuradas globalmente */}
       <Toaster 
         position="top-center"
         containerStyle={{
@@ -353,7 +371,7 @@ function App() {
             background: theme === 'dark' ? 'rgba(31, 41, 55, 0.95)' : theme === 'lya' ? 'rgba(253, 248, 245, 0.95)' : 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(16px)',
             color: theme === 'dark' ? '#f3f4f6' : theme === 'lya' ? '#4A2B29' : '#1f2937',
-            borderRadius: '9999px', // Forma de píldora
+            borderRadius: '9999px',
             border: '1px solid',
             borderColor: theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : theme === 'lya' ? 'rgba(230, 204, 178, 0.5)' : 'rgba(229, 231, 235, 0.5)',
             fontWeight: 'bold',
@@ -385,7 +403,6 @@ function App() {
       {!user ? (
         <LoginScreen onLogin={handleLogin} />
       ) : (
-        // 🔥 Pilar 1: Responsividad Estricta (h-[100dvh] w-full flex overflow-hidden)
         <div className="h-[100dvh] w-full flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300">
           
           <motion.aside
@@ -417,7 +434,6 @@ function App() {
                         <motion.button
                           whileTap={{ scale: 0.95 }}
                           onClick={() => toggleGroup(item.id)}
-                          // 🔥 Pilar 2: md:hover
                           className={`flex items-center justify-between px-3 py-3 rounded-xl transition-all relative overflow-hidden outline-none w-full ${
                             hasActiveChild && !isExpanded
                               ? 'text-orange-600 dark:text-orange-400 lya:text-lya-secondary font-bold bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-secondary/10'
@@ -462,12 +478,11 @@ function App() {
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-3">
                 
-                {/* 🔥 BOTÓN DE INSTALACIÓN PWA (Auto-ocultable) con guardado de modo Admin */}
                 {!isStandalone && isInstallable && (
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
-                      localStorage.setItem('lya_pwa_mode', 'admin'); // 🔥 Marcamos como Admin
+                      localStorage.setItem('lya_pwa_mode', 'admin');
                       promptInstall();
                     }}
                     className="w-full flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 transition-colors text-sm font-bold outline-none shadow-md"
@@ -592,7 +607,6 @@ function App() {
               {activeTab === 'reportes' && <ReportsPage />}
             </main>
 
-            {/* 🔥 Pilar 4 y 3: Modal de Cerrar Sesión con Geometría Premium (2.5rem) y Anti-Doble Clic */}
             <AnimatePresence>
               {showLogoutModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
