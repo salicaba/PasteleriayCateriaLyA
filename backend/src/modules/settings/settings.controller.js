@@ -1,5 +1,6 @@
 // backend/src/modules/settings/settings.controller.js
 import BusinessConfig from './BusinessConfig.model.js';
+import { getIO } from '../../config/socket.js'; // 🔥 IMPORTACIÓN CRÍTICA AÑADIDA
 
 export const getConfig = async (req, res) => {
   try {
@@ -10,18 +11,20 @@ export const getConfig = async (req, res) => {
       bank_accounts: [], 
       whatsapp_number: '', 
       printer_config: null, 
-      barcode_config: null 
+      barcode_config: null,
+      disabled_qrs: [] // 🔥 Aseguramos que siempre nazca como Array
     };
     
     configs.forEach(config => {
-      if (config.key === 'bank_accounts' || config.key === 'printer_config' || config.key === 'barcode_config') {
+      // 🔥 Añadimos disabled_qrs a la lista de parseo seguro
+      if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs'].includes(config.key)) {
         try {
           result[config.key] = JSON.parse(config.value);
         } catch(e) {
-          result[config.key] = config.key === 'bank_accounts' ? [] : {};
+          result[config.key] = (config.key === 'bank_accounts' || config.key === 'disabled_qrs') ? [] : {};
         }
       } else {
-        // Configuraciones de texto plano, como whatsapp_number
+        // Configuraciones de texto plano, como whatsapp_number y qr_service_active
         result[config.key] = config.value;
       }
     });
@@ -40,8 +43,8 @@ export const updateConfig = async (req, res) => {
     for (const [key, value] of Object.entries(updates)) {
       let valueToSave = value;
       
-      // Aseguramos que objetos y arreglos se guarden como string JSON (Añadimos disabled_qrs)
-      if (key === 'bank_accounts' || key === 'printer_config' || key === 'barcode_config' || key === 'disabled_qrs' || typeof value === 'object') {
+      // Aseguramos que objetos y arreglos se guarden como string JSON
+      if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs'].includes(key) || typeof value === 'object') {
         valueToSave = JSON.stringify(value);
       }
       
@@ -51,10 +54,12 @@ export const updateConfig = async (req, res) => {
       });
     }
 
-    // 🚀 INYECCIÓN TIEMPO REAL: Emitimos cualquier actualización genérica al socket
-    const io = req.app.get('io');
+    // 🚀 INYECCIÓN TIEMPO REAL CORREGIDA: Usamos el Singleton seguro
+    const io = getIO();
     if (io) {
       io.emit('config:update', updates);
+      io.emit('business_config_updated'); 
+      io.emit('pos:update'); // 🔥 Disparo extra para refrescar mapas de mesas en todo el local
     }
 
     res.json({ message: "Configuración guardada exitosamente" });
@@ -87,12 +92,13 @@ export const setQrStatus = async (req, res) => {
             await config.save();
         }
 
-        // 🚀 INYECCIÓN DE TIEMPO REAL: Emitimos la orden al Escudo del Cliente
-        const io = req.app.get('io');
+        // 🚀 INYECCIÓN DE TIEMPO REAL CORREGIDA: Usamos el Singleton seguro
+        const io = getIO();
         if (io) {
             // Disparamos la actualización global instantánea
-            io.emit('config:update', { qrService: active });
+            io.emit('config:update', { qr_service_active: String(active) });
             io.emit('qr:status_changed', active);
+            io.emit('pos:update'); // 🔥 Refresca las interfaces instantáneamente
         }
 
         res.json({ active: config.value === 'true' });
