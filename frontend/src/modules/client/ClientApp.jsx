@@ -33,7 +33,7 @@ export default function ClientApp({ type }) {
   const [isUpdating, setIsUpdating] = useState(false); 
   const [runtimeError, setRuntimeError] = useState(null);
   
-  // NUEVO: Estado para controlar la pantalla de carga inicial
+  // Estado para controlar la pantalla de carga inicial
   const [isAppReady, setIsAppReady] = useState(false);
 
   // Capturador visual de errores de respaldo
@@ -89,7 +89,9 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const isGridMode = (isStandalone && !standaloneSelection && !isScannedQr) || (!urlTableId && !isScannedQr && !clientData);
+  // CORRECCIÓN CLAVE: Esta lógica arregla el problema del "Botón que no hace nada"
+  // Solo mostramos el grid si NO hay sesión, NO se escaneó un QR de mesa, y NO se ha seleccionado nada.
+  const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -100,7 +102,7 @@ export default function ClientApp({ type }) {
     }
   }, [themeIndex]);
 
-  // Función de carga extraída
+  // Función de carga extraída para ser usada tanto al inicio como en los WebSockets
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     setIsLoadingTables(true);
     try {
@@ -126,10 +128,10 @@ export default function ClientApp({ type }) {
         disabledQrs: Array.isArray(disabled) ? disabled : []
       });
     } catch (error) {
-      console.error('Error al cargar configuración del Kiosko:', error);
+      console.error('Error al cargar configuración de la App de Clientes:', error);
     } finally {
       setIsLoadingTables(false);
-      // Si es la primera carga, quitamos la pantalla de carga (agregando un pequeñísimo delay para que luzca bien)
+      // Solo en la primera carga, esperamos medio segundito para que la pantalla de carga se vea fluida
       if (isInitialLoad) {
         setTimeout(() => setIsAppReady(true), 600);
       }
@@ -143,33 +145,24 @@ export default function ClientApp({ type }) {
 
   // Sincronización en tiempo real vía WebSockets
   useEffect(() => {
-    const handleUpdate = (eventName) => {
-      console.log(`📡 [WebSocket] Evento recibido del servidor: ${eventName}. Actualizando datos...`);
+    const handleUpdate = () => {
       fetchStoreData(false);
     };
 
-    // Funciones envoltura para saber qué evento detonó la actualización
-    const onConfigUpdate = () => handleUpdate('config:update');
-    const onBusinessConfig = () => handleUpdate('business_config_updated');
-    const onQrStatus = () => handleUpdate('qr:status_changed');
-    const onServiceStatus = () => handleUpdate('service_status_changed');
-    const onPosUpdate = () => handleUpdate('pos:update');
-    const onTableStatus = () => handleUpdate('table_status_updated');
-
-    socket.on('config:update', onConfigUpdate);
-    socket.on('business_config_updated', onBusinessConfig);
-    socket.on('qr:status_changed', onQrStatus); 
-    socket.on('service_status_changed', onServiceStatus); 
-    socket.on('pos:update', onPosUpdate); 
-    socket.on('table_status_updated', onTableStatus); 
+    socket.on('config:update', handleUpdate);
+    socket.on('business_config_updated', handleUpdate);
+    socket.on('qr:status_changed', handleUpdate); 
+    socket.on('service_status_changed', handleUpdate); 
+    socket.on('pos:update', handleUpdate); 
+    socket.on('table_status_updated', handleUpdate); 
     
     return () => {
-      socket.off('config:update', onConfigUpdate);
-      socket.off('business_config_updated', onBusinessConfig);
-      socket.off('qr:status_changed', onQrStatus);
-      socket.off('service_status_changed', onServiceStatus);
-      socket.off('pos:update', onPosUpdate);
-      socket.off('table_status_updated', onTableStatus);
+      socket.off('config:update', handleUpdate);
+      socket.off('business_config_updated', handleUpdate);
+      socket.off('qr:status_changed', handleUpdate);
+      socket.off('service_status_changed', handleUpdate);
+      socket.off('pos:update', handleUpdate);
+      socket.off('table_status_updated', handleUpdate);
     };
   }, [fetchStoreData]);
 
@@ -432,7 +425,7 @@ export default function ClientApp({ type }) {
                           </div>
                         </div>
                         
-                        {/* Overlay corregido para el botón Para Llevar */}
+                        {/* Overlay para el botón Para Llevar */}
                         {isLlevarDisabled && !isProcessingSelection && (
                           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-20">
                             <span className="bg-red-600 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
@@ -505,7 +498,8 @@ export default function ClientApp({ type }) {
 
                 <div className="w-full flex-1 flex flex-col overflow-y-auto custom-scrollbar relative">
                   
-                  {isStandalone && standaloneSelection && (
+                  {/* Este botón ahora aparece siempre que se seleccione manualmente algo, aunque pruebes desde PC */}
+                  {standaloneSelection && (
                     <div className="px-6 pt-6 pb-0 shrink-0 w-full max-w-sm mx-auto">
                       <motion.button
                         whileTap={{ scale: 0.95 }}
