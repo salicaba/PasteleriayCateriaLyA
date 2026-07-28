@@ -66,6 +66,9 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
+  // 🔥 NUEVO: Calculamos si estamos en el Mapa/Grid Principal
+  const isGridMode = isStandalone && !standaloneSelection && !isScannedQr;
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark', 'theme-lya');
@@ -258,12 +261,15 @@ export default function ClientApp({ type }) {
 
       <ClientConnectionShield>
         
+        {/* 🔥 FIX: AHORA SÍ PASAMOS TODA LA INFORMACIÓN AL ESCUDO */}
         <ClientServiceShield 
           activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
-          hasActiveSession={!!clientData}
           onForceLogout={handleClientLogout}
           type={effectiveType} 
           tableId={effectiveTableId} 
+          isStandalone={isStandalone}
+          isGridMode={isGridMode}
+          systemConfig={systemConfig}
         />
 
         <Toaster position="top-center" />
@@ -271,7 +277,7 @@ export default function ClientApp({ type }) {
         <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10">
           {!clientData ? (
             
-            isStandalone && !standaloneSelection && !isScannedQr ? (
+            isGridMode ? (
               
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
                 <header className="mb-6 mt-4 text-center">
@@ -298,7 +304,7 @@ export default function ClientApp({ type }) {
                       whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
                       disabled={isProcessingSelection !== null || isLlevarDisabled}
                       onClick={() => handleStandaloneSelect('llevar', null)}
-                      className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all ${
+                      className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all outline-none select-none ${
                         isLlevarDisabled 
                           ? 'bg-gray-300 dark:bg-gray-700 opacity-60 cursor-not-allowed shadow-none'
                           : 'bg-gray-900 dark:bg-white md:hover:shadow-2xl'
@@ -349,7 +355,7 @@ export default function ClientApp({ type }) {
                               whileTap={isMesaDisabled || isProcessingSelection ? {} : { scale: 0.95 }}
                               disabled={isMesaDisabled || isProcessingSelection !== null}
                               onClick={() => handleStandaloneSelect('mesa', table.id)}
-                              className={`relative overflow-hidden p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border ${
+                              className={`relative overflow-hidden p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border outline-none select-none ${
                                 isMesaDisabled
                                   ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-60'
                                   : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm md:hover:shadow-md'
@@ -385,10 +391,10 @@ export default function ClientApp({ type }) {
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setStandaloneSelection(null)}
-                      className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-bold transition-colors"
+                      className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-bold transition-colors outline-none select-none"
                     >
                       <ArrowLeft size={18} /> 
-                      <span>Volver al inicio</span>
+                      <span>Volver al Mapeo</span>
                     </motion.button>
                   </div>
                 )}
@@ -420,7 +426,7 @@ export default function ClientApp({ type }) {
                           setIsInstalling(false);
                         }
                       }}
-                      className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 md:hover:opacity-90 transition-all ${
+                      className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 md:hover:opacity-90 transition-all outline-none select-none ${
                         isInstalling ? 'opacity-70 cursor-not-allowed' : ''
                       }`}
                     >
