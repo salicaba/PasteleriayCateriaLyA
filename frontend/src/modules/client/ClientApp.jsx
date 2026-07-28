@@ -164,6 +164,22 @@ export default function ClientApp({ type }) {
     fetchStoreData(true);
   }, [fetchStoreData]);
 
+  // 🔥 MODO ESPÍA: ESCUCHA TODO LO QUE LLEGA POR WEBSOCKETS
+  useEffect(() => {
+    const espiaSockets = (eventName, ...args) => {
+      console.log(`🚨 SOCKET RECIBIDO: [${eventName}]`, args);
+      
+      // Si recibimos CUALQUIER evento que suene a configuración o mesas, forzamos recarga
+      if (eventName.includes('config') || eventName.includes('qr') || eventName.includes('table') || eventName.includes('pos')) {
+        console.log("🔄 Forzando actualización de datos por evento:", eventName);
+        fetchStoreData(false);
+      }
+    };
+
+    socket.onAny(espiaSockets);
+    return () => socket.offAny(espiaSockets);
+  }, [fetchStoreData]);
+
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
 
