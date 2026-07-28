@@ -1,3 +1,4 @@
+// src/modules/client/ClientApp.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -322,7 +323,9 @@ export default function ClientApp({ type }) {
         </AnimatePresence>
 
         <ClientConnectionShield>
+          {/* 🔥 EL BLINDAJE ANTI-CRASHEO: Este key obliga al Shield a reiniciarse al entrar al Login */}
           <ClientServiceShield 
+            key={`shield-mode-${isGridMode ? 'grid' : 'login'}`} 
             activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
             onForceLogout={handleClientLogout}
             type={effectiveType} 
