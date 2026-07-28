@@ -31,7 +31,6 @@ export const TicketCartGroup = ({
     try {
       await actionFn();
     } finally {
-      // Enfriamiento de 400ms para evitar saltos en el State Batching de React
       setTimeout(() => {
         setActionLocks(prev => ({ ...prev, [lockKey]: false }));
       }, 400);
@@ -66,7 +65,6 @@ export const TicketCartGroup = ({
       }
   }
 
-  // Lock para acciones a nivel de Cuenta (Ocultar, Cobrar, etc.)
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
   const isOcultarProcessing = actionLocks[`${cuentaName}-ocultar`];
 
@@ -206,22 +204,21 @@ export const TicketCartGroup = ({
       </div>
 
       <div className="px-2 pb-2 space-y-1.5">
-        {items.map((item, idx) => {
+        {/* 🔥 QUITAMOS EL `idx` DEL MAP PARA EVITAR CONFLICTOS DE RENDER */}
+        {items.map((item) => {
           
           const isCero = Number(item.precio) === 0;
           const isGhostPromo = item.isAutoPromo && isCero;
           const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA';
           const isDiscountedPromo = !isLockedPromo && (item.promoLabel || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)));
           
-          // 🔥 Variable Maestra (BUG 3 SOLUCIONADO)
           const isAnyPromo = isLockedPromo || isDiscountedPromo;
-          
           const promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
           const pOriginal = item.precioOriginal || (isGhostPromo ? (item.basePrice || item.precioBase || null) : null);
 
-          // ID Único estricto para los locks
+          // 🔥 MAGIA PURA: Clave inmutable. JAMÁS volverán a bailar en pantalla.
           const uniqueId = item.backendItemId || item.cartItemId || item.id;
-          const currentItemKey = `group-${uniqueId}-${Number(item.precio).toFixed(2)}-${item.enviadoCocina}-${item.kitchenStatus}-${idx}-${isGhostPromo}`;
+          const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}`;
           
           const isProcessingParent = processingItems[uniqueId];
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
@@ -234,7 +231,6 @@ export const TicketCartGroup = ({
             return true;
           });
 
-          // Keys para Locks individuales
           const lockKeyAdd = `${uniqueId}-add`;
           const lockKeyRemove = `${uniqueId}-rem`;
           const lockKeyDelete = `${uniqueId}-del`;
@@ -242,7 +238,6 @@ export const TicketCartGroup = ({
           const lockKeyToggle = `${uniqueId}-toggle`;
           const lockKeyTakeaway = `${uniqueId}-takeaway`;
 
-          // Estados de Locks Evaluados
           const isAddingLocal = actionLocks[lockKeyAdd];
           const isRemovingLocal = actionLocks[lockKeyRemove];
           const isDeletingLocal = actionLocks[lockKeyDelete];
@@ -250,7 +245,6 @@ export const TicketCartGroup = ({
           const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
           const isTakeawayLocal = actionLocks[lockKeyTakeaway];
 
-          // Construcción Condicional de Clases Neo-Bento para la Tarjeta
           let containerClasses = "relative group flex flex-col p-2.5 rounded-xl transition-all overflow-hidden border ";
           
           if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
@@ -262,7 +256,6 @@ export const TicketCartGroup = ({
              containerClasses += "opacity-100 ";
           }
 
-          // 🔥 APLICACIÓN BUG 3: Prioridad a isAnyPromo sobre enviadoCocina
           if (isAnyPromo) {
              if (item.enviadoCocina) {
                  containerClasses += "bg-rose-50/70 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30 ";
@@ -380,7 +373,6 @@ export const TicketCartGroup = ({
                 {!isVitrina && (
                   <div className="flex-1 flex items-center gap-1.5">
                     {item.enviadoCocina ? (
-                      // 🔥 BUG 2 SOLUCIONADO: Lock Asíncrono local envolviendo el botón
                       <motion.button 
                         whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
                         onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
