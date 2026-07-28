@@ -23,34 +23,6 @@ const getInitialTheme = () => {
   return 2;
 };
 
-// 🛡️ ESCUDO ANTI-CHOQUES (ErrorBoundary)
-// Si algo falla dentro del Login o el Menú, atrapa el error para que la pantalla no se quede negra.
-class ViewErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="m-6 p-6 bg-red-950/80 border border-red-500 rounded-2xl text-white shadow-xl">
-          <h3 className="text-lg font-black mb-2 text-red-400">Error interno en la vista</h3>
-          <p className="font-mono text-xs mb-4 text-red-200 break-words opacity-80">
-            {this.state.error?.toString()}
-          </p>
-          <p className="text-xs text-red-300">
-            *Toma captura de este error y compártelo con soporte.*
-          </p>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export default function ClientApp({ type }) {
   const { tableId: urlTableId } = useParams();
   const [searchParams] = useSearchParams();
@@ -60,8 +32,11 @@ export default function ClientApp({ type }) {
 
   const [isUpdating, setIsUpdating] = useState(false); 
   const [runtimeError, setRuntimeError] = useState(null);
+  
+  // Estado para controlar la pantalla de carga inicial
   const [isAppReady, setIsAppReady] = useState(false);
 
+  // Capturador visual de errores de respaldo
   useEffect(() => {
     const handleError = (event) => {
       setRuntimeError(event.message || String(event.error || 'Error desconocido de JavaScript'));
@@ -69,8 +44,10 @@ export default function ClientApp({ type }) {
     const handleRejection = (event) => {
       setRuntimeError(event.reason?.message || String(event.reason || 'Promesa rechazada no manejada'));
     };
+
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleRejection);
+
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleRejection);
@@ -99,8 +76,6 @@ export default function ClientApp({ type }) {
   const [isLoadingTables, setIsLoadingTables] = useState(false);
 
   const effectiveType = standaloneSelection?.type || type || (urlTableId ? 'mesa' : 'llevar');
-  
-  // 🔥 CONVERSIÓN ESTRICTA A STRING: Evita que el Login choque por recibir un Número en vez de un Texto.
   const effectiveTableId = standaloneSelection?.tableId 
     ? String(standaloneSelection.tableId) 
     : (urlTableId ? String(urlTableId) : undefined);
@@ -125,6 +100,7 @@ export default function ClientApp({ type }) {
     }
   }, [themeIndex]);
 
+  // Motor de carga en tiempo real y carga inicial
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     setIsLoadingTables(true);
     try {
@@ -157,10 +133,12 @@ export default function ClientApp({ type }) {
     }
   }, []);
 
+  // Primera carga al montar el componente
   useEffect(() => {
     fetchStoreData(true);
   }, [fetchStoreData]);
 
+  // Sincronización robusta en tiempo real vía WebSockets
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
 
@@ -252,7 +230,6 @@ export default function ClientApp({ type }) {
     setIsProcessingSelection(selectedTableId || 'takeaway');
     try {
       await new Promise(resolve => setTimeout(resolve, 300));
-      // Forzamos también el ID de mesa a ser String al guardarlo en el estado
       setStandaloneSelection({ type: selectedType, tableId: selectedTableId ? String(selectedTableId) : null });
     } finally {
       setIsProcessingSelection(null);
@@ -357,138 +334,129 @@ export default function ClientApp({ type }) {
           <Toaster position="top-center" />
           
           <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10">
-            {!clientData ? (
-              isGridMode ? (
-                /* ------------------------------------- */
-                /* VISTA DEL MAPEO / GRID DE MESAS       */
-                /* ------------------------------------- */
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
-                  <header className="mb-6 mt-4 text-center">
-                    <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
-                  </header>
+            {/* LÓGICA DE TRANSICIONES MÁGICAS (Soluciona la pantalla negra) */}
+            <AnimatePresence mode="wait">
+              {!clientData ? (
+                isGridMode ? (
+                  /* --- VISTA MAPEO (GRID) --- */
+                  <motion.div
+                    key="grid"
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -30, filter: 'blur(5px)' }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0 flex flex-col overflow-y-auto custom-scrollbar p-6 w-full"
+                  >
+                    <header className="mb-6 mt-4 text-center">
+                      <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
+                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
+                    </header>
 
-                  <AnimatePresence>
-                    {isGlobalOff && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3 mb-6">
-                        <ShieldAlert className="text-red-500 shrink-0 w-6 h-6" />
-                        <div>
-                          <h4 className="text-red-600 dark:text-red-400 font-black text-sm">Servicio Digital Suspendido</h4>
-                          <p className="text-red-500/80 text-xs font-bold mt-1 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. ¿Estamos abiertos?, pase y consuma sin compromiso.</p>
+                    <AnimatePresence>
+                      {isGlobalOff && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3 mb-6">
+                          <ShieldAlert className="text-red-500 shrink-0 w-6 h-6" />
+                          <div>
+                            <h4 className="text-red-600 dark:text-red-400 font-black text-sm">Servicio Digital Suspendido</h4>
+                            <p className="text-red-500/80 text-xs font-bold mt-1 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. ¿Estamos abiertos?, pase y consuma sin compromiso.</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="flex flex-col gap-6">
+                      {/* Botón Para Llevar */}
+                      <section>
+                        <motion.button
+                          whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
+                          disabled={isProcessingSelection !== null || isLlevarDisabled}
+                          onClick={() => handleStandaloneSelect('llevar', null)}
+                          className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all outline-none select-none ${isLlevarDisabled ? 'bg-gray-300 dark:bg-gray-700 opacity-60 cursor-not-allowed shadow-none' : 'bg-gray-900 dark:bg-white md:hover:shadow-2xl'} ${isProcessingSelection === 'takeaway' ? 'opacity-70' : ''}`}
+                        >
+                          <div className="flex items-center gap-4 relative z-10">
+                            <div className={`p-4 rounded-2xl ${isLlevarDisabled ? 'bg-gray-400 dark:bg-gray-600' : 'bg-white/10 dark:bg-gray-900/10'}`}>
+                              <Coffee className="w-7 h-7" />
+                            </div>
+                            <div className="text-left">
+                              <h3 className="text-xl font-bold">Para Llevar</h3>
+                              <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Desactivado / Apagado' : 'Recoge en mostrador'}</p>
+                            </div>
+                          </div>
+                          {isLlevarDisabled && !isProcessingSelection && (
+                            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-20">
+                              <span className="bg-red-600 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+                                <WifiOff className="w-4 h-4" /> Apagado
+                              </span>
+                            </div>
+                          )}
+                          {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-20" />}
+                        </motion.button>
+                      </section>
+
+                      {/* Mesas */}
+                      <section>
+                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                          {isLoadingTables ? (
+                            <div className="col-span-2 flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
+                          ) : activeTables.length === 0 ? (
+                            <div className="col-span-2 text-center py-6 bg-gray-100 dark:bg-gray-800/50 rounded-2xl text-gray-500 text-sm font-bold">No hay mesas disponibles en este momento.</div>
+                          ) : (
+                            activeTables.map((table) => {
+                              const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
+                              const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`) || safeDisabledQrs.includes(`table-${table.id}`) || safeDisabledQrs.includes(`mesa-${table.id}`);
+                              const isTableActive = table.isActive ?? table.qrActive ?? table.active ?? true;
+                              const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied || !isTableActive;
+                              const isThisProcessing = isProcessingSelection === table.id;
+
+                              return (
+                                <motion.button
+                                  key={table.id}
+                                  whileTap={isMesaDisabled || isProcessingSelection ? {} : { scale: 0.95 }}
+                                  disabled={isMesaDisabled || isProcessingSelection !== null}
+                                  onClick={() => handleStandaloneSelect('mesa', table.id)}
+                                  className={`relative overflow-hidden p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border outline-none select-none ${isMesaDisabled ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-60' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm md:hover:shadow-md'}`}
+                                >
+                                  {isThisProcessing ? <Loader2 className="w-7 h-7 animate-spin z-10" /> : <Utensils className={`w-7 h-7 z-10 ${isMesaDisabled ? 'opacity-40' : ''}`} />}
+                                  <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
+                                  {isMesaDisabled && (
+                                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 text-center z-20">
+                                      <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1">
+                                        <WifiOff className="w-3.5 h-3.5" /> {isOccupied ? 'Ocupada' : 'Apagado'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </motion.button>
+                              );
+                            })
+                          )}
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6">
-                    <section>
-                      <motion.button
-                        whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
-                        disabled={isProcessingSelection !== null || isLlevarDisabled}
-                        onClick={() => handleStandaloneSelect('llevar', null)}
-                        className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all outline-none select-none ${isLlevarDisabled ? 'bg-gray-300 dark:bg-gray-700 opacity-60 cursor-not-allowed shadow-none' : 'bg-gray-900 dark:bg-white md:hover:shadow-2xl'} ${isProcessingSelection === 'takeaway' ? 'opacity-70' : ''}`}
-                      >
-                        <div className="flex items-center gap-4 relative z-10">
-                          <div className={`p-4 rounded-2xl ${isLlevarDisabled ? 'bg-gray-400 dark:bg-gray-600' : 'bg-white/10 dark:bg-gray-900/10'}`}>
-                            <Coffee className="w-7 h-7" />
-                          </div>
-                          <div className="text-left">
-                            <h3 className="text-xl font-bold">Para Llevar</h3>
-                            <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Desactivado / Apagado' : 'Recoge en mostrador'}</p>
-                          </div>
-                        </div>
-                        {isLlevarDisabled && !isProcessingSelection && (
-                          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-20">
-                            <span className="bg-red-600 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
-                              <WifiOff className="w-4 h-4" /> Apagado
-                            </span>
-                          </div>
-                        )}
-                        {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-20" />}
-                      </motion.button>
-                    </section>
-
-                    <section>
-                      <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
-                      <div className="grid grid-cols-2 gap-4">
-                        {isLoadingTables ? (
-                          <div className="col-span-2 flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
-                        ) : activeTables.length === 0 ? (
-                          <div className="col-span-2 text-center py-6 bg-gray-100 dark:bg-gray-800/50 rounded-2xl text-gray-500 text-sm font-bold">No hay mesas disponibles en este momento.</div>
-                        ) : (
-                          activeTables.map((table) => {
-                            const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
-                            const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`) || safeDisabledQrs.includes(`table-${table.id}`) || safeDisabledQrs.includes(`mesa-${table.id}`);
-                            const isTableActive = table.isActive ?? table.qrActive ?? table.active ?? true;
-                            const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied || !isTableActive;
-                            const isThisProcessing = isProcessingSelection === table.id;
-
-                            return (
-                              <motion.button
-                                key={table.id}
-                                whileTap={isMesaDisabled || isProcessingSelection ? {} : { scale: 0.95 }}
-                                disabled={isMesaDisabled || isProcessingSelection !== null}
-                                onClick={() => handleStandaloneSelect('mesa', table.id)}
-                                className={`relative overflow-hidden p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border outline-none select-none ${isMesaDisabled ? 'bg-gray-100 dark:bg-gray-800 border-transparent cursor-not-allowed opacity-60' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm md:hover:shadow-md'}`}
-                              >
-                                {isThisProcessing ? <Loader2 className="w-7 h-7 animate-spin z-10" /> : <Utensils className={`w-7 h-7 z-10 ${isMesaDisabled ? 'opacity-40' : ''}`} />}
-                                <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
-                                {isMesaDisabled && (
-                                  <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 text-center z-20">
-                                    <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1">
-                                      <WifiOff className="w-3.5 h-3.5" /> {isOccupied ? 'Ocupada' : 'Apagado'}
-                                    </span>
-                                  </div>
-                                )}
-                              </motion.button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </section>
-                  </motion.div>
-                </div>
-              ) : (
-                /* ------------------------------------- */
-                /* VISTA DEL LOGIN DE CLIENTES           */
-                /* ------------------------------------- */
-                <div className="w-full flex-1 flex flex-col overflow-y-auto custom-scrollbar relative">
-                  
-                  {/* Botón de retorno seguro. Ahora NO se quita si hay error abajo. */}
-                  {standaloneSelection && (
-                    <div className="px-6 pt-6 pb-0 shrink-0 w-full max-w-sm mx-auto z-20 relative">
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setStandaloneSelection(null)}
-                        className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-bold transition-colors outline-none select-none bg-transparent"
-                      >
-                        <ArrowLeft size={18} /> 
-                        <span>Volver al Mapeo</span>
-                      </motion.button>
+                      </section>
                     </div>
-                  )}
-
-                  {!isStandalone && isInstallable && (
-                    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="m-4 mb-0 bg-gray-900 dark:bg-white rounded-2xl p-4 shadow-xl flex items-center justify-between gap-4 z-20 shrink-0">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-white/10 dark:bg-gray-900/10 p-2 rounded-xl shrink-0"><MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" /></div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya</h4>
-                          <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
-                        </div>
+                  </motion.div>
+                ) : (
+                  /* --- VISTA LOGIN --- */
+                  <motion.div
+                    key="login"
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 30, filter: 'blur(5px)' }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0 flex flex-col w-full h-full overflow-hidden"
+                  >
+                    {/* Botón flotante para regresar al Grid */}
+                    {standaloneSelection && (
+                      <div className="absolute top-6 left-6 z-50">
+                        <motion.button
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => setStandaloneSelection(null)}
+                          className="flex items-center justify-center w-11 h-11 bg-white/80 dark:bg-gray-800/80 lya:bg-[#EADCC9]/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] rounded-full shadow-lg text-gray-700 dark:text-gray-200 lya:text-[#3E2723] outline-none select-none transition-all"
+                        >
+                          <ArrowLeft size={22} strokeWidth={2.5} /> 
+                        </motion.button>
                       </div>
-                      <motion.button
-                        whileTap={isInstalling ? {} : { scale: 0.95 }} disabled={isInstalling}
-                        onClick={async (e) => { e.preventDefault(); setIsInstalling(true); try { localStorage.setItem('lya_pwa_mode', 'client'); await promptInstall(); } finally { setIsInstalling(false); } }}
-                        className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 transition-all outline-none select-none ${isInstalling ? 'opacity-70 cursor-not-allowed' : ''}`}
-                      >
-                        {isInstalling && <Loader2 className="w-3 h-3 animate-spin" />}<span>Instalar</span>
-                      </motion.button>
-                    </motion.div>
-                  )}
+                    )}
 
-                  {/* ENVOLTORIO PROTECTOR AL LOGIN */}
-                  <ViewErrorBoundary>
                     <ClientLogin 
                       onLogin={(data) => {
                         const sessionData = { ...data, type: effectiveType, tableId: effectiveTableId };
@@ -498,23 +466,50 @@ export default function ClientApp({ type }) {
                       type={effectiveType} 
                       tableId={effectiveTableId} 
                     />
-                  </ViewErrorBoundary>
-                </div>
-              )
-            ) : (
-              /* ------------------------------------- */
-              /* VISTA DEL MENÚ PRINCIPAL (YA LOGUEADO)*/
-              /* ------------------------------------- */
-              <ViewErrorBoundary>
-                <ClientMenu 
-                  clientData={clientData} 
-                  type={clientData.type || effectiveType} 
-                  tableId={clientData.tableId || effectiveTableId} 
-                  onLogout={handleClientLogout}
-                  setActiveOrdersCount={setActiveOrdersCount}
-                />
-              </ViewErrorBoundary>
-            )}
+
+                    {/* Banner Install PWA abajo del login */}
+                    {!isStandalone && isInstallable && (
+                      <div className="absolute bottom-6 left-6 right-6 z-50">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-900 dark:bg-white rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-white/10 dark:bg-gray-900/10 p-2 rounded-xl shrink-0"><MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" /></div>
+                            <div>
+                              <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya</h4>
+                              <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
+                            </div>
+                          </div>
+                          <motion.button
+                            whileTap={isInstalling ? {} : { scale: 0.95 }} disabled={isInstalling}
+                            onClick={async (e) => { e.preventDefault(); setIsInstalling(true); try { localStorage.setItem('lya_pwa_mode', 'client'); await promptInstall(); } finally { setIsInstalling(false); } }}
+                            className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 transition-all outline-none select-none ${isInstalling ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          >
+                            {isInstalling && <Loader2 className="w-3 h-3 animate-spin" />}<span>Instalar</span>
+                          </motion.button>
+                        </motion.div>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              ) : (
+                /* --- VISTA MENÚ DEL CLIENTE --- */
+                <motion.div
+                  key="menu"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.3 }}
+                  className="absolute inset-0 w-full h-full"
+                >
+                  <ClientMenu 
+                    clientData={clientData} 
+                    type={clientData.type || effectiveType} 
+                    tableId={clientData.tableId || effectiveTableId} 
+                    onLogout={handleClientLogout}
+                    setActiveOrdersCount={setActiveOrdersCount}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </main>
 
           {/* Modal "Código QR Expirado" */}
