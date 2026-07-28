@@ -1,5 +1,4 @@
-// frontend/src/modules/client/ClientApp.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, WifiOff } from 'lucide-react';
@@ -98,73 +97,67 @@ export default function ClientApp({ type }) {
     }
   }, [themeIndex]);
 
-  // 🔥 CARGA CORREGIDA: Sincroniza tanto las mesas como las configuraciones globales desde /settings
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoadingTables(true);
-      try {
-        const [tablesRes, settingsRes] = await Promise.all([
-          api.get('/pos/public/tables').catch(() => api.get('/pos/tables')),
-          api.get('/settings').catch(() => ({ data: {} }))
-        ]);
-        
-        const payload = tablesRes.data;
-        const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
-        setActiveTables(tablesArray);
+  // Función de carga extraída para ser llamada también por los WebSockets
+  const fetchStoreData = useCallback(async () => {
+    setIsLoadingTables(true);
+    try {
+      const [tablesRes, settingsRes] = await Promise.all([
+        api.get('/pos/public/tables').catch(() => api.get('/pos/tables')),
+        api.get('/settings').catch(() => ({ data: {} }))
+      ]);
+      
+      const payload = tablesRes.data;
+      const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
+      setActiveTables(tablesArray);
 
-        const settingsData = settingsRes.data || {};
-        const isActive = settingsData.qr_service_active !== 'false' && settingsData.qr_service_active !== false;
+      const settingsData = settingsRes.data || {};
+      const isActive = settingsData.qr_service_active !== 'false' && settingsData.qr_service_active !== false;
 
-        let disabled = settingsData.disabled_qrs || payload?.disabled_qrs || [];
-        if (typeof disabled === 'string') {
-          try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
-        }
-
-        setSystemConfig({
-          isQrActive: isActive,
-          disabledQrs: Array.isArray(disabled) ? disabled : []
-        });
-      } catch (error) {
-        console.error('Error al cargar configuración del Kiosko:', error);
-      } finally {
-        setIsLoadingTables(false);
+      let disabled = settingsData.disabled_qrs || payload?.disabled_qrs || [];
+      if (typeof disabled === 'string') {
+        try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
       }
-    };
-    fetchInitialData();
+
+      setSystemConfig({
+        isQrActive: isActive,
+        disabledQrs: Array.isArray(disabled) ? disabled : []
+      });
+    } catch (error) {
+      console.error('Error al cargar configuración del Kiosko:', error);
+    } finally {
+      setIsLoadingTables(false);
+    }
   }, []);
+
+  // Primera carga al montar el componente
+  useEffect(() => {
+    fetchStoreData();
+  }, [fetchStoreData]);
 
   // Sincronización en tiempo real vía WebSockets
   useEffect(() => {
-    const handleConfigUpdate = (updates) => {
-      if (!updates) return;
-      setSystemConfig(prev => {
-        const newState = { ...prev };
-        if (updates.qr_service_active !== undefined) {
-          newState.isQrActive = updates.qr_service_active !== 'false' && updates.qr_service_active !== false;
-        }
-        if (updates.disabled_qrs !== undefined) {
-          let parsed = updates.disabled_qrs;
-          if (typeof parsed === 'string') {
-            try { parsed = JSON.parse(parsed); } catch(e) { parsed = []; }
-          }
-          newState.disabledQrs = Array.isArray(parsed) ? parsed : [];
-        }
-        return newState;
-      });
+    // Si llega un evento, refrescamos directamente los datos de la base de datos
+    const handleUpdate = () => {
+      fetchStoreData();
     };
 
-    const handleStatusChange = (status) => {
-      setSystemConfig(prev => ({ ...prev, isQrActive: status !== 'false' && status !== false }));
-    };
-
-    socket.on('config:update', handleConfigUpdate);
-    socket.on('qr:status_changed', handleStatusChange); 
+    // Escuchar múltiples eventos para asegurar que cualquier cambio en POS o Admin actualice el grid del cliente
+    socket.on('config:update', handleUpdate);
+    socket.on('business_config_updated', handleUpdate);
+    socket.on('qr:status_changed', handleUpdate); 
+    socket.on('service_status_changed', handleUpdate); 
+    socket.on('pos:update', handleUpdate); 
+    socket.on('table_status_updated', handleUpdate); 
     
     return () => {
-      socket.off('config:update', handleConfigUpdate);
-      socket.off('qr:status_changed', handleStatusChange);
+      socket.off('config:update', handleUpdate);
+      socket.off('business_config_updated', handleUpdate);
+      socket.off('qr:status_changed', handleUpdate);
+      socket.off('service_status_changed', handleUpdate);
+      socket.off('pos:update', handleUpdate);
+      socket.off('table_status_updated', handleUpdate);
     };
-  }, []);
+  }, [fetchStoreData]);
 
   const handleClientLogout = React.useCallback(() => {
     localStorage.removeItem('lya_client_session');
@@ -366,7 +359,7 @@ export default function ClientApp({ type }) {
                       <ShieldAlert className="text-red-500 shrink-0 w-6 h-6" />
                       <div>
                         <h4 className="text-red-600 dark:text-red-400 font-black text-sm">Servicio Digital Suspendido</h4>
-                        <p className="text-red-500/80 text-xs font-bold mt-1 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. Por favor ordene en mostrador.</p>
+                        <p className="text-red-500/80 text-xs font-bold mt-1 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. ¿Estamos abiertos?, pase y consuma sin compromiso.</p>
                       </div>
                     </motion.div>
                   )}
@@ -395,14 +388,16 @@ export default function ClientApp({ type }) {
                         </div>
                       </div>
                       
+                      {/* Overlay corregido para el botón Para Llevar */}
                       {isLlevarDisabled && !isProcessingSelection && (
-                        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
-                          <span className="bg-red-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-20">
+                          <span className="bg-red-600 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
                             <WifiOff className="w-4 h-4" /> Apagado
                           </span>
                         </div>
                       )}
-                      {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-10" />}
+                      
+                      {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-20" />}
                     </motion.button>
                   </section>
 
@@ -447,7 +442,7 @@ export default function ClientApp({ type }) {
                               <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
                               
                               {isMesaDisabled && (
-                                <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 text-center z-20">
+                                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 text-center z-20">
                                   <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1">
                                     <WifiOff className="w-3.5 h-3.5" /> {isOccupied ? 'Ocupada' : 'Apagado'}
                                   </span>

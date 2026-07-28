@@ -11,26 +11,23 @@ export const ClientServiceShield = ({
   onForceLogout,
   type,
   tableId,
-  isGridMode, 
-  isStandalone 
+  isGridMode, // 🔥 Inyectamos para saber si estamos en el Mapa
+  isStandalone // 🔥 Inyectamos para saber si mostramos el botón de volver
 }) => {
   const [globalActive, setGlobalActive] = useState(true);
   const [disabledQrs, setDisabledQrs] = useState([]);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await client.get('/settings');
-      const data = res?.data || {};
+      const res = await client.get('/settings'); // Usamos la raíz
+      const data = res.data;
       
-      // Verificamos el estado global de forma segura
-      setGlobalActive(data.qr_service_active !== 'false' && data.qr_service_active !== false);
+      // Verificamos el estado global
+      setGlobalActive(data.qr_service_active !== 'false');
       
-      // Verificamos de forma defensiva la lista negra de QRs apagados
-      if (data.disabled_qrs !== undefined) {
-        let parsed = data.disabled_qrs;
-        if (typeof parsed === 'string') {
-          try { parsed = JSON.parse(parsed); } catch (e) { parsed = []; }
-        }
+      // Verificamos la lista negra de QRs apagados individualmente
+      if (data.disabled_qrs) {
+        const parsed = typeof data.disabled_qrs === 'string' ? JSON.parse(data.disabled_qrs) : data.disabled_qrs;
         setDisabledQrs(Array.isArray(parsed) ? parsed : []);
       } else {
         setDisabledQrs([]);
@@ -45,57 +42,38 @@ export const ClientServiceShield = ({
     const intervalId = setInterval(fetchStatus, 5000); 
 
     const handleConfigUpdate = (updates) => {
-      if (!updates) return;
-      if (updates.qr_service_active !== undefined) {
-        setGlobalActive(updates.qr_service_active !== 'false' && updates.qr_service_active !== false);
-      }
-      if (updates.disabled_qrs !== undefined) {
-        let parsed = updates.disabled_qrs;
-        if (typeof parsed === 'string') {
-          try { parsed = JSON.parse(parsed); } catch (e) { parsed = []; }
+      if (updates) {
+        if (updates.qr_service_active !== undefined) {
+          setGlobalActive(updates.qr_service_active !== 'false');
         }
-        setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        if (updates.disabled_qrs !== undefined) {
+          const parsed = typeof updates.disabled_qrs === 'string' ? JSON.parse(updates.disabled_qrs) : updates.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
       }
     };
 
-    const handleStatusChange = (status) => {
-      setGlobalActive(status !== 'false' && status !== false);
-    };
-
-    // Escucha de todos los eventos posibles del backend para actualización en tiempo real inmediata
     socket.on('config:update', handleConfigUpdate);
-    socket.on('business_config_updated', handleConfigUpdate);
-    socket.on('qr:status_changed', handleStatusChange);
-    socket.on('service_status_changed', handleStatusChange);
+    socket.on('qr:status_changed', (status) => setGlobalActive(status));
     socket.on('pos:update', fetchStatus); 
 
     return () => {
       clearInterval(intervalId);
       socket.off('config:update', handleConfigUpdate);
-      socket.off('business_config_updated', handleConfigUpdate);
-      socket.off('qr:status_changed', handleStatusChange);
-      socket.off('service_status_changed', handleStatusChange);
+      socket.off('qr:status_changed');
       socket.off('pos:update', fetchStatus);
     };
   }, [fetchStatus]);
 
-  // Si estamos en el Mapa/Grid principal, el Escudo se oculta para permitir elegir otra mesa u opción
+  // 🔥 REGLA DE ORO: Si estamos en el Mapa/Grid, el Escudo se oculta para dejarte elegir otra mesa.
   if (isGridMode) return null;
 
-  // Blindaje estricto de arreglos para evitar errores de tipo
-  const safeDisabledQrs = Array.isArray(disabledQrs) ? disabledQrs : [];
-
-  // Lógica granular de desactivación
-  const isLlevarDisabled = type === 'llevar' && (safeDisabledQrs.includes('llevar') || safeDisabledQrs.includes('takeaway'));
-  const isThisMesaDisabled = type === 'mesa' && (
-    safeDisabledQrs.includes(`mesa-${tableId}`) || 
-    safeDisabledQrs.includes(`table-${tableId}`) ||
-    safeDisabledQrs.includes(`mesa-${tableId?.toString()}`)
-  );
-  
+  // 🔥 LÓGICA GRANULAR: ¿A quién le toca el escudo?
+  const isLlevarDisabled = type === 'llevar' && disabledQrs.includes('llevar');
+  const isThisMesaDisabled = type === 'mesa' && disabledQrs.includes(`mesa-${tableId}`);
   const isLocallyDisabled = isLlevarDisabled || isThisMesaDisabled;
 
-  // Condición de visualización del escudo: Apagado global o local, y sin pedidos activos en curso
+  // Condición inquebrantable: Apagado global O local, Y sin pedidos activos
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
 
   useEffect(() => {
@@ -104,9 +82,9 @@ export const ClientServiceShield = ({
     }
   }, [shouldShowShield, hasActiveSession, onForceLogout]);
 
-  // Textos y componentes dinámicos de acuerdo al estado con el nuevo mensaje personalizado
-  let shieldTitle = "Servicio Digital Suspendido";
-  let shieldMessage = "El local está abierto, pero los pedidos desde la App están temporalmente pausados. ¿Estamos abiertos?, pase y consuma sin compromiso.";
+  // Textos dinámicos dependiendo de QUÉ se apagó
+  let shieldTitle = "Servicio Suspendido";
+  let shieldMessage = "Puede que ya haya acabado nuestro horario de servico y apagamos las peticiones en la App y QR. ¿Estamos abiertos?, pasa y consume sin compromiso.";
   let IconToRender = Store;
 
   if (isLocallyDisabled && globalActive) {
@@ -116,7 +94,7 @@ export const ClientServiceShield = ({
       IconToRender = Coffee;
     } else if (isThisMesaDisabled) {
       shieldTitle = "Mesa Fuera de Servicio";
-      shieldMessage = `La Mesa ${tableId || ''} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne otra mesa habilitada.`;
+      shieldMessage = `La Mesa ${tableId} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne otra mesa habilitada.`;
       IconToRender = UtensilsCrossed;
     }
   }
@@ -154,7 +132,7 @@ export const ClientServiceShield = ({
             </p>
 
             <div className="w-full relative z-10 flex flex-col gap-3">
-              {/* Botón para volver al Mapeo si está en la App standalone / PWA */}
+              {/* 🔥 BOTÓN PARA VOLVER AL MAPEO SI ESTÁ EN LA APP */}
               {isStandalone && (
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
@@ -166,7 +144,7 @@ export const ClientServiceShield = ({
                 </motion.button>
               )}
 
-              {/* Botón de comprobar servicio / recargar */}
+              {/* BOTÓN ORIGINAL DE REINTENTAR */}
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}
