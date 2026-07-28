@@ -1,22 +1,72 @@
-import React from 'react';
+// frontend/src/modules/client/views/components/ClientServiceShield.jsx
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Coffee, UtensilsCrossed, Home, RotateCcw } from 'lucide-react';
+import { socket } from '../../../../api/socket';
+import client from '../../../../api/client';
 
 export const ClientServiceShield = ({ 
   activeOrdersCount = 0, 
+  hasActiveSession = false, 
   onForceLogout,
   type,
   tableId,
-  isStandalone,
-  isGridMode,
-  systemConfig
+  isGridMode, // 🔥 Inyectamos para saber si estamos en el Mapa
+  isStandalone // 🔥 Inyectamos para saber si mostramos el botón de volver
 }) => {
+  const [globalActive, setGlobalActive] = useState(true);
+  const [disabledQrs, setDisabledQrs] = useState([]);
 
-  // 🛡️ Regla 1: Si estamos en el Grid del inicio (Mapeo), este escudo NO actúa.
-  if (isGridMode || !type) return null;
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await client.get('/settings'); // Usamos la raíz
+      const data = res.data;
+      
+      // Verificamos el estado global
+      setGlobalActive(data.qr_service_active !== 'false');
+      
+      // Verificamos la lista negra de QRs apagados individualmente
+      if (data.disabled_qrs) {
+        const parsed = typeof data.disabled_qrs === 'string' ? JSON.parse(data.disabled_qrs) : data.disabled_qrs;
+        setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+      } else {
+        setDisabledQrs([]);
+      }
+    } catch (error) {
+      console.error("Error al consultar estado de servicios", error);
+    }
+  }, []);
 
-  const globalActive = systemConfig?.isQrActive ?? true;
-  const disabledQrs = systemConfig?.disabledQrs || [];
+  useEffect(() => {
+    fetchStatus();
+    const intervalId = setInterval(fetchStatus, 5000); 
+
+    const handleConfigUpdate = (updates) => {
+      if (updates) {
+        if (updates.qr_service_active !== undefined) {
+          setGlobalActive(updates.qr_service_active !== 'false');
+        }
+        if (updates.disabled_qrs !== undefined) {
+          const parsed = typeof updates.disabled_qrs === 'string' ? JSON.parse(updates.disabled_qrs) : updates.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
+      }
+    };
+
+    socket.on('config:update', handleConfigUpdate);
+    socket.on('qr:status_changed', (status) => setGlobalActive(status));
+    socket.on('pos:update', fetchStatus); 
+
+    return () => {
+      clearInterval(intervalId);
+      socket.off('config:update', handleConfigUpdate);
+      socket.off('qr:status_changed');
+      socket.off('pos:update', fetchStatus);
+    };
+  }, [fetchStatus]);
+
+  // 🔥 REGLA DE ORO: Si estamos en el Mapa/Grid, el Escudo se oculta para dejarte elegir otra mesa.
+  if (isGridMode) return null;
 
   // 🔥 LÓGICA GRANULAR: ¿A quién le toca el escudo?
   const isLlevarDisabled = type === 'llevar' && disabledQrs.includes('llevar');
@@ -25,6 +75,12 @@ export const ClientServiceShield = ({
 
   // Condición inquebrantable: Apagado global O local, Y sin pedidos activos
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
+
+  useEffect(() => {
+    if (shouldShowShield && hasActiveSession && typeof onForceLogout === 'function') {
+      onForceLogout();
+    }
+  }, [shouldShowShield, hasActiveSession, onForceLogout]);
 
   // Textos dinámicos dependiendo de QUÉ se apagó
   let shieldTitle = "Servicio Suspendido";
@@ -76,22 +132,23 @@ export const ClientServiceShield = ({
             </p>
 
             <div className="w-full relative z-10 flex flex-col gap-3">
-              {/* 🔥 BOTÓN INTELIGENTE: Solo sale si están en la App (Standalone) */}
+              {/* 🔥 BOTÓN PARA VOLVER AL MAPEO SI ESTÁ EN LA APP */}
               {isStandalone && (
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
-                  onClick={onForceLogout}
-                  className="w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl md:hover:shadow-lg transition-all flex items-center justify-center gap-2 outline-none"
+                  onClick={onForceLogout} 
+                  className="w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl md:hover:shadow-lg transition-all flex items-center justify-center gap-2 outline-none select-none"
                 >
                   <Home size={18} />
                   Volver al Mapeo
                 </motion.button>
               )}
-              
+
+              {/* BOTÓN ORIGINAL DE REINTENTAR */}
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}
-                className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold py-4 rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 outline-none"
+                className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold py-4 rounded-2xl md:hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 outline-none select-none"
               >
                 <RotateCcw size={18} />
                 Comprobar Servicio

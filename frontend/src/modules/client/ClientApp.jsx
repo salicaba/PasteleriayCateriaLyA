@@ -56,7 +56,9 @@ export default function ClientApp({ type }) {
   const [activeTables, setActiveTables] = useState([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
 
-  const effectiveType = standaloneSelection?.type || type;
+  // 🔥 FIX CLAVE: Si 'type' viene vacío, deducimos qué es en base a la URL. 
+  // Esto evita que el Escudo muera por no saber si es mesa o llevar.
+  const effectiveType = standaloneSelection?.type || type || (urlTableId ? 'mesa' : 'llevar');
   const effectiveTableId = standaloneSelection?.tableId || urlTableId;
 
   const [themeIndex] = useState(getInitialTheme);
@@ -79,9 +81,6 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // ============================================================================
-  // 🔥 FIX: CARGA DINÁMICA DE CONFIGURACIÓN (AHORA PARA TODOS LOS CLIENTES)
-  // ============================================================================
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoadingTables(true);
@@ -93,14 +92,11 @@ export default function ClientApp({ type }) {
         setActiveTables(tablesArray);
 
         if (payload?.disabled_qrs !== undefined || payload?.isQrActive !== undefined) {
-          
-          // Blindaje booleano
           let isActive = true;
           if (payload.isQrActive !== undefined) {
             isActive = payload.isQrActive !== 'false' && payload.isQrActive !== false;
           }
 
-          // Blindaje Array
           let disabled = payload.disabled_qrs || [];
           if (typeof disabled === 'string') disabled = JSON.parse(disabled);
 
@@ -115,14 +111,9 @@ export default function ClientApp({ type }) {
         setIsLoadingTables(false);
       }
     };
-    
-    // Se ejecuta al cargar la app sin importar de dónde venga
     fetchInitialData();
   }, []);
 
-  // ============================================================================
-  // ESCUCHA DE SOCKETS (TIEMPO REAL)
-  // ============================================================================
   useEffect(() => {
     const handleConfigUpdate = (updates) => {
       if (!updates) return;
@@ -145,7 +136,7 @@ export default function ClientApp({ type }) {
     };
 
     socket.on('config:update', handleConfigUpdate);
-    socket.on('qr:status_changed', handleStatusChange); // Escucha de apagado global explícito
+    socket.on('qr:status_changed', handleStatusChange); 
     
     return () => {
       socket.off('config:update', handleConfigUpdate);
@@ -153,9 +144,6 @@ export default function ClientApp({ type }) {
     };
   }, []);
 
-  // ============================================================================
-  // LÓGICA DE EXPULSIÓN INMEDIATA (KILL-SWITCH EN ACCIÓN)
-  // ============================================================================
   const handleClientLogout = React.useCallback(() => {
     localStorage.removeItem('lya_client_session');
     setClientData(null);
@@ -163,19 +151,7 @@ export default function ClientApp({ type }) {
     setStandaloneSelection(null); 
   }, []);
 
-  useEffect(() => {
-    if (clientData && activeOrdersCount === 0) {
-      const isMesa = clientData.type === 'mesa';
-      const isLlevar = clientData.type === 'llevar';
-      
-      const isThisMesaPaused = isMesa && systemConfig.disabledQrs.includes(`mesa-${clientData.tableId}`);
-      const isThisLlevarPaused = isLlevar && systemConfig.disabledQrs.includes('llevar');
-
-      if (!systemConfig.isQrActive || isThisMesaPaused || isThisLlevarPaused) {
-        handleClientLogout();
-      }
-    }
-  }, [systemConfig, clientData, activeOrdersCount, handleClientLogout]);
+  // Nota: Quitamos la autoexpulsión de aquí para que el ClientServiceShield lo maneje con tu código original.
 
   useEffect(() => {
     if (clientData) {
@@ -183,10 +159,10 @@ export default function ClientApp({ type }) {
       let needsRedirect = false;
       let targetPath = '';
 
-      if (sessionType && sessionType !== type) {
+      if (sessionType && sessionType !== effectiveType) {
         needsRedirect = true;
         targetPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
-      } else if (sessionType === 'mesa' && type === 'mesa' && sessionTableId && sessionTableId !== urlTableId) {
+      } else if (sessionType === 'mesa' && effectiveType === 'mesa' && sessionTableId && sessionTableId !== urlTableId) {
         needsRedirect = true;
         targetPath = `/m/${sessionTableId}`;
       }
@@ -195,7 +171,7 @@ export default function ClientApp({ type }) {
         navigate(targetPath, { replace: true });
       }
     }
-  }, [clientData, type, urlTableId, navigate]);
+  }, [clientData, effectiveType, urlTableId, navigate]);
 
   useEffect(() => {
     if (isStandalone) {
@@ -294,6 +270,7 @@ export default function ClientApp({ type }) {
 
       <ClientConnectionShield>
         
+        {/* 🔥 PASAMOS isGridMode y isStandalone AL ESCUDO ORIGINAL */}
         <ClientServiceShield 
           activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
           onForceLogout={handleClientLogout}
@@ -301,7 +278,6 @@ export default function ClientApp({ type }) {
           tableId={effectiveTableId} 
           isStandalone={isStandalone}
           isGridMode={isGridMode}
-          systemConfig={systemConfig}
         />
 
         <Toaster position="top-center" />
@@ -490,6 +466,7 @@ export default function ClientApp({ type }) {
           )}
         </main>
 
+        {/* Modal "Código QR Expirado" */}
         <AnimatePresence>
           {!isQrValid && !isStandalone && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
