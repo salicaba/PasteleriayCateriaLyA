@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download } from 'lucide-react';
+import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -26,12 +26,13 @@ const getInitialTheme = () => {
 
 export default function ClientApp({ type }) {
   const { tableId: urlTableId } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const qrTokenUrl = searchParams.get('token') || '';
   const isScannedQr = searchParams.get('qr') === 'true';
 
   const [isUpdating, setIsUpdating] = useState(false); 
+  const [showDebugGrid, setShowDebugGrid] = useState(false); // 🔥 ESTADO DIRECTO DE DEBUG
 
   const {
     needRefresh: [needRefresh],
@@ -63,9 +64,8 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  // 🔥 DETECCIÓN DE MODO GRID (Ya sea por PWA o por el botón de Debug ?grid=true)
-  const forceGridInBrowser = searchParams.get('grid') === 'true';
-  const isGridMode = (isStandalone || forceGridInBrowser) && !standaloneSelection && !isScannedQr;
+  // 🔥 MODO GRID DIRECTO POR ESTADO O PWA
+  const isGridMode = (isStandalone || showDebugGrid) && !standaloneSelection && !isScannedQr;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -81,7 +81,6 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Carga inicial de mesas y estado de los QRs
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoadingTables(true);
@@ -117,7 +116,6 @@ export default function ClientApp({ type }) {
     fetchInitialData();
   }, []);
 
-  // Escucha de Sockets en tiempo real para apagar/encender QRs
   useEffect(() => {
     const handleConfigUpdate = (updates) => {
       if (!updates) return;
@@ -178,7 +176,7 @@ export default function ClientApp({ type }) {
   }, [clientData, effectiveType, urlTableId, navigate]);
 
   useEffect(() => {
-    if (isStandalone || forceGridInBrowser) {
+    if (isStandalone || showDebugGrid) {
       setIsQrValid(true);
       return;
     }
@@ -202,7 +200,7 @@ export default function ClientApp({ type }) {
 
     socket.on('qr_security_update', handleSecurityUpdate);
     return () => socket.off('qr_security_update', handleSecurityUpdate);
-  }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone, forceGridInBrowser]);
+  }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone, showDebugGrid]);
 
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
@@ -294,14 +292,10 @@ export default function ClientApp({ type }) {
               
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
                 <header className="mb-6 mt-4 text-center relative">
-                  {forceGridInBrowser && (
+                  {showDebugGrid && (
                     <button
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete('grid');
-                        setSearchParams(newParams);
-                      }}
-                      className="absolute left-0 top-1 text-xs font-bold text-gray-500 hover:text-gray-900 underline"
+                      onClick={() => setShowDebugGrid(false)}
+                      className="absolute left-0 top-1 text-xs font-bold text-gray-500 hover:text-gray-900 underline outline-none"
                     >
                       Salir de Debug
                     </button>
@@ -461,6 +455,7 @@ export default function ClientApp({ type }) {
                   </motion.div>
                 )}
 
+                {/* 🔥 PASAMOS LA FUNCIÓN DIRECTA AL LOGIN */}
                 <ClientLogin 
                   onLogin={(data) => {
                     const sessionData = { ...data, type: effectiveType, tableId: effectiveTableId };
@@ -469,6 +464,7 @@ export default function ClientApp({ type }) {
                   }} 
                   type={effectiveType} 
                   tableId={effectiveTableId} 
+                  onOpenGrid={() => setShowDebugGrid(true)} 
                 />
               </div>
             )
@@ -484,7 +480,7 @@ export default function ClientApp({ type }) {
         </main>
 
         <AnimatePresence>
-          {!isQrValid && !isStandalone && !forceGridInBrowser && (
+          {!isQrValid && !isStandalone && !showDebugGrid && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 40 }}
@@ -517,7 +513,7 @@ export default function ClientApp({ type }) {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-black text-gray-900 dark:text-white lya:text-lya-text uppercase tracking-wider mb-0.5">¿Qué debes hacer?</h4>
                     <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify leading-snug">
-                      Por favor, solicita al personal de 𝓛𝔂𝓪 que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
+                      Por favor, solicita al personal de 𝓛𝔂α que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
                     </p>
                   </div>
                 </div>
