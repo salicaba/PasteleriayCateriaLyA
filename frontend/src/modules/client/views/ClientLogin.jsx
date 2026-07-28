@@ -31,15 +31,27 @@ export default function ClientLogin({ onLogin, type, tableId }) {
 
   // Efectos para inyectar el tema desde el Login
   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark', 'theme-lya');
-    root.classList.add(THEME_CLASSES[themeIndex]);
-    localStorage.setItem('lya_client_theme', themeIndex);
+    try {
+      const root = window.document.documentElement;
+      root.classList.remove('light', 'dark', 'theme-lya');
+      if (THEME_CLASSES && THEME_CLASSES[themeIndex]) {
+        root.classList.add(THEME_CLASSES[themeIndex]);
+      }
+      localStorage.setItem('lya_client_theme', themeIndex);
+    } catch (e) {
+      console.error('Error aplicando tema:', e);
+    }
   }, [themeIndex]);
 
   useEffect(() => {
-    document.documentElement.style.fontSize = SIZES[sizeIndex].val;
-    localStorage.setItem('lya_client_size', sizeIndex);
+    try {
+      if (SIZES && SIZES[sizeIndex]) {
+        document.documentElement.style.fontSize = SIZES[sizeIndex].val;
+      }
+      localStorage.setItem('lya_client_size', sizeIndex);
+    } catch (e) {
+      console.error('Error aplicando tamaño:', e);
+    }
   }, [sizeIndex]);
 
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
@@ -74,7 +86,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
     setIsProcessing(true);
 
     try {
-      // 🔥 MAGIA DE INTEGRACIÓN: Enviamos el formato separado por " | "
+      // MAGIA DE INTEGRACIÓN: Enviamos el formato separado por " | "
       const finalName = phone ? `${trimmedName} | ${phone}` : trimmedName;
       
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -92,6 +104,9 @@ export default function ClientLogin({ onLogin, type, tableId }) {
     }
   };
 
+  // Blindaje para evitar crasheos si el router manda tableId como objeto
+  const displayTableId = typeof tableId === 'object' ? tableId?.id || tableId?.tableId || 'Desconocida' : tableId;
+
   // PILAR 1: Responsividad Estricta y Flexbox (Anti-Ghost Scroll)
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative items-center justify-center p-6">
@@ -108,7 +123,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
       {/* NOTIFICACIONES FLOTANTES (Cápsulas) */}
       <AnimatePresence>
         {notification && (
-          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+          <div key="notification-capsule" className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
             <motion.div 
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
@@ -152,7 +167,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-xl border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#3E2723] mx-auto w-fit mb-3">
             {type === 'mesa' ? <Utensils size={14} className="text-orange-500 lya:text-[#78350F]" /> : <ShoppingBag size={14} className="text-orange-500 lya:text-[#78350F]" />}
-            <span className="uppercase tracking-widest">{type === 'mesa' ? `Mesa ${tableId}` : 'Pedido Para Llevar'}</span>
+            <span className="uppercase tracking-widest">{type === 'mesa' ? `Mesa ${displayTableId}` : 'Pedido Para Llevar'}</span>
           </div>
           <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight">
             ¡Bienvenido!
@@ -223,6 +238,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
       <AnimatePresence>
         {showSettings && (
           <ClientSettingsModal 
+            key="settings-modal"
             themeIndex={themeIndex} 
             sizeIndex={sizeIndex} 
             cycleTheme={cycleTheme} 
