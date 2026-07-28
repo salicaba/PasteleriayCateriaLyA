@@ -129,7 +129,7 @@ export default function ClientApp({ type }) {
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     setIsLoadingTables(true);
     try {
-      // 🔥 TRUCO MAGISTRAL EN LA APP PRINCIPAL: Burlar la caché con la hora actual
+      // Burlar la caché con la hora actual
       const ts = Date.now();
       const [tablesRes, settingsRes] = await Promise.all([
         api.get(`/pos/public/tables?_t=${ts}`).catch(() => api.get(`/pos/tables?_t=${ts}`)),
@@ -164,23 +164,26 @@ export default function ClientApp({ type }) {
     fetchStoreData(true);
   }, [fetchStoreData]);
 
+  // 🔥 Múltiples eventos atrapados para garantizar recepción
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
 
-    socket.on('config:update', handleUpdate);
-    socket.on('business_config_updated', handleUpdate);
-    socket.on('qr:status_changed', handleUpdate); 
-    socket.on('service_status_changed', handleUpdate); 
-    socket.on('pos:update', handleUpdate); 
-    socket.on('table_status_updated', handleUpdate); 
+    const socketEvents = [
+      'config:update', 
+      'business_config_updated', 
+      'settings:updated',
+      'settings_updated',
+      'qr:status_changed', 
+      'service_status_changed', 
+      'pos:update', 
+      'table_status_updated',
+      'table:updated'
+    ];
+
+    socketEvents.forEach(event => socket.on(event, handleUpdate));
     
     return () => {
-      socket.off('config:update', handleUpdate);
-      socket.off('business_config_updated', handleUpdate);
-      socket.off('qr:status_changed', handleUpdate);
-      socket.off('service_status_changed', handleUpdate);
-      socket.off('pos:update', handleUpdate);
-      socket.off('table_status_updated', handleUpdate);
+      socketEvents.forEach(event => socket.off(event, handleUpdate));
     };
   }, [fetchStoreData]);
 
@@ -268,17 +271,17 @@ export default function ClientApp({ type }) {
 
   if (runtimeError) {
     return (
-      <div className="min-h-screen bg-red-950 text-white p-6 flex flex-col items-center justify-center text-center">
-        <div className="bg-red-900/50 border border-red-500 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-          <h2 className="text-xl font-black mb-2 text-red-200">⚠️ Error Detectado</h2>
-          <p className="text-xs text-red-300 mb-4 font-mono bg-black/40 p-3 rounded-xl overflow-auto text-left max-h-40">
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-red-950 text-white p-6 text-center overflow-hidden">
+        <div className="bg-red-900/50 border border-red-500 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl">
+          <h2 className="text-2xl font-black mb-3 text-red-200">⚠️ Error Detectado</h2>
+          <p className="text-sm text-red-300 mb-6 font-mono bg-black/40 p-4 rounded-xl overflow-y-auto custom-scrollbar text-left max-h-40">
             {runtimeError}
           </p>
-          <div className="flex flex-col gap-2">
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full py-3 bg-white text-red-950 font-black rounded-xl text-sm shadow">
+          <div className="flex flex-col gap-3">
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full py-4 bg-white text-red-950 font-black rounded-2xl text-sm shadow outline-none">
               Borrar Caché y Recargar
             </button>
-            <button onClick={() => setRuntimeError(null)} className="w-full py-2 bg-transparent text-red-300 text-xs font-bold underline">
+            <button onClick={() => setRuntimeError(null)} className="w-full py-2 bg-transparent text-red-300 text-xs font-bold underline outline-none">
               Intentar Ocultar
             </button>
           </div>
@@ -314,11 +317,12 @@ export default function ClientApp({ type }) {
         )}
       </AnimatePresence>
 
-      <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
+      {/* 🔥 REGLA 1: Anti-Ghost Scroll estricto aplicado aquí */}
+      <div className="h-full w-full flex-1 flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
         
         <AnimatePresence>
           {needRefresh && (
-            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 h-[100dvh] w-full bg-black/80 backdrop-blur-md">
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md pointer-events-auto">
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 max-w-sm w-full text-center flex flex-col items-center shadow-2xl border border-gray-100 dark:border-gray-800"
@@ -333,9 +337,9 @@ export default function ClientApp({ type }) {
                   disabled={isUpdating}
                   onClick={async () => {
                     setIsUpdating(true);
-                    try { await updateServiceWorker(true); } catch (e) { setIsUpdating(false); }
+                    try { await updateServiceWorker(true); } finally { setIsUpdating(false); }
                   }} 
-                  className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-400 cursor-not-allowed opacity-80' : 'bg-emerald-500 shadow-lg'}`}
+                  className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-400 cursor-not-allowed opacity-80' : 'bg-emerald-500 shadow-lg md:hover:shadow-xl'}`}
                 >
                   {isUpdating ? <><Loader2 size={24} className="animate-spin" /> Actualizando...</> : 'Actualizar Ahora'}
                 </motion.button>
@@ -345,9 +349,11 @@ export default function ClientApp({ type }) {
         </AnimatePresence>
 
         <ClientConnectionShield>
+          {/* 🔥 Se le pasan correctamente las props necesarias al escudo */}
           <ClientServiceShield 
             key={`shield-mode-${isGridMode ? 'grid' : 'login'}`} 
             activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
+            hasActiveSession={!!clientData}
             onForceLogout={handleClientLogout}
             type={effectiveType} 
             tableId={effectiveTableId} 
@@ -357,7 +363,7 @@ export default function ClientApp({ type }) {
           />
           <Toaster position="top-center" />
           
-          <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10">
+          <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10 overflow-hidden">
             <AnimatePresence mode="wait">
               {!clientData ? (
                 isGridMode ? (
@@ -376,11 +382,11 @@ export default function ClientApp({ type }) {
 
                     <AnimatePresence>
                       {isGlobalOff && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-start gap-3 mb-6">
-                          <ShieldAlert className="text-red-500 shrink-0 w-6 h-6" />
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-red-500/10 border border-red-500/20 p-4 rounded-[2rem] flex items-start gap-3 mb-6">
+                          <ShieldAlert className="text-red-500 shrink-0 w-6 h-6 mt-1" />
                           <div>
-                            <h4 className="text-red-600 dark:text-red-400 font-black text-sm">Servicio Digital Suspendido</h4>
-                            <p className="text-red-500/80 text-xs font-bold mt-1 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. ¿Estamos abiertos?, pase y consuma sin compromiso.</p>
+                            <h4 className="text-red-600 dark:text-red-400 font-black text-sm text-center">Servicio Digital Suspendido</h4>
+                            <p className="text-red-500/80 text-xs font-bold mt-2 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. Pase y consuma sin compromiso.</p>
                           </div>
                         </motion.div>
                       )}
@@ -392,9 +398,9 @@ export default function ClientApp({ type }) {
                           whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
                           disabled={isProcessingSelection !== null || isLlevarDisabled}
                           onClick={() => handleStandaloneSelect('llevar', null)}
-                          className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all outline-none select-none ${isLlevarDisabled ? 'bg-gray-300 dark:bg-gray-700 opacity-60 cursor-not-allowed shadow-none' : 'bg-gray-900 dark:bg-white md:hover:shadow-2xl'} ${isProcessingSelection === 'takeaway' ? 'opacity-70' : ''}`}
+                          className={`w-full relative overflow-hidden text-white dark:text-gray-900 rounded-[2rem] p-6 shadow-xl flex items-center justify-between transition-all outline-none select-none ${isLlevarDisabled ? 'bg-gray-300 dark:bg-gray-700 opacity-60 cursor-not-allowed shadow-none' : 'bg-gray-900 dark:bg-white md:hover:shadow-2xl'}`}
                         >
-                          <div className="flex items-center gap-4 relative z-10">
+                          <div className={`flex items-center gap-4 relative z-10 ${isProcessingSelection === 'takeaway' ? 'opacity-30' : ''}`}>
                             <div className={`p-4 rounded-2xl ${isLlevarDisabled ? 'bg-gray-400 dark:bg-gray-600' : 'bg-white/10 dark:bg-gray-900/10'}`}>
                               <Coffee className="w-7 h-7" />
                             </div>
@@ -410,17 +416,21 @@ export default function ClientApp({ type }) {
                               </span>
                             </div>
                           )}
-                          {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-20" />}
+                          {isProcessingSelection === 'takeaway' && (
+                            <div className="absolute inset-0 flex items-center justify-center z-30">
+                              <Loader2 className="w-8 h-8 animate-spin" />
+                            </div>
+                          )}
                         </motion.button>
                       </section>
 
                       <section>
-                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
+                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2 text-center">Consumo en Local</h2>
                         <div className="grid grid-cols-2 gap-4">
                           {isLoadingTables ? (
                             <div className="col-span-2 flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
                           ) : activeTables.length === 0 ? (
-                            <div className="col-span-2 text-center py-6 bg-gray-100 dark:bg-gray-800/50 rounded-2xl text-gray-500 text-sm font-bold">No hay mesas disponibles en este momento.</div>
+                            <div className="col-span-2 text-center py-6 bg-gray-100 dark:bg-gray-800/50 rounded-[2rem] text-gray-500 text-sm font-bold">No hay mesas disponibles en este momento.</div>
                           ) : (
                             activeTables.map((table) => {
                               const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
@@ -468,7 +478,7 @@ export default function ClientApp({ type }) {
                         <motion.button
                           whileTap={{ scale: 0.9 }}
                           onClick={() => setStandaloneSelection(null)}
-                          className="flex items-center justify-center w-11 h-11 bg-white/80 dark:bg-gray-800/80 lya:bg-[#EADCC9]/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] rounded-full shadow-lg text-gray-700 dark:text-gray-200 lya:text-[#3E2723] outline-none select-none transition-all"
+                          className="flex items-center justify-center w-11 h-11 bg-white/80 dark:bg-gray-800/80 lya:bg-[#EADCC9]/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] rounded-full shadow-lg text-gray-700 dark:text-gray-200 lya:text-[#3E2723] outline-none select-none transition-all md:hover:shadow-xl"
                         >
                           <ArrowLeft size={22} strokeWidth={2.5} /> 
                         </motion.button>
@@ -487,9 +497,9 @@ export default function ClientApp({ type }) {
 
                     {!isStandalone && isInstallable && (
                       <div className="absolute bottom-6 left-6 right-6 z-50">
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-900 dark:bg-white rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-900 dark:bg-white rounded-[2rem] p-5 shadow-2xl flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3">
-                            <div className="bg-white/10 dark:bg-gray-900/10 p-2 rounded-xl shrink-0"><MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" /></div>
+                            <div className="bg-white/10 dark:bg-gray-900/10 p-3 rounded-2xl shrink-0"><MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" /></div>
                             <div>
                               <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya</h4>
                               <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
@@ -498,9 +508,9 @@ export default function ClientApp({ type }) {
                           <motion.button
                             whileTap={isInstalling ? {} : { scale: 0.95 }} disabled={isInstalling}
                             onClick={async (e) => { e.preventDefault(); setIsInstalling(true); try { localStorage.setItem('lya_pwa_mode', 'client'); await promptInstall(); } finally { setIsInstalling(false); } }}
-                            className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 transition-all outline-none select-none ${isInstalling ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            className={`flex items-center gap-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs font-bold px-4 py-3 rounded-xl shrink-0 transition-all outline-none select-none md:hover:scale-105 ${isInstalling ? 'opacity-70 cursor-not-allowed' : ''}`}
                           >
-                            {isInstalling && <Loader2 className="w-3 h-3 animate-spin" />}<span>Instalar</span>
+                            {isInstalling ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Instalar</span>}
                           </motion.button>
                         </motion.div>
                       </div>
@@ -530,21 +540,21 @@ export default function ClientApp({ type }) {
 
           <AnimatePresence>
             {!isQrValid && !isStandalone && (
-              <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
+              <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }} transition={{ type: 'spring', damping: 25, stiffness: 230 }}
-                  className="bg-white dark:bg-gray-800 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-200 dark:border-gray-700 flex flex-col items-center text-center overflow-hidden"
+                  className="bg-white dark:bg-gray-800 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border border-gray-200 dark:border-gray-700 flex flex-col items-center text-center overflow-hidden"
                 >
-                  <div className="relative mb-5 flex items-center justify-center">
+                  <div className="relative mb-6 flex items-center justify-center">
                     <div className="w-20 h-20 bg-red-100 dark:bg-red-500/10 rounded-[1.75rem] flex items-center justify-center border border-red-200 shadow-inner">
                       <QrCode size={38} className="text-red-500" />
                     </div>
-                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-md border-2 border-white dark:border-gray-800">
-                      <ShieldAlert size={12} className="text-white" />
+                    <div className="absolute -top-1 -right-1 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center shadow-md border-2 border-white dark:border-gray-800">
+                      <ShieldAlert size={14} className="text-white" />
                     </div>
                   </div>
                   <h3 className="text-2xl font-black text-gray-900 dark:text-white leading-tight mb-3">Código QR Expirado</h3>
-                  <p className="text-sm font-bold text-gray-500 dark:text-gray-400 text-justify leading-relaxed mb-6 px-1">El enlace del menú digital que has escaneado ya no es válido debido a una actualización de seguridad. Solicita al personal el nuevo código QR.</p>
+                  <p className="text-sm font-bold text-gray-500 dark:text-gray-400 text-justify leading-relaxed px-1">El enlace del menú digital que has escaneado ya no es válido debido a una actualización de seguridad. Solicita al personal el nuevo código QR.</p>
                 </motion.div>
               </div>
             )}

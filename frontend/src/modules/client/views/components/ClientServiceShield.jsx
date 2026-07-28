@@ -1,10 +1,9 @@
 // frontend/src/modules/client/views/components/ClientServiceShield.jsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Coffee, UtensilsCrossed, Home, RotateCcw } from 'lucide-react';
-import { socket } from '../../../../api/socket';
-import client from '../../../../api/client';
 
+// 🔥 AHORA ES UN COMPONENTE CONTROLADO. Se alimenta puramente de systemConfig de su padre.
 export const ClientServiceShield = ({ 
   activeOrdersCount = 0, 
   hasActiveSession = false, 
@@ -12,62 +11,17 @@ export const ClientServiceShield = ({
   type,
   tableId,
   isGridMode,
-  isStandalone 
+  isStandalone,
+  systemConfig = { isQrActive: true, disabledQrs: [] }
 }) => {
-  const [globalActive, setGlobalActive] = useState(true);
-  const [disabledQrs, setDisabledQrs] = useState([]);
 
-  const fetchStatus = useCallback(async () => {
-    try {
-      // 🔥 TRUCO MAGISTRAL: Le ponemos la hora exacta al final para burlar al Caché del navegador
-      const res = await client.get(`/settings?_t=${Date.now()}`); 
-      const data = res.data;
-      
-      setGlobalActive(data.qr_service_active !== 'false');
-      
-      if (data.disabled_qrs) {
-        const parsed = typeof data.disabled_qrs === 'string' ? JSON.parse(data.disabled_qrs) : data.disabled_qrs;
-        setDisabledQrs(Array.isArray(parsed) ? parsed : []);
-      } else {
-        setDisabledQrs([]);
-      }
-    } catch (error) {
-      console.error("Error al consultar estado de servicios", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStatus();
-    const intervalId = setInterval(fetchStatus, 5000); 
-
-    const handleConfigUpdate = (updates) => {
-      if (updates) {
-        if (updates.qr_service_active !== undefined) {
-          setGlobalActive(updates.qr_service_active !== 'false');
-        }
-        if (updates.disabled_qrs !== undefined) {
-          const parsed = typeof updates.disabled_qrs === 'string' ? JSON.parse(updates.disabled_qrs) : updates.disabled_qrs;
-          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
-        }
-      }
-    };
-
-    socket.on('config:update', handleConfigUpdate);
-    socket.on('qr:status_changed', (status) => setGlobalActive(status));
-    socket.on('pos:update', fetchStatus); 
-
-    return () => {
-      clearInterval(intervalId);
-      socket.off('config:update', handleConfigUpdate);
-      socket.off('qr:status_changed');
-      socket.off('pos:update', fetchStatus);
-    };
-  }, [fetchStatus]);
+  const globalActive = systemConfig.isQrActive;
+  const disabledQrs = systemConfig.disabledQrs || [];
 
   if (isGridMode) return null;
 
-  const isLlevarDisabled = type === 'llevar' && disabledQrs.includes('llevar');
-  const isThisMesaDisabled = type === 'mesa' && disabledQrs.includes(`mesa-${tableId}`);
+  const isLlevarDisabled = type === 'llevar' && (disabledQrs.includes('llevar') || disabledQrs.includes('takeaway'));
+  const isThisMesaDisabled = type === 'mesa' && (disabledQrs.includes(`mesa-${tableId}`) || disabledQrs.includes(`table-${tableId}`));
   const isLocallyDisabled = isLlevarDisabled || isThisMesaDisabled;
 
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
@@ -79,7 +33,7 @@ export const ClientServiceShield = ({
   }, [shouldShowShield, hasActiveSession, onForceLogout]);
 
   let shieldTitle = "Servicio Suspendido";
-  let shieldMessage = "Puede que ya haya acabado nuestro horario de servico y apagamos las peticiones en la App y QR. ¿Estamos abiertos?, pasa y consume sin compromiso.";
+  let shieldMessage = "Puede que ya haya acabado nuestro horario de servicio y apagamos las peticiones en la App y QR. ¿Estamos abiertos?, pasa y consume sin compromiso.";
   let IconToRender = Store;
 
   if (isLocallyDisabled && globalActive) {
@@ -102,7 +56,7 @@ export const ClientServiceShield = ({
           animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
           exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 p-6"
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 p-6 pointer-events-auto"
         >
           <motion.div 
             initial={{ scale: 0.9, y: 20 }}
@@ -116,14 +70,14 @@ export const ClientServiceShield = ({
               <IconToRender size={40} strokeWidth={1.5} />
             </div>
             
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-3 relative z-10">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-4 relative z-10 text-center">
               {shieldTitle}
             </h2>
             
-            <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed font-medium mb-8 relative z-10 text-center">
+            <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed font-medium mb-8 relative z-10 text-justify">
               {shieldMessage}
               <br/><br/>
-              ¡Será un placer atenderte!
+              <span className="block text-center font-bold">¡Será un placer atenderte!</span>
             </p>
 
             <div className="w-full relative z-10 flex flex-col gap-3">
@@ -131,7 +85,7 @@ export const ClientServiceShield = ({
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={onForceLogout} 
-                  className="w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl md:hover:shadow-lg transition-all flex items-center justify-center gap-2 outline-none select-none"
+                  className="w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl md:hover:shadow-xl transition-all flex items-center justify-center gap-2 outline-none select-none"
                 >
                   <Home size={18} />
                   Volver al Mapeo
