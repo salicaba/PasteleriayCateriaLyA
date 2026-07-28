@@ -1,3 +1,4 @@
+// frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -31,7 +32,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('todas');
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -163,10 +164,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     const checkStatus = async () => {
       try {
         const res = await client.get(`/pos/orders/${activeOrderId}/status`, {
-          params: { cuenta: clientData.name }
+          params: { cuenta: clientData?.name }
         });
         
-        const status = res.data.status;
+        const status = res?.data?.status;
         
         if (status === 'PAID') {
            if (!isOrderPaid) {
@@ -180,6 +181,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
            triggerFinalized('CANCELLED');
         }
       } catch (error) {
+        // Ignorar errores transitorios de red
       }
     };
 
@@ -191,7 +193,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
        clearInterval(interval);
        socket.off('pos:update', checkStatus);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData.name]);
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name]);
 
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {
@@ -238,27 +240,26 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
     }
     const shortId = activeOrderId.split('-')[0];
-    const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(clientData.name)}`;
+    const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(clientData?.name || '')}`;
     window.open(url, '_blank');
   };
 
   // ============================================================================
-  // 🔥 FIX MASIVO: BLINDAJE EN LA CARGA DE DATOS DEL MENÚ
+  // 🔥 BLINDAJE EN LA CARGA DE DATOS DEL MENÚ
   // ============================================================================
   useEffect(() => {
     const loadMenuData = async () => {
       try {
         setIsLoading(true);
         const [catsRes, prodsRes] = await Promise.all([ 
-          client.get('/menu/categories'), 
-          client.get('/menu/products') 
+          client.get('/menu/categories').catch(() => ({ data: [] })), 
+          client.get('/menu/products').catch(() => ({ data: [] })) 
         ]);
         
         // 1. Extraemos y blindamos Categorías
         const rawCats = catsRes.data?.data || catsRes.data || [];
         const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
         
-        // El .some() ahora está 100% seguro porque sabemos que fetchedCats es un Array
         const hasTodas = fetchedCats.some(c => c.id === 'todas' || (c.name && c.name.trim().toLowerCase() === 'todas'));
         const catsData = hasTodas ? fetchedCats : [{ id: 'todas', name: 'Todas' }, ...fetchedCats];
         setCategories(catsData);
@@ -299,6 +300,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
 
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
+      if (!Array.isArray(updates)) return;
       setProducts(prevProducts => prevProducts.map(p => {
         const update = updates.find(u => u.id === p.id);
         if (update) {
@@ -315,7 +317,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   }, []);
 
   const activeCatObj = categories.find(c => c.id === activeCategory);
-  const isTodasCategory = activeCatObj && activeCatObj.name?.trim().toLowerCase() === 'todas';
+  const isTodasCategory = !activeCategory || activeCategory === 'todas' || (activeCatObj && activeCatObj.name?.trim().toLowerCase() === 'todas');
   const visibleProducts = isTodasCategory ? products : products.filter(p => p.categoria === activeCategory);
 
   useEffect(() => {
@@ -361,7 +363,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         const orderPayload = { 
           orderType: dbOrderType, 
           tableId: isActuallySalon ? tableId : null, 
-          ticketId: clientData.name 
+          ticketId: clientData?.name 
         };
         const orderRes = await client.post('/pos/orders', orderPayload);
         const newId = orderRes.data.order.id;
@@ -379,7 +381,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           productId: item.id,
           quantity: item.qty,
           subtotal: item.precioUnitario * item.qty,
-          cuenta: dbOrderType === 'LLEVAR' ? 'General' : (clientData.name || 'General'), 
+          cuenta: dbOrderType === 'LLEVAR' ? 'General' : (clientData?.name || 'General'), 
           notes: JSON.stringify(item.detalles ? [item.detalles] : []), 
           isTakeaway: item.isTakeaway || false,
           isAutoPromo: item.isAutoPromo || false,

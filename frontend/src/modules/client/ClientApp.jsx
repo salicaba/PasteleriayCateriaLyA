@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download } from 'lucide-react';
+import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -202,6 +202,22 @@ export default function ClientApp({ type }) {
 
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
+    
+    // Verificación robusta y defensiva contra elementos apagados o desactivados
+    const isGlobalOff = !systemConfig.isQrActive;
+    const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
+    
+    if (selectedType === 'llevar') {
+      if (isGlobalOff || safeDisabledQrs.includes('llevar')) return;
+    } else if (selectedType === 'mesa') {
+      const targetTable = activeTables.find(t => t.id === selectedTableId);
+      const isMesaPaused = safeDisabledQrs.includes(`mesa-${targetTable?.number}`) || safeDisabledQrs.includes(`table-${selectedTableId}`);
+      const isOccupied = targetTable?.status === 'occupied' || targetTable?.status === 'Ocupada';
+      const isTableActive = targetTable?.isActive ?? targetTable?.qrActive ?? targetTable?.active ?? true;
+
+      if (isGlobalOff || isMesaPaused || isOccupied || !isTableActive) return;
+    }
+
     setIsProcessingSelection(selectedTableId || 'takeaway');
     
     try {
@@ -213,7 +229,6 @@ export default function ClientApp({ type }) {
   };
 
   const isGlobalOff = !systemConfig.isQrActive;
-  // 🔥 BLINDAJE: Verificación segura garantizando que sea array
   const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
   const isLlevarPaused = safeDisabledQrs.includes('llevar');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
@@ -308,7 +323,7 @@ export default function ClientApp({ type }) {
                 </AnimatePresence>
 
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6">
-                  {/* Botón Para Llevar */}
+                  {/* Botón Para Llevar con indicador visual de Apagado / Desactivado */}
                   <section>
                     <motion.button
                       whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
@@ -326,20 +341,22 @@ export default function ClientApp({ type }) {
                         </div>
                         <div className="text-left">
                           <h3 className="text-xl font-bold">Para Llevar</h3>
-                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Temporalmente inactivo' : 'Recoge en mostrador'}</p>
+                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Desactivado / Apagado' : 'Recoge en mostrador'}</p>
                         </div>
                       </div>
                       
                       {isLlevarDisabled && !isProcessingSelection && (
-                        <div className="absolute inset-0 flex items-center justify-end pr-6 pointer-events-none">
-                          <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md">Pausado</span>
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
+                          <span className="bg-red-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+                            <WifiOff className="w-4 h-4" /> Apagado
+                          </span>
                         </div>
                       )}
                       {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-10" />}
                     </motion.button>
                   </section>
 
-                  {/* Mesas */}
+                  {/* Mesas con indicador visual robusto para estados apagados */}
                   <section>
                     <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
                     
@@ -355,8 +372,9 @@ export default function ClientApp({ type }) {
                       ) : (
                         activeTables.map((table) => {
                           const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
-                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`);
-                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied;
+                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`) || safeDisabledQrs.includes(`table-${table.id}`);
+                          const isTableActive = table.isActive ?? table.qrActive ?? table.active ?? true;
+                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied || !isTableActive;
                           const isThisProcessing = isProcessingSelection === table.id;
 
                           return (
@@ -378,9 +396,11 @@ export default function ClientApp({ type }) {
                               )}
                               <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
                               
-                              {(isMesaPaused || isGlobalOff) && !isOccupied && (
-                                <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center backdrop-blur-[1px]">
-                                   <span className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-md -rotate-6">Pausada</span>
+                              {isMesaDisabled && (
+                                <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 text-center z-20">
+                                  <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1">
+                                    <WifiOff className="w-3.5 h-3.5" /> {isOccupied ? 'Ocupada' : 'Apagado'}
+                                  </span>
                                 </div>
                               )}
                             </motion.button>
