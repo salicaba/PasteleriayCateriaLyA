@@ -56,8 +56,6 @@ export default function ClientApp({ type }) {
   const [activeTables, setActiveTables] = useState([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
 
-  // 🔥 FIX CLAVE: Si 'type' viene vacío, deducimos qué es en base a la URL. 
-  // Esto evita que el Escudo muera por no saber si es mesa o llevar.
   const effectiveType = standaloneSelection?.type || type || (urlTableId ? 'mesa' : 'llevar');
   const effectiveTableId = standaloneSelection?.tableId || urlTableId;
 
@@ -98,7 +96,9 @@ export default function ClientApp({ type }) {
           }
 
           let disabled = payload.disabled_qrs || [];
-          if (typeof disabled === 'string') disabled = JSON.parse(disabled);
+          if (typeof disabled === 'string') {
+            try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
+          }
 
           setSystemConfig({
             isQrActive: isActive,
@@ -123,9 +123,11 @@ export default function ClientApp({ type }) {
           newState.isQrActive = updates.qr_service_active !== 'false' && updates.qr_service_active !== false;
         }
         if (updates.disabled_qrs !== undefined) {
-          newState.disabledQrs = typeof updates.disabled_qrs === 'string' 
-            ? JSON.parse(updates.disabled_qrs) 
-            : updates.disabled_qrs;
+          let parsed = updates.disabled_qrs;
+          if (typeof parsed === 'string') {
+            try { parsed = JSON.parse(parsed); } catch(e) { parsed = []; }
+          }
+          newState.disabledQrs = Array.isArray(parsed) ? parsed : [];
         }
         return newState;
       });
@@ -150,8 +152,6 @@ export default function ClientApp({ type }) {
     setActiveOrdersCount(0);
     setStandaloneSelection(null); 
   }, []);
-
-  // Nota: Quitamos la autoexpulsión de aquí para que el ClientServiceShield lo maneje con tu código original.
 
   useEffect(() => {
     if (clientData) {
@@ -213,7 +213,9 @@ export default function ClientApp({ type }) {
   };
 
   const isGlobalOff = !systemConfig.isQrActive;
-  const isLlevarPaused = systemConfig.disabledQrs.includes('llevar');
+  // 🔥 BLINDAJE: Verificación segura garantizando que sea array
+  const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
+  const isLlevarPaused = safeDisabledQrs.includes('llevar');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
 
   return (
@@ -270,7 +272,6 @@ export default function ClientApp({ type }) {
 
       <ClientConnectionShield>
         
-        {/* 🔥 PASAMOS isGridMode y isStandalone AL ESCUDO ORIGINAL */}
         <ClientServiceShield 
           activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
           onForceLogout={handleClientLogout}
@@ -278,6 +279,7 @@ export default function ClientApp({ type }) {
           tableId={effectiveTableId} 
           isStandalone={isStandalone}
           isGridMode={isGridMode}
+          systemConfig={systemConfig}
         />
 
         <Toaster position="top-center" />
@@ -353,7 +355,7 @@ export default function ClientApp({ type }) {
                       ) : (
                         activeTables.map((table) => {
                           const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
-                          const isMesaPaused = systemConfig.disabledQrs.includes(`mesa-${table.number}`);
+                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`);
                           const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied;
                           const isThisProcessing = isProcessingSelection === table.id;
 
