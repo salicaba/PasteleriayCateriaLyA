@@ -63,7 +63,9 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  const isGridMode = isStandalone && !standaloneSelection && !isScannedQr;
+  // 🔥 TRUCO DE DEBUG: Si agregas ?grid=true en la URL del navegador, fuerza el Mapeo para inspeccionar consola
+  const forceGridInBrowser = searchParams.get('grid') === 'true';
+  const isGridMode = (isStandalone || forceGridInBrowser) && !standaloneSelection && !isScannedQr;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -174,7 +176,7 @@ export default function ClientApp({ type }) {
   }, [clientData, effectiveType, urlTableId, navigate]);
 
   useEffect(() => {
-    if (isStandalone) {
+    if (isStandalone || forceGridInBrowser) {
       setIsQrValid(true);
       return;
     }
@@ -198,7 +200,7 @@ export default function ClientApp({ type }) {
 
     socket.on('qr_security_update', handleSecurityUpdate);
     return () => socket.off('qr_security_update', handleSecurityUpdate);
-  }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone]);
+  }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone, forceGridInBrowser]);
 
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
@@ -213,7 +215,6 @@ export default function ClientApp({ type }) {
   };
 
   const isGlobalOff = !systemConfig.isQrActive;
-  // 🔥 BLINDAJE: Verificación segura garantizando que sea array
   const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
   const isLlevarPaused = safeDisabledQrs.includes('llevar');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
@@ -468,9 +469,8 @@ export default function ClientApp({ type }) {
           )}
         </main>
 
-        {/* Modal "Código QR Expirado" */}
         <AnimatePresence>
-          {!isQrValid && !isStandalone && (
+          {!isQrValid && !isStandalone && !forceGridInBrowser && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 40 }}
