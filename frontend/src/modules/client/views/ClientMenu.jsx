@@ -242,6 +242,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     window.open(url, '_blank');
   };
 
+  // ============================================================================
+  // 🔥 FIX MASIVO: BLINDAJE EN LA CARGA DE DATOS DEL MENÚ
+  // ============================================================================
   useEffect(() => {
     const loadMenuData = async () => {
       try {
@@ -251,13 +254,19 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           client.get('/menu/products') 
         ]);
         
-        const fetchedCats = catsRes.data;
-        const hasTodas = fetchedCats.some(c => c.id === 'todas' || c.name.trim().toLowerCase() === 'todas');
+        // 1. Extraemos y blindamos Categorías
+        const rawCats = catsRes.data?.data || catsRes.data || [];
+        const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
+        
+        // El .some() ahora está 100% seguro porque sabemos que fetchedCats es un Array
+        const hasTodas = fetchedCats.some(c => c.id === 'todas' || (c.name && c.name.trim().toLowerCase() === 'todas'));
         const catsData = hasTodas ? fetchedCats : [{ id: 'todas', name: 'Todas' }, ...fetchedCats];
-
         setCategories(catsData);
         
-        const prodsData = prodsRes.data;
+        // 2. Extraemos y blindamos Productos
+        const rawProds = prodsRes.data?.data || prodsRes.data || [];
+        const prodsData = Array.isArray(rawProds) ? rawProds : [];
+        
         const activeProducts = prodsData.filter(p => {
           const estado = p.isActive !== undefined ? p.isActive : p.disponible;
           if (estado === false || estado === 0 || estado === '0') return false;
@@ -306,7 +315,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   }, []);
 
   const activeCatObj = categories.find(c => c.id === activeCategory);
-  const isTodasCategory = activeCatObj && activeCatObj.name.trim().toLowerCase() === 'todas';
+  const isTodasCategory = activeCatObj && activeCatObj.name?.trim().toLowerCase() === 'todas';
   const visibleProducts = isTodasCategory ? products : products.filter(p => p.categoria === activeCategory);
 
   useEffect(() => {
@@ -496,8 +505,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       </div>
     );
   }
-
-  // 🔥 AQUÍ ES DONDE LIMPIAMOS: Se eliminó el "Servicio Suspendido" viejo 
 
   if (isConfirmed && !isReadOnly) {
     return (
