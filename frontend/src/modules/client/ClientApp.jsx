@@ -5,7 +5,6 @@ import { Toaster } from 'react-hot-toast';
 import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// 🔥 IMPORTANTE: Hook oficial de Vite PWA para detectar actualizaciones
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import ClientLogin from './views/ClientLogin';
@@ -32,10 +31,7 @@ export default function ClientApp({ type }) {
   const qrTokenUrl = searchParams.get('token') || '';
   const isScannedQr = searchParams.get('qr') === 'true';
 
-  // ============================================================================
-  // 🚀 EL BOTÓN OBLIGATORIO DE ACTUALIZACIÓN (CON BLINDAJE ASÍNCRONO)
-  // ============================================================================
-  const [isUpdating, setIsUpdating] = useState(false); // 🔥 CANDADO ASÍNCRONO AGREGADO
+  const [isUpdating, setIsUpdating] = useState(false); 
 
   const {
     needRefresh: [needRefresh],
@@ -83,39 +79,58 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // ============================================================================
+  // 🔥 FIX: CARGA DINÁMICA DE CONFIGURACIÓN (AHORA PARA TODOS LOS CLIENTES)
+  // ============================================================================
   useEffect(() => {
-    if (isStandalone && !standaloneSelection && !clientData) {
-      const fetchTables = async () => {
-        setIsLoadingTables(true);
-        try {
-          const response = await api.get('/pos/public/tables').catch(() => api.get('/pos/tables'));
-          const payload = response.data;
+    const fetchInitialData = async () => {
+      setIsLoadingTables(true);
+      try {
+        const response = await api.get('/pos/public/tables').catch(() => api.get('/pos/tables'));
+        const payload = response.data;
+        
+        const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
+        setActiveTables(tablesArray);
+
+        if (payload?.disabled_qrs !== undefined || payload?.isQrActive !== undefined) {
           
-          const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
-          setActiveTables(tablesArray);
-
-          if (payload?.disabled_qrs !== undefined) {
-            setSystemConfig({
-              isQrActive: payload.isQrActive ?? true,
-              disabledQrs: payload.disabled_qrs || []
-            });
+          // Blindaje booleano
+          let isActive = true;
+          if (payload.isQrActive !== undefined) {
+            isActive = payload.isQrActive !== 'false' && payload.isQrActive !== false;
           }
-        } catch (error) {
-          console.error('Error al cargar mesas dinámicas:', error);
-          setActiveTables([]); 
-        } finally {
-          setIsLoadingTables(false);
-        }
-      };
-      fetchTables();
-    }
-  }, [isStandalone, standaloneSelection, clientData]);
 
+          // Blindaje Array
+          let disabled = payload.disabled_qrs || [];
+          if (typeof disabled === 'string') disabled = JSON.parse(disabled);
+
+          setSystemConfig({
+            isQrActive: isActive,
+            disabledQrs: Array.isArray(disabled) ? disabled : []
+          });
+        }
+      } catch (error) {
+        console.error('Error al cargar configuración del Kiosko:', error);
+      } finally {
+        setIsLoadingTables(false);
+      }
+    };
+    
+    // Se ejecuta al cargar la app sin importar de dónde venga
+    fetchInitialData();
+  }, []);
+
+  // ============================================================================
+  // ESCUCHA DE SOCKETS (TIEMPO REAL)
+  // ============================================================================
   useEffect(() => {
     const handleConfigUpdate = (updates) => {
+      if (!updates) return;
       setSystemConfig(prev => {
         const newState = { ...prev };
-        if (updates.qr_service_active !== undefined) newState.isQrActive = updates.qr_service_active;
+        if (updates.qr_service_active !== undefined) {
+          newState.isQrActive = updates.qr_service_active !== 'false' && updates.qr_service_active !== false;
+        }
         if (updates.disabled_qrs !== undefined) {
           newState.disabledQrs = typeof updates.disabled_qrs === 'string' 
             ? JSON.parse(updates.disabled_qrs) 
@@ -125,10 +140,22 @@ export default function ClientApp({ type }) {
       });
     };
 
+    const handleStatusChange = (status) => {
+      setSystemConfig(prev => ({ ...prev, isQrActive: status !== 'false' && status !== false }));
+    };
+
     socket.on('config:update', handleConfigUpdate);
-    return () => socket.off('config:update', handleConfigUpdate);
+    socket.on('qr:status_changed', handleStatusChange); // Escucha de apagado global explícito
+    
+    return () => {
+      socket.off('config:update', handleConfigUpdate);
+      socket.off('qr:status_changed', handleStatusChange);
+    };
   }, []);
 
+  // ============================================================================
+  // LÓGICA DE EXPULSIÓN INMEDIATA (KILL-SWITCH EN ACCIÓN)
+  // ============================================================================
   const handleClientLogout = React.useCallback(() => {
     localStorage.removeItem('lya_client_session');
     setClientData(null);
@@ -216,9 +243,6 @@ export default function ClientApp({ type }) {
   return (
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       
-      {/* ========================================================= */}
-      {/* 🚀 EL ESCUDO VERDUGO CON BOTÓN BLINDADO (PILARES 2, 3 Y 5) */}
-      {/* ========================================================= */}
       <AnimatePresence>
         {needRefresh && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 h-[100dvh] w-full bg-black/80 backdrop-blur-md">
@@ -237,7 +261,6 @@ export default function ClientApp({ type }) {
                 Se han detectado nuevas funciones y correcciones en el sistema. Debes actualizar la aplicación para continuar operando.
               </p>
               
-              {/* 🔥 FIX VISUAL Y LÓGICO: Botón 100% Blindado */}
               <motion.button 
                 whileTap={isUpdating ? {} : { scale: 0.95 }}
                 disabled={isUpdating}
@@ -245,10 +268,8 @@ export default function ClientApp({ type }) {
                   setIsUpdating(true);
                   try {
                     await updateServiceWorker(true);
-                    // No ponemos setIsUpdating(false) aquí porque el ServiceWorker
-                    // fuerza una recarga de la página que matará el estado naturalmente.
                   } catch (e) {
-                    setIsUpdating(false); // Solo liberamos si falló por alguna razón extraña
+                    setIsUpdating(false); 
                   }
                 }} 
                 className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none select-none transition-all ${
