@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Utensils, ShoppingBag, Loader2, CheckCircle2, 
-  AlertTriangle, AlertCircle, Phone, User, ChevronRight, Settings
+  AlertTriangle, AlertCircle, Phone, User, ChevronRight, Settings, LayoutGrid
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import logoLyA from '../../../assets/logo.jpeg';
 
 // Importación de configuración visual
@@ -14,6 +15,7 @@ import { THEME_CLASSES, SIZES, getInitialTheme, getInitialSize } from './utils/c
 export default function ClientLogin({ onLogin, type, tableId }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [notification, setNotification] = useState(null);
@@ -51,6 +53,12 @@ export default function ClientLogin({ onLogin, type, tableId }) {
     if (value.length <= 10) {
       setPhone(value);
     }
+  };
+
+  const handleOpenGridDebug = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('grid', 'true');
+    setSearchParams(newParams);
   };
 
   const handleSubmit = async (e) => {
@@ -96,6 +104,21 @@ export default function ClientLogin({ onLogin, type, tableId }) {
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative items-center justify-center p-6">
       
+      {/* ========================================================= */}
+      {/* 🚀 BOTÓN DE DEBUG EN ESQUINA SUPERIOR IZQUIERDA           */}
+      {/* ========================================================= */}
+      <div className="absolute top-6 left-6 z-40">
+        <button
+          type="button"
+          onClick={handleOpenGridDebug}
+          className="flex items-center gap-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-[11px] font-black px-3.5 py-2 rounded-full border border-orange-200 dark:border-orange-800/30 transition-all outline-none shadow-sm select-none"
+          title="Saltar al mapeo de mesas para pruebas y consola"
+        >
+          <LayoutGrid size={14} />
+          <span>Ver Mapeo (Debug)</span>
+        </button>
+      </div>
+
       {/* BOTÓN FLOTANTE DE CONFIGURACIÓN */}
       <motion.button 
         whileTap={{ scale: 0.95 }} 
@@ -138,7 +161,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', damping: 25 }}
-        className="w-full max-w-sm bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] p-8 flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9] relative overflow-hidden"
+        className="w-full max-w-sm bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] p-8 flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9] relative overflow-hidden mt-6"
       >
         {/* Barra de color superior */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
