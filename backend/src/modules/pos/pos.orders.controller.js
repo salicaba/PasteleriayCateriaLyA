@@ -6,6 +6,35 @@ import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
 
 // ==========================================
+// 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN
+// ==========================================
+const extractPromoMeta = (item) => {
+  const plainItem = item.toJSON ? item.toJSON() : item;
+  plainItem.isAutoPromo = false;
+  plainItem.promoLabel = null;
+  plainItem.precioOriginal = null;
+  
+  if (plainItem.notes) {
+      try {
+          let parsedNotes = JSON.parse(plainItem.notes);
+          if (Array.isArray(parsedNotes)) {
+              const metaIndex = parsedNotes.findIndex(n => n && n._isPromoMeta);
+              if (metaIndex >= 0) {
+                  const meta = parsedNotes[metaIndex];
+                  plainItem.isAutoPromo = meta.isAutoPromo;
+                  plainItem.promoLabel = meta.promoLabel;
+                  plainItem.precioOriginal = meta.precioOriginal;
+                  // Removemos la metadata para que no salga en los detalles visuales
+                  parsedNotes.splice(metaIndex, 1);
+                  plainItem.notes = JSON.stringify(parsedNotes);
+              }
+          }
+      } catch(e) {}
+  }
+  return plainItem;
+};
+
+// ==========================================
 // 🛒 CREAR O RECUPERAR ORDEN (Folios Seguros)
 // ==========================================
 export const createOrder = async (req, res) => {
@@ -86,22 +115,43 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
 
-    // 🔥 BLINDAJE: Mapeo estricto incluyendo banderas de promoción
-    const itemsToInsert = items.map(item => ({ 
-      ...item, 
-      orderId, 
-      cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
-      kitchenStatus: 'PENDING',
-      isTakeaway: item.isTakeaway || false,
-      isAutoPromo: item.isAutoPromo || false,
-      promoLabel: item.promoLabel || null,
-      precioOriginal: item.precioOriginal || null
-    }));
+    // 🔥 BLINDAJE NEO-BENTO: Contrabando de las etiquetas de Promoción dentro del JSON `notes`
+    const itemsToInsert = items.map(item => {
+      let parsedNotes = [];
+      if (item.notes) {
+        try { parsedNotes = JSON.parse(item.notes); } catch(e){}
+        if (!Array.isArray(parsedNotes)) parsedNotes = [parsedNotes];
+      }
+
+      if (item.isAutoPromo || item.promoLabel || item.precioOriginal) {
+        parsedNotes.push({
+          _isPromoMeta: true,
+          isAutoPromo: item.isAutoPromo || false,
+          promoLabel: item.promoLabel || null,
+          precioOriginal: item.precioOriginal || null
+        });
+      }
+
+      return { 
+        ...item, 
+        orderId, 
+        cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
+        kitchenStatus: 'PENDING',
+        isTakeaway: item.isTakeaway || false,
+        notes: JSON.stringify(parsedNotes)
+      };
+    });
 
     await OrderItem.bulkCreate(itemsToInsert);
     
     const subtotalNuevo = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-    await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
+    
+    // 🔥 FIX BUG 1: Si la mesa estaba "Pagada" pero caen nuevos pedidos, ¡REVIVE A OPEN!
+    if (order.status === 'PAID') {
+        await order.update({ status: 'OPEN', totalAmount: Number(order.totalAmount) + subtotalNuevo });
+    } else {
+        await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
+    }
 
     // 🚀 MOTOR DE STOCK: Deducción en Tiempo Real
     const stockToDeduct = {};
@@ -143,7 +193,8 @@ export const addItemsToOrder = async (req, res) => {
     getIO().emit('pos:update');
     getIO().emit('kitchen:update'); 
     
-    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems });
+    // Desempaquetamos para enviar al frontend correctamente
+    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems.map(extractPromoMeta) });
   } catch (error) { 
     console.error("🔥 Error crítico al agregar items:", error);
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
@@ -168,7 +219,12 @@ export const getActiveOrderByTable = async (req, res) => {
         }
       ]
     });
-    const validOrder = orders.length > 0 ? orders[0] : null;
+    const validOrder = orders.length > 0 ? orders[0].toJSON() : null;
+    
+    if (validOrder && validOrder.items) {
+        validOrder.items = validOrder.items.map(extractPromoMeta);
+    }
+    
     res.json({ order: validOrder });
   } catch (error) { 
     res.status(500).json({ message: 'Error al recuperar comanda', error: error.message }); 
@@ -215,7 +271,11 @@ export const getActiveOrders = async (req, res) => {
       if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
          if (!order.createdBy) continue; 
       }
-      validOrders.push(order);
+      const plainOrder = order.toJSON();
+      if (plainOrder.items) {
+          plainOrder.items = plainOrder.items.map(extractPromoMeta);
+      }
+      validOrders.push(plainOrder);
     }
     res.json(validOrders);
   } catch (error) { 
@@ -234,9 +294,22 @@ export const moveItemAccount = async (req, res) => {
     const item = await OrderItem.findByPk(itemId);
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
     
+    // 🔥 Recuperamos la metadata antes de dividir para no perder las promos al mover cuentas
+    let moveNotes = [];
+    try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
+    if (!Array.isArray(moveNotes)) moveNotes = [moveNotes];
+    
+    let metaObj = null;
+    const metaIdx = moveNotes.findIndex(n => n && n._isPromoMeta);
+    if (metaIdx >= 0) {
+        metaObj = moveNotes.splice(metaIdx, 1)[0];
+    }
+    
+    const isAutoPromo = metaObj ? metaObj.isAutoPromo : false;
+    const promoLabel = metaObj ? metaObj.promoLabel : null;
+    
     const unitPrice = Number(item.subtotal) / item.quantity;
     
-    // 🔥 BLINDAJE: Evitar agrupar regalos con productos cobrados
     const existingItems = await OrderItem.findAll({
         where: {
             orderId: item.orderId,
@@ -244,24 +317,39 @@ export const moveItemAccount = async (req, res) => {
             cuenta: targetCuenta,
             kitchenStatus: item.kitchenStatus,
             isTakeaway: item.isTakeaway,
-            status: 'ACTIVE',
-            isAutoPromo: item.isAutoPromo || false, 
-            promoLabel: item.promoLabel || null
+            status: 'ACTIVE'
         }
     });
 
-    const existingItem = existingItems.find(i => (Number(i.subtotal) / i.quantity) === unitPrice);
-    let moveNotes = [];
-    try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
-    if (!Array.isArray(moveNotes)) moveNotes = [moveNotes];
-    
+    const existingItem = existingItems.find(i => {
+        if ((Number(i.subtotal) / i.quantity) !== unitPrice) return false;
+        
+        let eNotes = [];
+        try { eNotes = JSON.parse(i.notes || '[]'); } catch(e){}
+        const eMeta = eNotes.find(n => n && n._isPromoMeta);
+        const eIsPromo = eMeta ? eMeta.isAutoPromo : false;
+        const eLabel = eMeta ? eMeta.promoLabel : null;
+        
+        return eIsPromo === isAutoPromo && eLabel === promoLabel;
+    });
+
     const notesToMove = moveNotes.slice(0, qtyToMove);
     const remainingNotes = moveNotes.slice(qtyToMove);
 
+    // Reinyectamos la magia en los objetos separados
+    if (metaObj) {
+        notesToMove.push(metaObj);
+        remainingNotes.push(metaObj);
+    }
+    
     if (existingItem && existingItem.id !== item.id) {
         let existingNotes = [];
         try { existingNotes = JSON.parse(existingItem.notes || '[]'); } catch(e){}
         if (!Array.isArray(existingNotes)) existingNotes = [existingNotes];
+        
+        const eMetaIdx = existingNotes.findIndex(n => n && n._isPromoMeta);
+        if (eMetaIdx >= 0) existingNotes.splice(eMetaIdx, 1);
+        
         await existingItem.update({
             quantity: existingItem.quantity + qtyToMove,
             subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove),
@@ -275,11 +363,9 @@ export const moveItemAccount = async (req, res) => {
     } else {
         if (qtyToMove < item.quantity) {
            await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
-           // 🔥 BLINDAJE: Heredar banderas de promoción al nuevo registro
            await OrderItem.create({
              orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove,
-             cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE',
-             isAutoPromo: item.isAutoPromo, promoLabel: item.promoLabel, precioOriginal: item.precioOriginal
+             cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE'
            });
         } else {
            await item.update({ cuenta: targetCuenta });
@@ -292,7 +378,7 @@ export const moveItemAccount = async (req, res) => {
     });
     
     getIO().emit('pos:update');
-    res.json({ message: 'Producto movido y agrupado con éxito', orderItems: allItems });
+    res.json({ message: 'Producto movido y agrupado con éxito', orderItems: allItems.map(extractPromoMeta) });
   } catch (error) {
     res.status(500).json({ message: 'Error al mover producto', error: error.message });
   }
@@ -327,11 +413,23 @@ export const checkOrderStatus = async (req, res) => {
     const { cuenta } = req.query; 
     const order = await Order.findByPk(orderId);
     if (!order) return res.json({ status: 'DELETED' });
-    if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) return res.json({ status: order.status });
-    if (cuenta && order.paidAccounts && Array.isArray(order.paidAccounts)) {
-      if (order.paidAccounts.includes(cuenta)) return res.json({ status: 'PAID' });
+    
+    if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) {
+        return res.json({ status: order.status, accountStatus: order.status });
     }
-    res.json({ status: order.status });
+    
+    // 🔥 FIX BUG 1: Inteligencia de Cuentas Independientes.
+    let accountStatus = order.status;
+    
+    if (cuenta && order.paidAccounts && Array.isArray(order.paidAccounts)) {
+      if (order.paidAccounts.includes(cuenta)) {
+          accountStatus = 'PAID';
+      } else {
+          accountStatus = 'OPEN';
+      }
+    }
+    
+    res.json({ status: order.status, accountStatus });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });
   }
