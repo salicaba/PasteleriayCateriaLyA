@@ -34,7 +34,7 @@ export default function ClientApp({ type }) {
   const [isUpdating, setIsUpdating] = useState(false); 
   const [runtimeError, setRuntimeError] = useState(null);
 
-  // Capturador visual de errores por si algo falla en tiempo de ejecución
+  // Capturador visual de errores de respaldo
   useEffect(() => {
     const handleError = (event) => {
       setRuntimeError(event.message || String(event.error || 'Error desconocido de JavaScript'));
@@ -87,7 +87,6 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Configuración segura del modo grid/mapa para que cargue en cualquier navegador
   const isGridMode = (isStandalone && !standaloneSelection && !isScannedQr) || (!urlTableId && !isScannedQr && !clientData);
 
   useEffect(() => {
@@ -99,32 +98,32 @@ export default function ClientApp({ type }) {
     }
   }, [themeIndex]);
 
+  // 🔥 CARGA CORREGIDA: Sincroniza tanto las mesas como las configuraciones globales desde /settings
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoadingTables(true);
       try {
-        const response = await api.get('/pos/public/tables').catch(() => api.get('/pos/tables'));
-        const payload = response.data;
+        const [tablesRes, settingsRes] = await Promise.all([
+          api.get('/pos/public/tables').catch(() => api.get('/pos/tables')),
+          api.get('/settings').catch(() => ({ data: {} }))
+        ]);
         
+        const payload = tablesRes.data;
         const tablesArray = payload?.tables || payload?.data || (Array.isArray(payload) ? payload : []);
         setActiveTables(tablesArray);
 
-        if (payload?.disabled_qrs !== undefined || payload?.isQrActive !== undefined) {
-          let isActive = true;
-          if (payload.isQrActive !== undefined) {
-            isActive = payload.isQrActive !== 'false' && payload.isQrActive !== false;
-          }
+        const settingsData = settingsRes.data || {};
+        const isActive = settingsData.qr_service_active !== 'false' && settingsData.qr_service_active !== false;
 
-          let disabled = payload.disabled_qrs || [];
-          if (typeof disabled === 'string') {
-            try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
-          }
-
-          setSystemConfig({
-            isQrActive: isActive,
-            disabledQrs: Array.isArray(disabled) ? disabled : []
-          });
+        let disabled = settingsData.disabled_qrs || payload?.disabled_qrs || [];
+        if (typeof disabled === 'string') {
+          try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
         }
+
+        setSystemConfig({
+          isQrActive: isActive,
+          disabledQrs: Array.isArray(disabled) ? disabled : []
+        });
       } catch (error) {
         console.error('Error al cargar configuración del Kiosko:', error);
       } finally {
@@ -134,6 +133,7 @@ export default function ClientApp({ type }) {
     fetchInitialData();
   }, []);
 
+  // Sincronización en tiempo real vía WebSockets
   useEffect(() => {
     const handleConfigUpdate = (updates) => {
       if (!updates) return;
@@ -222,10 +222,26 @@ export default function ClientApp({ type }) {
 
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
+    
+    // Verificación defensiva previa a entrar
+    const isGlobalOff = !systemConfig.isQrActive;
+    const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
+
+    if (selectedType === 'llevar') {
+      if (isGlobalOff || safeDisabledQrs.includes('llevar') || safeDisabledQrs.includes('takeaway')) return;
+    } else if (selectedType === 'mesa') {
+      const targetTable = activeTables.find(t => t.id === selectedTableId);
+      const isMesaPaused = safeDisabledQrs.includes(`mesa-${targetTable?.number}`) || safeDisabledQrs.includes(`table-${selectedTableId}`) || safeDisabledQrs.includes(`mesa-${selectedTableId}`);
+      const isOccupied = targetTable?.status === 'occupied' || targetTable?.status === 'Ocupada';
+      const isTableActive = targetTable?.isActive ?? targetTable?.qrActive ?? targetTable?.active ?? true;
+
+      if (isGlobalOff || isMesaPaused || isOccupied || !isTableActive) return;
+    }
+
     setIsProcessingSelection(selectedTableId || 'takeaway');
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 300));
       setStandaloneSelection({ type: selectedType, tableId: selectedTableId });
     } finally {
       setIsProcessingSelection(null);
@@ -234,7 +250,7 @@ export default function ClientApp({ type }) {
 
   const isGlobalOff = !systemConfig.isQrActive;
   const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
-  const isLlevarPaused = safeDisabledQrs.includes('llevar');
+  const isLlevarPaused = safeDisabledQrs.includes('llevar') || safeDisabledQrs.includes('takeaway');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
 
   if (runtimeError) {
@@ -375,13 +391,15 @@ export default function ClientApp({ type }) {
                         </div>
                         <div className="text-left">
                           <h3 className="text-xl font-bold">Para Llevar</h3>
-                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Temporalmente inactivo' : 'Recoge en mostrador'}</p>
+                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Desactivado / Apagado' : 'Recoge en mostrador'}</p>
                         </div>
                       </div>
                       
                       {isLlevarDisabled && !isProcessingSelection && (
-                        <div className="absolute inset-0 flex items-center justify-end pr-6 pointer-events-none">
-                          <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md">Pausado</span>
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
+                          <span className="bg-red-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+                            <WifiOff className="w-4 h-4" /> Apagado
+                          </span>
                         </div>
                       )}
                       {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-10" />}
@@ -404,8 +422,9 @@ export default function ClientApp({ type }) {
                       ) : (
                         activeTables.map((table) => {
                           const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
-                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`);
-                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied;
+                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`) || safeDisabledQrs.includes(`table-${table.id}`) || safeDisabledQrs.includes(`mesa-${table.id}`);
+                          const isTableActive = table.isActive ?? table.qrActive ?? table.active ?? true;
+                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied || !isTableActive;
                           const isThisProcessing = isProcessingSelection === table.id;
 
                           return (
@@ -427,9 +446,11 @@ export default function ClientApp({ type }) {
                               )}
                               <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
                               
-                              {(isMesaPaused || isGlobalOff) && !isOccupied && (
-                                <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center backdrop-blur-[1px]">
-                                   <span className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-md -rotate-6">Pausada</span>
+                              {isMesaDisabled && (
+                                <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 text-center z-20">
+                                  <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1">
+                                    <WifiOff className="w-3.5 h-3.5" /> {isOccupied ? 'Ocupada' : 'Apagado'}
+                                  </span>
                                 </div>
                               )}
                             </motion.button>
