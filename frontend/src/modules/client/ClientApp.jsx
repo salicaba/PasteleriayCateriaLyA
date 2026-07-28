@@ -33,14 +33,15 @@ export default function ClientApp({ type }) {
   const isScannedQr = searchParams.get('qr') === 'true';
 
   // ============================================================================
-  // 🚀 EL BOTÓN OBLIGATORIO DE ACTUALIZACIÓN
+  // 🚀 EL BOTÓN OBLIGATORIO DE ACTUALIZACIÓN (CON BLINDAJE ASÍNCRONO)
   // ============================================================================
+  const [isUpdating, setIsUpdating] = useState(false); // 🔥 CANDADO ASÍNCRONO AGREGADO
+
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      // Revisa si hay código nuevo en el servidor cada minuto en silencio
       if (r) {
         setInterval(() => {
           r.update();
@@ -66,7 +67,6 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  // 🔥 NUEVO: Calculamos si estamos en el Mapa/Grid Principal
   const isGridMode = isStandalone && !standaloneSelection && !isScannedQr;
 
   useEffect(() => {
@@ -83,15 +83,11 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // ============================================================================
-  // CARGA DINÁMICA DE MESAS - BLINDADA CONTRA RUTAS
-  // ============================================================================
   useEffect(() => {
     if (isStandalone && !standaloneSelection && !clientData) {
       const fetchTables = async () => {
         setIsLoadingTables(true);
         try {
-          // 🔥 Buscador Indestructible: Intenta la ruta pública, si falla, intenta la normal
           const response = await api.get('/pos/public/tables').catch(() => api.get('/pos/tables'));
           const payload = response.data;
           
@@ -115,9 +111,6 @@ export default function ClientApp({ type }) {
     }
   }, [isStandalone, standaloneSelection, clientData]);
 
-  // ============================================================================
-  // ESCUCHA DE SOCKETS PARA APAGADOS EN TIEMPO REAL
-  // ============================================================================
   useEffect(() => {
     const handleConfigUpdate = (updates) => {
       setSystemConfig(prev => {
@@ -136,9 +129,6 @@ export default function ClientApp({ type }) {
     return () => socket.off('config:update', handleConfigUpdate);
   }, []);
 
-  // ============================================================================
-  // 🚀 LÓGICA DE EXPULSIÓN INMEDIATA (KILL-SWITCH EN ACCIÓN)
-  // ============================================================================
   const handleClientLogout = React.useCallback(() => {
     localStorage.removeItem('lya_client_session');
     setClientData(null);
@@ -147,7 +137,6 @@ export default function ClientApp({ type }) {
   }, []);
 
   useEffect(() => {
-    // Si el cliente está logueado, y NO TIENE ÓRDENES ACTIVAS
     if (clientData && activeOrdersCount === 0) {
       const isMesa = clientData.type === 'mesa';
       const isLlevar = clientData.type === 'llevar';
@@ -155,7 +144,6 @@ export default function ClientApp({ type }) {
       const isThisMesaPaused = isMesa && systemConfig.disabledQrs.includes(`mesa-${clientData.tableId}`);
       const isThisLlevarPaused = isLlevar && systemConfig.disabledQrs.includes('llevar');
 
-      // Si apagaron todo globalmente, o apagaron SU QR específico -> ¡PUM! Expulsado.
       if (!systemConfig.isQrActive || isThisMesaPaused || isThisLlevarPaused) {
         handleClientLogout();
       }
@@ -229,7 +217,7 @@ export default function ClientApp({ type }) {
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       
       {/* ========================================================= */}
-      {/* 🚀 EL ESCUDO VERDUGO: ACTUALIZACIÓN OBLIGATORIA (PWA) */}
+      {/* 🚀 EL ESCUDO VERDUGO CON BOTÓN BLINDADO (PILARES 2, 3 Y 5) */}
       {/* ========================================================= */}
       <AnimatePresence>
         {needRefresh && (
@@ -248,12 +236,36 @@ export default function ClientApp({ type }) {
               <p className="text-gray-500 dark:text-gray-400 font-bold text-sm mb-8 text-justify px-2">
                 Se han detectado nuevas funciones y correcciones en el sistema. Debes actualizar la aplicación para continuar operando.
               </p>
-              <button 
-                onClick={() => updateServiceWorker(true)} 
-                className="w-full bg-emerald-500 text-white font-black py-4 rounded-2xl text-lg shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform uppercase tracking-wider"
+              
+              {/* 🔥 FIX VISUAL Y LÓGICO: Botón 100% Blindado */}
+              <motion.button 
+                whileTap={isUpdating ? {} : { scale: 0.95 }}
+                disabled={isUpdating}
+                onClick={async () => {
+                  setIsUpdating(true);
+                  try {
+                    await updateServiceWorker(true);
+                    // No ponemos setIsUpdating(false) aquí porque el ServiceWorker
+                    // fuerza una recarga de la página que matará el estado naturalmente.
+                  } catch (e) {
+                    setIsUpdating(false); // Solo liberamos si falló por alguna razón extraña
+                  }
+                }} 
+                className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none select-none transition-all ${
+                  isUpdating 
+                    ? 'bg-emerald-400 dark:bg-emerald-600 cursor-not-allowed opacity-80 shadow-none' 
+                    : 'bg-emerald-500 md:hover:bg-emerald-600 shadow-lg shadow-emerald-500/30'
+                }`}
               >
-                Actualizar Ahora
-              </button>
+                {isUpdating ? (
+                  <>
+                    <Loader2 size={24} className="animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  'Actualizar Ahora'
+                )}
+              </motion.button>
             </motion.div>
           </div>
         )}
@@ -261,7 +273,6 @@ export default function ClientApp({ type }) {
 
       <ClientConnectionShield>
         
-        {/* 🔥 FIX: AHORA SÍ PASAMOS TODA LA INFORMACIÓN AL ESCUDO */}
         <ClientServiceShield 
           activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
           onForceLogout={handleClientLogout}
@@ -458,7 +469,6 @@ export default function ClientApp({ type }) {
           )}
         </main>
 
-        {/* Modal "Código QR Expirado" */}
         <AnimatePresence>
           {!isQrValid && !isStandalone && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
