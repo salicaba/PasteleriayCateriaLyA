@@ -36,7 +36,7 @@ export default function ClientApp({ type }) {
   
   const [isAppReady, setIsAppReady] = useState(false);
 
-  // 🔥 SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
+  // SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
   useEffect(() => {
     const updateMetaColor = () => {
       let metaThemeColor = document.querySelector("meta[name='theme-color']");
@@ -129,9 +129,11 @@ export default function ClientApp({ type }) {
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     setIsLoadingTables(true);
     try {
+      // 🔥 TRUCO MAGISTRAL EN LA APP PRINCIPAL: Burlar la caché con la hora actual
+      const ts = Date.now();
       const [tablesRes, settingsRes] = await Promise.all([
-        api.get('/pos/public/tables').catch(() => api.get('/pos/tables')),
-        api.get('/settings').catch(() => ({ data: {} }))
+        api.get(`/pos/public/tables?_t=${ts}`).catch(() => api.get(`/pos/tables?_t=${ts}`)),
+        api.get(`/settings?_t=${ts}`).catch(() => ({ data: {} }))
       ]);
       
       const payload = tablesRes.data;

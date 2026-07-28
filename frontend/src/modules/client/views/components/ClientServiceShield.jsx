@@ -11,21 +11,20 @@ export const ClientServiceShield = ({
   onForceLogout,
   type,
   tableId,
-  isGridMode, // 🔥 Inyectamos para saber si estamos en el Mapa
-  isStandalone // 🔥 Inyectamos para saber si mostramos el botón de volver
+  isGridMode,
+  isStandalone 
 }) => {
   const [globalActive, setGlobalActive] = useState(true);
   const [disabledQrs, setDisabledQrs] = useState([]);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await client.get('/settings'); // Usamos la raíz
+      // 🔥 TRUCO MAGISTRAL: Le ponemos la hora exacta al final para burlar al Caché del navegador
+      const res = await client.get(`/settings?_t=${Date.now()}`); 
       const data = res.data;
       
-      // Verificamos el estado global
       setGlobalActive(data.qr_service_active !== 'false');
       
-      // Verificamos la lista negra de QRs apagados individualmente
       if (data.disabled_qrs) {
         const parsed = typeof data.disabled_qrs === 'string' ? JSON.parse(data.disabled_qrs) : data.disabled_qrs;
         setDisabledQrs(Array.isArray(parsed) ? parsed : []);
@@ -65,15 +64,12 @@ export const ClientServiceShield = ({
     };
   }, [fetchStatus]);
 
-  // 🔥 REGLA DE ORO: Si estamos en el Mapa/Grid, el Escudo se oculta para dejarte elegir otra mesa.
   if (isGridMode) return null;
 
-  // 🔥 LÓGICA GRANULAR: ¿A quién le toca el escudo?
   const isLlevarDisabled = type === 'llevar' && disabledQrs.includes('llevar');
   const isThisMesaDisabled = type === 'mesa' && disabledQrs.includes(`mesa-${tableId}`);
   const isLocallyDisabled = isLlevarDisabled || isThisMesaDisabled;
 
-  // Condición inquebrantable: Apagado global O local, Y sin pedidos activos
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
 
   useEffect(() => {
@@ -82,7 +78,6 @@ export const ClientServiceShield = ({
     }
   }, [shouldShowShield, hasActiveSession, onForceLogout]);
 
-  // Textos dinámicos dependiendo de QUÉ se apagó
   let shieldTitle = "Servicio Suspendido";
   let shieldMessage = "Puede que ya haya acabado nuestro horario de servico y apagamos las peticiones en la App y QR. ¿Estamos abiertos?, pasa y consume sin compromiso.";
   let IconToRender = Store;
@@ -132,7 +127,6 @@ export const ClientServiceShield = ({
             </p>
 
             <div className="w-full relative z-10 flex flex-col gap-3">
-              {/* 🔥 BOTÓN PARA VOLVER AL MAPEO SI ESTÁ EN LA APP */}
               {isStandalone && (
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
@@ -144,7 +138,6 @@ export const ClientServiceShield = ({
                 </motion.button>
               )}
 
-              {/* BOTÓN ORIGINAL DE REINTENTAR */}
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}

@@ -53,6 +53,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
 
+  // 🔥 NUEVO: Estado para saber si el QR está activo y pasárselo al Ticket
+  const [isServiceActive, setIsServiceActive] = useState(true);
+
   const [isConfirmed, setIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
@@ -93,7 +96,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // El Puente al padre
   useEffect(() => {
     if (typeof setActiveOrdersCount === 'function') {
       setActiveOrdersCount(confirmedSnapshot?.items?.length || 0);
@@ -112,6 +114,40 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
+
+  // 🔥 LÓGICA PARA ESCUCHAR SI EL SERVICIO SE APAGA (Para pasarlo al Ticket)
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await client.get(`/settings?_t=${Date.now()}`); // BUST CACHE
+        const data = res.data;
+        const globalActive = data.qr_service_active !== 'false' && data.qr_service_active !== false;
+        
+        let disabled = data.disabled_qrs || [];
+        if (typeof disabled === 'string') {
+          try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
+        }
+        
+        const isLlevarDisabled = type === 'llevar' && disabled.includes('llevar');
+        const isThisMesaDisabled = type === 'mesa' && disabled.includes(`mesa-${tableId}`);
+        
+        setIsServiceActive(globalActive && !isLlevarDisabled && !isThisMesaDisabled);
+      } catch(e) {
+        console.error("Error obteniendo status local:", e);
+      }
+    };
+
+    fetchStatus();
+    
+    const handleUpdate = () => fetchStatus();
+    socket.on('config:update', handleUpdate);
+    socket.on('qr:status_changed', handleUpdate);
+    
+    return () => {
+      socket.off('config:update', handleUpdate);
+      socket.off('qr:status_changed', handleUpdate);
+    };
+  }, [type, tableId]);
 
   useEffect(() => {
     if (!localStorage.getItem('lya_client_last_activity')) {
@@ -181,7 +217,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
            triggerFinalized('CANCELLED');
         }
       } catch (error) {
-        // Ignorar errores transitorios de red
+        // Ignorar errores transitorios
       }
     };
 
@@ -244,9 +280,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     window.open(url, '_blank');
   };
 
-  // ============================================================================
-  // 🔥 BLINDAJE EN LA CARGA DE DATOS DEL MENÚ
-  // ============================================================================
   useEffect(() => {
     const loadMenuData = async () => {
       try {
@@ -256,7 +289,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           client.get('/menu/products').catch(() => ({ data: [] })) 
         ]);
         
-        // 1. Extraemos y blindamos Categorías
         const rawCats = catsRes.data?.data || catsRes.data || [];
         const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
         
@@ -264,7 +296,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         const catsData = hasTodas ? fetchedCats : [{ id: 'todas', name: 'Todas' }, ...fetchedCats];
         setCategories(catsData);
         
-        // 2. Extraemos y blindamos Productos
         const rawProds = prodsRes.data?.data || prodsRes.data || [];
         const prodsData = Array.isArray(rawProds) ? rawProds : [];
         
@@ -523,6 +554,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           isOrderPaid={isOrderPaid} 
           onReset={() => { if (!isOrderPaid) setIsConfirmed(false); }} 
           onOpenSettings={() => setShowSettings(true)}
+          isQrActive={isServiceActive} // 🔥 AQUÍ PASAMOS EL ESTADO REAL AL TICKET
         />
         <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
         <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
