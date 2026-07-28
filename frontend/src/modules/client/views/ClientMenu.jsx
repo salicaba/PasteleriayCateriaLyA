@@ -53,7 +53,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
 
-  // 🔥 NUEVO: Estado para saber si el QR está activo y pasárselo al Ticket
+  // Estado para saber si el QR está activo y pasárselo al Ticket
   const [isServiceActive, setIsServiceActive] = useState(true);
 
   const [isConfirmed, setIsConfirmed] = useState(() => {
@@ -115,7 +115,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // 🔥 LÓGICA PARA ESCUCHAR SI EL SERVICIO SE APAGA (Para pasarlo al Ticket)
+  // LÓGICA PARA ESCUCHAR SI EL SERVICIO SE APAGA (Para pasarlo al Ticket)
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -203,7 +203,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           params: { cuenta: clientData?.name }
         });
         
-        const status = res?.data?.status;
+        const data = res?.data || {};
+        // 🔥 PILAR APLICADO: Priorizamos el estado individual de la cuenta si el backend lo provee.
+        const status = data.accountStatus || data.status;
         
         if (status === 'PAID') {
            if (!isOrderPaid) {
@@ -385,6 +387,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     if (cart.length === 0) return;
     setIsSubmitting(true);
     
+    // 🔥 FIX BUG 1: Limpiamos el estado de "Pagado" residual explícitamente antes de enviar nuevos productos a la mesa.
+    setIsOrderPaid(false);
+    localStorage.removeItem('lya_client_order_paid');
+    
     try {
       const isActuallySalon = type === 'mesa' && tableId;
       const dbOrderType = isActuallySalon ? 'SALON' : 'LLEVAR';
@@ -554,7 +560,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           isOrderPaid={isOrderPaid} 
           onReset={() => { if (!isOrderPaid) setIsConfirmed(false); }} 
           onOpenSettings={() => setShowSettings(true)}
-          isQrActive={isServiceActive} // 🔥 AQUÍ PASAMOS EL ESTADO REAL AL TICKET
+          isQrActive={isServiceActive} 
         />
         <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
         <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
@@ -758,12 +764,17 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       <AnimatePresence>
         {cart.length > 0 && !showCheckout && !selectedProduct && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowCheckout(true)} className="w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-gray-800 dark:md:hover:bg-gray-100 lya:md:hover:bg-[#5C240A] transition-colors outline-none select-none touch-manipulation">
+            <motion.button 
+              whileTap={{ scale: 0.98 }} 
+              disabled={isSubmitting}
+              onClick={() => setShowCheckout(true)} 
+              className={`w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-gray-800 dark:md:hover:bg-gray-100 lya:md:hover:bg-[#5C240A] transition-colors outline-none select-none touch-manipulation ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 flex items-center justify-center font-black text-sm">{totalItems}</div>
                 <span className="text-base font-black">Revisar Pedido</span>
               </div>
-              {addingToCartId !== null ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${totalCart.toFixed(2)}</span>}
+              {addingToCartId !== null || isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${totalCart.toFixed(2)}</span>}
             </motion.button>
           </motion.div>
         )}

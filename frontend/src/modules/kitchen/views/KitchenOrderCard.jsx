@@ -22,12 +22,16 @@ export const KitchenOrderCard = ({
     timeBg: 'bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-primary/10 text-blue-600 dark:text-blue-400 lya:text-lya-primary'
   });
 
+  // 🔥 LOCKS ASÍNCRONOS LOCALES (Prevención de Efecto Fantasma)
+  const [localProcessingItems, setLocalProcessingItems] = useState({});
+  const [localProcessingOrder, setLocalProcessingOrder] = useState(false);
+
   // 🔥 LÓGICA DE CANCELACIONES Y ESTADOS
   const allCancelled = order.items.every(i => i.status === 'CANCELLED');
   const activeItems = order.items.filter(i => i.status !== 'CANCELLED');
   const allReady = activeItems.length > 0 && activeItems.every(i => i.kitchenStatus === 'PREPARING');
   
-  const isOrderProcessing = processingOrders.has(order.id);
+  const isOrderProcessing = processingOrders.has(order.id) || localProcessingOrder;
 
   const getDisplayTitle = () => {
     const tipo = order.tipo || 'salon';
@@ -118,6 +122,40 @@ export const KitchenOrderCard = ({
     return () => clearInterval(timer);
   }, [order.createdAt, allReady, allCancelled]);
 
+  // 🔥 HANDLERS BLINDADOS
+  const handleItemClick = async (e, item) => {
+    e.stopPropagation();
+    const isCancelled = item.status === 'CANCELLED';
+    const isItemProcessing = localProcessingItems[item.id] || processingItems.has(item.id) || isOrderProcessing;
+    
+    if (isItemProcessing || isCancelled) return;
+
+    setLocalProcessingItems(prev => ({ ...prev, [item.id]: true }));
+    try {
+      await onToggleItem(order.id, item.id);
+    } finally {
+      setTimeout(() => {
+        setLocalProcessingItems(prev => ({ ...prev, [item.id]: false }));
+      }, 800); // Lock de enfriamiento para el estado individual
+    }
+  };
+
+  const handleOrderAction = async (e, actionFn) => {
+    e.stopPropagation();
+    if (isOrderProcessing) return;
+
+    setLocalProcessingOrder(true);
+    try {
+      await actionFn(order.id);
+    } finally {
+      // 🔥 CONGELAMIENTO PERSISTENTE: Mantiene el loader visual por 2.5s
+      // Da tiempo suficiente para que el WebSocket llegue y destruya el componente antes de que regrese a false.
+      setTimeout(() => {
+        setLocalProcessingOrder(false);
+      }, 2500);
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -148,15 +186,14 @@ export const KitchenOrderCard = ({
         {order.items.map(item => {
           const isCancelled = item.status === 'CANCELLED';
           const isReady = item.kitchenStatus === 'PREPARING' && !isCancelled;
-          const isItemProcessing = processingItems.has(item.id) || isOrderProcessing;
+          const isItemProcessing = localProcessingItems[item.id] || processingItems.has(item.id) || isOrderProcessing;
           
           return (
             <motion.div 
               layout
               key={item.id} 
-              onClick={() => {
-                if (!isItemProcessing && !isCancelled) onToggleItem(order.id, item.id);
-              }}
+              whileTap={!isItemProcessing && !isCancelled ? { scale: 0.98 } : {}}
+              onClick={(e) => handleItemClick(e, item)}
               className={`group flex items-start gap-3 p-3 rounded-2xl transition-all duration-300 ${
                 isItemProcessing || isCancelled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
               } ${
@@ -164,7 +201,7 @@ export const KitchenOrderCard = ({
                   ? 'bg-red-50/50 dark:bg-red-900/10 lya:bg-red-500/5 border-red-200 dark:border-red-900/50 lya:border-red-500/30 border-2 border-dashed'
                   : isReady 
                     ? 'bg-gray-50/50 dark:bg-gray-800/30 lya:bg-lya-bg/30 opacity-60' 
-                    : 'bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 hover:shadow-sm hover:border-blue-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/40'
+                    : 'bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 md:hover:shadow-sm md:hover:border-blue-200 dark:md:hover:border-gray-600 lya:md:hover:border-lya-primary/40'
               }`}
             >
               <div className={`relative w-8 h-8 mt-0.5 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm ${
@@ -174,7 +211,7 @@ export const KitchenOrderCard = ({
                     ? 'bg-red-100 dark:bg-red-900/50 lya:bg-red-500/20 text-red-600 dark:text-red-400 lya:text-red-500'
                     : isReady 
                       ? 'bg-emerald-500 text-white shadow-emerald-500/30 scale-95' 
-                      : 'bg-gray-100 dark:bg-gray-700 lya:bg-lya-surface text-gray-800 dark:text-gray-200 lya:text-lya-primary group-hover:bg-blue-100 dark:group-hover:bg-gray-600 lya:group-hover:bg-lya-primary/20'
+                      : 'bg-gray-100 dark:bg-gray-700 lya:bg-lya-surface text-gray-800 dark:text-gray-200 lya:text-lya-primary md:group-hover:bg-blue-100 dark:md:group-hover:bg-gray-600 lya:md:group-hover:bg-lya-primary/20'
               }`}>
                 {isItemProcessing ? (
                   <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" />
@@ -258,38 +295,41 @@ export const KitchenOrderCard = ({
 
       <div className="p-3 bg-transparent pt-0">
         {allCancelled ? (
-          <button 
-            onClick={() => onComplete(order.id)}
+          <motion.button 
+            whileTap={!isOrderProcessing ? { scale: 0.95 } : {}}
+            onClick={(e) => handleOrderAction(e, onComplete)}
             disabled={isOrderProcessing}
-            className={`w-full py-3.5 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 lya:bg-red-500 lya:hover:bg-red-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 transition-all border border-transparent dark:border-red-500/50 ${
-              isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
+            className={`w-full py-3.5 outline-none bg-red-500 md:hover:bg-red-600 dark:bg-red-600 dark:md:hover:bg-red-700 lya:bg-red-500 lya:md:hover:bg-red-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 transition-all border border-transparent dark:border-red-500/50 ${
+              isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : ''
             }`}
           >
             {isOrderProcessing ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             {isOrderProcessing ? 'Descartando...' : 'Descartar Comanda'}
-          </button>
+          </motion.button>
         ) : allReady ? (
-          <button 
-            onClick={() => onComplete(order.id)}
+          <motion.button 
+            whileTap={!isOrderProcessing ? { scale: 0.95 } : {}}
+            onClick={(e) => handleOrderAction(e, onComplete)}
             disabled={isOrderProcessing}
-            className={`w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 lya:shadow-lya-primary/30 transition-all border border-transparent dark:border-emerald-500/50 lya:border-lya-primary ${
-              isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
+            className={`w-full py-3.5 outline-none bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-500 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 lya:shadow-lya-primary/30 transition-all border border-transparent dark:border-emerald-500/50 lya:border-lya-primary ${
+              isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : ''
             }`}
           >
             {isOrderProcessing ? <Loader2 size={18} className="animate-spin" /> : <BellRing size={18} className="animate-pulse" />}
             {isOrderProcessing ? 'Procesando...' : 'Entregar'}
-          </button>
+          </motion.button>
         ) : (
-          <button 
-            onClick={() => onMarkAllReady(order.id)}
+          <motion.button 
+            whileTap={!isOrderProcessing ? { scale: 0.95 } : {}}
+            onClick={(e) => handleOrderAction(e, onMarkAllReady)}
             disabled={isOrderProcessing}
-            className={`w-full py-3.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-surface lya:hover:bg-lya-border/20 text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-all border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/40 ${
-              isOrderProcessing ? 'opacity-70 cursor-wait' : 'active:scale-[0.98]'
+            className={`w-full py-3.5 outline-none bg-gray-50 md:hover:bg-gray-100 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-surface lya:md:hover:bg-lya-border/20 text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-all border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/40 ${
+              isOrderProcessing ? 'opacity-70 cursor-wait' : ''
             }`}
           >
             {isOrderProcessing ? <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> : <ChefHat size={16} strokeWidth={2.5} />}
             {isOrderProcessing ? 'Procesando...' : 'Todo Preparado'}
-          </button>
+          </motion.button>
         )}
       </div>
     </motion.div>
