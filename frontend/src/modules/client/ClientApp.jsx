@@ -32,6 +32,25 @@ export default function ClientApp({ type }) {
   const isScannedQr = searchParams.get('qr') === 'true';
 
   const [isUpdating, setIsUpdating] = useState(false); 
+  const [runtimeError, setRuntimeError] = useState(null);
+
+  // Capturador visual de errores por si algo falla en tiempo de ejecución
+  useEffect(() => {
+    const handleError = (event) => {
+      setRuntimeError(event.message || String(event.error || 'Error desconocido de JavaScript'));
+    };
+    const handleRejection = (event) => {
+      setRuntimeError(event.reason?.message || String(event.reason || 'Promesa rechazada no manejada'));
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
 
   const {
     needRefresh: [needRefresh],
@@ -63,7 +82,13 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  const isGridMode = isStandalone && !standaloneSelection && !isScannedQr;
+  const [clientData, setClientData] = useState(() => {
+    const saved = localStorage.getItem('lya_client_session');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Configuración segura del modo grid/mapa para que cargue en cualquier navegador
+  const isGridMode = (isStandalone && !standaloneSelection && !isScannedQr) || (!urlTableId && !isScannedQr && !clientData);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -73,11 +98,6 @@ export default function ClientApp({ type }) {
       localStorage.setItem('lya_client_theme', themeIndex);
     }
   }, [themeIndex]);
-
-  const [clientData, setClientData] = useState(() => {
-    const saved = localStorage.getItem('lya_client_session');
-    return saved ? JSON.parse(saved) : null;
-  });
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -202,22 +222,6 @@ export default function ClientApp({ type }) {
 
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
-    
-    // Verificación robusta y defensiva contra elementos apagados o desactivados
-    const isGlobalOff = !systemConfig.isQrActive;
-    const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
-    
-    if (selectedType === 'llevar') {
-      if (isGlobalOff || safeDisabledQrs.includes('llevar')) return;
-    } else if (selectedType === 'mesa') {
-      const targetTable = activeTables.find(t => t.id === selectedTableId);
-      const isMesaPaused = safeDisabledQrs.includes(`mesa-${targetTable?.number}`) || safeDisabledQrs.includes(`table-${selectedTableId}`);
-      const isOccupied = targetTable?.status === 'occupied' || targetTable?.status === 'Ocupada';
-      const isTableActive = targetTable?.isActive ?? targetTable?.qrActive ?? targetTable?.active ?? true;
-
-      if (isGlobalOff || isMesaPaused || isOccupied || !isTableActive) return;
-    }
-
     setIsProcessingSelection(selectedTableId || 'takeaway');
     
     try {
@@ -232,6 +236,36 @@ export default function ClientApp({ type }) {
   const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
   const isLlevarPaused = safeDisabledQrs.includes('llevar');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
+
+  if (runtimeError) {
+    return (
+      <div className="min-h-screen bg-red-950 text-white p-6 flex flex-col items-center justify-center text-center">
+        <div className="bg-red-900/50 border border-red-500 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+          <h2 className="text-xl font-black mb-2 text-red-200">⚠️ Error Detectado en la App</h2>
+          <p className="text-xs text-red-300 mb-4 font-mono bg-black/40 p-3 rounded-xl overflow-auto text-left max-h-40">
+            {runtimeError}
+          </p>
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-white text-red-950 font-black rounded-xl text-sm shadow hover:bg-gray-100 transition-colors"
+            >
+              Borrar Caché y Recargar
+            </button>
+            <button 
+              onClick={() => setRuntimeError(null)}
+              className="w-full py-2 bg-transparent text-red-300 text-xs font-bold underline"
+            >
+              Intentar Ocultar (Avanzar)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
@@ -323,7 +357,7 @@ export default function ClientApp({ type }) {
                 </AnimatePresence>
 
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6">
-                  {/* Botón Para Llevar con indicador visual de Apagado / Desactivado */}
+                  {/* Botón Para Llevar */}
                   <section>
                     <motion.button
                       whileTap={isProcessingSelection || isLlevarDisabled ? {} : { scale: 0.95 }}
@@ -341,22 +375,20 @@ export default function ClientApp({ type }) {
                         </div>
                         <div className="text-left">
                           <h3 className="text-xl font-bold">Para Llevar</h3>
-                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Desactivado / Apagado' : 'Recoge en mostrador'}</p>
+                          <p className="text-sm opacity-80 mt-1">{isLlevarDisabled ? 'Temporalmente inactivo' : 'Recoge en mostrador'}</p>
                         </div>
                       </div>
                       
                       {isLlevarDisabled && !isProcessingSelection && (
-                        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center">
-                          <span className="bg-red-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5">
-                            <WifiOff className="w-4 h-4" /> Apagado
-                          </span>
+                        <div className="absolute inset-0 flex items-center justify-end pr-6 pointer-events-none">
+                          <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md">Pausado</span>
                         </div>
                       )}
                       {isProcessingSelection === 'takeaway' && <Loader2 className="w-6 h-6 animate-spin relative z-10" />}
                     </motion.button>
                   </section>
 
-                  {/* Mesas con indicador visual robusto para estados apagados */}
+                  {/* Mesas */}
                   <section>
                     <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Consumo en Local</h2>
                     
@@ -372,9 +404,8 @@ export default function ClientApp({ type }) {
                       ) : (
                         activeTables.map((table) => {
                           const isOccupied = table.status === 'occupied' || table.status === 'Ocupada';
-                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`) || safeDisabledQrs.includes(`table-${table.id}`);
-                          const isTableActive = table.isActive ?? table.qrActive ?? table.active ?? true;
-                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied || !isTableActive;
+                          const isMesaPaused = safeDisabledQrs.includes(`mesa-${table.number}`);
+                          const isMesaDisabled = isGlobalOff || isMesaPaused || isOccupied;
                           const isThisProcessing = isProcessingSelection === table.id;
 
                           return (
@@ -396,11 +427,9 @@ export default function ClientApp({ type }) {
                               )}
                               <span className="font-bold text-sm z-10">{table.name || `Mesa ${table.number}`}</span>
                               
-                              {isMesaDisabled && (
-                                <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 text-center z-20">
-                                  <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1">
-                                    <WifiOff className="w-3.5 h-3.5" /> {isOccupied ? 'Ocupada' : 'Apagado'}
-                                  </span>
+                              {(isMesaPaused || isGlobalOff) && !isOccupied && (
+                                <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center backdrop-blur-[1px]">
+                                   <span className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-md -rotate-6">Pausada</span>
                                 </div>
                               )}
                             </motion.button>
@@ -523,7 +552,7 @@ export default function ClientApp({ type }) {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-black text-gray-900 dark:text-white lya:text-lya-text uppercase tracking-wider mb-0.5">¿Qué debes hacer?</h4>
                     <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify leading-snug">
-                      Por favor, solicita al personal de 𝓛𝔂𝓪 que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
+                      Por favor, solicita al personal de 𝓛𝔂α que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
                     </p>
                   </div>
                 </div>
