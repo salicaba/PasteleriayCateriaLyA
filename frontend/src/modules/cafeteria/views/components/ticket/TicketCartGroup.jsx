@@ -17,7 +17,6 @@ export const TicketCartGroup = ({
   showToast 
 }) => {
 
-  // 🔥 LOCKS ASÍNCRONOS LOCALES (Motor Anti-Spam)
   const [actionLocks, setActionLocks] = useState({});
 
   const executeWithLock = async (e, lockKey, actionFn) => {
@@ -64,6 +63,58 @@ export const TicketCartGroup = ({
           finalDisplayPhone = strPhone.split(' | ')[0].trim();
       }
   }
+
+  const getPrepStr = (item) => {
+    if (!item?.preparaciones || item.preparaciones.length === 0) return "";
+    // Ignoramos la metadata secreta para el ordenamiento
+    const validPreps = item.preparaciones.filter(p => p && !p._isPromoMeta);
+    if (validPreps.length === 0) return "";
+    const p = validPreps[0];
+    return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
+  };
+
+  // 🔥 RESCATE DE LA AMNESIA: Extraemos los datos de promoción justo antes de agrupar
+  const rawItemsConMagia = items.map(item => {
+      let isAutoPromo = item.isAutoPromo === true || item.isAutoPromo === 'true';
+      let promoLabel = item.promoLabel;
+      let precioOriginal = item.precioOriginal;
+
+      if (item.preparaciones && Array.isArray(item.preparaciones)) {
+          const meta = item.preparaciones.find(p => p && p._isPromoMeta);
+          if (meta) {
+              isAutoPromo = isAutoPromo || meta.isAutoPromo;
+              promoLabel = promoLabel || meta.promoLabel;
+              precioOriginal = precioOriginal || meta.precioOriginal;
+          }
+      }
+      precioOriginal = precioOriginal || item.precioBase || (item.product ? item.product.basePrice : null) || null;
+
+      return { ...item, isAutoPromo, promoLabel, precioOriginal };
+  });
+
+  const displayItems = [];
+  rawItemsConMagia.forEach(item => {
+      const isGhost = item.isAutoPromo || Number(item.precio) === 0;
+
+      const existing = displayItems.find(d => 
+          d.id === item.id && 
+          Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
+          d.enviadoCocina === item.enviadoCocina && 
+          d.kitchenStatus === item.kitchenStatus &&
+          !!d.isTakeaway === !!item.isTakeaway && 
+          (d.isAutoPromo || Number(d.precio) === 0) === isGhost && 
+          getPrepStr(d) === getPrepStr(item)
+      );
+      
+      if (existing) { 
+          existing.qty += item.qty; 
+          const newPreps = item.preparaciones ? item.preparaciones.filter(p => !p._isPromoMeta) : [];
+          existing.preparaciones = [...existing.preparaciones, ...newPreps]; 
+          existing._groupedItems.push(item); 
+      } else { 
+          displayItems.push({ ...item, _groupedItems: [item] }); 
+      }
+  });
 
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
   const isOcultarProcessing = actionLocks[`${cuentaName}-ocultar`];
@@ -134,7 +185,7 @@ export const TicketCartGroup = ({
             </div>
             {isCuentaPagada 
                 ? <span className="text-[9px] text-emerald-600 dark:text-emerald-400 lya:text-lya-primary font-bold uppercase tracking-wider flex items-center gap-1"><Lock size={8}/> Cobrada</span> 
-                : <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-wide">{items.length} productos</span>}
+                : <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-wide">{displayItems.length} productos</span>}
           </div>
         </div>
         
@@ -143,7 +194,7 @@ export const TicketCartGroup = ({
               ${subtotalCuenta.toFixed(2)}
           </span>
           <div className="flex gap-1.5 flex-wrap justify-end pointer-events-auto">
-            {items.length === 0 && cuentaName !== 'General' && (
+            {displayItems.length === 0 && cuentaName !== 'General' && (
               <motion.button 
                   whileTap={!isOcultarProcessing ? { scale: 0.95 } : {}}
                   disabled={isOcultarProcessing}
@@ -175,7 +226,7 @@ export const TicketCartGroup = ({
               </motion.button>
             )}
             
-            {!isVitrina && !isLlevar && (isCuentaPagada || isCompletamentePagada) && items.length > 0 && (
+            {!isVitrina && !isLlevar && (isCuentaPagada || isCompletamentePagada) && displayItems.length > 0 && (
               <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => executeWithLock(e, `${cuentaName}-print`, () => onPrintTicket(cuentaName))} 
@@ -185,7 +236,7 @@ export const TicketCartGroup = ({
               </motion.button>
             )}
 
-            {!isVitrina && !isLlevar && isCuentaPagada && items.length > 0 && (
+            {!isVitrina && !isLlevar && isCuentaPagada && displayItems.length > 0 && (
               <motion.button 
                   whileTap={!isOcultarProcessing ? { scale: 0.95 } : {}}
                   disabled={isOcultarProcessing}
@@ -204,19 +255,17 @@ export const TicketCartGroup = ({
       </div>
 
       <div className="px-2 pb-2 space-y-1.5">
-        {/* 🔥 QUITAMOS EL `idx` DEL MAP PARA EVITAR CONFLICTOS DE RENDER */}
-        {items.map((item) => {
+        {displayItems.map((item) => {
           
           const isCero = Number(item.precio) === 0;
           const isGhostPromo = item.isAutoPromo && isCero;
           const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA';
           const isDiscountedPromo = !isLockedPromo && (item.promoLabel || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)));
           
-          const isAnyPromo = isLockedPromo || isDiscountedPromo;
+          const isAnyPromo = isLockedPromo || isDiscountedPromo || isGhostPromo;
           const promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
-          const pOriginal = item.precioOriginal || (isGhostPromo ? (item.basePrice || item.precioBase || null) : null);
+          const pOriginal = item.precioOriginal;
 
-          // 🔥 MAGIA PURA: Clave inmutable. JAMÁS volverán a bailar en pantalla.
           const uniqueId = item.backendItemId || item.cartItemId || item.id;
           const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}`;
           
@@ -225,8 +274,7 @@ export const TicketCartGroup = ({
           const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
           const hasRealPreparations = item.preparaciones?.some(prep => {
-            if (!prep) return false;
-            if (Object.keys(prep).length === 0) return false;
+            if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta) return false;
             if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
             return true;
           });
@@ -258,7 +306,7 @@ export const TicketCartGroup = ({
 
           if (isAnyPromo) {
              if (item.enviadoCocina) {
-                 containerClasses += "bg-rose-50/70 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30 ";
+                 containerClasses += "bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/30 ";
              } else {
                  containerClasses += "bg-rose-50 dark:bg-rose-900/20 border-rose-300 dark:border-rose-700/50 shadow-sm ";
              }
@@ -354,7 +402,7 @@ export const TicketCartGroup = ({
                 {hasRealPreparations && !isGhostPromo && (
                   <div className="space-y-0.5 pointer-events-none mt-1">
                     {item.preparaciones?.map((prep, pIdx) => {
-                      if (!prep || Object.keys(prep).length === 0 || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
+                      if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
                       return (
                         <div key={pIdx} className="bg-gray-100/80 dark:bg-gray-900/60 lya:bg-lya-surface rounded p-1 flex flex-col gap-0.5 border border-gray-200/50 dark:border-gray-800/50 lya:border-lya-border/40">
                           <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase flex items-center gap-1"><Info size={8} /> {prep.tamano} {prep.leche && `• ${prep.leche}`}</span>

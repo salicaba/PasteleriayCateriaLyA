@@ -18,15 +18,13 @@ const extractPromoMeta = (item) => {
       try {
           let parsedNotes = JSON.parse(plainItem.notes);
           if (Array.isArray(parsedNotes)) {
-              const metaIndex = parsedNotes.findIndex(n => n && n._isPromoMeta);
-              if (metaIndex >= 0) {
-                  const meta = parsedNotes[metaIndex];
+              const meta = parsedNotes.find(n => n && n._isPromoMeta);
+              if (meta) {
                   plainItem.isAutoPromo = meta.isAutoPromo;
                   plainItem.promoLabel = meta.promoLabel;
                   plainItem.precioOriginal = meta.precioOriginal;
-                  // Removemos la metadata para que no salga en los detalles visuales
-                  parsedNotes.splice(metaIndex, 1);
-                  plainItem.notes = JSON.stringify(parsedNotes);
+                  // 🔥 CLAVE: No borramos la metadata. La dejamos viajar al frontend
+                  // para que TicketCartGroup la rescate y pinte los colores correctos.
               }
           }
       } catch(e) {}
@@ -180,7 +178,6 @@ export const addItemsToOrder = async (req, res) => {
       }
     }
 
-    // 📡 Emitir actualizaciones de stock si hubo cambios
     if (stockAlerts.length > 0) {
       getIO().emit('stock:update', stockAlerts);
     }
@@ -193,7 +190,6 @@ export const addItemsToOrder = async (req, res) => {
     getIO().emit('pos:update');
     getIO().emit('kitchen:update'); 
     
-    // Desempaquetamos para enviar al frontend correctamente
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems.map(extractPromoMeta) });
   } catch (error) { 
     console.error("🔥 Error crítico al agregar items:", error);
