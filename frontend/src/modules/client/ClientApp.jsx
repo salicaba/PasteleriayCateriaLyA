@@ -318,7 +318,7 @@ export default function ClientApp({ type }) {
       </AnimatePresence>
 
       {/* 🔥 REGLA 1: Anti-Ghost Scroll estricto aplicado aquí */}
-      <div className="h-full w-full flex-1 flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
+      <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
         
         <AnimatePresence>
           {needRefresh && (
