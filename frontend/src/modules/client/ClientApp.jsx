@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, LayoutGrid } from 'lucide-react';
+import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -32,7 +32,6 @@ export default function ClientApp({ type }) {
   const isScannedQr = searchParams.get('qr') === 'true';
 
   const [isUpdating, setIsUpdating] = useState(false); 
-  const [showDebugGrid, setShowDebugGrid] = useState(false); // 🔥 ESTADO DIRECTO DE DEBUG
 
   const {
     needRefresh: [needRefresh],
@@ -64,8 +63,7 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  // 🔥 MODO GRID DIRECTO POR ESTADO O PWA
-  const isGridMode = (isStandalone || showDebugGrid) && !standaloneSelection && !isScannedQr;
+  const isGridMode = isStandalone && !standaloneSelection && !isScannedQr;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -176,7 +174,7 @@ export default function ClientApp({ type }) {
   }, [clientData, effectiveType, urlTableId, navigate]);
 
   useEffect(() => {
-    if (isStandalone || showDebugGrid) {
+    if (isStandalone) {
       setIsQrValid(true);
       return;
     }
@@ -200,7 +198,7 @@ export default function ClientApp({ type }) {
 
     socket.on('qr_security_update', handleSecurityUpdate);
     return () => socket.off('qr_security_update', handleSecurityUpdate);
-  }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone, showDebugGrid]);
+  }, [urlTableId, qrTokenUrl, handleClientLogout, isStandalone]);
 
   const handleStandaloneSelect = async (selectedType, selectedTableId) => {
     if (isProcessingSelection) return;
@@ -215,6 +213,7 @@ export default function ClientApp({ type }) {
   };
 
   const isGlobalOff = !systemConfig.isQrActive;
+  // 🔥 BLINDAJE: Verificación segura garantizando que sea array
   const safeDisabledQrs = Array.isArray(systemConfig.disabledQrs) ? systemConfig.disabledQrs : [];
   const isLlevarPaused = safeDisabledQrs.includes('llevar');
   const isLlevarDisabled = isGlobalOff || isLlevarPaused;
@@ -291,16 +290,8 @@ export default function ClientApp({ type }) {
             isGridMode ? (
               
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
-                <header className="mb-6 mt-4 text-center relative">
-                  {showDebugGrid && (
-                    <button
-                      onClick={() => setShowDebugGrid(false)}
-                      className="absolute left-0 top-1 text-xs font-bold text-gray-500 hover:text-gray-900 underline outline-none"
-                    >
-                      Salir de Debug
-                    </button>
-                  )}
-                  <h1 className="text-2xl font-black mb-1">Mapeo de Mesas</h1>
+                <header className="mb-6 mt-4 text-center">
+                  <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
                 </header>
 
@@ -455,7 +446,6 @@ export default function ClientApp({ type }) {
                   </motion.div>
                 )}
 
-                {/* 🔥 PASAMOS LA FUNCIÓN DIRECTA AL LOGIN */}
                 <ClientLogin 
                   onLogin={(data) => {
                     const sessionData = { ...data, type: effectiveType, tableId: effectiveTableId };
@@ -464,7 +454,6 @@ export default function ClientApp({ type }) {
                   }} 
                   type={effectiveType} 
                   tableId={effectiveTableId} 
-                  onOpenGrid={() => setShowDebugGrid(true)} 
                 />
               </div>
             )
@@ -479,8 +468,9 @@ export default function ClientApp({ type }) {
           )}
         </main>
 
+        {/* Modal "Código QR Expirado" */}
         <AnimatePresence>
-          {!isQrValid && !isStandalone && !showDebugGrid && (
+          {!isQrValid && !isStandalone && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 h-[100dvh] w-full bg-black/50 dark:bg-black/70 backdrop-blur-md pointer-events-auto">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 40 }}
@@ -513,7 +503,7 @@ export default function ClientApp({ type }) {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-black text-gray-900 dark:text-white lya:text-lya-text uppercase tracking-wider mb-0.5">¿Qué debes hacer?</h4>
                     <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify leading-snug">
-                      Por favor, solicita al personal de 𝓛𝔂α que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
+                      Por favor, solicita al personal de 𝓛𝔂𝓪 que te proporcione el nuevo código QR físico de la mesa para escanearlo y continuar con tu experiencia.
                     </p>
                   </div>
                 </div>
