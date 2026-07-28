@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, LayoutGrid } from 'lucide-react';
+import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -63,7 +63,7 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  // 🔥 MAPEO FORZADO: Si la URL tiene ?grid=true o el usuario dio clic al botón de debug
+  // 🔥 DETECCIÓN DE MODO GRID (Ya sea por PWA o por el botón de Debug ?grid=true)
   const forceGridInBrowser = searchParams.get('grid') === 'true';
   const isGridMode = (isStandalone || forceGridInBrowser) && !standaloneSelection && !isScannedQr;
 
@@ -81,6 +81,7 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Carga inicial de mesas y estado de los QRs
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoadingTables(true);
@@ -116,6 +117,7 @@ export default function ClientApp({ type }) {
     fetchInitialData();
   }, []);
 
+  // Escucha de Sockets en tiempo real para apagar/encender QRs
   useEffect(() => {
     const handleConfigUpdate = (updates) => {
       if (!updates) return;
@@ -222,26 +224,6 @@ export default function ClientApp({ type }) {
   return (
     <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
       
-      {/* ========================================================= */}
-      {/* 🚀 BOTÓN FLOTANTE DE DEBUG: VER MAPEO EN NAVEGADOR         */}
-      {/* ========================================================= */}
-      {!isGridMode && !clientData && (
-        <div className="absolute top-4 right-4 z-50">
-          <button
-            onClick={() => {
-              const newParams = new URLSearchParams(searchParams);
-              newParams.set('grid', 'true');
-              setSearchParams(newParams);
-            }}
-            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black px-3.5 py-2 rounded-full shadow-lg transition-all active:scale-95 outline-none"
-            title="Forzar vista de mapeo para pruebas"
-          >
-            <LayoutGrid size={14} />
-            <span>Ver Mapeo (Debug)</span>
-          </button>
-        </div>
-      )}
-
       <AnimatePresence>
         {needRefresh && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 h-[100dvh] w-full bg-black/80 backdrop-blur-md">
@@ -312,7 +294,6 @@ export default function ClientApp({ type }) {
               
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col h-full w-full">
                 <header className="mb-6 mt-4 text-center relative">
-                  {/* Botón para salir del modo debug en el navegador */}
                   {forceGridInBrowser && (
                     <button
                       onClick={() => {
