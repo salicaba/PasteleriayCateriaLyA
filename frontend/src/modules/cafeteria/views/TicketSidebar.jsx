@@ -79,9 +79,17 @@ export const TicketSidebar = ({
     return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
   };
 
-  // 🔥 AGRUPADOR BLINDADO
+  // 🔥 AGRUPADOR BLINDADO Y ORDEN ESTRICTO
   const groupedCart = availableAccs.map(cuentaName => {
-    const rawItems = activeCart.filter(item => (item.cuenta || 'General') === cuentaName);
+    const rawItems = activeCart
+      .filter(item => (item.cuenta || 'General') === cuentaName)
+      .sort((a, b) => {
+        // Inmovilizamos los productos comparando estrictamente sus identificadores
+        const idA = String(a.backendItemId || a.cartItemId || a.id || '');
+        const idB = String(b.backendItemId || b.cartItemId || b.id || '');
+        return idA.localeCompare(idB, undefined, { numeric: true });
+      });
+
     const displayItems = [];
     
     rawItems.forEach(item => {
@@ -355,7 +363,7 @@ export const TicketSidebar = ({
     setDragOverCuenta(null);
     if (draggedItem && draggedItem.cuentaName !== cuentaName && !cuentasPagadasReales.includes(cuentaName) && !isLlevar && !isVitrina) {
       
-      // 🔥 BLOQUEO DE SEGURIDAD: Evita que el usuario suelte un producto fantasma/gratis en otra cuenta.
+      // BLOQUEO DE SEGURIDAD: Evita que el usuario suelte un producto fantasma/gratis en otra cuenta.
       if (draggedItem.item.isAutoPromo || Number(draggedItem.item.precio) === 0) return;
 
       let qtyToMove = draggedItem.item.qty;
