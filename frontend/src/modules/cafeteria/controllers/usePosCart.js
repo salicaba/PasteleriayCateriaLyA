@@ -1,4 +1,4 @@
-// frontend/src/modules/pos/controllers/usePosCart.js
+// src/modules/pos/controllers/usePosCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
@@ -22,7 +22,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const [promotions, setPromotions] = useState([]);
 
   const isProcessingRef = useRef(false);
-  const notifiedPromos = useRef({});
+  // 🔥 CIRUGÍA 1: Eliminamos la referencia "notifiedPromos" que causaba el efecto saludo.
 
   const [promoWarning, setPromoWarning] = useState({
     isOpen: false, message: '', onConfirm: null, onCancel: null
@@ -312,41 +312,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       return item;
     });
 
-    const currentPromoQtys = {};
-    cleanCart.forEach(item => {
-      if (item.isAutoPromo && item.promoId) {
-        const promoKey = `${item.promoId}::${item.cuenta}`;
-        currentPromoQtys[promoKey] = (currentPromoQtys[promoKey] || 0) + item.qty;
-      }
-    });
-
-    if (triggerNotification) {
-      Object.keys(currentPromoQtys).forEach(promoKey => {
-        const newQty = currentPromoQtys[promoKey];
-        const oldQty = notifiedPromos.current[promoKey] || 0;
-
-        if (newQty > oldQty) {
-          const [promoId, cuenta] = promoKey.split('::');
-          const promoItem = cleanCart.find(item => String(item.promoId) === promoId && String(item.cuenta) === cuenta);
-          
-          if (promoItem) {
-            const multiplierText = newQty > 1 ? ` x${newQty}` : '';
-            const baseMsg = promoItem.cuenta !== 'General' ? ` en ${promoItem.cuenta}` : '';
-
-            setTimeout(() => {
-              if (promoItem.promoType === 'NxM') {
-                triggerNotification(`Promo Automática: ¡${promoItem.nombre} GRATIS${baseMsg}!${multiplierText}`, 'success');
-              } else if (promoItem.promoType === 'NTH_FIXED') {
-                triggerNotification(`Descuento aplicado en ${promoItem.nombre}${baseMsg}${multiplierText}`, 'success');
-              } else if (promoItem.promoType === 'FIXED') {
-                triggerNotification(`Rebaja directa en ${promoItem.nombre}${baseMsg}${multiplierText}`, 'success');
-              }
-            }, 50);
-          }
-        }
-      });
-      notifiedPromos.current = currentPromoQtys;
-    }
+    // 🔥 CIRUGÍA 2: Hemos extirpado por completo la lógica de notificaciones fantasma aquí. 
+    // Ahora syncPromotions SOLO calcula números, no saluda.
 
     return cleanCart;
   };
@@ -441,6 +408,14 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     try {
       const targetCuenta = forceCuenta || cuentaActiva;
 
+      // 🔥 CIRUGÍA 3: Limpiamos el nombre de la cuenta para usarlo en las notificaciones
+      let cleanCuenta = '';
+      if (targetCuenta && targetCuenta !== 'General') {
+        // Cortamos en el separador ' | ' o ' - ' y nos quedamos solo con el nombre de pila.
+        cleanCuenta = targetCuenta.split(' | ')[0].split(' - ')[0].trim();
+      }
+      const baseMsg = cleanCuenta ? ` en la cuenta de ${cleanCuenta}` : '';
+
       if (cuentasPagadasReales.includes(targetCuenta)) {
           if (triggerNotification) triggerNotification(`La cuenta "${targetCuenta}" está sellada. Selecciona una nueva.`, 'error');
           return false; 
@@ -504,6 +479,12 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         isAutoPromoFlag = true;
         mainPromoLabel = ghostLabel;
         promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
+
+        // 🔥 NOTIFICACIÓN ACTIVA AL AÑADIR NTH_FIXED (El N-ésimo rebajado)
+        if (triggerNotification) {
+          setTimeout(() => triggerNotification(`Descuento aplicado en ${productWithDetails.nombre}${baseMsg}`, 'success'), 50);
+        }
+
       } else if (activePromo && activePromo.type === 'FIXED') {
         const baseOriginal = parseFloat(productWithDetails.precioBase || productWithDetails.precio || 0);
         const discountFixed = Number(activePromo.discountValue || activePromo.discount_value || 0);
@@ -513,6 +494,12 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         mainPromoLabel = 'OFERTA';
         isAutoPromoFlag = true;
         promoMetadata = { promoId: activePromo.id, promoType: activePromo.type };
+
+        // 🔥 NOTIFICACIÓN ACTIVA AL AÑADIR FIXED (Descuento Fijo)
+        if (triggerNotification) {
+          setTimeout(() => triggerNotification(`Rebaja directa en ${productWithDetails.nombre}${baseMsg}`, 'success'), 50);
+        }
+
       } else if (!productWithDetails.detalles) {
         const defaultCustoms = getDefaultCustomizations(productWithDetails);
         if (defaultCustoms) {
@@ -580,6 +567,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 qty: extraGhostQty, preparaciones: Array(extraGhostQty).fill(ghostDetails), enviadoCocina: false, status: 'ACTIVE', cuenta: targetCuenta,
                 isAutoPromo: true, requiereCocina: productWithDetails.requiereCocina !== false, promoId: activePromo.id, promoType: activePromo.type
               });
+          }
+
+          // 🔥 NOTIFICACIÓN ACTIVA AL AÑADIR NxM (Ej. 2x1 o 3x2)
+          if (triggerNotification) {
+            setTimeout(() => triggerNotification(`Promo Automática: ¡${productWithDetails.nombre} GRATIS${baseMsg}!`, 'success'), 50);
           }
         }
 
