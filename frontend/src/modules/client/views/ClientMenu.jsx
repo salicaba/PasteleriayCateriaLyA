@@ -16,6 +16,7 @@ import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
 import ClientLogoutModal from './components/ClientLogoutModal';
 import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
+import ClientServiceShield from './components/ClientServiceShield'; // 🔥 ESCUDO IMPORTADO
 import { 
   THEME_CLASSES, SIZES, getInitialTheme, getInitialSize, 
   getProductModifiers, getDefaultCustomizations 
@@ -53,8 +54,14 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
 
-  // Estado para saber si el QR está activo y pasárselo al Ticket
-  const [isServiceActive, setIsServiceActive] = useState(true);
+  // 🔥 NUEVO CEREBRO DE ESTADO QR (Sincronizado con MesasPage)
+  const [globalQrActive, setGlobalQrActive] = useState(true);
+  const [disabledQrs, setDisabledQrs] = useState([]);
+
+  // Estado derivado al vuelo
+  const isServiceActive = globalQrActive && 
+    !(type === 'llevar' && disabledQrs.includes('llevar')) && 
+    !(type === 'mesa' && disabledQrs.includes(`mesa-${tableId}`));
 
   const [isConfirmed, setIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
@@ -115,39 +122,48 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // LÓGICA PARA ESCUCHAR SI EL SERVICIO SE APAGA
+  // 🔥 LÓGICA DE ESCUCHA SOCKET OPTIMIZADA (CERO PETICIONES)
   useEffect(() => {
-    const fetchStatus = async () => {
+    const fetchInitialConfig = async () => {
       try {
-        const res = await client.get(`/settings?_t=${Date.now()}`); // BUST CACHE
+        const res = await client.get(`/settings?_t=${Date.now()}`); // Bust Cache Inicial
         const data = res.data;
-        const globalActive = data.qr_service_active !== 'false' && data.qr_service_active !== false;
         
-        let disabled = data.disabled_qrs || [];
-        if (typeof disabled === 'string') {
-          try { disabled = JSON.parse(disabled); } catch(e) { disabled = []; }
+        if (data.qr_service_active !== undefined) {
+          setGlobalQrActive(data.qr_service_active !== 'false' && data.qr_service_active !== false);
         }
-        
-        const isLlevarDisabled = type === 'llevar' && disabled.includes('llevar');
-        const isThisMesaDisabled = type === 'mesa' && disabled.includes(`mesa-${tableId}`);
-        
-        setIsServiceActive(globalActive && !isLlevarDisabled && !isThisMesaDisabled);
+        if (data.disabled_qrs) {
+          const parsed = typeof data.disabled_qrs === 'string' ? JSON.parse(data.disabled_qrs) : data.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
       } catch(e) {
         console.error("Error obteniendo status local:", e);
       }
     };
 
-    fetchStatus();
+    fetchInitialConfig();
     
-    const handleUpdate = () => fetchStatus();
-    socket.on('config:update', handleUpdate);
-    socket.on('qr:status_changed', handleUpdate);
+    // Leemos directo del Payload para no golpear la base de datos
+    const handleConfigUpdate = (updates) => {
+      if (updates) {
+        if (updates.qr_service_active !== undefined) {
+          setGlobalQrActive(updates.qr_service_active !== 'false' && updates.qr_service_active !== false);
+        }
+        if (updates.disabled_qrs !== undefined) {
+          const parsed = typeof updates.disabled_qrs === 'string' ? JSON.parse(updates.disabled_qrs) : updates.disabled_qrs;
+          setDisabledQrs(Array.isArray(parsed) ? parsed : []);
+        }
+      }
+    };
+
+    socket.on('config:update', handleConfigUpdate);
+    socket.on('qr:status_changed', (status) => setGlobalQrActive(status));
     
     return () => {
-      socket.off('config:update', handleUpdate);
-      socket.off('qr:status_changed', handleUpdate);
+      socket.off('config:update', handleConfigUpdate);
+      socket.off('qr:status_changed');
     };
-  }, [type, tableId]);
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem('lya_client_last_activity')) {
@@ -170,7 +186,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       if (isConfirmed || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) {
+      if (now - lastActivityRef.current > 1500000) { // 25 Minutos
         localStorage.setItem('lya_client_session_expired', 'true');
         setSessionExpired(true);
       }
@@ -543,6 +559,11 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     );
   }
 
+  // 🔥 ESCUDO NEO-BENTO: Se bloquea la pantalla si apagan el servicio y el cliente no ha confirmado.
+  if (!isServiceActive && !isConfirmed && !isReadOnly && !sessionExpired) {
+    return <ClientServiceShield />;
+  }
+
   if (isConfirmed && !isReadOnly) {
     return (
       <>
@@ -766,7 +787,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
                           triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
                           return;
                         }
-                        // 🔥 REGLA DE PROTECCIÓN: Si exige tamaño, abre el modal. Si no, directo al carrito con los Predeterminados.
+                        // 🔥 REGLA DE PROTECCIÓN: Si exige tamaño, abre el modal. Si no, directo al carrito.
                         if (defaultMods === 'REQUIRE_MODAL') {
                           setSelectedProduct(product);
                         } else {
