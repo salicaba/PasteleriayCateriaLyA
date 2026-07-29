@@ -15,6 +15,36 @@ export const usePosMutations = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); // 🔥 Candado Global (Anti-Doble Clic)
 
+  // 🧙‍♂️ HELPER INTERNO: Reconstruye el producto manteniendo el ADN de la promoción
+  const mapDBItemToLocal = (dbItem, itemsNuevos = []) => {
+      let parsedPreps = [];
+      if (dbItem.notes) { 
+        try { parsedPreps = JSON.parse(dbItem.notes); } 
+        catch(e) { parsedPreps = [{ detalles: "Personalización" }]; } 
+      }
+      if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+      
+      return { 
+        id: dbItem.productId, 
+        nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
+        imagen: dbItem.product?.imageUrl || null, 
+        precio: parseFloat(dbItem.subtotal) / dbItem.quantity, 
+        qty: dbItem.quantity, 
+        preparaciones: parsedPreps, 
+        enviadoCocina: true, 
+        kitchenStatus: dbItem.kitchenStatus, 
+        status: dbItem.status || 'ACTIVE', 
+        cuenta: dbItem.cuenta || 'General', 
+        isTakeaway: dbItem.isTakeaway || false, 
+        backendItemId: dbItem.id, 
+        requiereCocina: itemsNuevos.find(n => n.id === dbItem.productId)?.requiereCocina !== false,
+        // 🔥 RESCATE DE LA AMNESIA: Mantener las etiquetas de promoción vivas
+        isAutoPromo: dbItem.isAutoPromo || false,
+        promoLabel: dbItem.promoLabel || null,
+        precioOriginal: dbItem.precioOriginal || null
+      };
+  };
+
   const simulateKitchenSend = async (onComplete = null) => {
     const itemsNuevos = cart.filter(p => !p.enviadoCocina);
     if (itemsNuevos.length === 0) { 
@@ -45,42 +75,23 @@ export const usePosMutations = ({
         });
       }
 
+      // 🔥 BLINDAJE: Mandar las banderas de promoción al backend en el payload
       const payload = itemsNuevos.map(item => ({ 
         productId: item.id, 
         quantity: item.qty, 
         subtotal: item.precio * item.qty, 
         cuenta: item.cuenta || 'General', 
         notes: JSON.stringify(item.preparaciones), 
-        isTakeaway: item.isTakeaway || false 
+        isTakeaway: item.isTakeaway || false,
+        isAutoPromo: item.isAutoPromo || false,
+        promoLabel: item.promoLabel || null,
+        precioOriginal: item.precioOriginal || null
       }));
 
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
       let allItemsFromDB = response.data.orderItems || [];
       
-      const updatedCart = allItemsFromDB.map(item => {
-          let parsedPreps = [];
-          if (item.notes) { 
-            try { parsedPreps = JSON.parse(item.notes); } 
-            catch(e) { parsedPreps = [{ detalles: "Personalización" }]; } 
-          }
-          if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
-          
-          return { 
-            id: item.productId, 
-            nombre: item.product?.name || item.product?.nombre || 'Producto', 
-            imagen: item.product?.imageUrl || null, 
-            precio: parseFloat(item.subtotal) / item.quantity, 
-            qty: item.quantity, 
-            preparaciones: parsedPreps, 
-            enviadoCocina: true, 
-            kitchenStatus: item.kitchenStatus, 
-            status: item.status || 'ACTIVE', 
-            cuenta: item.cuenta || 'General', 
-            isTakeaway: item.isTakeaway || false, 
-            backendItemId: item.id, 
-            requiereCocina: itemsNuevos.find(n => n.id === item.productId)?.requiereCocina !== false 
-          };
-      });
+      const updatedCart = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
 
       setCart(prev => {
           const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
@@ -175,22 +186,7 @@ export const usePosMutations = ({
         }
         
         if (dbMoveMade && allItemsFromDB) {
-            const updatedCart = allItemsFromDB.map(dbItem => {
-                let parsedPreps = [];
-                if (dbItem.notes) { 
-                  try { parsedPreps = JSON.parse(dbItem.notes); } 
-                  catch(e) { parsedPreps = [{ detalles: "Personalización" }]; } 
-                }
-                if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
-                return { 
-                  id: dbItem.productId, nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
-                  imagen: dbItem.product?.imageUrl || null, precio: parseFloat(dbItem.subtotal) / dbItem.quantity, 
-                  qty: dbItem.quantity, preparaciones: parsedPreps, enviadoCocina: true, 
-                  kitchenStatus: dbItem.kitchenStatus, status: dbItem.status || 'ACTIVE', 
-                  cuenta: dbItem.cuenta || 'General', isTakeaway: dbItem.isTakeaway || false, 
-                  backendItemId: dbItem.id, requiereCocina: dbItem.product?.requiereCocina !== false 
-                };
-            });
+            const updatedCart = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem));
             setCart(prev => { 
               const unsentLocal = prev.filter(p => !p.enviadoCocina); 
               return [...updatedCart, ...unsentLocal]; 
@@ -237,13 +233,11 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 FIX: Lógica corregida para Entregar Todo estrictamente a ítems READY
   const deliverAllActiveItems = async () => {
     if (!activeOrderId) return;
     setIsProcessing(true);
     
     try {
-        // 1. Filtrar ESTRICTAMENTE los productos que ya están READY en cocina
         const itemsListos = cart.filter(item => 
           item.enviadoCocina && 
           item.kitchenStatus === 'READY' && 
@@ -256,12 +250,10 @@ export const usePosMutations = ({
             return;
         }
 
-        // 2. Orquestar la actualización granular desde el frontend evadiendo endpoints masivos
         await Promise.all(itemsListos.map(item => 
           client.put(`/kitchen/tickets/${item.backendItemId}/status`, { status: 'DELIVERED' })
         ));
 
-        // 3. Actualización de UI solo para los ítems modificados
         setCart(prev => prev.map(item => 
           itemsListos.some(listo => listo.backendItemId === item.backendItemId)
           ? { ...item, kitchenStatus: 'DELIVERED' } 
@@ -280,7 +272,7 @@ export const usePosMutations = ({
 
   const cancelItem = async (item, cancelReason = 'Cancelación desde POS', cancelQty = item.qty) => {
     if (!item.enviadoCocina) { 
-      setCart(prev => prev.filter(p => !(p === item))); // Se delega el remove local puro
+      setCart(prev => prev.filter(p => !(p === item))); 
       return; 
     }
     if (!activeOrderId || !item.backendItemId) return;
@@ -289,21 +281,7 @@ export const usePosMutations = ({
     try {
         const response = await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty });
         if (response.data.orderItems) {
-            const updatedCart = response.data.orderItems.map(dbItem => {
-                let parsedPreps = [];
-                if (dbItem.notes) { 
-                  try { parsedPreps = JSON.parse(dbItem.notes); } catch(e) { parsedPreps = [{ detalles: "Personalización" }]; } 
-                }
-                if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
-                return { 
-                  id: dbItem.productId, nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
-                  imagen: dbItem.product?.imageUrl || null, precio: parseFloat(dbItem.subtotal) / dbItem.quantity, 
-                  qty: dbItem.quantity, preparaciones: parsedPreps, enviadoCocina: true, 
-                  kitchenStatus: dbItem.kitchenStatus, status: dbItem.status || 'ACTIVE', 
-                  cuenta: dbItem.cuenta || 'General', isTakeaway: dbItem.isTakeaway || false, 
-                  backendItemId: dbItem.id, requiereCocina: dbItem.product?.requiereCocina !== false 
-                };
-            });
+            const updatedCart = response.data.orderItems.map(dbItem => mapDBItemToLocal(dbItem));
             setCart(prev => { 
               const unsentLocal = prev.filter(p => !p.enviadoCocina); 
               return [...updatedCart, ...unsentLocal]; 
