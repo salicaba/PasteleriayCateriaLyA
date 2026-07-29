@@ -16,7 +16,7 @@ import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
 import ClientLogoutModal from './components/ClientLogoutModal';
 import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
-import ClientServiceShield from './components/ClientServiceShield'; // 🔥 ESCUDO IMPORTADO
+import { ClientServiceShield } from './components/ClientServiceShield'; // 🔥 ESCUDO IMPORTADO CORREGIDO
 import { 
   THEME_CLASSES, SIZES, getInitialTheme, getInitialSize, 
   getProductModifiers, getDefaultCustomizations 
