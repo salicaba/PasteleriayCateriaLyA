@@ -16,7 +16,7 @@ import { CancelOrderModal } from './modals/CancelOrderModal';
 import { PapeleraModal } from './modals/PapeleraModal';
 import { VentasHoyModal } from './modals/VentasHoyModal';
 
-export const MesasPage = ({ globalScroll }) => {
+export const MesasPage = () => {
   const { 
     mesasSalon, mesasLlevar, isLoading, 
     handleLiberarMesa, handleUpdateTotal, handleUnirMesas, handlePagoParcial,
@@ -70,7 +70,7 @@ export const MesasPage = ({ globalScroll }) => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const res = await client.get('/settings'); // Usamos la raíz
+        const res = await client.get('/settings');
         if (res.data.qr_service_active !== undefined) {
           setGlobalQrActive(res.data.qr_service_active !== 'false');
         }
@@ -221,7 +221,7 @@ export const MesasPage = ({ globalScroll }) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`flex flex-col flex-1 w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 ${globalScroll ? 'min-h-full' : 'h-full overflow-hidden'}`}
+      className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300"
     >
       
       <AnimatePresence>
@@ -268,7 +268,7 @@ export const MesasPage = ({ globalScroll }) => {
         setShowPapelera={setShowPapelera}
       />
 
-      <div className={`flex-1 w-full relative px-4 md:px-6 pb-6 ${globalScroll ? '' : 'overflow-y-auto custom-scrollbar'}`}>
+      <div className="flex-1 w-full relative px-4 md:px-6 pb-6 overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="wait">
           {activeTab === 'salon' && (
             <motion.div key="salon-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-2">
@@ -285,23 +285,16 @@ export const MesasPage = ({ globalScroll }) => {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {mesasSalon.map(mesa => {
-                    // 🔥 SELLO VISUAL: Si está apagada globalmente o individualmente
-                    const isQrPaused = !globalQrActive || disabledQrs.includes(`mesa-${mesa.number}`);
+                    // 🔥 SELLO VISUAL: Calculamos el estado apagado y lo inyectamos a la tarjeta
+                    const isQrPaused = !globalQrActive || disabledQrs.includes(`mesa-${mesa.numero}`);
 
                     return (
-                      <div key={mesa.id} className="relative group">
-                        {/* 🚀 El empleado SIEMPRE puede clickear y abrir la mesa */}
-                        <MesaCard mesa={mesa} onClick={() => setSelectedMesa(mesa)} />
-                        
-                        {/* SELLO NEO-BENTO DE MESA PAUSADA PARA EL MESERO (No bloquea clics) */}
-                        {isQrPaused && (
-                          <div className="absolute -top-2 -right-2 z-10 pointer-events-none">
-                            <div className="bg-red-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md border border-red-400/50">
-                              QR Pausado
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <MesaCard 
+                        key={mesa.id} 
+                        mesa={mesa} 
+                        onClick={() => setSelectedMesa(mesa)} 
+                        isQrPaused={isQrPaused} 
+                      />
                     );
                   })}
                 </div>
@@ -315,9 +308,9 @@ export const MesasPage = ({ globalScroll }) => {
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="text-gray-400" size={20} />
                   <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Cuentas Para Llevar</h3>
-                  {/* 🔥 SELLO VISUAL PARA LLEVAR */}
+                  {/* 🔥 SELLO VISUAL PARA LLEVAR (Global) */}
                   {isLlevarPaused && (
-                    <span className="bg-red-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm ml-2 pointer-events-none">
+                    <span className="bg-amber-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm ml-2 pointer-events-none">
                       QR Pausado
                     </span>
                   )}
@@ -347,6 +340,7 @@ export const MesasPage = ({ globalScroll }) => {
                       mesa={pedido} 
                       onClick={() => setSelectedMesa(pedido)} 
                       onCancel={() => setOrderToCancel(pedido)} 
+                      isQrPaused={isLlevarPaused} // Propagamos el estado a la tarjeta
                     />
                   ))}
                 </div>

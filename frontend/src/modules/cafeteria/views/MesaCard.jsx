@@ -1,14 +1,12 @@
-// frontend/src/modules/cafeteria/views/MesaCard.jsx
+// src/modules/cafeteria/views/MesaCard.jsx
 import React, { useMemo } from 'react';
-import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2, BellRing } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, ChefHat, Check, Trash2, BellRing, WifiOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export const MesaCard = ({ mesa, onClick, onCancel }) => {
+export const MesaCard = ({ mesa, onClick, onCancel, isQrPaused }) => {
   const isOcupada = mesa.estado === 'ocupada';
   
   // 🔥 ESCUDO NEO-BENTO: Validación estricta anti-contaminación de zonas.
-  // Si el identificador de la mesa es puramente numérico (ej. "1", "12") o corto (ej. "T1"), 
-  // ES MESA FÍSICA y bloqueamos visualmente la etiqueta de "Para Llevar".
   const rawNumero = String(mesa.numero || '').trim();
   const esMesaFisica = /^(M|T)?-?\d+$/i.test(rawNumero);
   
@@ -67,12 +65,11 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
     let nombre = '';
     let telefono = '';
 
-    // Patrón: "Llevar #5 - Juan - 9611234567" o "Llevar #5 - Emmanuel | 961..."
     const match = rawNumero.match(/Llevar\s*#?\s*(\d+)\s*-\s*(.*)/i);
 
     if (match) {
-        id = match[1]; // Extraemos solo el "5"
-        let resto = match[2]; // Extraemos el resto de la cadena
+        id = match[1]; 
+        let resto = match[2]; 
 
         if (resto.includes(' | ')) {
             const pts = resto.split(' | ');
@@ -81,7 +78,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
         } else if (resto.includes(' - ')) {
             const pts = resto.split(' - ');
             const posTel = pts[pts.length - 1].trim();
-            // Validamos que sea un teléfono válido de 10 dígitos
             if (posTel.replace(/\D/g, '').length === 10) {
                 telefono = posTel;
                 nombre = pts.slice(0, -1).join(' - ').trim();
@@ -92,7 +88,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             nombre = resto.trim();
         }
     } else {
-        // Fallback si el nombre viene estructurado diferente
         let cleanRaw = rawNumero.replace(/Llevar/gi, '').replace(/L-/gi, '').replace(/#/g, '').trim();
         
         if (cleanRaw.includes(' | ')) {
@@ -114,7 +109,6 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
         }
     }
 
-    // Limpieza estética: Si dice "Cliente" y no tiene teléfono, lo ocultamos para que no estorbe
     if (nombre.toLowerCase() === 'cliente' && !telefono) nombre = '';
 
     return { idPrincipal: id, nombreCliente: nombre, telefonoCliente: telefono };
@@ -122,7 +116,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
 
   return (
     <motion.div 
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: 0.95 }}
       onClick={() => onClick(mesa)}
       className={`group relative rounded-2xl shadow-sm md:hover:shadow-lg md:hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[150px] overflow-visible select-none outline-none ${
         hasReadyItems 
@@ -132,7 +126,15 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
             : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 lya:bg-lya-bg lya:border-lya-border/50'
       }`}
     >
-      {/* ETIQUETA FLOTANTE DE NOTIFICACIÓN MULTI-TEMA */}
+      {/* 🔥 ETIQUETA QR APAGADO (TOP-LEFT) */}
+      {isQrPaused && (
+        <div className="absolute -top-3 -left-2 bg-amber-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-amber-500/30 border border-amber-400 z-50 pointer-events-none">
+          <WifiOff size={12} strokeWidth={2.5} />
+          QR APAGADO
+        </div>
+      )}
+
+      {/* ETIQUETA FLOTANTE DE NOTIFICACIÓN MULTI-TEMA (TOP-RIGHT) */}
       {hasReadyItems && (
         <div className="absolute -top-3 -right-2 bg-blue-600 dark:bg-blue-500 lya:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 dark:shadow-blue-900/60 lya:shadow-blue-600/30 animate-bounce z-50 pointer-events-none">
           <BellRing size={12} className="animate-pulse" />
@@ -140,7 +142,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
         </div>
       )}
 
-      {/* BARRA LATERAL IZQUIERDA MULTI-TEMA (Actualizada a rounded-l-2xl) */}
+      {/* BARRA LATERAL IZQUIERDA MULTI-TEMA */}
       <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors rounded-l-2xl ${
         hasReadyItems 
           ? 'bg-blue-500 dark:bg-blue-400 lya:bg-blue-500' 
@@ -151,7 +153,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
 
       <div className="p-4 pl-5 flex-grow flex flex-col justify-between h-full relative z-10 pointer-events-none">
         <div className="flex justify-between items-start">
-          <div className="z-10">
+          <div className="z-10 mt-1">
             {/* TEXTO DE CABECERA MULTI-TEMA */}
             <span className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 block ${
               hasReadyItems 
@@ -172,7 +174,7 @@ export const MesaCard = ({ mesa, onClick, onCancel }) => {
           <div className="flex items-center gap-1.5 z-20 pointer-events-auto">
             {isLlevar && onCancel && (
               <motion.button
-                whileTap={{ scale: 0.85 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={(e) => {
                   e.stopPropagation(); 
                   onCancel();
