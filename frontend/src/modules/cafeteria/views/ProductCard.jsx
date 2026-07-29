@@ -67,8 +67,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
       }
       if (product.stock < requiredQty) {
-        console.log(`❌ Promo Oculta: Stock insuficiente (${product.stock}) para la oferta que exige ${requiredQty}.`);
-        return null; // Se autodestruye visualmente
+        return null; // Se autodestruye visualmente si no hay stock suficiente para la promo
       }
     }
 
@@ -101,6 +100,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return discountVal + costoExtras;
   }, [activePromo, realBasePrice, product.precioBase, product.precio]);
 
+  // 🔥 CEREBRO MATEMÁTICO: PORCENTAJE DINÁMICO
   const discountPercent = useMemo(() => {
     if (activePromo?.type === 'FIXED' && realBasePrice > 0) {
       const percent = ((realBasePrice - promoFixedPrice) / realBasePrice) * 100;
@@ -138,6 +138,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return activePromo.name || 'Promo';
   }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
 
+  // 🔥 LA MAGIA DEL AÑADIR DIRECTO (BYPASS DEL MODAL)
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
     if (isAgotado || isAdding || isLocked) return;
@@ -148,6 +149,8 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     }
 
     const defaultTamano = parsedOptions?.defaults?.tamano;
+    
+    // Si tiene opciones, pero NO tiene un tamaño por defecto válido, forzamos abrir el modal
     if (hasOptions && (!defaultTamano || defaultTamano.toLowerCase().includes('elegir'))) {
       if (onClick) onClick(product); 
       return;
@@ -155,7 +158,22 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
     setIsAdding(true);
     try {
-      if (onQuickAdd) await onQuickAdd(product);
+      if (hasOptions && defaultTamano) {
+        // Armamos el "Paquete de Preparación" simulando lo que haría el Modal
+        const customizations = {
+          precioFinal: realBasePrice,
+          detalles: {
+            tamano: defaultTamano,
+            ...(parsedOptions.defaults.leche && { leche: parsedOptions.defaults.leche }),
+            ...(parsedOptions.defaults.extras && { extras: parsedOptions.defaults.extras })
+          }
+        };
+        // Se lo pasamos al padre para que lo inyecte directo al carrito
+        if (onQuickAdd) await onQuickAdd(product, customizations);
+      } else {
+        // Producto simple
+        if (onQuickAdd) await onQuickAdd(product);
+      }
     } finally {
       setIsAdding(false);
     }

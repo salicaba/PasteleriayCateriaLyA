@@ -1,11 +1,11 @@
 // src/modules/client/views/components/ClientProductModal.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, Check, Image as ImageIcon, ShoppingBag, Loader2, Lock } from 'lucide-react';
+import { X, Check, Image as ImageIcon, ShoppingBag, Loader2, Lock, Tag, Gift } from 'lucide-react';
 import clsx from 'clsx';
 import { getProductModifiers } from '../utils/clientMenuUtils';
 
-export default function ClientProductModal({ product, cart = [], onClose, onConfirm }) {
+export default function ClientProductModal({ product, cart = [], promoData = null, onClose, onConfirm }) {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(false);
   
@@ -31,7 +31,6 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
     setSelections(initial);
   }, [availableModifiers]);
 
-  // 🔥 FUNCIÓN DE BLINDAJE MATEMÁTICO: Limpia cualquier error de escritura del administrador
   const cleanNumber = (val) => {
     if (!val) return 0;
     let stringVal = String(val).replace(',', '.');
@@ -42,7 +41,6 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
 
   const handleToggle = (modId, optId, type) => {
     if (isCalculatingTotal) return;
-    
     setIsCalculatingTotal(true);
 
     setTimeout(() => {
@@ -59,7 +57,6 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
         }
         return { ...prev, [modId]: [...currentArray, optId] };
       });
-      
       setIsCalculatingTotal(false);
     }, 200);
   };
@@ -84,6 +81,22 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
     });
     return Math.max(0, total); 
   };
+
+  // 🔥 CEREBRO MATEMÁTICO DEL MODAL
+  const basePrice = cleanNumber(product.precioBase || product.precio);
+  const totalOriginal = calculateTotal();
+  const costoExtras = Math.max(0, totalOriginal - basePrice);
+
+  let finalPrice = totalOriginal;
+  let displayPromoText = promoData?.text;
+
+  if (promoData?.type === 'FIXED') {
+      finalPrice = promoData.discountValue + costoExtras;
+      if (totalOriginal > 0) {
+          const p = ((totalOriginal - finalPrice) / totalOriginal) * 100;
+          displayPromoText = `-${Math.max(0, Math.round(p))}% OFF`;
+      }
+  }
 
   const handleConfirmAction = async () => {
     if (isAgotado || isLimitReached || isProcessing || isCalculatingTotal) return;
@@ -123,7 +136,7 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
       });
 
       await onConfirm({
-        precioFinal: calculateTotal(),
+        precioFinal: totalOriginal, // Mandamos el original; el carrito de la App aplica la promo matemáticamente
         detalles: { tamano: tamanoStr, ...(lecheStr && { leche: lecheStr }), ...(extrasArr.length > 0 && { extras: extrasArr }) },
         isTakeaway
       });
@@ -161,10 +174,19 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
               <ImageIcon size={32} />
             </div>
           )}
-          <div className="flex-1 min-w-0 pt-1">
+          <div className="flex-1 min-w-0 pt-1 flex flex-col items-start">
             <h3 className="text-lg sm:text-xl font-black leading-tight text-gray-900 dark:text-white lya:text-[#3E2723] line-clamp-2 mb-1.5">{product.nombre}</h3>
+            
+            {/* 🔥 BADGE DE PROMOCIÓN EN EL MODAL */}
+            {promoData && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1.5 shadow-sm">
+                {promoData.type === 'NxM' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
+                <span>{displayPromoText}</span>
+              </span>
+            )}
+
             <p className="font-bold text-base text-orange-600 dark:text-orange-400 lya:text-[#78350F]">
-              ${cleanNumber(product.precioBase || product.precio).toFixed(2)} 
+              ${basePrice.toFixed(2)} 
               <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] ml-1 uppercase tracking-wider">Base</span>
             </p>
           </div>
@@ -300,17 +322,17 @@ export default function ClientProductModal({ product, cart = [], onClose, onConf
               </span>
             </span>
 
-            {/* 🔥 FEEDBACK VISUAL PREMIUM */}
-            <span className={clsx(
-              "px-3 py-1 rounded-[1rem] pointer-events-none flex items-center justify-center min-w-[4.5rem]",
-              isLimitReached ? "bg-amber-200/50 text-amber-700 dark:text-amber-400" : "bg-black/20 text-white"
-            )}>
-              {isCalculatingTotal ? (
-                <Loader2 className="animate-spin" size={16} strokeWidth={3} />
-              ) : (
-                `$${calculateTotal().toFixed(2)}`
+            {/* 🔥 FEEDBACK VISUAL PREMIUM CON TACHADO */}
+            <div className="flex flex-col items-end justify-center">
+              {promoData?.type === 'FIXED' && totalOriginal > finalPrice && (
+                 <span className="text-[10px] font-bold text-white/70 line-through leading-none -mb-0.5">
+                   ${totalOriginal.toFixed(2)}
+                 </span>
               )}
-            </span>
+              <span className={clsx("px-3 py-1 rounded-[1rem] pointer-events-none flex items-center justify-center min-w-[4.5rem] bg-black/20 text-white font-black text-lg")}>
+                {isCalculatingTotal ? <Loader2 className="animate-spin" size={16} strokeWidth={3} /> : `$${finalPrice.toFixed(2)}`}
+              </span>
+            </div>
           </motion.button>
         </div>
       </motion.div>

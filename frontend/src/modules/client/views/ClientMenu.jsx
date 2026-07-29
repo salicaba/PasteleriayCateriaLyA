@@ -115,7 +115,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // LÓGICA PARA ESCUCHAR SI EL SERVICIO SE APAGA (Para pasarlo al Ticket)
+  // LÓGICA PARA ESCUCHAR SI EL SERVICIO SE APAGA
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -204,7 +204,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         });
         
         const data = res?.data || {};
-        // 🔥 PILAR APLICADO: Priorizamos el estado individual de la cuenta si el backend lo provee.
         const status = data.accountStatus || data.status;
         
         if (status === 'PAID') {
@@ -387,7 +386,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     if (cart.length === 0) return;
     setIsSubmitting(true);
     
-    // 🔥 FIX BUG 1: Limpiamos el estado de "Pagado" residual explícitamente antes de enviar nuevos productos a la mesa.
     setIsOrderPaid(false);
     localStorage.removeItem('lya_client_order_paid');
     
@@ -638,6 +636,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
             if (promoData?.type === 'FIXED') {
               displayOriginalPrice = finalPriceWithDefaults;
               displayFinalPrice = promoData.discountValue + (costoExtras > 0 ? costoExtras : 0);
+              
+              // 🔥 CEREBRO MATEMÁTICO INYECTADO: Porcentaje dinámico perfecto
+              if (displayOriginalPrice > 0) {
+                 const percent = ((displayOriginalPrice - displayFinalPrice) / displayOriginalPrice) * 100;
+                 promoData.text = `-${Math.max(0, Math.round(percent))}% OFF`;
+              }
             }
 
             return (

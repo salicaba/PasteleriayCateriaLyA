@@ -93,7 +93,7 @@ export const TicketCartGroup = ({
 
   const displayItems = [];
   rawItemsConMagia.forEach(item => {
-      const isGhost = item.isAutoPromo || Number(item.precio) === 0;
+      const isGhost = item.isAutoPromo && Number(item.precio) === 0;
 
       const existing = displayItems.find(d => 
           d.id === item.id && 
@@ -101,7 +101,7 @@ export const TicketCartGroup = ({
           d.enviadoCocina === item.enviadoCocina && 
           d.kitchenStatus === item.kitchenStatus &&
           !!d.isTakeaway === !!item.isTakeaway && 
-          (d.isAutoPromo || Number(d.precio) === 0) === isGhost && 
+          (d.isAutoPromo && Number(d.precio) === 0) === isGhost && 
           getPrepStr(d) === getPrepStr(item)
       );
       
@@ -256,14 +256,30 @@ export const TicketCartGroup = ({
       <div className="px-2 pb-2 space-y-1.5">
         {displayItems.map((item) => {
           
+          // 🔥 LÓGICA REFINADA DE PROMOCIONES
           const isCero = Number(item.precio) === 0;
-          const isGhostPromo = item.isAutoPromo && isCero;
-          const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA';
-          const isDiscountedPromo = !isLockedPromo && (item.promoLabel || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio)));
+          const isGhostPromo = item.isAutoPromo && isCero; // Es un regalo (NxM)
           
-          const isAnyPromo = isLockedPromo || isDiscountedPromo || isGhostPromo;
-          const promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
-          const pOriginal = item.precioOriginal;
+          // Si tiene el símbolo 'º' o 'REBAJADO', es Unidad Adicional (depende de otro producto, SE BLOQUEA)
+          const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
+          
+          // Solo bloqueamos controles (+ y -) para Regalos y Unidades Adicionales. 
+          // La REBAJA DIRECTA queda libre para sumarse.
+          const isLockedPromo = isGhostPromo || isNthPromo;
+          
+          const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
+          const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
+          
+          let promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
+
+          // 🔥 CEREBRO MATEMÁTICO: CÁLCULO DINÁMICO DEL PORCENTAJE (Rebaja Directa)
+          if (pOriginal && Number(pOriginal) > Number(item.precio) && !isGhostPromo && !item.promoLabel?.includes('º')) {
+              const originalNum = Number(pOriginal);
+              const actualNum = Number(item.precio);
+              const discountAmt = originalNum - actualNum;
+              const percentage = Math.round((discountAmt / originalNum) * 100);
+              promoText = `-${percentage}% OFF`;
+          }
 
           const uniqueId = item.backendItemId || item.cartItemId || item.id;
           const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}`;
@@ -272,7 +288,7 @@ export const TicketCartGroup = ({
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
           const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
-          // 🔥 MAGIA DEVUELTA: Quitamos el `!isGhostPromo` de aquí para que se vean las preparaciones siempre
+          // 🔥 Aquí las preparaciones SIEMPRE se evalúan y se muestran, incluso para promos.
           const hasRealPreparations = item.preparaciones?.some(prep => {
             if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta) return false;
             if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
@@ -399,7 +415,6 @@ export const TicketCartGroup = ({
                     )}
                 </div>
 
-                {/* 🔥 Y AQUÍ LA SEGUNDA PARTE: Se eliminó el `!isGhostPromo` para que las preparaciones de los productos gratis sí se rendericen */}
                 {hasRealPreparations && (
                   <div className="space-y-0.5 pointer-events-none mt-1">
                     {item.preparaciones?.map((prep, pIdx) => {
@@ -416,8 +431,7 @@ export const TicketCartGroup = ({
               </div>
             </div>
 
-            {/* 🔥 CORRECCIÓN EXACTA: Separamos la visibilidad de los botones. 
-                Los bloqueados SÍ muestran Entregar, pero NO los controles derechos (+, -, basura). */}
+            {/* 🔥 SIEMPRE MOSTRAR BOTONES INFERIORES: El Entregar y Por Enviar están siempre libres */}
             {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
               <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 
@@ -475,7 +489,7 @@ export const TicketCartGroup = ({
                   </div>
                 )}
                 
-                {/* Controles de Modificación: Ocultos para Promos Bloqueadas */}
+                {/* 🔥 BLOQUEO DE MODIFICACIÓN EXCLUSIVO: Solo se oculta el + y el - para NxM y Unidades Adicionales */}
                 {!isLockedPromo && (
                   <div className={clsx(
                     "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg p-0.5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
