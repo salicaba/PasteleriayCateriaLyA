@@ -337,9 +337,15 @@ export default function ClientApp({ type }) {
                   disabled={isUpdating}
                   onClick={async () => {
                     setIsUpdating(true);
-                    try { await updateServiceWorker(true); } finally { setIsUpdating(false); }
+                    try { 
+                      await updateServiceWorker(true); 
+                      // 🔥 MAGIA: NO lo regresamos a false. 
+                      // La página se va a recargar, así que el loader se queda congelado bloqueando los clics.
+                    } catch (error) {
+                      setIsUpdating(false); // Solo liberamos si algo falla trágicamente
+                    }
                   }} 
-                  className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-400 cursor-not-allowed opacity-80' : 'bg-emerald-500 shadow-lg md:hover:shadow-xl'}`}
+                  className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-600 cursor-wait opacity-90 shadow-inner' : 'bg-emerald-500 shadow-lg md:hover:shadow-xl'}`}
                 >
                   {isUpdating ? <><Loader2 size={24} className="animate-spin" /> Actualizando...</> : 'Actualizar Ahora'}
                 </motion.button>
