@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon } from 'lucide-react';
@@ -66,14 +67,12 @@ export const TicketCartGroup = ({
 
   const getPrepStr = (item) => {
     if (!item?.preparaciones || item.preparaciones.length === 0) return "";
-    // Ignoramos la metadata secreta para el ordenamiento
     const validPreps = item.preparaciones.filter(p => p && !p._isPromoMeta);
     if (validPreps.length === 0) return "";
     const p = validPreps[0];
     return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
   };
 
-  // 🔥 RESCATE DE LA AMNESIA: Extraemos los datos de promoción justo antes de agrupar
   const rawItemsConMagia = items.map(item => {
       let isAutoPromo = item.isAutoPromo === true || item.isAutoPromo === 'true';
       let promoLabel = item.promoLabel;
@@ -273,6 +272,7 @@ export const TicketCartGroup = ({
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
           const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
+          // 🔥 MAGIA DEVUELTA: Quitamos el `!isGhostPromo` de aquí para que se vean las preparaciones siempre
           const hasRealPreparations = item.preparaciones?.some(prep => {
             if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta) return false;
             if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
@@ -306,7 +306,7 @@ export const TicketCartGroup = ({
 
           if (isAnyPromo) {
              if (item.enviadoCocina) {
-                 containerClasses += "bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/30 ";
+                 containerClasses += "bg-rose-50/70 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30 ";
              } else {
                  containerClasses += "bg-rose-50 dark:bg-rose-900/20 border-rose-300 dark:border-rose-700/50 shadow-sm ";
              }
@@ -399,7 +399,8 @@ export const TicketCartGroup = ({
                     )}
                 </div>
 
-                {hasRealPreparations && !isGhostPromo && (
+                {/* 🔥 Y AQUÍ LA SEGUNDA PARTE: Se eliminó el `!isGhostPromo` para que las preparaciones de los productos gratis sí se rendericen */}
+                {hasRealPreparations && (
                   <div className="space-y-0.5 pointer-events-none mt-1">
                     {item.preparaciones?.map((prep, pIdx) => {
                       if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
@@ -415,7 +416,9 @@ export const TicketCartGroup = ({
               </div>
             </div>
 
-            {!isLockedPromo && (!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
+            {/* 🔥 CORRECCIÓN EXACTA: Separamos la visibilidad de los botones. 
+                Los bloqueados SÍ muestran Entregar, pero NO los controles derechos (+, -, basura). */}
+            {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
               <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 
                 {!isVitrina && (
@@ -449,11 +452,11 @@ export const TicketCartGroup = ({
                       <>
                         <span className={clsx(
                           "flex items-center justify-center gap-1 text-[8px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/50 bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-1.5 py-1.5 rounded-lg uppercase border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-center shadow-inner",
-                          (isLlevar || !toggleItemTakeaway) ? "w-full" : "flex-1"
+                          (isLlevar || !toggleItemTakeaway || isLockedPromo) ? "w-full" : "flex-1"
                         )}>
                           Por enviar
                         </span>
-                        {!isLlevar && toggleItemTakeaway && (
+                        {!isLlevar && toggleItemTakeaway && !isLockedPromo && (
                           <motion.button 
                               whileTap={!isTakeawayLocal ? { scale: 0.95 } : {}}
                               disabled={isTakeawayLocal}
@@ -472,7 +475,8 @@ export const TicketCartGroup = ({
                   </div>
                 )}
                 
-                {((!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
+                {/* Controles de Modificación: Ocultos para Promos Bloqueadas */}
+                {!isLockedPromo && (
                   <div className={clsx(
                     "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg p-0.5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
                     isVitrina ? "w-full justify-between" : "shrink-0"
