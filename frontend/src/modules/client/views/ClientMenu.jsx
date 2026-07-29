@@ -623,9 +623,38 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
 
-            const defaultMods = getDefaultCustomizations(product);
+            // 🔥 CEREBRO DE AUTOCOMPLETADO (Alineado con el Gestor de Menú)
+            let parsedOptions = null;
+            try { if (product.opciones) parsedOptions = typeof product.opciones === 'string' ? JSON.parse(product.opciones) : product.opciones; } catch(e){}
+            
+            const hasOptions = parsedOptions && (parsedOptions.tamanos?.length > 0 || parsedOptions.leches?.length > 0 || parsedOptions.extras?.length > 0);
             const baseOriginal = Number(product.precio);
-            const finalPriceWithDefaults = defaultMods ? defaultMods.precioFinal : baseOriginal;
+            let finalPriceWithDefaults = baseOriginal;
+            let defaultMods = null;
+
+            if (hasOptions) {
+                const isPlaceholderTamano = parsedOptions.defaults?.tamano && parsedOptions.defaults.tamano.toLowerCase().includes('elegir');
+                const requiresSizeSelection = parsedOptions.tamanos?.length > 0 && (!parsedOptions.defaults?.tamano || isPlaceholderTamano);
+
+                if (requiresSizeSelection) {
+                    defaultMods = 'REQUIRE_MODAL'; // Fuerza a abrir el modal si no hay default válido
+                } else {
+                    const tamanoDefault = (!isPlaceholderTamano && parsedOptions.defaults?.tamano) ? parsedOptions.defaults.tamano : (parsedOptions.tamanos?.[0]?.nombre || 'Estándar');
+                    const isPlaceholderLeche = parsedOptions.defaults?.leche && parsedOptions.defaults.leche.toLowerCase().includes('elegir');
+                    const lecheDefault = (!isPlaceholderLeche && parsedOptions.defaults?.leche) ? parsedOptions.defaults.leche : parsedOptions.leches?.[0]?.nombre;
+                    const extrasDefault = parsedOptions.defaults?.extras || [];
+
+                    let precioAdicional = 0;
+                    if (tamanoDefault) { const t = parsedOptions.tamanos?.find(x => x.nombre === tamanoDefault); if (t && t.precioAdicional) precioAdicional += Number(t.precioAdicional); }
+                    if (lecheDefault) { const l = parsedOptions.leches?.find(x => x.nombre === lecheDefault); if (l && l.precioAdicional) precioAdicional += Number(l.precioAdicional); }
+
+                    finalPriceWithDefaults = baseOriginal + precioAdicional;
+                    defaultMods = {
+                        precioFinal: finalPriceWithDefaults,
+                        detalles: { tamano: tamanoDefault, ...(lecheDefault && { leche: lecheDefault }), ...(extrasDefault.length > 0 && { extras: extrasDefault }) }
+                    };
+                }
+            }
             const costoExtras = finalPriceWithDefaults - baseOriginal;
 
             const promoData = getPromoBadge(product.id, finalPriceWithDefaults);
@@ -737,7 +766,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
                           triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
                           return;
                         }
-                        handleAddDirectly(product, defaultMods, e); 
+                        // 🔥 REGLA DE PROTECCIÓN: Si exige tamaño, abre el modal. Si no, directo al carrito con los Predeterminados.
+                        if (defaultMods === 'REQUIRE_MODAL') {
+                          setSelectedProduct(product);
+                        } else {
+                          handleAddDirectly(product, defaultMods, e); 
+                        }
                       }} 
                       className={`w-10 h-10 rounded-[1rem] flex items-center justify-center shadow transition-all outline-none touch-manipulation ${
                         isAgotado 
