@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
@@ -58,7 +59,6 @@ export const PosModal = ({
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   
-  // 🔥 MOVIMOS EL TOAST HACIA ARRIBA PARA PODER PASARLO AL HOOK
   const [localToast, setLocalToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -85,7 +85,6 @@ export const PosModal = ({
     filteredProducts 
   } = usePosMenu(isVitrina);
 
-  // 🔥 1. CONECTAMOS EL CABLE: Pasamos showToast como 4to parámetro
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
@@ -358,15 +357,18 @@ export const PosModal = ({
                     cartQty={currentCartQty} 
                     onLimitReached={(stock) => showToast(`Límite en carrito: Solo quedan ${stock} en stock.`, 'warning')} 
                     onClick={setSelectedProduct} 
-                    onQuickAdd={(p) => {
-                      let ops = p.opciones;
-                      if (typeof ops === 'string') try { ops = JSON.parse(ops); } catch (e) { ops = null; }
-                      let precioAdicional = 0, detalles = { tamano: 'Estándar' };
-                      if (ops && typeof ops === 'object') {
-                         if (ops.defaults?.tamano) { detalles.tamano = ops.defaults.tamano; const t = ops.tamanos?.find(x => x.nombre === ops.defaults.tamano); if (t?.precioAdicional) precioAdicional += Number(t.precioAdicional); }
-                         if (ops.defaults?.leche) { detalles.leche = ops.defaults.leche; const l = ops.leches?.find(x => x.nombre === ops.defaults.leche); if (l?.precioAdicional) precioAdicional += Number(l.precioAdicional); }
+                    // 🔥 CONEXIÓN DEL PUENTE: Aquí pasamos el paquete de "customizations" directo al carrito
+                    onQuickAdd={(p, customizations) => {
+                      if (customizations) {
+                        addToCart({ 
+                          ...p, 
+                          precioFinal: customizations.precioFinal, 
+                          detalles: customizations.detalles,
+                          isTakeaway: customizations.isTakeaway || p.isTakeaway 
+                        });
+                      } else {
+                        addToCart(p);
                       }
-                      addToCart({ ...p, precioFinal: Number(p.precioBase || p.precio || 0) + precioAdicional, detalles });
                     }} 
                   />
                 );

@@ -24,25 +24,31 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
   const hasOptions = parsedOptions && (parsedOptions.tamanos?.length > 0 || parsedOptions.leches?.length > 0 || parsedOptions.extras?.length > 0);
 
+  // 🔥 CEREBRO DE AUTOCOMPLETADO (Fallback a la primera opción si no hay default)
+  const autoDefaults = useMemo(() => {
+    if (!hasOptions) return null;
+    // Si no existe 'defaults.tamano', tomamos el primer elemento de la lista 'tamanos'
+    const tamano = parsedOptions.defaults?.tamano || parsedOptions.tamanos?.[0]?.nombre;
+    const leche = parsedOptions.defaults?.leche || parsedOptions.leches?.[0]?.nombre;
+    const extras = parsedOptions.defaults?.extras || [];
+    return { tamano, leche, extras };
+  }, [parsedOptions, hasOptions]);
+
   const realBasePrice = useMemo(() => {
     let base = Number(product.precioBase || product.precio || 0);
-    if (parsedOptions && parsedOptions.defaults) {
-      const defaultTamano = parsedOptions.defaults.tamano;
-      const defaultLeche = parsedOptions.defaults.leche;
-
-      if (defaultTamano) {
-        const t = parsedOptions.tamanos?.find(x => x.nombre === defaultTamano);
+    if (autoDefaults) {
+      if (autoDefaults.tamano) {
+        const t = parsedOptions.tamanos?.find(x => x.nombre === autoDefaults.tamano);
         if (t && t.precioAdicional) base += Number(t.precioAdicional);
       }
-      if (defaultLeche) {
-        const l = parsedOptions.leches?.find(x => x.nombre === defaultLeche);
+      if (autoDefaults.leche) {
+        const l = parsedOptions.leches?.find(x => x.nombre === autoDefaults.leche);
         if (l && l.precioAdicional) base += Number(l.precioAdicional);
       }
     }
     return base;
-  }, [product.precioBase, product.precio, parsedOptions]);
+  }, [product.precioBase, product.precio, parsedOptions, autoDefaults]);
 
-  // 🔥 FILTRADO ESTRICTO + ESCUDO ANTI-QUIEBRE DE STOCK
   const activePromo = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
@@ -60,14 +66,13 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
     if (!promo) return null;
     
-    // 🛡️ VALIDACIÓN DE STOCK: ¿Alcanza para cumplir la promoción?
     if (product.controlarStock) {
       let requiredQty = 1;
       if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
         requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
       }
       if (product.stock < requiredQty) {
-        return null; // Se autodestruye visualmente si no hay stock suficiente para la promo
+        return null; 
       }
     }
 
@@ -100,7 +105,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return discountVal + costoExtras;
   }, [activePromo, realBasePrice, product.precioBase, product.precio]);
 
-  // 🔥 CEREBRO MATEMÁTICO: PORCENTAJE DINÁMICO
   const discountPercent = useMemo(() => {
     if (activePromo?.type === 'FIXED' && realBasePrice > 0) {
       const percent = ((realBasePrice - promoFixedPrice) / realBasePrice) * 100;
@@ -138,7 +142,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return activePromo.name || 'Promo';
   }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
 
-  // 🔥 LA MAGIA DEL AÑADIR DIRECTO (BYPASS DEL MODAL)
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
     if (isAgotado || isAdding || isLocked) return;
@@ -148,30 +151,31 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       return;
     }
 
-    const defaultTamano = parsedOptions?.defaults?.tamano;
-    
-    // Si tiene opciones, pero NO tiene un tamaño por defecto válido, forzamos abrir el modal
-    if (hasOptions && (!defaultTamano || defaultTamano.toLowerCase().includes('elegir'))) {
+    // Evaluamos si el primer tamaño del sistema dice "elegir" como placeholder
+    const isPlaceholderTamano = autoDefaults?.tamano && autoDefaults.tamano.toLowerCase().includes('elegir');
+    const requiresSizeSelection = parsedOptions?.tamanos?.length > 0 && (!autoDefaults?.tamano || isPlaceholderTamano);
+
+    // Si tiene tamaños obligatorios y no hay uno default/valido que el sistema pueda tomar, abre el modal
+    if (hasOptions && requiresSizeSelection) {
       if (onClick) onClick(product); 
       return;
     }
 
     setIsAdding(true);
     try {
-      if (hasOptions && defaultTamano) {
-        // Armamos el "Paquete de Preparación" simulando lo que haría el Modal
+      if (hasOptions) {
+        const isPlaceholderLeche = autoDefaults?.leche && autoDefaults.leche.toLowerCase().includes('elegir');
+        
         const customizations = {
           precioFinal: realBasePrice,
           detalles: {
-            tamano: defaultTamano,
-            ...(parsedOptions.defaults.leche && { leche: parsedOptions.defaults.leche }),
-            ...(parsedOptions.defaults.extras && { extras: parsedOptions.defaults.extras })
+            tamano: (!isPlaceholderTamano && autoDefaults?.tamano) ? autoDefaults.tamano : 'Estándar',
+            ...((autoDefaults?.leche && !isPlaceholderLeche) && { leche: autoDefaults.leche }),
+            ...(autoDefaults?.extras?.length > 0 && { extras: autoDefaults.extras })
           }
         };
-        // Se lo pasamos al padre para que lo inyecte directo al carrito
         if (onQuickAdd) await onQuickAdd(product, customizations);
       } else {
-        // Producto simple
         if (onQuickAdd) await onQuickAdd(product);
       }
     } finally {
