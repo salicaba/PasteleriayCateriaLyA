@@ -5,6 +5,30 @@ import { Printer, X, MessageCircle, Coffee, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
+// 🔥 CEREBRO EXTRACTOR: Separa quirúrgicamente el nombre del teléfono
+const parseAccountData = (str) => {
+  if (!str) return { name: 'General', phone: '' };
+  const s = String(str);
+  
+  if (s.includes(' | ')) {
+    const parts = s.split(' | ');
+    const name = parts[0].trim();
+    const phone = parts[1].replace(/\D/g, '');
+    return { name, phone: phone.length >= 10 ? phone.slice(0, 10) : '' };
+  }
+  
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) {
+      const name = parts.slice(0, -1).join(' - ').trim();
+      return { name, phone: possiblePhone.slice(0, 10) };
+    }
+  }
+  
+  return { name: s, phone: '' };
+};
+
 export const TicketPreviewModal = ({ 
   isOpen, 
   onClose, 
@@ -16,7 +40,7 @@ export const TicketPreviewModal = ({
   onSendWhatsApp,
   userName = 'Cajero en turno',
   cuentasPagadasReales = [], 
-  cuentasTelefonos = {} // 🔥 RECIBIMOS EL DICCIONARIO DE TELÉFONOS
+  cuentasTelefonos = {} // DICCIONARIO DE TELÉFONOS POS
 }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [viewMode, setViewMode] = useState('Todas');
@@ -27,7 +51,7 @@ export const TicketPreviewModal = ({
   const validCart = useMemo(() => cart.filter(item => cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED'), [cart, cuentasPagadasReales]);
   const uniqueAccounts = useMemo(() => Array.from(new Set(validCart.map(item => item.cuenta || 'General'))), [validCart]);
   
-  // 🔥 LÓGICA DE MONTAJE: Solo se ejecuta al abrir el modal
+  // 🔥 LÓGICA DE MONTAJE: Auto-Completado Inteligente de WhatsApp
   useEffect(() => {
     if (isOpen) {
       let initialMode = 'Todas';
@@ -38,38 +62,45 @@ export const TicketPreviewModal = ({
       }
       setViewMode(initialMode);
       
-      // Asignar teléfono inicial inteligentemente
-      if (initialMode !== 'Todas' && cuentasTelefonos[initialMode]) {
-        setPhoneNumber(cuentasTelefonos[initialMode]);
-      } else if (telefonoPredeterminado) {
-        setPhoneNumber(telefonoPredeterminado);
+      let bestPhone = '';
+      
+      if (initialMode !== 'Todas') {
+        const parsed = parseAccountData(initialMode);
+        // Prioridad: 1. El extraído del nombre (Cliente App) | 2. El del diccionario (POS)
+        bestPhone = parsed.phone || cuentasTelefonos[initialMode] || '';
       } else {
-        if (mesa) {
-          const partes = (mesa.numero || '').toString().split(' - ');
-          if (mesa.zona === 'llevar' && partes.length > 2) {
-            const posibleTelefono = partes[partes.length - 1].replace(/\D/g, '');
-            if (posibleTelefono.length >= 10) {
-              setPhoneNumber(posibleTelefono.slice(0, 10));
-              return;
-            }
-          }
-        }
-        setPhoneNumber('');
+        bestPhone = telefonoPredeterminado;
       }
+      
+      // Fallback definitivo: Extraer del ticket principal de la mesa/llevar
+      if (!bestPhone && mesa) {
+        const rawMesaName = String(mesa.ticketId || mesa.numero || '');
+        bestPhone = parseAccountData(rawMesaName).phone || '';
+      }
+
+      setPhoneNumber(bestPhone);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // 🛡️ NO SE AGREGAN DEPENDENCIAS REACTIVAS PARA NO BORRAR INPUT DEL USUARIO
+  }, [isOpen]); 
 
   // 🔥 CONTROLADOR DE PESTAÑAS (Cambio Dinámico)
   const handleTabChange = (newMode) => {
     setViewMode(newMode);
-    if (newMode !== 'Todas' && cuentasTelefonos[newMode]) {
-      setPhoneNumber(cuentasTelefonos[newMode]);
-    } else if (newMode === 'Todas' && telefonoPredeterminado) {
-      setPhoneNumber(telefonoPredeterminado);
+    
+    let bestPhone = '';
+    if (newMode !== 'Todas') {
+      const parsed = parseAccountData(newMode);
+      bestPhone = parsed.phone || cuentasTelefonos[newMode] || '';
     } else {
-      setPhoneNumber(''); // Vaciamos si no hay número para esa cuenta
+      bestPhone = telefonoPredeterminado;
     }
+    
+    if (!bestPhone && mesa) {
+      const rawMesaName = String(mesa.ticketId || mesa.numero || '');
+      bestPhone = parseAccountData(rawMesaName).phone || '';
+    }
+
+    setPhoneNumber(bestPhone);
   };
 
   const itemsToPrint = viewMode === 'Todas' ? validCart : validCart.filter(item => (item.cuenta || 'General') === viewMode);
@@ -80,7 +111,6 @@ export const TicketPreviewModal = ({
   const isVitrina = mesa?.zona === 'vitrina';
 
   const partesNumero = (mesa?.numero || '').toString().split(' - ');
-  
   let numeroReal = partesNumero[0] || 'Pedido';
   numeroReal = numeroReal.replace(/Llevar\s*#?/i, '').trim(); 
   
@@ -160,13 +190,13 @@ export const TicketPreviewModal = ({
               <button 
                 onClick={onClose} 
                 disabled={isPrinting || isSending}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:hover:text-orange-600 bg-gray-100 dark:bg-gray-700 lya:bg-orange-50 rounded-full transition-colors disabled:opacity-50" 
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:hover:text-orange-600 bg-gray-100 dark:bg-gray-700 lya:bg-orange-50 rounded-full transition-colors disabled:opacity-50 outline-none" 
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* 🔥 CONTENEDOR DE PESTAÑAS */}
+            {/* 🔥 CONTENEDOR DE PESTAÑAS (Con Nombres Limpios) */}
             {uniqueAccounts.length > 1 && (
               <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 lya:border-orange-100 bg-gray-50 dark:bg-gray-800/50 lya:bg-orange-50/30 shrink-0">
                 <p className="text-[10px] uppercase font-bold text-gray-500 lya:text-orange-600/70 mb-2 tracking-wider">
@@ -174,12 +204,12 @@ export const TicketPreviewModal = ({
                 </p>
                 <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
                   <button
-                    onClick={() => handleTabChange('Todas')} // 🔌 REEMPLAZADO CON CONTROLADOR
+                    onClick={() => handleTabChange('Todas')} 
                     className={clsx(
-                      "px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200",
+                      "px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200 outline-none",
                       viewMode === 'Todas' 
                         ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30" 
-                        : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-100"
+                        : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 md:hover:bg-gray-100"
                     )}
                   >
                     Todas las cuentas
@@ -187,16 +217,17 @@ export const TicketPreviewModal = ({
                   {uniqueAccounts.map(acc => (
                     <button
                       key={acc}
-                      onClick={() => handleTabChange(acc)} // 🔌 REEMPLAZADO CON CONTROLADOR
+                      onClick={() => handleTabChange(acc)} 
                       className={clsx(
-                        "px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-2",
+                        "px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-2 outline-none",
                         viewMode === acc 
                           ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30" 
-                          : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-100"
+                          : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 md:hover:bg-gray-100"
                       )}
                     >
                       <span className="w-2 h-2 rounded-full bg-current opacity-70"></span>
-                      {acc}
+                      {/* 🔥 VISTA LIMPIA: Solo el nombre, sin el teléfono */}
+                      {parseAccountData(acc).name}
                     </button>
                   ))}
                 </div>
@@ -230,13 +261,15 @@ export const TicketPreviewModal = ({
                   {!isVitrina && isLlevar && nombreCliente !== 'MOSTRADOR' && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Cliente:</span> 
-                      <span className="font-bold text-right text-black uppercase">{nombreCliente}</span>
+                      {/* 🔥 VISTA LIMPIA EN TICKET */}
+                      <span className="font-bold text-right text-black uppercase">{parseAccountData(nombreCliente).name}</span>
                     </div>
                   )}
                   {viewMode !== 'Todas' && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Cuenta exclusiva:</span> 
-                      <span className="font-bold text-right text-black uppercase bg-gray-100 px-2 py-0.5 rounded-md">{viewMode}</span>
+                      {/* 🔥 VISTA LIMPIA EN TICKET */}
+                      <span className="font-bold text-right text-black uppercase bg-gray-100 px-2 py-0.5 rounded-md">{parseAccountData(viewMode).name}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
@@ -284,7 +317,8 @@ export const TicketPreviewModal = ({
                             {uniqueAccounts.length > 1 && viewMode === 'Todas' && (
                               <tr>
                                 <td colSpan="3" className="text-[10px] font-bold text-gray-500 uppercase pt-2 pb-1 bg-gray-50 px-2 rounded">
-                                  ● Cuenta: {accName}
+                                  {/* 🔥 VISTA LIMPIA EN SEPARADOR DE CUENTAS */}
+                                  ● Cuenta: {parseAccountData(accName).name}
                                 </td>
                               </tr>
                             )}
@@ -333,7 +367,8 @@ export const TicketPreviewModal = ({
                         const subTotalAcc = itemsToPrint.filter(item => (item.cuenta || 'General') === accName).reduce((sum, item) => sum + (item.precio * item.qty), 0);
                         return (
                           <div key={accName} className="flex justify-between">
-                            <span className="uppercase">{accName}:</span>
+                            {/* 🔥 VISTA LIMPIA EN RESUMEN FINAL */}
+                            <span className="uppercase">{parseAccountData(accName).name}:</span>
                             <span className="font-bold text-black">${subTotalAcc.toFixed(2)}</span>
                           </div>
                         );
@@ -368,7 +403,7 @@ export const TicketPreviewModal = ({
                   <button 
                     onClick={handleWhatsAppClick}
                     disabled={phoneNumber.length < 10 || isSending}
-                    className="absolute right-2 p-2.5 bg-green-500 text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 hover:bg-green-600 active:scale-95 transition-all shadow-md shadow-green-500/20 flex items-center justify-center min-w-[42px]"
+                    className="absolute right-2 p-2.5 bg-green-500 text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 md:hover:bg-green-600 active:scale-95 transition-all shadow-md shadow-green-500/20 flex items-center justify-center min-w-[42px] outline-none"
                     title="Enviar por WhatsApp"
                   >
                     {isSending ? <Loader2 size={18} strokeWidth={3} className="animate-spin" /> : <MessageCircle size={20} strokeWidth={2.5} />}
@@ -378,7 +413,7 @@ export const TicketPreviewModal = ({
                 <button 
                   onClick={handlePhysicalPrint}
                   disabled={isPrinting}
-                  className="py-4 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white lya:bg-orange-600 text-white dark:text-gray-900 lya:text-white hover:bg-black dark:hover:bg-gray-100 lya:hover:bg-orange-700 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 shrink-0 disabled:opacity-70 disabled:active:scale-100 min-w-[64px]"
+                  className="py-4 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white lya:bg-orange-600 text-white dark:text-gray-900 lya:text-white md:hover:bg-black dark:md:hover:bg-gray-100 lya:md:hover:bg-orange-700 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 shrink-0 disabled:opacity-70 disabled:active:scale-100 min-w-[64px] outline-none"
                   title="Imprimir Ticket Físico"
                 >
                   {isPrinting ? <Loader2 size={22} className="animate-spin" /> : <Printer size={22} />}
