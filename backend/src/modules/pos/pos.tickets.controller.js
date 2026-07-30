@@ -35,7 +35,7 @@ export const getTickets = async (req, res) => {
         {
           model: OrderItem,
           as: 'items',
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'departamento'] }]
         }
       ],
       order: [['updatedAt', 'DESC']],
@@ -72,7 +72,7 @@ export const getTodayTickets = async (req, res) => {
         {
           model: OrderItem,
           as: 'items',
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice'] }]
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }]
         }
       ],
       order: [['updatedAt', 'DESC']]
@@ -101,7 +101,7 @@ export const printOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice'] }] 
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
         }
       ]
     });
@@ -155,8 +155,15 @@ export const printOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salon'}`;
     }
 
-    // 🔥 Forzamos el folio elegante
-    const ticketFolio = 'CAF-' + order.id.split('-')[0].toUpperCase();
+    // 🔥 FOLIOS DINÁMICOS POR DEPARTAMENTO
+    const baseFolioStr = order.id.split('-')[0].toUpperCase();
+    const hasPasteleria = order.items.some(i => i.product?.departamento === 'pasteleria');
+    const hasCafeteria = order.items.some(i => i.product?.departamento !== 'pasteleria');
+    
+    let foliosArr = [];
+    if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${baseFolioStr}`);
+    if (hasPasteleria) foliosArr.push(`PAS-${baseFolioStr}`);
+    const ticketFolio = foliosArr.join(' / ');
 
     printer.alignCenter();
     printer.println("COMPROBANTE DE VENTA");
@@ -340,7 +347,7 @@ export const shareOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice'] }] 
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
         }
       ]
     });
@@ -396,8 +403,15 @@ export const shareOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salón'}`;
     }
 
-    // 🔥 Folio Elegante forzado
-    const ticketFolio = `CAF-${order.id.split('-')[0].toUpperCase()}`;
+    // 🔥 FOLIOS DINÁMICOS POR DEPARTAMENTO
+    const baseFolioStr = order.id.split('-')[0].toUpperCase();
+    const hasPasteleria = itemsFiltrados.some(i => i.product?.departamento === 'pasteleria');
+    const hasCafeteria = itemsFiltrados.some(i => i.product?.departamento !== 'pasteleria');
+    
+    let foliosArr = [];
+    if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${baseFolioStr}`);
+    if (hasPasteleria) foliosArr.push(`PAS-${baseFolioStr}`);
+    const ticketFolio = foliosArr.join(' / ');
 
     const htmlResponse = `
     <!DOCTYPE html>
@@ -445,7 +459,7 @@ export const shareOrderTicket = async (req, res) => {
             <div class="text-4xl mb-2 text-slate-800">☕</div>
             <h1 class="text-5xl font-black text-slate-900 mb-1 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
             <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Cafetería</p>
-            <h2 class="text-3xl font-black text-slate-900 tracking-wider mt-4">${ticketFolio}</h2>
+            <h2 class="text-[20px] font-black text-slate-900 tracking-wider mt-4">${ticketFolio}</h2>
           </div>
 
           <div class="space-y-1.5 text-sm font-medium text-slate-600 mb-6 px-1">
@@ -556,7 +570,6 @@ export const shareOrderTicket = async (req, res) => {
               <span class="text-sm font-black text-slate-600 uppercase tracking-tight">Total Consumido</span>
               <span class="text-3xl font-black text-slate-900 tracking-tighter">$${totalAmount.toFixed(2)}</span>
             </div>
-            <!-- SE ELIMINÓ EL ESTADO DE CUENTA -->
           </div>
 
           <div class="border-t border-slate-200 my-5"></div>
@@ -598,7 +611,7 @@ export const shareOrderTicket = async (req, res) => {
           const heightMm = (element.scrollHeight * 0.264583) + 5;
           const options = {
             margin: 0,
-            filename: 'Ticket_Lya_Cafeteria_${ticketFolio}.pdf',
+            filename: 'Ticket_Lya_Cafeteria_${ticketFolio.replace(' / ', '_')}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff' },
             jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
@@ -611,7 +624,7 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
           html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = 'Ticket_Lya_Cafeteria_${ticketFolio}.png';
+            link.download = 'Ticket_Lya_Cafeteria_${ticketFolio.replace(' / ', '_')}.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
           });
