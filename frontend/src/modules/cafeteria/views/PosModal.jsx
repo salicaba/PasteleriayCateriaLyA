@@ -17,7 +17,6 @@ import { OpcionesMesaModal } from './OpcionesMesaModal';
 import { TicketPreviewModal } from './TicketPreviewModal';
 import MenuLoader from '../../../components/animations/MenuLoader';
 
-// 🔥 CEREBRO EXTRACTOR: Limpieza absoluta para notificaciones
 const parseAccountName = (str) => {
   if (!str) return 'General';
   const s = String(str);
@@ -166,11 +165,8 @@ export const PosModal = ({
     }
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
-    
-    // 🔥 APLICANDO FILTRO AQUÍ TAMBIÉN PARA WHATSAPP
     const cleanName = parseAccountName(cuentaName);
     const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cleanName}*` : '';
-    
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
@@ -215,7 +211,6 @@ export const PosModal = ({
 
   const handleOpenPayCuenta = (cuentaName) => {
     if (!isVitrina && !validateAllDelivered(cuentaName)) { 
-      // 🔥 APLICANDO FILTRO EN ADVERTENCIA
       showToast(`Los productos de la cuenta "${parseAccountName(cuentaName)}" deben estar ENTREGADOS antes de cobrar.`, "warning");
       return; 
     }
@@ -227,15 +222,22 @@ export const PosModal = ({
   };
 
   const handleFinalizePayment = async (paymentDetails) => {
-    const { amountPaid, targetType, cuentaName } = paymentDetails;
+    const { amountPaid, targetType, cuentaName, isLastInBatch } = paymentDetails;
     
-    if (targetType === 'partial' && cuentaName) { 
+    // 🔥 EL MANEJADOR INTELIGENTE (Detecta si es un cobro por lote)
+    if (targetType === 'partial' || targetType === 'silent_partial') { 
       await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
-        // 🔥 APLICANDO FILTRO AL PAGAR CUENTA PARCIAL
-        setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${parseAccountName(cuentaName)}" ha sido pagada exitosamente.` });
-        setTimeout(() => setPaymentSuccessData(null), 2000);
-        setShowCheckout(false); 
+        
+        if (targetType === 'partial') {
+          setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${parseAccountName(cuentaName)}" ha sido pagada exitosamente.` });
+          setTimeout(() => setPaymentSuccessData(null), 2000);
+        }
+        
+        // Solo cerramos la caja si es el último del lote
+        if (isLastInBatch) {
+          setShowCheckout(false); 
+        }
       }); 
       return; 
     }

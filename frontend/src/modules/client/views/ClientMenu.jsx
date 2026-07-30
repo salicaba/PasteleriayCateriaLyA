@@ -16,7 +16,7 @@ import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
 import ClientLogoutModal from './components/ClientLogoutModal';
 import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
-import { ClientServiceShield } from './components/ClientServiceShield'; // 🔥 ESCUDO IMPORTADO CORREGIDO
+import { ClientServiceShield } from './components/ClientServiceShield';
 import { 
   THEME_CLASSES, SIZES, getInitialTheme, getInitialSize, 
   getProductModifiers, getDefaultCustomizations 
@@ -54,11 +54,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
 
-  // 🔥 NUEVO CEREBRO DE ESTADO QR (Sincronizado con MesasPage)
   const [globalQrActive, setGlobalQrActive] = useState(true);
   const [disabledQrs, setDisabledQrs] = useState([]);
 
-  // Estado derivado al vuelo
   const isServiceActive = globalQrActive && 
     !(type === 'llevar' && disabledQrs.includes('llevar')) && 
     !(type === 'mesa' && disabledQrs.includes(`mesa-${tableId}`));
@@ -122,11 +120,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // 🔥 LÓGICA DE ESCUCHA SOCKET OPTIMIZADA (CERO PETICIONES)
   useEffect(() => {
     const fetchInitialConfig = async () => {
       try {
-        const res = await client.get(`/settings?_t=${Date.now()}`); // Bust Cache Inicial
+        const res = await client.get(`/settings?_t=${Date.now()}`); 
         const data = res.data;
         
         if (data.qr_service_active !== undefined) {
@@ -143,7 +140,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
 
     fetchInitialConfig();
     
-    // Leemos directo del Payload para no golpear la base de datos
     const handleConfigUpdate = (updates) => {
       if (updates) {
         if (updates.qr_service_active !== undefined) {
@@ -186,7 +182,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       if (isConfirmed || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) { // 25 Minutos
+      if (now - lastActivityRef.current > 1500000) { 
         localStorage.setItem('lya_client_session_expired', 'true');
         setSessionExpired(true);
       }
@@ -210,6 +206,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     };
   }, [isConfirmed, isSubmitting, finalizedStatus, sessionExpired]);
 
+  // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -220,17 +217,19 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         });
         
         const data = res?.data || {};
-        
-        // 🔥 REGLA DE AUTORIDAD SUPREMA: La orden global MANDA. 
-        // Si el mesero cobra toda la mesa, el status global es PAID y bloquea todo.
         const globalStatus = data.status;
         const accountStatus = data.accountStatus;
         
         let finalStatus = 'OPEN';
-        if (globalStatus === 'PAID' || globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
+        
+        if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
+        } else if (accountStatus === 'PAID') {
+            finalStatus = 'PAID';
         } else {
-            finalStatus = accountStatus || globalStatus;
+            // Si la mesa se pagó, pero mi cuenta no dice explícitamente "PAID", 
+            // asumo que soy una cuenta nueva o que sigo activa. ¡NO ME BLOQUEO!
+            finalStatus = 'OPEN'; 
         }
         
         if (finalStatus === 'PAID') {
@@ -570,7 +569,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     );
   }
 
-  // 🔥 ESCUDO NEO-BENTO: Se bloquea la pantalla si apagan el servicio y el cliente no ha confirmado.
   if (!isServiceActive && !isConfirmed && !isReadOnly && !sessionExpired) {
     return <ClientServiceShield />;
   }
@@ -655,7 +653,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
             
             const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
 
-            // 🔥 CEREBRO DE AUTOCOMPLETADO (Alineado con el Gestor de Menú)
             let parsedOptions = null;
             try { if (product.opciones) parsedOptions = typeof product.opciones === 'string' ? JSON.parse(product.opciones) : product.opciones; } catch(e){}
             
@@ -669,7 +666,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
                 const requiresSizeSelection = parsedOptions.tamanos?.length > 0 && (!parsedOptions.defaults?.tamano || isPlaceholderTamano);
 
                 if (requiresSizeSelection) {
-                    defaultMods = 'REQUIRE_MODAL'; // Fuerza a abrir el modal si no hay default válido
+                    defaultMods = 'REQUIRE_MODAL'; 
                 } else {
                     const tamanoDefault = (!isPlaceholderTamano && parsedOptions.defaults?.tamano) ? parsedOptions.defaults.tamano : (parsedOptions.tamanos?.[0]?.nombre || 'Estándar');
                     const isPlaceholderLeche = parsedOptions.defaults?.leche && parsedOptions.defaults.leche.toLowerCase().includes('elegir');
@@ -698,7 +695,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
               displayOriginalPrice = finalPriceWithDefaults;
               displayFinalPrice = promoData.discountValue + (costoExtras > 0 ? costoExtras : 0);
               
-              // 🔥 CEREBRO MATEMÁTICO INYECTADO: Porcentaje dinámico perfecto
               if (displayOriginalPrice > 0) {
                  const percent = ((displayOriginalPrice - displayFinalPrice) / displayOriginalPrice) * 100;
                  promoData.text = `-${Math.max(0, Math.round(percent))}% OFF`;
@@ -798,7 +794,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
                           triggerNotification(`Límite en carrito: Solo hay ${product.stock} en stock.`, 'warning');
                           return;
                         }
-                        // 🔥 REGLA DE PROTECCIÓN: Si exige tamaño, abre el modal. Si no, directo al carrito.
                         if (defaultMods === 'REQUIRE_MODAL') {
                           setSelectedProduct(product);
                         } else {

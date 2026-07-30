@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
 import client from '../../../api/client'; 
 
-// 🔥 CEREBRO EXTRACTOR VISUAL: Solo recorta el nombre para pintar la pantalla
 const parseAccountName = (str) => {
   if (!str) return 'General';
   const s = String(str);
@@ -39,13 +38,9 @@ export const CheckoutModal = ({
   
   const [cobroMode, setCobroMode] = useState('full');
   const [splitCount, setSplitCount] = useState(1);
-  
-  // 🔥 ESTADO DE SELECCIÓN MÚLTIPLE (Pilar de Lógica)
   const [selectedCuentas, setSelectedCuentas] = useState([]);
-  
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // ESTADO PARA LA NOTIFICACIÓN DE CÁPSULA NEO-BENTO
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
 
   const showToast = (message, type = 'error') => {
@@ -79,13 +74,11 @@ export const CheckoutModal = ({
       client.get('/settings')
         .then(res => { if (res.data) setTransferInfo(res.data); })
         .catch(err => {
-          console.error("Error al cargar datos bancarios:", err);
           showToast("No se pudieron cargar los datos de transferencia.", "error");
         });
     }
   }, [isOpen, method]);
 
-  // 🔥 CÁLCULO DE TOTAL DINÁMICO
   const amountToPay = 
     cobroMode === 'full' ? total :
     cobroMode === 'equal' ? total / splitCount :
@@ -103,7 +96,6 @@ export const CheckoutModal = ({
     }
   }, [amountReceived, amountToPay, method]);
 
-  // Lógica de Selección de Cuentas
   const toggleCuentaSelection = (nombreCuenta) => {
     if (isProcessing) return;
     setSelectedCuentas(prev => 
@@ -117,7 +109,6 @@ export const CheckoutModal = ({
     setSelectedCuentas(todas);
   };
 
-  // 🔥 BUCLE DE COBROS ASÍNCRONO
   const handlePayment = async () => {
     if (amountToPay <= 0) return showToast("No hay monto a cobrar en la selección actual.", "error");
     if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return showToast("El monto recibido es insuficiente.", "error");
@@ -128,32 +119,39 @@ export const CheckoutModal = ({
     
     try {
       if (cobroMode === 'nominal' && selectedCuentas.length > 0) {
-          // Bucle para procesar cuenta por cuenta
           for (let i = 0; i < selectedCuentas.length; i++) {
               const cuentaTarget = selectedCuentas[i];
               const cuentaMonto = cuentasResumen.find(c => c.nombre === cuentaTarget).subtotal;
+              const isLast = (i === selectedCuentas.length - 1);
               
               await onConfirmPayment({ 
-                method, 
-                amountReceived: cuentaMonto, 
-                change: 0, 
-                amountPaid: cuentaMonto,
-                targetType: 'partial',
-                cuentaName: cuentaTarget
+                method, amountReceived: cuentaMonto, change: 0, amountPaid: cuentaMonto,
+                targetType: 'partial', cuentaName: cuentaTarget, isLastInBatch: isLast
               });
           }
+      } else if (cobroMode === 'full' && orderType === 'salon') {
+          // 🔥 EL FIX SUPREMO: Cobramos las cuentas en silencio para sincronizar la BD exacta.
+          for (let i = 0; i < cuentasResumen.length; i++) {
+              const c = cuentasResumen[i];
+              if (c.subtotal > 0) {
+                  await onConfirmPayment({ 
+                      method, amountReceived: c.subtotal, change: 0, amountPaid: c.subtotal, 
+                      targetType: 'silent_partial', cuentaName: c.nombre, isLastInBatch: false 
+                  });
+              }
+          }
+          await onConfirmPayment({ 
+            method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
+            change, amountPaid: amountToPay, targetType: 'full', cuentaName: null, isLastInBatch: true
+          });
       } else {
           await onConfirmPayment({ 
-            method, 
-            amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
-            change, 
-            amountPaid: amountToPay,
-            targetType: cobroMode === 'equal' ? 'equal' : 'full',
-            cuentaName: null
+            method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
+            change, amountPaid: amountToPay, targetType: cobroMode === 'equal' ? 'equal' : 'full',
+            cuentaName: null, isLastInBatch: true
           });
       }
     } catch(e) {
-      console.error(e);
       showToast(e?.response?.data?.message || e.message || "Ocurrió un error al procesar el pago.", "error");
       setIsProcessing(false); 
     }
@@ -176,7 +174,6 @@ export const CheckoutModal = ({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 h-full w-full flex-col overflow-hidden">
       
-      {/* NOTIFICACIÓN FLOTANTE (ESTILO CÁPSULA NEO-BENTO) */}
       <AnimatePresence>
         {toast.show && (
           <div className="fixed top-6 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -267,7 +264,6 @@ export const CheckoutModal = ({
                 </motion.div>
               )}
               
-              {/* 🔥 NUEVO PANEL MULTI-SELECCIÓN (Nombres Limpios) */}
               {cobroMode === 'nominal' && orderType === 'salon' && (
                 <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-col gap-2">
                   <div className="flex justify-between items-center px-1">
@@ -292,7 +288,6 @@ export const CheckoutModal = ({
                                   : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:border-orange-300 dark:md:hover:border-orange-700'
                               }`}
                             >
-                              {/* 🔥 FILTRO VISUAL APLICADO AQUÍ */}
                               {parseAccountName(cuenta.nombre)} 
                               <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'opacity-100' : 'opacity-60'}`}>${cuenta.subtotal.toFixed(2)}</span>
                            </motion.button>
