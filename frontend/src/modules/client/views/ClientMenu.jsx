@@ -220,17 +220,28 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         });
         
         const data = res?.data || {};
-        const status = data.accountStatus || data.status;
         
-        if (status === 'PAID') {
+        // 🔥 REGLA DE AUTORIDAD SUPREMA: La orden global MANDA. 
+        // Si el mesero cobra toda la mesa, el status global es PAID y bloquea todo.
+        const globalStatus = data.status;
+        const accountStatus = data.accountStatus;
+        
+        let finalStatus = 'OPEN';
+        if (globalStatus === 'PAID' || globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
+            finalStatus = globalStatus;
+        } else {
+            finalStatus = accountStatus || globalStatus;
+        }
+        
+        if (finalStatus === 'PAID') {
            if (!isOrderPaid) {
                setIsOrderPaid(true);
                localStorage.setItem('lya_client_order_paid', 'true');
                setIsConfirmed(true); 
            }
-        } else if (status === 'CLOSED') {
+        } else if (finalStatus === 'CLOSED') {
            triggerFinalized('CLOSED');
-        } else if (status === 'CANCELLED' || status === 'DELETED') {
+        } else if (finalStatus === 'CANCELLED' || finalStatus === 'DELETED') {
            triggerFinalized('CANCELLED');
         }
       } catch (error) {

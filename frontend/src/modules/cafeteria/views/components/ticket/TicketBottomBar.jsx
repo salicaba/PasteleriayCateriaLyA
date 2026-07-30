@@ -181,7 +181,8 @@ export const TicketBottomBar = ({
         )}
       </AnimatePresence>
 
-      {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && hasCuentasActivas && (
+      {/* 🔥 LIBERADO: Ya no requiere que hasCuentasActivas sea true */}
+      {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
           <motion.button 
              whileTap={{ scale: 0.95 }}
              onClick={() => setShowCancelModal(true)} 
