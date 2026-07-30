@@ -106,14 +106,14 @@ export const payOrder = async (req, res) => {
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
     // Crear transacciones separadas si hay montos
-    // 🔥 LE REGRESAMOS SU FOLIO AL FINAL DE LA DESCRIPCIÓN
     if (amountCafeteria > 0) {
       const folioCaf = `CAF-${baseFolio}`;
       await Transaction.create({
         folio: folioCaf, 
         source: 'CAFETERIA',
         amount: amountCafeteria,
-        description: `${descBase}${mixTag}  ${folioCaf}`,
+        // 🔥 EL FIX: Ponemos el folio ANTES del mixTag para que el frontend no lo oculte
+        description: `${descBase} ${folioCaf}${mixTag}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
         createdBy: userId 
@@ -126,7 +126,8 @@ export const payOrder = async (req, res) => {
         folio: folioPas, 
         source: 'PASTELERIA',
         amount: amountPasteleria,
-        description: `${descBase}${mixTag}  ${folioPas}`,
+        // 🔥 EL FIX: Ponemos el folio ANTES del mixTag para que el frontend no lo oculte
+        description: `${descBase} ${folioPas}${mixTag}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
         createdBy: userId 
