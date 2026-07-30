@@ -216,7 +216,7 @@ export const CashRegisterPage = ({ user }) => {
           <Filter size={18} className="text-gray-400 lya:text-lya-text/50" /> Movimientos
         </h3>
         
-        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar p-1">
           
           {/* 🔥 BARRA DE BÚSQUEDA */}
           <div className="relative w-full sm:w-64 flex-shrink-0">
