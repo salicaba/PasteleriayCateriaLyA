@@ -66,13 +66,11 @@ export const TicketPreviewModal = ({
       
       if (initialMode !== 'Todas') {
         const parsed = parseAccountData(initialMode);
-        // Prioridad: 1. El extraído del nombre (Cliente App) | 2. El del diccionario (POS)
         bestPhone = parsed.phone || cuentasTelefonos[initialMode] || '';
       } else {
         bestPhone = telefonoPredeterminado;
       }
       
-      // Fallback definitivo: Extraer del ticket principal de la mesa/llevar
       if (!bestPhone && mesa) {
         const rawMesaName = String(mesa.ticketId || mesa.numero || '');
         bestPhone = parseAccountData(rawMesaName).phone || '';
@@ -124,16 +122,35 @@ export const TicketPreviewModal = ({
     }
   }
 
-  const generarFolio = () => {
-    if (mesa?.folio) return mesa.folio; 
-    if (mesa?.orderId) {
-       const shortId = mesa.orderId.split('-')[0].toUpperCase();
-       return isVitrina ? `MOS-${shortId}` : `CAF-${shortId}`;
-    }
-    return isVitrina ? 'MOS-000000' : 'CAF-000000';
+  const generarFolios = () => {
+    if (mesa?.folio) return [mesa.folio]; 
+    if (!mesa?.orderId) return [isVitrina ? 'MOS-000000' : 'CAF-000000'];
+    
+    const shortId = mesa.orderId.split('-')[0].toUpperCase();
+    if (isVitrina) return [`MOS-${shortId}`];
+
+    // 🔥 SÚPER DETECTOR DE DEPARTAMENTOS
+    const isPasteleria = (item) => {
+      const dep = String(item.departamento || '').toLowerCase();
+      const cat = String(item.categoria || '').toLowerCase();
+      const nom = String(item.nombre || '').toLowerCase();
+      
+      return dep === 'pasteleria' || 
+             cat.includes('pastel') || cat.includes('postre') ||
+             nom.includes('pastel') || nom.includes('postre') || nom.includes('rebanada');
+    };
+
+    const hasPasteleria = itemsToPrint.some(isPasteleria);
+    const hasCafeteria = itemsToPrint.some(item => !isPasteleria(item));
+    
+    let foliosArr = [];
+    if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${shortId}`);
+    if (hasPasteleria) foliosArr.push(`PAS-${shortId}`);
+    
+    return foliosArr;
   };
 
-  const ticketFolio = generarFolio();
+  const foliosToRender = generarFolios();
 
   const handlePhysicalPrint = async () => {
     try {
@@ -242,11 +259,18 @@ export const TicketPreviewModal = ({
                 <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                   <Coffee size={32} className="mx-auto mb-2 text-gray-800" />
                   <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
-                  <p className="text-xs font-bold text-gray-600 uppercase mt-1">Pastelería & Cafetería</p>
+                  <p className="text-xs font-bold text-gray-600 uppercase mt-1">Cafetería</p>
                   <p className="text-xs text-gray-500 mt-1">Comprobante de Venta</p>
-                  <p className="text-lg font-black mt-2 text-black tracking-wider bg-gray-100 rounded-lg inline-block px-4 py-1">
-                    {ticketFolio}
-                  </p>
+                  
+                  {/* 🔥 AQUI ESTAN LOS FOLIOS APILADOS */}
+                  <div className="mt-2 flex flex-col gap-1 items-center">
+                    {foliosToRender.map(folio => (
+                      <span key={folio} className="text-lg font-black text-black tracking-wider bg-gray-100 rounded-lg inline-block px-4 py-1">
+                        {folio}
+                      </span>
+                    ))}
+                  </div>
+                  
                 </div>
 
                 <div className="space-y-2 mb-4 text-sm">
