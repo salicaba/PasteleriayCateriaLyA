@@ -6,13 +6,14 @@ import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
 
 // ==========================================
-// 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN
+// 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN Y LIBERACIÓN
 // ==========================================
 const extractPromoMeta = (item) => {
   const plainItem = item.toJSON ? item.toJSON() : item;
   plainItem.isAutoPromo = false;
   plainItem.promoLabel = null;
   plainItem.precioOriginal = null;
+  plainItem._isReleased = false; // 🔥 Bandera Ninja
   
   if (plainItem.notes) {
       try {
@@ -23,6 +24,10 @@ const extractPromoMeta = (item) => {
                   plainItem.isAutoPromo = meta.isAutoPromo;
                   plainItem.promoLabel = meta.promoLabel;
                   plainItem.precioOriginal = meta.precioOriginal;
+              }
+              // Detectamos si este producto ya fue liberado
+              if (parsedNotes.some(n => n && n._isReleased)) {
+                  plainItem._isReleased = true;
               }
           }
       } catch(e) {}
@@ -86,13 +91,10 @@ export const createOrder = async (req, res) => {
   } catch (error) { 
     console.error("🔥 Error crítico al crear orden:", error);
     if (error.name === 'SequelizeForeignKeyConstraintError') {
-      return res.status(400).json({ success: false, message: "La mesa que intentas usar no existe o tu sesión tiene datos cruzados. Por favor, limpia tu sesión y escanea el QR nuevamente." });
+      return res.status(400).json({ success: false, message: "La mesa que intentas usar no existe o tu sesión tiene datos cruzados." });
     }
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ success: false, message: "Esta mesa ya tiene un pedido activo en curso o hay un conflicto de sesión." });
-    }
-    if (error.name === 'SequelizeValidationError') {
-      return res.status(400).json({ success: false, message: "Los datos enviados están incompletos o corruptos." });
+      return res.status(400).json({ success: false, message: "Esta mesa ya tiene un pedido activo en curso." });
     }
     return res.status(500).json({ success: false, message: `Error interno de base de datos: ${error.message}` });
   }
@@ -160,22 +162,12 @@ export const addItemsToOrder = async (req, res) => {
         const newStock = Math.max(0, product.stockQuantity - qtyToSubstract);
         const isNowAgotado = newStock === 0 || product.isAgotado;
         
-        await product.update({ 
-          stockQuantity: newStock, 
-          isAgotado: isNowAgotado 
-        });
-        
-        stockAlerts.push({ 
-          id: product.id, 
-          stock: newStock, 
-          isAgotado: isNowAgotado 
-        });
+        await product.update({ stockQuantity: newStock, isAgotado: isNowAgotado });
+        stockAlerts.push({ id: product.id, stock: newStock, isAgotado: isNowAgotado });
       }
     }
 
-    if (stockAlerts.length > 0) {
-      getIO().emit('stock:update', stockAlerts);
-    }
+    if (stockAlerts.length > 0) getIO().emit('stock:update', stockAlerts);
 
     const allItems = await OrderItem.findAll({
       where: { orderId, status: 'ACTIVE' },
@@ -185,9 +177,10 @@ export const addItemsToOrder = async (req, res) => {
     getIO().emit('pos:update');
     getIO().emit('kitchen:update'); 
     
-    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: allItems.map(extractPromoMeta) });
+    // 🔥 Filtramos los productos liberados para que no viajen al Frontend
+    const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
+    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: cleanItems });
   } catch (error) { 
-    console.error("🔥 Error crítico al agregar items:", error);
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
   }
 };
@@ -213,7 +206,8 @@ export const getActiveOrderByTable = async (req, res) => {
     const validOrder = orders.length > 0 ? orders[0].toJSON() : null;
     
     if (validOrder && validOrder.items) {
-        validOrder.items = validOrder.items.map(extractPromoMeta);
+        // 🔥 Filtramos los productos liberados
+        validOrder.items = validOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
     }
     
     res.json({ order: validOrder });
@@ -242,7 +236,7 @@ export const closeOrder = async (req, res) => {
 };
 
 // ==========================================
-// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta)
+// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta) [EL FIX NINJA 🥷]
 // ==========================================
 export const closeAccount = async (req, res) => {
   try {
@@ -253,17 +247,30 @@ export const closeAccount = async (req, res) => {
       return res.status(400).json({ message: "Se requiere el nombre de la cuenta" });
     }
 
-    // 🔥 Magia: Pasamos los items a estado 'CLOSED'. 
-    // Como el POS solo busca items 'ACTIVE', estos desaparecerán de la pantalla.
-    await OrderItem.update(
-      { status: 'CLOSED' },
-      { where: { orderId, cuenta: cuentaName, status: 'ACTIVE' } }
-    );
-
-    // Verificamos si al cerrar esta cuenta, toda la mesa se quedó sin items activos
-    const activeItemsCount = await OrderItem.count({ where: { orderId, status: 'ACTIVE' } });
+    const items = await OrderItem.findAll({ where: { orderId, cuenta: cuentaName, status: 'ACTIVE' } });
     
-    if (activeItemsCount === 0) {
+    for (const item of items) {
+        let notes = [];
+        try { notes = JSON.parse(item.notes || '[]'); } catch(e){}
+        if (!Array.isArray(notes)) notes = [notes];
+        
+        // Inyectamos la bandera secreta de liberación
+        if (!notes.some(n => n && n._isReleased)) {
+            notes.push({ _isReleased: true });
+            await item.update({ notes: JSON.stringify(notes) });
+        }
+    }
+
+    // Revisar si TODA la mesa ya está liberada para cerrarla completamente
+    const allActiveItems = await OrderItem.findAll({ where: { orderId, status: 'ACTIVE' } });
+    const remainingVisible = allActiveItems.filter(item => {
+        try {
+            const n = JSON.parse(item.notes || '[]');
+            return !(Array.isArray(n) && n.some(x => x && x._isReleased));
+        } catch(e) { return true; }
+    });
+
+    if (remainingVisible.length === 0) {
        const order = await Order.findByPk(orderId);
        if (order && order.status !== 'CLOSED') {
          await order.update({ status: 'CLOSED' });
@@ -307,7 +314,8 @@ export const getActiveOrders = async (req, res) => {
       }
       const plainOrder = order.toJSON();
       if (plainOrder.items) {
-          plainOrder.items = plainOrder.items.map(extractPromoMeta);
+          // 🔥 Filtramos los productos liberados
+          plainOrder.items = plainOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
       }
       validOrders.push(plainOrder);
     }
@@ -334,35 +342,23 @@ export const moveItemAccount = async (req, res) => {
     
     let metaObj = null;
     const metaIdx = moveNotes.findIndex(n => n && n._isPromoMeta);
-    if (metaIdx >= 0) {
-        metaObj = moveNotes.splice(metaIdx, 1)[0];
-    }
+    if (metaIdx >= 0) { metaObj = moveNotes.splice(metaIdx, 1)[0]; }
     
     const isAutoPromo = metaObj ? metaObj.isAutoPromo : false;
     const promoLabel = metaObj ? metaObj.promoLabel : null;
-    
     const unitPrice = Number(item.subtotal) / item.quantity;
     
     const existingItems = await OrderItem.findAll({
-        where: {
-            orderId: item.orderId,
-            productId: item.productId,
-            cuenta: targetCuenta,
-            kitchenStatus: item.kitchenStatus,
-            isTakeaway: item.isTakeaway,
-            status: 'ACTIVE'
-        }
+        where: { orderId: item.orderId, productId: item.productId, cuenta: targetCuenta, kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' }
     });
 
     const existingItem = existingItems.find(i => {
         if ((Number(i.subtotal) / i.quantity) !== unitPrice) return false;
-        
         let eNotes = [];
         try { eNotes = JSON.parse(i.notes || '[]'); } catch(e){}
         const eMeta = eNotes.find(n => n && n._isPromoMeta);
         const eIsPromo = eMeta ? eMeta.isAutoPromo : false;
         const eLabel = eMeta ? eMeta.promoLabel : null;
-        
         return eIsPromo === isAutoPromo && eLabel === promoLabel;
     });
 
@@ -382,23 +378,13 @@ export const moveItemAccount = async (req, res) => {
         const eMetaIdx = existingNotes.findIndex(n => n && n._isPromoMeta);
         if (eMetaIdx >= 0) existingNotes.splice(eMetaIdx, 1);
         
-        await existingItem.update({
-            quantity: existingItem.quantity + qtyToMove,
-            subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove),
-            notes: JSON.stringify([...existingNotes, ...notesToMove])
-        });
-        if (qtyToMove >= item.quantity) {
-            await item.destroy();
-        } else {
-            await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
-        }
+        await existingItem.update({ quantity: existingItem.quantity + qtyToMove, subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove), notes: JSON.stringify([...existingNotes, ...notesToMove]) });
+        if (qtyToMove >= item.quantity) { await item.destroy(); } 
+        else { await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) }); }
     } else {
         if (qtyToMove < item.quantity) {
            await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
-           await OrderItem.create({
-             orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove,
-             cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE'
-           });
+           await OrderItem.create({ orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove, cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' });
         } else {
            await item.update({ cuenta: targetCuenta });
         }
@@ -410,7 +396,8 @@ export const moveItemAccount = async (req, res) => {
     });
     
     getIO().emit('pos:update');
-    res.json({ message: 'Producto movido y agrupado con éxito', orderItems: allItems.map(extractPromoMeta) });
+    const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
+    res.json({ message: 'Producto movido y agrupado con éxito', orderItems: cleanItems });
   } catch (error) {
     res.status(500).json({ message: 'Error al mover producto', error: error.message });
   }
@@ -453,16 +440,21 @@ export const checkOrderStatus = async (req, res) => {
     let accountStatus = order.status;
     
     if (cuenta) {
-      // 🔥 Buscamos si los items de ESTA cuenta pasaron a estado 'CLOSED' (Liberados)
       const itemsCuenta = await OrderItem.findAll({ where: { orderId, cuenta } });
       
       if (itemsCuenta.length > 0) {
          const hasActive = itemsCuenta.some(i => i.status === 'ACTIVE');
          const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
          
-         if (!hasActive && !allCancelled) {
-             // Si no hay ninguno activo, y no es porque los hayan borrado/cancelado,
-             // significa que los pasaron a estado CLOSED con el nuevo botón de liberar
+         // 🔥 ¿Fueron todos los activos liberados usando la etiqueta Ninja?
+         const isReleased = !allCancelled && itemsCuenta.filter(i => i.status === 'ACTIVE').every(item => {
+             try {
+                 const n = JSON.parse(item.notes || '[]');
+                 return Array.isArray(n) && n.some(x => x && x._isReleased);
+             } catch(e) { return false; }
+         });
+
+         if (isReleased) {
              accountStatus = 'CLOSED';
          } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(cuenta)) {
              accountStatus = 'PAID';
