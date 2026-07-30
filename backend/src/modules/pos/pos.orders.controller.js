@@ -13,7 +13,7 @@ const extractPromoMeta = (item) => {
   plainItem.isAutoPromo = false;
   plainItem.promoLabel = null;
   plainItem.precioOriginal = null;
-  plainItem._isReleased = false; // 🔥 Bandera Ninja
+  plainItem._isReleased = false; 
   
   if (plainItem.notes) {
       try {
@@ -25,7 +25,6 @@ const extractPromoMeta = (item) => {
                   plainItem.promoLabel = meta.promoLabel;
                   plainItem.precioOriginal = meta.precioOriginal;
               }
-              // Detectamos si este producto ya fue liberado
               if (parsedNotes.some(n => n && n._isReleased)) {
                   plainItem._isReleased = true;
               }
@@ -177,7 +176,6 @@ export const addItemsToOrder = async (req, res) => {
     getIO().emit('pos:update');
     getIO().emit('kitchen:update'); 
     
-    // 🔥 Filtramos los productos liberados para que no viajen al Frontend
     const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: cleanItems });
   } catch (error) { 
@@ -203,11 +201,21 @@ export const getActiveOrderByTable = async (req, res) => {
         }
       ]
     });
+    
     const validOrder = orders.length > 0 ? orders[0].toJSON() : null;
     
     if (validOrder && validOrder.items) {
-        // 🔥 Filtramos los productos liberados
+        // 🔥 FILTRO NINJA: Quitamos los liberados de la lista
         validOrder.items = validOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
+        
+        // 🔥 FIX: Actualizamos el total visual ($460 -> $160)
+        validOrder.totalAmount = validOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+        
+        // 🔥 FIX: Limpiamos las cuentas pagadas para que no cuente a los fantasmas (5 cuentas -> 2 cuentas)
+        if (validOrder.paidAccounts && Array.isArray(validOrder.paidAccounts)) {
+            const visibleAccounts = new Set(validOrder.items.map(i => i.cuenta || 'General'));
+            validOrder.paidAccounts = validOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
+        }
     }
     
     res.json({ order: validOrder });
@@ -254,14 +262,12 @@ export const closeAccount = async (req, res) => {
         try { notes = JSON.parse(item.notes || '[]'); } catch(e){}
         if (!Array.isArray(notes)) notes = [notes];
         
-        // Inyectamos la bandera secreta de liberación
         if (!notes.some(n => n && n._isReleased)) {
             notes.push({ _isReleased: true });
             await item.update({ notes: JSON.stringify(notes) });
         }
     }
 
-    // Revisar si TODA la mesa ya está liberada para cerrarla completamente
     const allActiveItems = await OrderItem.findAll({ where: { orderId, status: 'ACTIVE' } });
     const remainingVisible = allActiveItems.filter(item => {
         try {
@@ -312,13 +318,24 @@ export const getActiveOrders = async (req, res) => {
       if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
          if (!order.createdBy) continue; 
       }
+      
       const plainOrder = order.toJSON();
       if (plainOrder.items) {
-          // 🔥 Filtramos los productos liberados
+          // 🔥 FILTRO NINJA: Quitamos los liberados
           plainOrder.items = plainOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
+          
+          // 🔥 FIX: Actualizamos el total para la tarjetita visual
+          plainOrder.totalAmount = plainOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+          
+          // 🔥 FIX: Limpiamos los fantasmas del conteo de cuentas
+          if (plainOrder.paidAccounts && Array.isArray(plainOrder.paidAccounts)) {
+              const visibleAccounts = new Set(plainOrder.items.map(i => i.cuenta || 'General'));
+              plainOrder.paidAccounts = plainOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
+          }
       }
       validOrders.push(plainOrder);
     }
+    
     res.json(validOrders);
   } catch (error) { 
     res.status(500).json({ message: 'Error al listar órdenes', error: error.message }); 
@@ -446,7 +463,6 @@ export const checkOrderStatus = async (req, res) => {
          const hasActive = itemsCuenta.some(i => i.status === 'ACTIVE');
          const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
          
-         // 🔥 ¿Fueron todos los activos liberados usando la etiqueta Ninja?
          const isReleased = !allCancelled && itemsCuenta.filter(i => i.status === 'ACTIVE').every(item => {
              try {
                  const n = JSON.parse(item.notes || '[]');
