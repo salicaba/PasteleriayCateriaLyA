@@ -10,6 +10,19 @@ import { TicketBottomBar } from './components/ticket/TicketBottomBar';
 import { TicketCartGroup } from './components/ticket/TicketCartGroup';
 import { ConfirmActionModal } from './modals/ConfirmActionModal';
 
+// 🔥 CEREBRO EXTRACTOR VISUAL: Solo recorta el nombre para pintar la pantalla
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 export const TicketSidebar = ({ 
   cart, total, hasUnsentItems, unsentTotal, mesaTotal, 
   onAdd, onRemove, onDelete, onSendToKitchen, onCheckout,
@@ -79,12 +92,10 @@ export const TicketSidebar = ({
     return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
   };
 
-  // 🔥 AGRUPADOR BLINDADO Y ORDEN ESTRICTO
   const groupedCart = availableAccs.map(cuentaName => {
     const rawItems = activeCart
       .filter(item => (item.cuenta || 'General') === cuentaName)
       .sort((a, b) => {
-        // Inmovilizamos los productos comparando estrictamente sus identificadores
         const idA = String(a.backendItemId || a.cartItemId || a.id || '');
         const idB = String(b.backendItemId || b.cartItemId || b.id || '');
         return idA.localeCompare(idB, undefined, { numeric: true });
@@ -363,7 +374,6 @@ export const TicketSidebar = ({
     setDragOverCuenta(null);
     if (draggedItem && draggedItem.cuentaName !== cuentaName && !cuentasPagadasReales.includes(cuentaName) && !isLlevar && !isVitrina) {
       
-      // BLOQUEO DE SEGURIDAD: Evita que el usuario suelte un producto fantasma/gratis en otra cuenta.
       if (draggedItem.item.isAutoPromo || Number(draggedItem.item.precio) === 0) return;
 
       let qtyToMove = draggedItem.item.qty;
@@ -532,7 +542,8 @@ export const TicketSidebar = ({
                     key={acc} onClick={() => handleReleaseAccounts([acc])} disabled={isReleasing}
                     className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none disabled:opacity-50 touch-manipulation"
                   >
-                    <span>{acc}</span> 
+                    {/* 🔥 FILTRO VISUAL APLICADO AQUÍ */}
+                    <span>{parseAccountName(acc)}</span> 
                     {isReleasing ? <Loader2 size={16} className="text-gray-400 animate-spin" /> : <ArrowRightLeft size={16} className="text-gray-400 dark:text-gray-500" />}
                   </motion.button>
                 ))}

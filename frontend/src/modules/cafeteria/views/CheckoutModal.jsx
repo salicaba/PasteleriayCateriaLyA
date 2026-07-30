@@ -4,6 +4,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
 import client from '../../../api/client'; 
 
+// 🔥 CEREBRO EXTRACTOR VISUAL: Solo recorta el nombre para pintar la pantalla
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 const modalVariants = {
   hidden: { scale: 0.95, opacity: 0, y: 15 },
   visible: { scale: 1, opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 25 } },
@@ -254,7 +267,7 @@ export const CheckoutModal = ({
                 </motion.div>
               )}
               
-              {/* 🔥 NUEVO PANEL MULTI-SELECCIÓN */}
+              {/* 🔥 NUEVO PANEL MULTI-SELECCIÓN (Nombres Limpios) */}
               {cobroMode === 'nominal' && orderType === 'salon' && (
                 <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-col gap-2">
                   <div className="flex justify-between items-center px-1">
@@ -279,7 +292,8 @@ export const CheckoutModal = ({
                                   : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:border-orange-300 dark:md:hover:border-orange-700'
                               }`}
                             >
-                              {cuenta.nombre} 
+                              {/* 🔥 FILTRO VISUAL APLICADO AQUÍ */}
+                              {parseAccountName(cuenta.nombre)} 
                               <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'opacity-100' : 'opacity-60'}`}>${cuenta.subtotal.toFixed(2)}</span>
                            </motion.button>
                          )
