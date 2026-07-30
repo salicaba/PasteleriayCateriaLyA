@@ -163,13 +163,13 @@ export const printOrderTicket = async (req, res) => {
     let foliosArr = [];
     if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${baseFolioStr}`);
     if (hasPasteleria) foliosArr.push(`PAS-${baseFolioStr}`);
-    const ticketFolio = foliosArr.join(' / ');
 
     printer.alignCenter();
     printer.println("COMPROBANTE DE VENTA");
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
-    printer.println(ticketFolio);
+    // Imprime un folio debajo del otro automáticamente
+    foliosArr.forEach(folio => printer.println(folio));
     printer.setTextNormal();
     printer.drawLine();
     
@@ -411,7 +411,10 @@ export const shareOrderTicket = async (req, res) => {
     let foliosArr = [];
     if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${baseFolioStr}`);
     if (hasPasteleria) foliosArr.push(`PAS-${baseFolioStr}`);
-    const ticketFolio = foliosArr.join(' / ');
+    
+    // Para el HTML usamos un salto de línea (<br>), para el archivo usamos un guion bajo (_)
+    const ticketFolioHTML = foliosArr.join('<br>');
+    const ticketFolioFile = foliosArr.join('_');
 
     const htmlResponse = `
     <!DOCTYPE html>
@@ -419,7 +422,7 @@ export const shareOrderTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Ticket de Consumo #${ticketFolio} - 𝓛𝔂𝓪</title>
+      <title>Ticket de Consumo #${ticketFolioFile} - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
@@ -459,7 +462,7 @@ export const shareOrderTicket = async (req, res) => {
             <div class="text-4xl mb-2 text-slate-800">☕</div>
             <h1 class="text-5xl font-black text-slate-900 mb-1 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
             <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Cafetería</p>
-            <h2 class="text-[20px] font-black text-slate-900 tracking-wider mt-4">${ticketFolio}</h2>
+            <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
           </div>
 
           <div class="space-y-1.5 text-sm font-medium text-slate-600 mb-6 px-1">
@@ -611,7 +614,7 @@ export const shareOrderTicket = async (req, res) => {
           const heightMm = (element.scrollHeight * 0.264583) + 5;
           const options = {
             margin: 0,
-            filename: 'Ticket_Lya_Cafeteria_${ticketFolio.replace(' / ', '_')}.pdf',
+            filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff' },
             jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
@@ -624,7 +627,7 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
           html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = 'Ticket_Lya_Cafeteria_${ticketFolio.replace(' / ', '_')}.png';
+            link.download = 'Ticket_Lya_${ticketFolioFile}.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
           });
