@@ -4,6 +4,19 @@ import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon } from 'lucide-react';
 import clsx from 'clsx';
 
+// 🔥 CEREBRO EXTRACTOR VISUAL
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 export const TicketCartGroup = ({
   cuentaName, items, isActive, isDragTarget, subtotalCuenta,
   isCuentaPagada, isCompletamentePagada, isTodoEntregadoEnCuenta,
@@ -93,15 +106,14 @@ export const TicketCartGroup = ({
 
   const displayItems = [];
   rawItemsConMagia.forEach(item => {
-      // 🔥 CIRUGÍA VISUAL: Reglas estrictas de agrupación para separar Promos de Normales.
       const existing = displayItems.find(d => 
           d.id === item.id && 
           Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
           d.enviadoCocina === item.enviadoCocina && 
           d.kitchenStatus === item.kitchenStatus &&
           !!d.isTakeaway === !!item.isTakeaway && 
-          !!d.isAutoPromo === !!item.isAutoPromo && // PROTECCIÓN 1: Nunca junta promo con normal
-          d.promoLabel === item.promoLabel &&       // PROTECCIÓN 2: Nunca junta promos diferentes
+          !!d.isAutoPromo === !!item.isAutoPromo && 
+          d.promoLabel === item.promoLabel &&       
           getPrepStr(d) === getPrepStr(item)
       );
       
@@ -144,7 +156,8 @@ export const TicketCartGroup = ({
               if (isCuentaPagada) {
                   openConfirmModal({
                       title: 'Cuenta Sellada',
-                      message: `La cuenta "${cuentaName}" ya fue pagada. Si el cliente desea algo adicional, por favor crea una cuenta nueva para no alterar el cobro anterior.`,
+                      // 🔥 APLICANDO FILTRO AQUÍ
+                      message: `La cuenta "${parseAccountName(cuentaName)}" ya fue pagada. Si el cliente desea algo adicional, por favor crea una cuenta nueva para no alterar el cobro anterior.`,
                       icon: Lock,
                       color: 'blue',
                       confirmText: 'Entendido',
@@ -256,14 +269,10 @@ export const TicketCartGroup = ({
       <div className="px-2 pb-2 space-y-1.5">
         {displayItems.map((item, index) => {
           
-          // 🔥 LÓGICA REFINADA DE PROMOCIONES
           const isCero = Number(item.precio) === 0;
           const isGhostPromo = item.isAutoPromo && isCero; 
           
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-          
-          // Solo bloqueamos controles (+ y -) para Regalos y Unidades Adicionales. 
-          // La REBAJA DIRECTA (FIXED) queda libre para sumarse o restarse.
           const isLockedPromo = isGhostPromo || isNthPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
@@ -271,7 +280,6 @@ export const TicketCartGroup = ({
           
           let promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
 
-          // 🔥 CEREBRO MATEMÁTICO: CÁLCULO DINÁMICO DEL PORCENTAJE (Rebaja Directa)
           if (pOriginal && Number(pOriginal) > Number(item.precio) && !isGhostPromo && !item.promoLabel?.includes('º')) {
               const originalNum = Number(pOriginal);
               const actualNum = Number(item.precio);
@@ -486,7 +494,6 @@ export const TicketCartGroup = ({
                   </div>
                 )}
                 
-                {/* 🔥 BLOQUEO DE MODIFICACIÓN EXCLUSIVO: Solo se oculta el + y el - para NxM y Unidades Adicionales */}
                 {!isLockedPromo && (
                   <div className={clsx(
                     "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg p-0.5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",

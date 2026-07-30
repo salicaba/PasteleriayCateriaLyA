@@ -2,6 +2,19 @@
 import { useState } from 'react';
 import client from '../../../api/client.js';
 
+// 🔥 CEREBRO EXTRACTOR VISUAL
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 export const usePosMutations = ({
   cart, setCart,
   activeOrderId, setActiveOrderId,
@@ -15,7 +28,6 @@ export const usePosMutations = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
 
-  // 🧙‍♂️ HELPER INTERNO: Reconstruye el producto manteniendo el ADN de la promoción
   const mapDBItemToLocal = (dbItem, itemsNuevos = []) => {
       let parsedPreps = [];
       if (dbItem.notes) { 
@@ -36,7 +48,6 @@ export const usePosMutations = ({
         status: dbItem.status || 'ACTIVE', 
         cuenta: dbItem.cuenta || 'General', 
         isTakeaway: dbItem.isTakeaway || false, 
-        // 🔥 FIX: Blindaje estricto de tipo de dato para evitar fallos de renderizado
         backendItemId: String(dbItem.id), 
         requiereCocina: itemsNuevos.find(n => n.id === dbItem.productId)?.requiereCocina !== false,
         isAutoPromo: dbItem.isAutoPromo || false,
@@ -113,7 +124,8 @@ export const usePosMutations = ({
 
   const moveItemToCuenta = async (item, target, qtyToMove = item.qty) => { 
     if (cuentasPagadasReales.includes(target)) {
-        triggerNotification(`La cuenta "${target}" ya está cobrada. No puedes moverle más productos.`, 'error');
+        // 🔥 APLICANDO FILTRO AQUÍ
+        triggerNotification(`La cuenta "${parseAccountName(target)}" ya está cobrada. No puedes moverle más productos.`, 'error');
         return;
     }
 
@@ -216,7 +228,6 @@ export const usePosMutations = ({
           } 
         }));
         
-        // 🔥 FIX: Actualización local forzando los IDs a String
         setCart(prev => { 
           const newCart = [...prev]; 
           itemsToUpdate.forEach(subItem => { 
@@ -254,7 +265,6 @@ export const usePosMutations = ({
           client.put(`/kitchen/tickets/${item.backendItemId}/status`, { status: 'DELIVERED' })
         ));
 
-        // 🔥 FIX: Actualización local forzando IDs a String
         setCart(prev => prev.map(item => 
           itemsListos.some(listo => String(listo.backendItemId) === String(item.backendItemId))
           ? { ...item, kitchenStatus: 'DELIVERED' } 
@@ -311,7 +321,9 @@ export const usePosMutations = ({
             await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty: item.qty });
         }
         setCart(prev => prev.map(item => itemsToCancel.some(i => String(i.backendItemId) === String(item.backendItemId)) ? { ...item, status: 'CANCELLED' } : item));
-        triggerNotification(`Ítems de la cuenta ${cuentaName} cancelados.`, 'success');
+        
+        // 🔥 APLICANDO FILTRO AQUÍ
+        triggerNotification(`Ítems de la cuenta ${parseAccountName(cuentaName)} cancelados.`, 'success');
     } catch (error) { 
       triggerNotification("Error al cancelar los ítems de la cuenta.", "error");
       throw error; 

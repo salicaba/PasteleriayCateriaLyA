@@ -10,7 +10,7 @@ import { TicketBottomBar } from './components/ticket/TicketBottomBar';
 import { TicketCartGroup } from './components/ticket/TicketCartGroup';
 import { ConfirmActionModal } from './modals/ConfirmActionModal';
 
-// 🔥 CEREBRO EXTRACTOR VISUAL: Solo recorta el nombre para pintar la pantalla
+// 🔥 CEREBRO EXTRACTOR VISUAL
 const parseAccountName = (str) => {
   if (!str) return 'General';
   const s = String(str);
@@ -79,7 +79,8 @@ export const TicketSidebar = ({
     const name = newCuentaName.trim();
     if (name && addNewCuenta) {
       addNewCuenta(name, newCuentaPhone);
-      toast(`Cuenta "${name}" creada exitosamente`, 'success');
+      // 🔥 APLICANDO FILTRO AQUÍ
+      toast(`Cuenta "${parseAccountName(name)}" creada exitosamente`, 'success');
     }
     setNewCuentaName('');
     setNewCuentaPhone('');
@@ -259,9 +260,10 @@ export const TicketSidebar = ({
             onConfirm: () => { onDelete(item); toast('Orden vaciada', 'success'); }
         });
     } else if (isLastInAccount) {
+        // 🔥 APLICANDO FILTRO AQUÍ
         openConfirmModal({
             title: 'Eliminar Último Producto',
-            message: `¿Seguro que deseas eliminar el producto "${item.nombre}"? Al ser el último, la cuenta "${item.cuenta || 'General'}" quedará vacía.`,
+            message: `¿Seguro que deseas eliminar el producto "${item.nombre}"? Al ser el último, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía.`,
             icon: Trash2, color: 'red', confirmText: 'Sí, Eliminar',
             onConfirm: () => { onDelete(item); toast('Producto eliminado', 'success'); }
         });
@@ -283,9 +285,10 @@ export const TicketSidebar = ({
             onConfirm: () => { onRemove(item); toast('Orden vaciada', 'success'); }
         });
     } else if (isLastInAccount) {
+         // 🔥 APLICANDO FILTRO AQUÍ
          openConfirmModal({
             title: 'Quitar Último Producto',
-            message: `Al quitar este producto, la cuenta "${item.cuenta || 'General'}" quedará vacía. ¿Deseas continuar?`,
+            message: `Al quitar este producto, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía. ¿Deseas continuar?`,
             icon: Minus, color: 'red', confirmText: 'Sí, Quitar',
             onConfirm: () => { onRemove(item); toast('Producto removido', 'success'); }
         });
@@ -351,8 +354,9 @@ export const TicketSidebar = ({
         } else {
             openConfirmModal({
                 title: isLastInAccount ? 'Cancelar Último Producto' : 'Cancelar Producto',
+                // 🔥 APLICANDO FILTRO AQUÍ
                 message: isLastInAccount 
-                    ? `¿Seguro que deseas cancelar "${item.nombre}"? Al ser el último producto, la cuenta "${item.cuenta || 'General'}" se limpiará de las activas.`
+                    ? `¿Seguro que deseas cancelar "${item.nombre}"? Al ser el último producto, la cuenta "${parseAccountName(item.cuenta)}" se limpiará de las activas.`
                     : `¿Seguro que deseas cancelar 1x ${item.nombre}?`,
                 icon: XCircle, color: 'red', confirmText: isLastInAccount ? 'Cancelar y Limpiar Cuenta' : 'Cancelar Producto',
                 requireInput: true, inputType: 'text', inputPlaceholder: 'Motivo (opcional)', inputDefault: 'Cancelado desde POS',
@@ -382,7 +386,8 @@ export const TicketSidebar = ({
       if (qtyToMove > 1) {
           openConfirmModal({
               title: 'Mover Producto',
-              message: `¿Cuántos "${draggedItem.item.nombre}" deseas mover a la cuenta de ${cuentaName}? (Máx: ${qtyToMove})`,
+              // 🔥 APLICANDO FILTRO AQUÍ
+              message: `¿Cuántos "${draggedItem.item.nombre}" deseas mover a la cuenta de ${parseAccountName(cuentaName)}? (Máx: ${qtyToMove})`,
               icon: ArrowRightLeft, color: 'blue', confirmText: 'Mover Producto',
               requireInput: true, inputType: 'number', inputMax: qtyToMove, inputDefault: qtyToMove.toString(),
               onConfirm: async (val) => { 
@@ -391,7 +396,7 @@ export const TicketSidebar = ({
                       setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
                       try {
                         await onMoveItem(draggedItem.item, cuentaName, qty); 
-                        toast(`Movido a ${cuentaName}`, 'success');
+                        toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
                       } catch (error) {
                         toast('Error al mover el producto', 'error');
                       } finally {
@@ -404,7 +409,8 @@ export const TicketSidebar = ({
           setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
           try {
             await onMoveItem(draggedItem.item, cuentaName, 1);
-            toast(`Movido a ${cuentaName}`, 'success');
+            // 🔥 APLICANDO FILTRO AQUÍ
+            toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
           } catch (error) {
             toast('Error al mover el producto', 'error');
           } finally {
@@ -576,7 +582,8 @@ export const TicketSidebar = ({
                 toast('Orden completa cancelada', 'success');
             } else {
                 if (onCancelAccount) await onCancelAccount(cuenta, motivo);
-                toast(`Cuenta ${cuenta} cancelada exitosamente`, 'success');
+                // 🔥 APLICANDO FILTRO AQUÍ
+                toast(`Cuenta ${parseAccountName(cuenta)} cancelada exitosamente`, 'success');
             }
           } catch (e) {
             toast('Error durante la cancelación', 'error');

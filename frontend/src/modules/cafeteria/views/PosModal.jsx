@@ -17,6 +17,19 @@ import { OpcionesMesaModal } from './OpcionesMesaModal';
 import { TicketPreviewModal } from './TicketPreviewModal';
 import MenuLoader from '../../../components/animations/MenuLoader';
 
+// 🔥 CEREBRO EXTRACTOR: Limpieza absoluta para notificaciones
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const modalVariants = { 
   hidden: { y: "100%", opacity: 0 }, 
@@ -153,7 +166,11 @@ export const PosModal = ({
     }
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
-    const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cuentaName}*` : '';
+    
+    // 🔥 APLICANDO FILTRO AQUÍ TAMBIÉN PARA WHATSAPP
+    const cleanName = parseAccountName(cuentaName);
+    const textoCuenta = (cuentaName && cuentaName !== 'Todas') ? ` de la cuenta de *${cleanName}*` : '';
+    
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
@@ -198,7 +215,8 @@ export const PosModal = ({
 
   const handleOpenPayCuenta = (cuentaName) => {
     if (!isVitrina && !validateAllDelivered(cuentaName)) { 
-      showToast(`Los productos de la cuenta "${cuentaName}" deben estar ENTREGADOS antes de cobrar.`, "warning");
+      // 🔥 APLICANDO FILTRO EN ADVERTENCIA
+      showToast(`Los productos de la cuenta "${parseAccountName(cuentaName)}" deben estar ENTREGADOS antes de cobrar.`, "warning");
       return; 
     }
     const subtotal = getSubtotalByCuenta(cuentaName);
@@ -214,7 +232,8 @@ export const PosModal = ({
     if (targetType === 'partial' && cuentaName) { 
       await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
-        setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${cuentaName}" ha sido pagada exitosamente.` });
+        // 🔥 APLICANDO FILTRO AL PAGAR CUENTA PARCIAL
+        setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${parseAccountName(cuentaName)}" ha sido pagada exitosamente.` });
         setTimeout(() => setPaymentSuccessData(null), 2000);
         setShowCheckout(false); 
       }); 
@@ -357,7 +376,6 @@ export const PosModal = ({
                     cartQty={currentCartQty} 
                     onLimitReached={(stock) => showToast(`Límite en carrito: Solo quedan ${stock} en stock.`, 'warning')} 
                     onClick={setSelectedProduct} 
-                    // 🔥 CONEXIÓN DEL PUENTE: Aquí pasamos el paquete de "customizations" directo al carrito
                     onQuickAdd={(p, customizations) => {
                       if (customizations) {
                         addToCart({ 
@@ -513,7 +531,6 @@ export const PosModal = ({
                   cuentasTelefonos={cuentasTelefonos} 
                 />
 
-                {/* 🔥 PILAR 5: TOAST NATIVO ESTRICTO (Formato Píldora, Animación Suave) */}
                 <AnimatePresence>
                   {localToast && (
                     <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
