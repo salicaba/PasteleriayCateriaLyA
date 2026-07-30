@@ -31,7 +31,7 @@ export const TicketSidebar = ({
   isLlevar, isVitrina, toggleItemTakeaway, cuentasTelefonos,
   onDeliverAll, onDeliverAccount, onCancelItem, onCancelFullOrder, onCancelAccount,
   nombreCliente, showToast,
-  onReleaseAccount // <--- 🔥 FALTABA ESTO AQUÍ
+  onReleaseAccount
 }) => {
   const toast = showToast || (() => {}); 
 
@@ -73,14 +73,23 @@ export const TicketSidebar = ({
     }, {});
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
-  const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultas.includes(acc));
+  
+  // 🔥 AUTO-OCULTAR FANTASMAS: Detectar cuentas que el backend ya liberó (pagadas y que se quedaron con 0 items)
+  const cuentasLiberadasPorBackend = cuentasPagadasReales.filter(acc => {
+     return !activeCart.some(item => (item.cuenta || 'General') === acc);
+  });
+  
+  // 🔥 Combinamos las ocultas manualmente (animación rápida) con las que la BD ya liberó
+  const cuentasOcultasEfectivas = Array.from(new Set([...cuentasOcultas, ...cuentasLiberadasPorBackend]));
+
+  // Las cuentas visibles para el Modal de Liberar ahora descartan a los fantasmas
+  const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultasEfectivas.includes(acc));
 
   const handleAddCuenta = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     const name = newCuentaName.trim();
     if (name && addNewCuenta) {
       addNewCuenta(name, newCuentaPhone);
-      // 🔥 APLICANDO FILTRO AQUÍ
       toast(`Cuenta "${parseAccountName(name)}" creada exitosamente`, 'success');
     }
     setNewCuentaName('');
@@ -128,8 +137,9 @@ export const TicketSidebar = ({
     return { cuentaName, items: displayItems };
   });
 
+  // 🔥 Aplicamos la limpieza para que las cajas vacías ya no se rendericen
   const visibleGroups = groupedCart.filter(g => {
-      if (cuentasOcultas.includes(g.cuentaName)) return false;
+      if (cuentasOcultasEfectivas.includes(g.cuentaName)) return false;
       if (g.items.length === 0 && g.cuentaName === 'General') {
           const otherGroupsWithItems = groupedCart.some(other => other.cuentaName !== 'General' && other.items.length > 0);
           if (otherGroupsWithItems) return false;
@@ -203,7 +213,6 @@ export const TicketSidebar = ({
     setIsReleasing(true); 
 
     try {
-      // 🔥 EL FIX: Avisar a la base de datos cuenta por cuenta ANTES de ocultarlas visualmente
       if (onReleaseAccount) {
         for (const acc of cuentasALiberar) {
           await onReleaseAccount(acc);
@@ -266,7 +275,6 @@ export const TicketSidebar = ({
             onConfirm: () => { onDelete(item); toast('Orden vaciada', 'success'); }
         });
     } else if (isLastInAccount) {
-        // 🔥 APLICANDO FILTRO AQUÍ
         openConfirmModal({
             title: 'Eliminar Último Producto',
             message: `¿Seguro que deseas eliminar el producto "${item.nombre}"? Al ser el último, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía.`,
@@ -291,7 +299,6 @@ export const TicketSidebar = ({
             onConfirm: () => { onRemove(item); toast('Orden vaciada', 'success'); }
         });
     } else if (isLastInAccount) {
-         // 🔥 APLICANDO FILTRO AQUÍ
          openConfirmModal({
             title: 'Quitar Último Producto',
             message: `Al quitar este producto, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía. ¿Deseas continuar?`,
@@ -360,7 +367,6 @@ export const TicketSidebar = ({
         } else {
             openConfirmModal({
                 title: isLastInAccount ? 'Cancelar Último Producto' : 'Cancelar Producto',
-                // 🔥 APLICANDO FILTRO AQUÍ
                 message: isLastInAccount 
                     ? `¿Seguro que deseas cancelar "${item.nombre}"? Al ser el último producto, la cuenta "${parseAccountName(item.cuenta)}" se limpiará de las activas.`
                     : `¿Seguro que deseas cancelar 1x ${item.nombre}?`,
@@ -392,7 +398,6 @@ export const TicketSidebar = ({
       if (qtyToMove > 1) {
           openConfirmModal({
               title: 'Mover Producto',
-              // 🔥 APLICANDO FILTRO AQUÍ
               message: `¿Cuántos "${draggedItem.item.nombre}" deseas mover a la cuenta de ${parseAccountName(cuentaName)}? (Máx: ${qtyToMove})`,
               icon: ArrowRightLeft, color: 'blue', confirmText: 'Mover Producto',
               requireInput: true, inputType: 'number', inputMax: qtyToMove, inputDefault: qtyToMove.toString(),
@@ -415,7 +420,6 @@ export const TicketSidebar = ({
           setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
           try {
             await onMoveItem(draggedItem.item, cuentaName, 1);
-            // 🔥 APLICANDO FILTRO AQUÍ
             toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
           } catch (error) {
             toast('Error al mover el producto', 'error');
@@ -500,7 +504,8 @@ export const TicketSidebar = ({
       <TicketBottomBar 
         mesaTotal={mesaTotal} unsentTotal={unsentTotal} hasUnsentItems={hasUnsentItems}
         activeCart={activeCart} isVitrina={isVitrina} isLlevar={isLlevar} 
-        paidAccounts={paidAccounts} cuentasOcultas={cuentasOcultas}
+        paidAccounts={paidAccounts} 
+        cuentasOcultas={cuentasOcultasEfectivas} // 🔥 Pasamos las cuentas filtradas para que libere la barra inferior
         orderStatus={orderStatus} 
         cuentasPagadasReales={cuentasPagadasReales} 
         
@@ -554,7 +559,6 @@ export const TicketSidebar = ({
                     key={acc} onClick={() => handleReleaseAccounts([acc])} disabled={isReleasing}
                     className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text md:hover:border-blue-300 dark:md:hover:border-blue-700 transition-colors flex justify-between items-center outline-none disabled:opacity-50 touch-manipulation"
                   >
-                    {/* 🔥 FILTRO VISUAL APLICADO AQUÍ */}
                     <span>{parseAccountName(acc)}</span> 
                     {isReleasing ? <Loader2 size={16} className="text-gray-400 animate-spin" /> : <ArrowRightLeft size={16} className="text-gray-400 dark:text-gray-500" />}
                   </motion.button>
@@ -588,7 +592,6 @@ export const TicketSidebar = ({
                 toast('Orden completa cancelada', 'success');
             } else {
                 if (onCancelAccount) await onCancelAccount(cuenta, motivo);
-                // 🔥 APLICANDO FILTRO AQUÍ
                 toast(`Cuenta ${parseAccountName(cuenta)} cancelada exitosamente`, 'success');
             }
           } catch (e) {
