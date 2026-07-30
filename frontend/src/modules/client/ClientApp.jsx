@@ -1,4 +1,4 @@
-// src/modules/client/ClientApp.jsx
+// frontend/src/modules/client/ClientApp.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -127,7 +127,11 @@ export default function ClientApp({ type }) {
   }, [themeIndex]);
 
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
-    setIsLoadingTables(true);
+    // 🔥 SILENCIADOR NINJA: Solo mostramos loader si es la primera carga
+    if (isInitialLoad) {
+      setIsLoadingTables(true);
+    }
+    
     try {
       // Burlar la caché con la hora actual
       const ts = Date.now();
@@ -155,8 +159,11 @@ export default function ClientApp({ type }) {
     } catch (error) {
       console.error('Error al cargar configuración:', error);
     } finally {
-      setIsLoadingTables(false);
-      if (isInitialLoad) setTimeout(() => setIsAppReady(true), 600);
+      // 🔥 SILENCIADOR NINJA: Solo quitamos loader si lo pusimos
+      if (isInitialLoad) {
+        setIsLoadingTables(false);
+        setTimeout(() => setIsAppReady(true), 600);
+      }
     }
   }, []);
 
