@@ -1,6 +1,7 @@
+// src/modules/cash/views/CashRegister.jsx
 import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
-import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, Landmark, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, Landmark, Eye, EyeOff, Loader2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const CashRegisterPage = ({ user }) => {
@@ -12,6 +13,9 @@ export const CashRegisterPage = ({ user }) => {
 
   const [filterSource, setFilterSource] = useState('ALL');
   const [showModDetails, setShowModDetails] = useState(false);
+  
+  // 🔥 NUEVO ESTADO: Buscador
+  const [searchTerm, setSearchTerm] = useState('');
   
   // PILAR 3: Estado local para bloqueo asíncrono del modal
   const [isProcessing, setIsProcessing] = useState(false);
@@ -79,9 +83,24 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
+  // 🔥 LÓGICA DE FILTRADO Y BÚSQUEDA
   const filteredTransactions = transactions.filter(tx => {
-    if (filterSource === 'ALL') return true;
-    return tx.source === filterSource;
+    // 1. Filtro por origen (Cafetería, Pastelería, Todos)
+    if (filterSource !== 'ALL' && tx.source !== filterSource) return false;
+    
+    // 2. Filtro por búsqueda (Folio, Nombre o Descripción)
+    if (searchTerm.trim() !== '') {
+      const term = searchTerm.toLowerCase();
+      const desc = (tx.description || '').toLowerCase();
+      const folio = (tx.folio || '').toLowerCase();
+      const amount = String(tx.amount || '');
+
+      if (!desc.includes(term) && !folio.includes(term) && !amount.includes(term)) {
+        return false;
+      }
+    }
+    
+    return true;
   });
 
   const containerVariants = {
@@ -198,6 +217,21 @@ export const CashRegisterPage = ({ user }) => {
         </h3>
         
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
+          
+          {/* 🔥 BARRA DE BÚSQUEDA */}
+          <div className="relative w-full sm:w-64 flex-shrink-0">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={16} className="text-gray-400 lya:text-lya-text/50" />
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar folio, cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-xl text-sm font-bold text-gray-800 dark:text-white lya:text-lya-text focus:outline-none focus:ring-2 focus:ring-orange-500/30 lya:focus:ring-lya-primary/30 transition-all placeholder-gray-400"
+            />
+          </div>
+
           <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto flex-shrink-0">
             {/* PILAR 2: Botones de filtro táctiles */}
             <motion.button
@@ -257,7 +291,12 @@ export const CashRegisterPage = ({ user }) => {
               {filteredTransactions.length === 0 && !loading && (
                 <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                   <td colSpan="6" className="text-center py-10 text-gray-400 font-medium lya:text-lya-text/50">
-                    {filterSource === 'ALL' ? 'No hay movimientos registrados en esta fecha.' : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`}
+                    {searchTerm !== '' 
+                      ? `No se encontraron resultados para "${searchTerm}"`
+                      : filterSource === 'ALL' 
+                        ? 'No hay movimientos registrados en esta fecha.' 
+                        : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
+                    }
                   </td>
                 </motion.tr>
               )}
