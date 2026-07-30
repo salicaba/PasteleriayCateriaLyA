@@ -104,7 +104,7 @@ export const PosModal = ({
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
-    promoWarning, confirmPromoRupture, cancelPromoRupture
+    releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture // <-- Restaurados los de promociones
   } = usePosController(mesa, isOpen, todasLasMesas, showToast); 
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
@@ -309,6 +309,7 @@ export const PosModal = ({
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
     nombreCliente: isLlevar ? nombreParaSidebar : null,
+    onReleaseAccount: releaseAccount, // <--- AÑADIDO AQUÍ
     showToast 
   };
 

@@ -224,11 +224,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
-        } else if (accountStatus === 'PAID') {
-            finalStatus = 'PAID';
+        // 🔥 AHORA SÍ LEEMOS EL ESTADO 'CLOSED' DE LA CUENTA INDIVIDUAL
+        } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED') {
+            finalStatus = accountStatus;
         } else {
-            // Si la mesa se pagó, pero mi cuenta no dice explícitamente "PAID", 
-            // asumo que soy una cuenta nueva o que sigo activa. ¡NO ME BLOQUEO!
             finalStatus = 'OPEN'; 
         }
         

@@ -201,6 +201,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     cancelItem: mutations.cancelItem, 
     cancelFullOrder: mutations.cancelFullOrder, 
     cancelAccountItems: mutations.cancelAccountItems, 
+    releaseAccount: mutations.releaseAccount, // <--- AÑADIR ESTA LÍNEA
     
     // Dominio: Notificaciones UI
     notification, 

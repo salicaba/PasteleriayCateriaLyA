@@ -420,6 +420,20 @@ export const usePosMutations = ({
       finally { setIsProcessing(false); }
   };
 
+  const releaseAccount = async (cuentaName) => {
+    setIsProcessing(true);
+    try {
+      if (activeOrderId) {
+        // 🔥 Le avisamos al backend que cierre ESTA cuenta en específico
+        await client.put(`/pos/orders/${activeOrderId}/close-account`, { cuentaName });
+      }
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handlePrintTicket = async (cuentaName = null) => {
     if (!activeOrderId) return;
     try { await client.post(`/pos/orders/${activeOrderId}/print`, { cuentaName }); } catch (error) {}
@@ -429,6 +443,6 @@ export const usePosMutations = ({
     isSuccess, isProcessing,
     simulateKitchenSend, moveItemToCuenta, toggleDeliveredStatus, deliverAllActiveItems,
     cancelItem, cancelAccountItems, cancelFullOrder, payCuenta, handleCheckout, handleCloseTable, handlePrintTicket,
-    validateAllDelivered
+    validateAllDelivered, releaseAccount
   };
 };

@@ -23,8 +23,6 @@ const extractPromoMeta = (item) => {
                   plainItem.isAutoPromo = meta.isAutoPromo;
                   plainItem.promoLabel = meta.promoLabel;
                   plainItem.precioOriginal = meta.precioOriginal;
-                  // 🔥 CLAVE: No borramos la metadata. La dejamos viajar al frontend
-                  // para que TicketCartGroup la rescate y pinte los colores correctos.
               }
           }
       } catch(e) {}
@@ -113,7 +111,6 @@ export const addItemsToOrder = async (req, res) => {
       return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
     }
 
-    // 🔥 BLINDAJE NEO-BENTO: Contrabando de las etiquetas de Promoción dentro del JSON `notes`
     const itemsToInsert = items.map(item => {
       let parsedNotes = [];
       if (item.notes) {
@@ -144,14 +141,12 @@ export const addItemsToOrder = async (req, res) => {
     
     const subtotalNuevo = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
-    // 🔥 FIX BUG 1: Si la mesa estaba "Pagada" pero caen nuevos pedidos, ¡REVIVE A OPEN!
     if (order.status === 'PAID') {
         await order.update({ status: 'OPEN', totalAmount: Number(order.totalAmount) + subtotalNuevo });
     } else {
         await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
     }
 
-    // 🚀 MOTOR DE STOCK: Deducción en Tiempo Real
     const stockToDeduct = {};
     items.forEach(item => {
       if (!stockToDeduct[item.productId]) stockToDeduct[item.productId] = 0;
@@ -236,10 +231,53 @@ export const closeOrder = async (req, res) => {
     const order = await Order.findByPk(orderId);
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
     await order.update({ status: 'CLOSED' });
+    if (order.tableId) {
+      await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+    }
     getIO().emit('pos:update');
     res.json({ message: 'Mesa liberada y orden archivada.' });
   } catch (error) { 
     res.status(500).json({ message: 'Error al cerrar mesa', error: error.message }); 
+  }
+};
+
+// ==========================================
+// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta)
+// ==========================================
+export const closeAccount = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cuentaName } = req.body;
+
+    if (!cuentaName) {
+      return res.status(400).json({ message: "Se requiere el nombre de la cuenta" });
+    }
+
+    // 🔥 Magia: Pasamos los items a estado 'CLOSED'. 
+    // Como el POS solo busca items 'ACTIVE', estos desaparecerán de la pantalla.
+    await OrderItem.update(
+      { status: 'CLOSED' },
+      { where: { orderId, cuenta: cuentaName, status: 'ACTIVE' } }
+    );
+
+    // Verificamos si al cerrar esta cuenta, toda la mesa se quedó sin items activos
+    const activeItemsCount = await OrderItem.count({ where: { orderId, status: 'ACTIVE' } });
+    
+    if (activeItemsCount === 0) {
+       const order = await Order.findByPk(orderId);
+       if (order && order.status !== 'CLOSED') {
+         await order.update({ status: 'CLOSED' });
+         if (order.tableId) {
+           await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+         }
+       }
+    }
+
+    getIO().emit('pos:update');
+    return res.status(200).json({ success: true, message: `La cuenta ${cuentaName} ha sido liberada exitosamente.` });
+  } catch (error) {
+    console.error("Error al cerrar la cuenta:", error);
+    return res.status(500).json({ message: "Error interno al liberar la cuenta." });
   }
 };
 
@@ -290,7 +328,6 @@ export const moveItemAccount = async (req, res) => {
     const item = await OrderItem.findByPk(itemId);
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
     
-    // 🔥 Recuperamos la metadata antes de dividir para no perder las promos al mover cuentas
     let moveNotes = [];
     try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
     if (!Array.isArray(moveNotes)) moveNotes = [moveNotes];
@@ -332,7 +369,6 @@ export const moveItemAccount = async (req, res) => {
     const notesToMove = moveNotes.slice(0, qtyToMove);
     const remainingNotes = moveNotes.slice(qtyToMove);
 
-    // Reinyectamos la magia en los objetos separados
     if (metaObj) {
         notesToMove.push(metaObj);
         remainingNotes.push(metaObj);
@@ -414,14 +450,27 @@ export const checkOrderStatus = async (req, res) => {
         return res.json({ status: order.status, accountStatus: order.status });
     }
     
-    // 🔥 FIX BUG 1: Inteligencia de Cuentas Independientes.
     let accountStatus = order.status;
     
-    if (cuenta && order.paidAccounts && Array.isArray(order.paidAccounts)) {
-      if (order.paidAccounts.includes(cuenta)) {
-          accountStatus = 'PAID';
-      } else {
-          accountStatus = 'OPEN';
+    if (cuenta) {
+      // 🔥 Buscamos si los items de ESTA cuenta pasaron a estado 'CLOSED' (Liberados)
+      const itemsCuenta = await OrderItem.findAll({ where: { orderId, cuenta } });
+      
+      if (itemsCuenta.length > 0) {
+         const hasActive = itemsCuenta.some(i => i.status === 'ACTIVE');
+         const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
+         
+         if (!hasActive && !allCancelled) {
+             // Si no hay ninguno activo, y no es porque los hayan borrado/cancelado,
+             // significa que los pasaron a estado CLOSED con el nuevo botón de liberar
+             accountStatus = 'CLOSED';
+         } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(cuenta)) {
+             accountStatus = 'PAID';
+         } else {
+             accountStatus = 'OPEN';
+         }
+      } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(cuenta)) {
+         accountStatus = 'PAID';
       }
     }
     

@@ -30,7 +30,8 @@ export const TicketSidebar = ({
   orderStatus, paidAccounts, onPrintTicket, onCloseTable, toggleDeliveredStatus,
   isLlevar, isVitrina, toggleItemTakeaway, cuentasTelefonos,
   onDeliverAll, onDeliverAccount, onCancelItem, onCancelFullOrder, onCancelAccount,
-  nombreCliente, showToast 
+  nombreCliente, showToast,
+  onReleaseAccount // <--- 🔥 FALTABA ESTO AQUÍ
 }) => {
   const toast = showToast || (() => {}); 
 
@@ -201,26 +202,31 @@ export const TicketSidebar = ({
   const handleReleaseAccounts = async (cuentasALiberar) => {
     setIsReleasing(true); 
 
-    const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
-    const unhiddenAccounts = activeCart.filter(item => {
-      const c = item.cuenta || 'General';
-      return !updatedOcultas.includes(c);
-    });
-
-    setCuentasOcultas(updatedOcultas);
-    setShowReleaseModal(false);
-
     try {
+      // 🔥 EL FIX: Avisar a la base de datos cuenta por cuenta ANTES de ocultarlas visualmente
+      if (onReleaseAccount) {
+        for (const acc of cuentasALiberar) {
+          await onReleaseAccount(acc);
+        }
+      }
+
+      const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
+      const unhiddenAccounts = activeCart.filter(item => {
+        const c = item.cuenta || 'General';
+        return !updatedOcultas.includes(c);
+      });
+
+      setCuentasOcultas(updatedOcultas);
+      setShowReleaseModal(false);
+
       if (unhiddenAccounts.length === 0 && onCloseTable) {
         await onCloseTable();
         toast('Todas las cuentas finalizadas. Mesa liberada.', 'success');
       } else {
-        toast(`Cuentas liberadas exitosamente.`, 'success');
+        toast(`Cuentas liberadas exitosamente en el sistema.`, 'success');
       }
     } catch (error) {
-      toast('Error al procesar la liberación', 'error');
-      const revertOcultas = cuentasOcultas.filter(c => !cuentasALiberar.includes(c));
-      setCuentasOcultas(revertOcultas);
+      toast('Error al procesar la liberación en la base de datos', 'error');
     } finally {
       setIsReleasing(false);
     }

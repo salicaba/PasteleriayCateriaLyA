@@ -10,10 +10,10 @@ import {
   getActiveOrders, 
   moveItemAccount, 
   deliverAllItems,
-  checkOrderStatus // 🔥 IMPORTAMOS LA NUEVA FUNCIÓN AQUÍ
+  checkOrderStatus,
+  closeAccount // 🔥 IMPORTAMOS LA NUEVA FUNCIÓN AQUÍ
 } from './pos.orders.controller.js';
 
-// 🔥 AÑADIMOS getPublicTables A LA IMPORTACIÓN
 import { getTables, createTable, deleteTable, getPublicTables } from './pos.tables.controller.js';
 import { payOrder } from './pos.payments.controller.js';
 import { printOrderTicket, shareOrderTicket } from './pos.tickets.controller.js';
@@ -25,7 +25,6 @@ const router = Router();
 // 🟢 RUTAS PÚBLICAS (No necesitan token, van antes del middleware)
 // =========================================================================
 
-// 🔥 NUEVA RUTA: El Kiosko del cliente usará esto para listar las mesas sin chocar con el login
 router.get('/public/tables', getPublicTables);
 
 router.get('/ticket/:orderId', shareOrderTicket); 
@@ -34,7 +33,6 @@ router.get('/orders/:orderId/share', shareOrderTicket);
 router.post('/orders', createOrder);
 router.post('/orders/:orderId/items', addItemsToOrder);
 
-// 🔥 NUEVA RUTA: El celular del cliente usará esto para saber de qué color pintar la pantalla
 router.get('/orders/:orderId/status', checkOrderStatus);
 
 // =========================================================================
@@ -47,6 +45,10 @@ router.get('/orders/active', getActiveOrders);
 router.get('/orders/table/:tableId', getActiveOrderByTable); 
 router.put('/orders/:orderId/pay', payOrder); 
 router.put('/orders/:orderId/close', closeOrder); 
+
+// 🔥 NUEVA RUTA: Recibe la orden de liberar la cuenta específica
+router.put('/orders/:orderId/close-account', closeAccount);
+
 router.post('/orders/:orderId/print', printOrderTicket);
 
 router.get('/tables', getTables);
