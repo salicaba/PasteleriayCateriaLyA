@@ -5,6 +5,19 @@ import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
 import Product from '../menu/Product.model.js';
 
+// 🔥 CEREBRO EXTRACTOR VISUAL (Para limpiar el nombre en la Caja)
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 // ==========================================
 // 💰 REGISTRAR PAGO (Parcial o Total)
 // ==========================================
@@ -83,20 +96,24 @@ export const payOrder = async (req, res) => {
 
     const isMixed = amountCafeteria > 0 && amountPasteleria > 0;
     let descBase = `Pago de Consumo (${identificador})`;
+    
+    // 🔥 APLICAMOS EL FILTRO AL NOMBRE DE LA CUENTA
     if (!isFullPayment && cuentaName) {
-      descBase += ` Cuenta: ${cuentaName}`;
+      descBase += ` Cuenta: ${parseAccountName(cuentaName)}`;
     }
     
     const mixTag = isMixed ? ' | 🔗 Ticket Mixto' : '';
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
     // Crear transacciones separadas si hay montos
+    // 🔥 LE REGRESAMOS SU FOLIO AL FINAL DE LA DESCRIPCIÓN
     if (amountCafeteria > 0) {
+      const folioCaf = `CAF-${baseFolio}`;
       await Transaction.create({
-        folio: `CAF-${baseFolio}`, 
+        folio: folioCaf, 
         source: 'CAFETERIA',
         amount: amountCafeteria,
-        description: `${descBase}${mixTag}`,
+        description: `${descBase}${mixTag}  ${folioCaf}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
         createdBy: userId 
@@ -104,11 +121,12 @@ export const payOrder = async (req, res) => {
     }
 
     if (amountPasteleria > 0) {
+      const folioPas = `PAS-${baseFolio}`;
       await Transaction.create({
-        folio: `PAS-${baseFolio}`, 
+        folio: folioPas, 
         source: 'PASTELERIA',
         amount: amountPasteleria,
-        description: `${descBase}${mixTag}`,
+        description: `${descBase}${mixTag}  ${folioPas}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
         createdBy: userId 
