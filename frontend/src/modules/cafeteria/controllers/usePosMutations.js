@@ -13,7 +13,7 @@ export const usePosMutations = ({
   triggerNotification
 }) => {
   const [isSuccess, setIsSuccess] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false); // 🔥 Candado Global (Anti-Doble Clic)
+  const [isProcessing, setIsProcessing] = useState(false); 
 
   // 🧙‍♂️ HELPER INTERNO: Reconstruye el producto manteniendo el ADN de la promoción
   const mapDBItemToLocal = (dbItem, itemsNuevos = []) => {
@@ -36,9 +36,9 @@ export const usePosMutations = ({
         status: dbItem.status || 'ACTIVE', 
         cuenta: dbItem.cuenta || 'General', 
         isTakeaway: dbItem.isTakeaway || false, 
-        backendItemId: dbItem.id, 
+        // 🔥 FIX: Blindaje estricto de tipo de dato para evitar fallos de renderizado
+        backendItemId: String(dbItem.id), 
         requiereCocina: itemsNuevos.find(n => n.id === dbItem.productId)?.requiereCocina !== false,
-        // 🔥 RESCATE DE LA AMNESIA: Mantener las etiquetas de promoción vivas
         isAutoPromo: dbItem.isAutoPromo || false,
         promoLabel: dbItem.promoLabel || null,
         precioOriginal: dbItem.precioOriginal || null
@@ -75,7 +75,6 @@ export const usePosMutations = ({
         });
       }
 
-      // 🔥 BLINDAJE: Mandar las banderas de promoción al backend en el payload
       const payload = itemsNuevos.map(item => ({ 
         productId: item.id, 
         quantity: item.qty, 
@@ -217,10 +216,11 @@ export const usePosMutations = ({
           } 
         }));
         
+        // 🔥 FIX: Actualización local forzando los IDs a String
         setCart(prev => { 
           const newCart = [...prev]; 
           itemsToUpdate.forEach(subItem => { 
-            const idx = newCart.findIndex(p => p.backendItemId === subItem.backendItemId); 
+            const idx = newCart.findIndex(p => String(p.backendItemId) === String(subItem.backendItemId)); 
             if (idx !== -1) newCart[idx] = { ...newCart[idx], kitchenStatus: newStatus }; 
           }); 
           return newCart; 
@@ -254,8 +254,9 @@ export const usePosMutations = ({
           client.put(`/kitchen/tickets/${item.backendItemId}/status`, { status: 'DELIVERED' })
         ));
 
+        // 🔥 FIX: Actualización local forzando IDs a String
         setCart(prev => prev.map(item => 
-          itemsListos.some(listo => listo.backendItemId === item.backendItemId)
+          itemsListos.some(listo => String(listo.backendItemId) === String(item.backendItemId))
           ? { ...item, kitchenStatus: 'DELIVERED' } 
           : item
         ));
@@ -287,7 +288,7 @@ export const usePosMutations = ({
               return [...updatedCart, ...unsentLocal]; 
             });
         } else {
-            setCart(prev => prev.map(p => p.backendItemId === item.backendItemId ? { ...p, status: 'CANCELLED' } : p));
+            setCart(prev => prev.map(p => String(p.backendItemId) === String(item.backendItemId) ? { ...p, status: 'CANCELLED' } : p));
         }
         
         if (response.data.wasRefunded) triggerNotification('Cancelado. Reembolso registrado en caja.', 'success');
@@ -309,7 +310,7 @@ export const usePosMutations = ({
         for (const item of itemsToCancel) {
             await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty: item.qty });
         }
-        setCart(prev => prev.map(item => itemsToCancel.some(i => i.backendItemId === item.backendItemId) ? { ...item, status: 'CANCELLED' } : item));
+        setCart(prev => prev.map(item => itemsToCancel.some(i => String(i.backendItemId) === String(item.backendItemId)) ? { ...item, status: 'CANCELLED' } : item));
         triggerNotification(`Ítems de la cuenta ${cuentaName} cancelados.`, 'success');
     } catch (error) { 
       triggerNotification("Error al cancelar los ítems de la cuenta.", "error");
