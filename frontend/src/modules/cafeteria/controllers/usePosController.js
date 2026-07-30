@@ -8,7 +8,6 @@ import { usePosAccounts } from './usePosAccounts.js';
 import { usePosCart } from './usePosCart.js';
 import { usePosMutations } from './usePosMutations.js';
 
-// 🔥 1. Recibimos showToast como 4to parámetro
 export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showToast) => {
   // 1. Determinar Mesa Activa
   const mesaActual = useMemo(() => {
@@ -27,7 +26,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const menu = usePosMenu(isVitrina);
   const accounts = usePosAccounts();
   
-  // 🔥 2. Conectamos showToast al Cerebro Matemático (Prioridad a la UI visual)
   const cartLogic = usePosCart(accounts.cuentaActiva, accounts.cuentasPagadasReales, showToast || triggerNotification);
 
   const mutations = usePosMutations({
@@ -40,13 +38,23 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     setPaidAccounts: accounts.setPaidAccounts,
     setOrderStatus,
     cuentasPagadasReales: accounts.cuentasPagadasReales,
-    // 🔥 3. Conectamos el Toast visual también a las mutaciones
     triggerNotification: showToast || triggerNotification 
   });
 
   // 4. EL ORQUESTADOR DE SINCRONIZACIÓN (Base de Datos a UI)
   const { setCart } = cartLogic;
   const { setPaidAccounts, setNombresCuentas, setCuentaActiva, setCuentasTelefonos } = accounts;
+
+  // 🔥 CIRUGÍA ANTI-BUCLE: Extraemos valores primitivos para el useEffect
+  // Esto evita que React se confunda con referencias de memoria y cicle el renderizado.
+  const mesaId = mesaActual?.id;
+  const mesaEstado = mesaActual?.estado;
+  const mesaOrderId = mesaActual?.orderId;
+  const mesaOrderStatus = mesaActual?.orderStatus;
+  
+  // Convertimos a string para detectar cambios REALES en los datos, no en las referencias
+  const dbItemsString = JSON.stringify(mesaActual?.items || []);
+  const paidAccountsString = JSON.stringify(mesaActual?.paidAccounts || []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -62,20 +70,20 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
     let nuevasCuentas = new Set(['General']);
 
-    if (mesaActual && mesaActual.estado === 'ocupada') {
-        const currentOrderId = mesaActual.orderId;
-        setActiveOrderId(currentOrderId);
-        setOrderStatus(mesaActual.orderStatus || 'OPEN');
+    if (mesaEstado === 'ocupada') {
+        setActiveOrderId(mesaOrderId);
+        setOrderStatus(mesaOrderStatus || 'OPEN');
         
-        let loadedPaidAccounts = mesaActual.paidAccounts || [];
+        let loadedPaidAccounts = [];
+        try { loadedPaidAccounts = JSON.parse(paidAccountsString); } catch(e) {}
 
-        if (currentOrderId) {
+        if (mesaOrderId) {
             // RECUPERAR TELÉFONOS
-            const storedPhones = localStorage.getItem(`lya_phones_${currentOrderId}`);
+            const storedPhones = localStorage.getItem(`lya_phones_${mesaOrderId}`);
             if (storedPhones) try { setCuentasTelefonos(JSON.parse(storedPhones)); } catch(e) {}
 
             // ESCUDO CONTRA AMNESIA DE BD: RECUPERAR PAGOS LOCALES
-            const storedPaid = localStorage.getItem(`lya_paid_${currentOrderId}`);
+            const storedPaid = localStorage.getItem(`lya_paid_${mesaOrderId}`);
             if (storedPaid) {
                 try {
                   const parsedPaid = JSON.parse(storedPaid);
@@ -86,7 +94,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         
         setPaidAccounts(prev => Array.from(new Set([...prev, ...loadedPaidAccounts])));
 
-        const dbItems = mesaActual.items || [];
+        let dbItems = [];
+        try { dbItems = JSON.parse(dbItemsString); } catch(e) {}
+
         const loadedCart = dbItems.map(item => {
             let parsedPreps = [];
             if (item.notes) {
@@ -131,7 +141,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
     setNombresCuentas(prev => Array.from(new Set([...prev, ...Array.from(nuevasCuentas)])));
 
-  }, [isOpen, mesaActual, setCart, setPaidAccounts, setNombresCuentas, setCuentaActiva, setCuentasTelefonos]);
+  // 🔥 SOLUCIÓN ESTRICTA: Solo dependemos de primitivas inmutables. 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString]);
 
   // 5. Cálculos Derivados (Orquestados)
   const cuentasDisponibles = useMemo(() => 
@@ -192,6 +204,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     
     // Dominio: Notificaciones UI
     notification, 
-    triggerNotification: showToast || triggerNotification // Exportamos el correcto
+    triggerNotification: showToast || triggerNotification 
   };
 };

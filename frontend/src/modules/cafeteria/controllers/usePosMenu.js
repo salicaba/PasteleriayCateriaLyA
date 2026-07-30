@@ -16,14 +16,11 @@ export const usePosMenu = (isVitrina) => {
         client.get('/menu/products'),
         client.get('/menu/categories'),
         client.get('/promotions').catch((err) => {
-          console.error("⚠️ Error exacto al pedir promociones (¿La ruta es /promotions o /menu/promotions?):", err);
+          console.error("⚠️ Error exacto al pedir promociones:", err);
           return { data: [] };
         })
       ]);
       
-      // 🔍 DEBUG LOG INYECTADO PARA DIAGNÓSTICO
-      console.log("🔍 PROMO DEBUG - Datos crudos recibidos del backend:", promoRes.data);
-
       const prods = prodsRes.data;
       const cats = catsRes.data;
 
@@ -46,13 +43,11 @@ export const usePosMenu = (isVitrina) => {
       
       setDbProducts(activeProducts); 
 
-      // EXTRACCIÓN SEGURA ASEGURANDO QUE SEA UN ARREGLO
       const rawPromoData = promoRes.data;
       const promosList = Array.isArray(rawPromoData) 
         ? rawPromoData 
         : (rawPromoData?.data || rawPromoData?.promotions || []);
       
-      console.log("🔍 PROMO DEBUG - Promociones procesadas para el estado:", promosList);
       setActivePromotions(promosList);
 
       const hasTodas = cats.some(c => c.id === 'todas' || c.name.trim().toLowerCase() === 'todas');
@@ -82,7 +77,6 @@ export const usePosMenu = (isVitrina) => {
     const handlePromoChange = async () => {
       try {
         const res = await client.get('/promotions');
-        console.log("🔍 PROMO DEBUG (Socket) - Promos actualizadas:", res.data);
         const raw = res.data;
         const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
         setActivePromotions(list);

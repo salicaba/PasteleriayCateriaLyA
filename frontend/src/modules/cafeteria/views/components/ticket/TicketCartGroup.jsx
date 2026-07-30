@@ -254,7 +254,7 @@ export const TicketCartGroup = ({
       </div>
 
       <div className="px-2 pb-2 space-y-1.5">
-        {displayItems.map((item) => {
+        {displayItems.map((item, index) => {
           
           // 🔥 LÓGICA REFINADA DE PROMOCIONES
           const isCero = Number(item.precio) === 0;
@@ -281,7 +281,7 @@ export const TicketCartGroup = ({
           }
 
           const uniqueId = item.backendItemId || item.cartItemId || item.id;
-          const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}`;
+          const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}-${index}`;
           
           const isProcessingParent = processingItems[uniqueId];
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
