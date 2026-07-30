@@ -93,15 +93,15 @@ export const TicketCartGroup = ({
 
   const displayItems = [];
   rawItemsConMagia.forEach(item => {
-      const isGhost = item.isAutoPromo && Number(item.precio) === 0;
-
+      // 🔥 CIRUGÍA VISUAL: Reglas estrictas de agrupación para separar Promos de Normales.
       const existing = displayItems.find(d => 
           d.id === item.id && 
           Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
           d.enviadoCocina === item.enviadoCocina && 
           d.kitchenStatus === item.kitchenStatus &&
           !!d.isTakeaway === !!item.isTakeaway && 
-          (d.isAutoPromo && Number(d.precio) === 0) === isGhost && 
+          !!d.isAutoPromo === !!item.isAutoPromo && // PROTECCIÓN 1: Nunca junta promo con normal
+          d.promoLabel === item.promoLabel &&       // PROTECCIÓN 2: Nunca junta promos diferentes
           getPrepStr(d) === getPrepStr(item)
       );
       
@@ -258,13 +258,12 @@ export const TicketCartGroup = ({
           
           // 🔥 LÓGICA REFINADA DE PROMOCIONES
           const isCero = Number(item.precio) === 0;
-          const isGhostPromo = item.isAutoPromo && isCero; // Es un regalo (NxM)
+          const isGhostPromo = item.isAutoPromo && isCero; 
           
-          // Si tiene el símbolo 'º' o 'REBAJADO', es Unidad Adicional (depende de otro producto, SE BLOQUEA)
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
           
           // Solo bloqueamos controles (+ y -) para Regalos y Unidades Adicionales. 
-          // La REBAJA DIRECTA queda libre para sumarse.
+          // La REBAJA DIRECTA (FIXED) queda libre para sumarse o restarse.
           const isLockedPromo = isGhostPromo || isNthPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
@@ -288,7 +287,6 @@ export const TicketCartGroup = ({
           const isStatusLocked = isCuentaPagada || isCompletamentePagada;
           const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
-          // 🔥 Aquí las preparaciones SIEMPRE se evalúan y se muestran, incluso para promos.
           const hasRealPreparations = item.preparaciones?.some(prep => {
             if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta) return false;
             if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
@@ -431,7 +429,6 @@ export const TicketCartGroup = ({
               </div>
             </div>
 
-            {/* 🔥 SIEMPRE MOSTRAR BOTONES INFERIORES: El Entregar y Por Enviar están siempre libres */}
             {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
               <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 
