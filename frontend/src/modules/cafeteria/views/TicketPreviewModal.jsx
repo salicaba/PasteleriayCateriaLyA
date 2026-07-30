@@ -267,7 +267,7 @@ export const TicketPreviewModal = ({
                   )}
                   {viewMode !== 'Todas' && (
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Cuenta exclusiva:</span> 
+                      <span className="text-gray-500">Cuenta:</span> 
                       {/* 🔥 VISTA LIMPIA EN TICKET */}
                       <span className="font-bold text-right text-black uppercase bg-gray-100 px-2 py-0.5 rounded-md">{parseAccountData(viewMode).name}</span>
                     </div>

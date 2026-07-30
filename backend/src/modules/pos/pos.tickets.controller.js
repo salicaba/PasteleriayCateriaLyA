@@ -8,13 +8,24 @@ import Transaction from '../cash/Transaction.model.js';
 import User from '../users/User.model.js'; 
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
+// 🔥 CEREBRO EXTRACTOR VISUAL
+const parseAccountName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 // ==========================================
 // 🧾 OBTENER HISTORIAL DE TICKETS (SOLO PAGADOS)
 // ==========================================
 export const getTickets = async (req, res) => {
   try {
-    // 🔥 REGLA DE DOMINIO FINANCIERO:
-    // Solo traemos órdenes cuyo status general sea 'PAID'.
     const tickets = await Order.findAll({
       where: {
         status: 'PAID' 
@@ -28,7 +39,7 @@ export const getTickets = async (req, res) => {
         }
       ],
       order: [['updatedAt', 'DESC']],
-      limit: 150 // Límite de seguridad para evitar cuellos de botella en memoria
+      limit: 150 
     });
 
     res.json(tickets);
@@ -51,7 +62,7 @@ export const getTodayTickets = async (req, res) => {
 
     const tickets = await Order.findAll({
       where: {
-        status: 'PAID', // 🔥 GARANTÍA: Estrictamente pagadas.
+        status: 'PAID', 
         updatedAt: {
           [Op.between]: [startOfDay, endOfDay]
         }
@@ -135,7 +146,7 @@ export const printOrderTicket = async (req, res) => {
 
     if (isLlevar) {
       if (rawId.startsWith('MOSTRADOR') || rawId.startsWith('VITRINA') || rawId.startsWith('MOS-')) {
-        identificadorMesa = rawId; 
+        identificadorMesa = 'Mostrador'; 
       } else {
         let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
         identificadorMesa = `Pedido #${idLimpio || 'Llevar'}`;
@@ -144,17 +155,17 @@ export const printOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salon'}`;
     }
 
-    const ticketFolio = rawId || (isLlevar ? 'LLEVAR-' : 'CAFE-') + order.id.split('-')[0].toUpperCase();
+    // 🔥 Forzamos el folio elegante
+    const ticketFolio = 'CAF-' + order.id.split('-')[0].toUpperCase();
 
     printer.alignCenter();
     printer.println("COMPROBANTE DE VENTA");
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
-    printer.println(ticketFolio); // Folio en Grande
+    printer.println(ticketFolio);
     printer.setTextNormal();
     printer.drawLine();
     
-    // 🔥 Formateo y saneo de fecha para impresora térmica
     const d = new Date();
     const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
     const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
@@ -168,7 +179,7 @@ export const printOrderTicket = async (req, res) => {
     printer.println(`Atendido por:     ${cashierName}`);
     printer.println(`Servicio:         ${identificadorMesa}`);
     if (cuentaName && cuentaName !== 'General') {
-      printer.println(`Cuenta de:        ${cuentaName}`);
+      printer.println(`Cuenta de:        ${parseAccountName(cuentaName)}`);
     }
     
     printer.drawLine();
@@ -193,7 +204,7 @@ export const printOrderTicket = async (req, res) => {
 
       if (cuentasUnicas.length > 1 && (!cuentaName || cuentaName === 'General')) {
         printer.println("");
-        printer.println(`>> CUENTA: ${accName.toUpperCase()}`);
+        printer.println(`>> CUENTA: ${parseAccountName(accName).toUpperCase()}`);
         printer.println("------------------------------------------");
       }
 
@@ -269,7 +280,7 @@ export const printOrderTicket = async (req, res) => {
       cuentasUnicas.forEach(accName => {
         const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
         printer.tableCustom([
-          { text: accName.toUpperCase(), align: "LEFT", width: 0.60 },
+          { text: parseAccountName(accName).toUpperCase(), align: "LEFT", width: 0.60 },
           { text: `$${subTotalAcc.toFixed(2)}`, align: "RIGHT", width: 0.40 }
         ]);
       });
@@ -289,10 +300,6 @@ export const printOrderTicket = async (req, res) => {
     printer.println("Este documento es un comprobante");
     printer.println("de caja impreso.");
     printer.cut(); 
-
-    console.log(`\n=== TICKET FÍSICO PARA ORDEN ${orderId} ===`);
-    console.log(printer.getText());
-    console.log(`==========================================\n`);
 
     res.json({ message: 'Ticket enviado a impresión exitosamente' });
   } catch (error) {
@@ -361,8 +368,9 @@ export const shareOrderTicket = async (req, res) => {
     }
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
-    const estadoLiquidacion = order.status === 'PAID' ? 'LIQUIDADO' : 'PENDIENTE';
-    const nombreCliente = order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General');
+    
+    // 🔥 Nombre limpio para el ticket
+    const nombreCliente = parseAccountName(order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General'));
     
     const d = new Date(order.createdAt);
     const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
@@ -379,7 +387,7 @@ export const shareOrderTicket = async (req, res) => {
 
     if (isLlevar) {
       if (rawId.startsWith('MOSTRADOR') || rawId.startsWith('VITRINA') || rawId.startsWith('MOS-')) {
-        identificadorMesa = rawId;
+        identificadorMesa = 'Mostrador';
       } else {
         let idLimpio = rawId.split(' - ')[0].replace(/Llevar\s*#?/i, '').trim();
         identificadorMesa = `Pedido #${idLimpio || 'Llevar'}`;
@@ -388,7 +396,8 @@ export const shareOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salón'}`;
     }
 
-    const ticketFolio = rawId || (isLlevar ? 'LLEVAR-' : 'CAFE-') + order.id.split('-')[0].toUpperCase();
+    // 🔥 Folio Elegante forzado
+    const ticketFolio = `CAF-${order.id.split('-')[0].toUpperCase()}`;
 
     const htmlResponse = `
     <!DOCTYPE html>
@@ -420,7 +429,7 @@ export const shareOrderTicket = async (req, res) => {
             <select onchange="window.location.href='?cuenta=' + encodeURIComponent(this.value)" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 appearance-none text-center shadow-sm cursor-pointer">
               <option value="Todas" ${cuentaSeleccionada === 'Todas' ? 'selected' : ''}>🌟 Todas las cuentas (General)</option>
               ${cuentasDisponibles.map(c => `
-                <option value="${c}" ${cuentaSeleccionada === c ? 'selected' : ''}>👤 Cuenta: ${c}</option>
+                <option value="${c}" ${cuentaSeleccionada === c ? 'selected' : ''}>👤 Cuenta: ${parseAccountName(c)}</option>
               `).join('')}
             </select>
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
@@ -496,7 +505,7 @@ export const shareOrderTicket = async (req, res) => {
                 <div class="space-y-3">
                   ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
                     <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg uppercase tracking-wider text-center">
-                      — Cuenta: ${accName} —
+                      — Cuenta: ${parseAccountName(accName)} —
                     </div>
                   ` : ''}
                   
@@ -533,7 +542,7 @@ export const shareOrderTicket = async (req, res) => {
                 const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
                 return `
                   <div class="flex justify-between">
-                    <span class="uppercase">${accName}:</span>
+                    <span class="uppercase">${parseAccountName(accName)}:</span>
                     <span class="font-bold text-slate-800">$${subTotalAcc.toFixed(2)}</span>
                   </div>
                 `;
@@ -547,18 +556,13 @@ export const shareOrderTicket = async (req, res) => {
               <span class="text-sm font-black text-slate-600 uppercase tracking-tight">Total Consumido</span>
               <span class="text-3xl font-black text-slate-900 tracking-tighter">$${totalAmount.toFixed(2)}</span>
             </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs font-bold text-slate-500">Estado de Cuenta:</span>
-              <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800">
-                ${estadoLiquidacion}
-              </span>
-            </div>
+            <!-- SE ELIMINÓ EL ESTADO DE CUENTA -->
           </div>
 
           <div class="border-t border-slate-200 my-5"></div>
 
           <div class="text-center space-y-2 mb-6 bg-slate-50/80 p-4 rounded-2xl">
-            <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Ubicación</p>
+            <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest">Ubicación</p>
             <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
               Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
             </p>
