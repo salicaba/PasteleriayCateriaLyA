@@ -29,10 +29,11 @@ export const useMesasController = () => {
         
         let cuentasActivas = 0;
         if (order) {
-          const cuentasSet = new Set(['General']);
+          const cuentasSet = new Set();
           if (order.items) order.items.forEach(item => cuentasSet.add(item.cuenta || 'General'));
           if (order.paidAccounts) order.paidAccounts.forEach(acc => cuentasSet.add(acc));
-          cuentasActivas = cuentasSet.size;
+          // Si el set está vacío, significa que es una mesa nueva, mostramos 1. Si no, el tamaño real.
+          cuentasActivas = cuentasSet.size > 0 ? cuentasSet.size : 1;
         }
 
         return {
@@ -52,9 +53,10 @@ export const useMesasController = () => {
 
       let indexLlevar = 1;
       const paraLlevarOrders = orders.filter(o => o.orderType === 'LLEVAR').map(o => {
-          const cuentasSet = new Set(['General']);
+          const cuentasSet = new Set();
           if (o.items) o.items.forEach(item => cuentasSet.add(item.cuenta || 'General'));
           if (o.paidAccounts) o.paidAccounts.forEach(acc => cuentasSet.add(acc));
+          const cuentasActivasFinal = cuentasSet.size > 0 ? cuentasSet.size : 1;
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
           
@@ -79,7 +81,7 @@ export const useMesasController = () => {
             orderId: o.id, 
             items: o.items || [], 
             horaInicio: o.createdAt || null,
-            cuentasActivas: cuentasSet.size, 
+            cuentasActivas: cuentasActivasFinal, 
             orderStatus: o.status, 
             paidAccounts: o.paidAccounts || []
           };
