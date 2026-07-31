@@ -1,10 +1,10 @@
 // src/modules/pasteleria/views/PasteleriaDashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
-  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, MessageCircle, Loader2,
-  Trash2, RotateCcw, Calculator
+  DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, 
+  MessageCircle, Loader2, Trash2, RotateCcw, Calculator, Flame, Timer, CalendarDays
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
@@ -24,9 +24,10 @@ const KpiCard = ({ title, value, icon: Icon, themeColor, isActive, onClick }) =>
   const style = colors[themeColor];
 
   return (
-    <div 
+    <motion.div 
+      whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all active:scale-95 hover:shadow-md ${style.border} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-70 hover:opacity-100'}`}
+      className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 flex justify-between items-center cursor-pointer transition-all duration-300 md:hover:shadow-md ${style.border} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-70 md:hover:opacity-100'}`}
     >
       <div>
         <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
@@ -35,18 +36,17 @@ const KpiCard = ({ title, value, icon: Icon, themeColor, isActive, onClick }) =>
       <div className={`p-2 sm:p-3 rounded-xl bg-opacity-10 dark:bg-opacity-20 lya:bg-opacity-20 ${style.bg}`}>
         <Icon size={24} className={style.text} />
       </div>
-    </div>
+    </motion.div>
   );
 };
 // -----------------------------------------------------------------
 
-// --- NUEVO COMPONENTE DE CARGA ---
 const PasteleriaLoader = () => (
-  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg">
+  <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
       animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
       transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
+      className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
     >
       <ShoppingBasket size={40} className="text-emerald-500 lya:text-lya-primary" />
     </motion.div>
@@ -61,6 +61,7 @@ const PasteleriaLoader = () => (
 
 export default function PasteleriaDashboard() {
   const { 
+    pedidos, // 🔥 1. AÑADIMOS ESTA VARIABLE AQUÍ
     pedidosFiltrados, conteos, loading, 
     activeTab, setActiveTab, searchQuery, setSearchQuery,
     isModalOpen, abrirModalNuevoPedido, cerrarModalNuevoPedido, fechaPredefinida,
@@ -75,15 +76,9 @@ export default function PasteleriaDashboard() {
   } = usePedidosController();
 
   const [transferInfo, setTransferInfo] = useState(null);
-
-  // Estados para los paneles laterales
   const [showCancelados, setShowCancelados] = useState(false);
   const [showEntregados, setShowEntregados] = useState(false);
-  
-  // Estado para el campo de motivo de cancelación
   const [modalInputValue, setModalInputValue] = useState('');
-
-  // Estado para manejar qué pedido se está restaurando (para mostrar el spinner de carga local)
   const [restoringId, setRestoringId] = useState(null);
 
   useEffect(() => {
@@ -94,10 +89,50 @@ export default function PasteleriaDashboard() {
     }
   }, [abonoModal.isOpen, abonoForm.metodo]);
 
-  // Aquí renderizamos el nuevo loader si los datos están cargando
+  // 🔥 LÓGICA DEL HUD DE ANTICIPACIÓN (Mise en place) ABSOLUTA
+  const hudMetrics = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const dayAfterTomorrow = new Date(today);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+    const next7Days = new Date(today);
+    next7Days.setDate(next7Days.getDate() + 7);
+
+    let hoy = 0;
+    let manana = 0;
+    let proximos7 = 0;
+
+    // 🔥 2. AHORA LEEMOS DE "pedidos" (todos), NO DE "pedidosFiltrados"
+    (pedidos || []).forEach(p => {
+      // Si ya se entregó o canceló, lo ignoramos
+      if (p.estado === 'entregado' || p.estado === 'cancelado') return;
+      
+      const fechaEntrega = new Date(p.fechaEntrega);
+      
+      // Si el pedido ya está atrasado (es del pasado), no debe salir en el radar de "Hoy" ni "Mañana"
+      if (fechaEntrega < today) return; 
+      
+      if (fechaEntrega >= today && fechaEntrega < tomorrow) {
+        hoy++;
+      } else if (fechaEntrega >= tomorrow && fechaEntrega < dayAfterTomorrow) {
+        manana++;
+      }
+      
+      if (fechaEntrega >= today && fechaEntrega <= next7Days) {
+        proximos7++;
+      }
+    });
+
+    return { hoy, manana, proximos7, today, tomorrow, dayAfterTomorrow };
+  }, [pedidos]); // 🔥 3. DEPENDEMOS DE "pedidos", NO DE "pedidosFiltrados"
+
   if (loading) return <PasteleriaLoader />; 
 
-  // --- FUNCIÓN DE RESTAURACIÓN DIRECTA ---
   const handleRestaurarDirecto = async (pedido) => {
     setRestoringId(pedido.id);
     try {
@@ -150,10 +185,10 @@ export default function PasteleriaDashboard() {
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
-      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-emerald-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-emerald-500/20 lya:shadow-lya-primary/20">
             <ShoppingBasket size={28} />
@@ -170,11 +205,60 @@ export default function PasteleriaDashboard() {
             <input type="text" placeholder="Buscar pedido..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 lya:focus:ring-lya-primary/30 transition-all lya:text-lya-text lya:placeholder-lya-text/40" />
           </div>
 
-          <button onClick={() => abrirModalNuevoPedido()} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-6 py-3 rounded-xl font-bold shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2">
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => abrirModalNuevoPedido()} 
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-6 py-3 rounded-xl font-bold shadow-md shadow-emerald-500/30 lya:shadow-lya-secondary/30 transform md:hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-2"
+          >
             <Plus size={20} /><span>Nuevo Pedido</span>
-          </button>
+          </motion.button>
         </div>
       </header>
+
+      {/* 🔥 HUD DE ANTICIPACIÓN Y PRODUCCIÓN NEO-BENTO */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 shrink-0 w-full">
+        {/* Entregas de Hoy */}
+        <div className="bg-gradient-to-br from-red-50 to-white dark:from-red-900/10 dark:to-gray-900 lya:from-red-500/10 lya:to-lya-surface border border-red-100 dark:border-red-900/30 lya:border-red-500/20 p-5 rounded-[2rem] shadow-sm flex items-center justify-between transition-all md:hover:scale-[1.02] relative overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-red-500 dark:text-red-400 font-black text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1.5">
+              <Flame size={14} /> Fuego / Hoy
+            </p>
+            <h3 className="text-3xl font-black text-red-600 dark:text-red-500">{hudMetrics.hoy}</h3>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">Pedidos a entregar hoy</p>
+          </div>
+          <div className="bg-red-500 text-white p-3.5 rounded-2xl shadow-md shadow-red-500/20 relative z-10">
+            <AlertTriangle size={24} />
+          </div>
+        </div>
+
+        {/* Entregas de Mañana */}
+        <div className="bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/10 dark:to-gray-900 lya:from-orange-500/10 lya:to-lya-surface border border-orange-100 dark:border-orange-900/30 lya:border-orange-500/20 p-5 rounded-[2rem] shadow-sm flex items-center justify-between transition-all md:hover:scale-[1.02] relative overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-orange-500 dark:text-orange-400 font-black text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1.5">
+              <Timer size={14} /> Mise en place
+            </p>
+            <h3 className="text-3xl font-black text-orange-600 dark:text-orange-500">{hudMetrics.manana}</h3>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">Avanzar para mañana</p>
+          </div>
+          <div className="bg-orange-500 text-white p-3.5 rounded-2xl shadow-md shadow-orange-500/20 relative z-10">
+            <CalendarClock size={24} />
+          </div>
+        </div>
+
+        {/* Proximos 7 días */}
+        <div className="bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 lya:from-purple-500/10 lya:to-lya-surface border border-purple-100 dark:border-purple-900/30 lya:border-purple-500/20 p-5 rounded-[2rem] shadow-sm flex items-center justify-between transition-all md:hover:scale-[1.02] relative overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-purple-500 dark:text-purple-400 font-black text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1.5">
+              <CalendarDays size={14} /> Radar
+            </p>
+            <h3 className="text-3xl font-black text-purple-600 dark:text-purple-500">{hudMetrics.proximos7}</h3>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">Volumen prox. 7 días</p>
+          </div>
+          <div className="bg-purple-500 text-white p-3.5 rounded-2xl shadow-md shadow-purple-500/20 relative z-10">
+            <ShoppingBasket size={24} />
+          </div>
+        </div>
+      </div>
 
       {/* --- GRID DE TARJETAS KPI --- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 shrink-0 w-full">
@@ -219,7 +303,6 @@ export default function PasteleriaDashboard() {
           }} 
         />
       </div>
-      {/* --------------------------------------------------------- */}
 
       {/* GRID PRINCIPAL (Solo se muestra si los paneles están cerrados) */}
       {(!showCancelados && !showEntregados) && (
@@ -239,8 +322,14 @@ export default function PasteleriaDashboard() {
               <AnimatePresence mode="popLayout">
                 {pedidosFiltrados.map((pedido) => {
                   const finanzas = calcularFinanzas(pedido);
-                  const fecha = new Date(pedido.fechaEntrega).toLocaleDateString('es-MX', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
-                  const isAtrasado = new Date(pedido.fechaEntrega) < new Date() && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
+                  const fechaRaw = new Date(pedido.fechaEntrega);
+                  const fecha = fechaRaw.toLocaleDateString('es-MX', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+                  
+                  const isAtrasado = fechaRaw < new Date() && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
+                  
+                  // 🔥 Lógica de Alertas Tempranas (Badges de producción)
+                  const isHoy = fechaRaw >= hudMetrics.today && fechaRaw < hudMetrics.tomorrow && !isAtrasado && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
+                  const isManana = fechaRaw >= hudMetrics.tomorrow && fechaRaw < hudMetrics.dayAfterTomorrow && !isAtrasado && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
 
                   return (
                     <motion.div
@@ -251,11 +340,14 @@ export default function PasteleriaDashboard() {
                       exit={{ opacity: 0, scale: 0.8, y: -20 }}
                       transition={{ type: "spring", stiffness: 200, damping: 20 }}
                       onClick={() => abrirDetalles(pedido)} 
-                      className={`cursor-pointer relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface
-                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 hover:border-emerald-400/50 lya:border-lya-border/30 lya:hover:border-lya-secondary/50'}
+                      className={`cursor-pointer relative overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface
+                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 md:hover:border-emerald-400/50 lya:border-lya-border/30 lya:md:hover:border-lya-secondary/50'}
                         ${isAtrasado ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}
                     >
+                      {/* 🔥 ETIQUETAS DE PRODUCCIÓN (BADGES) */}
                       {isAtrasado && <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10">ATRASADO</div>}
+                      {isHoy && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10 animate-pulse flex items-center gap-1"><Flame size={12}/> ¡ENTREGAR HOY!</div>}
+                      {isManana && <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10 flex items-center gap-1"><Timer size={12}/> PREPARAR HOY</div>}
 
                       <div>
                         <div className="flex justify-between items-start mb-4">
@@ -263,12 +355,12 @@ export default function PasteleriaDashboard() {
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-wider mb-2 inline-block lya:border lya:border-lya-border/30">{pedido.id}</span>
                             <h3 className="text-lg font-bold truncate text-gray-800 dark:text-white lya:text-lya-text">{pedido.cliente}</h3>
                           </div>
-                          <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${isAtrasado ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary border-emerald-500/10 lya:border-lya-secondary/20'}`}>
+                          <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${isAtrasado || isHoy ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' : isManana ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary border-emerald-500/10 lya:border-lya-secondary/20'}`}>
                             <CalendarClock size={14} /> {fecha}
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 mb-4">
+                        <div className="flex flex-wrap gap-2 mb-4 mt-2">
                           <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 lya:border-indigo-800/50 px-2 py-1 rounded-md shadow-sm">
                             {pedido.categoria || 'Pastel'}
                           </span>
@@ -301,27 +393,28 @@ export default function PasteleriaDashboard() {
                           )}
                           
                           <div className="flex gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); abrirTicket(pedido); }} title="Ver Ticket" className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors">
+                            <motion.button whileTap={{ scale: 0.95 }} onClick={(e) => { e.stopPropagation(); abrirTicket(pedido); }} title="Ver Ticket" className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 lya:text-lya-secondary lya:hover:bg-lya-secondary/10 rounded-lg transition-colors">
                               <FileText size={18} />
-                            </button>
+                            </motion.button>
                             
-                            <button onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'cancelar'); }} title="Cancelar Pedido" className="p-2 text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 lya:text-red-500 lya:hover:bg-red-500/10 rounded-lg transition-colors">
+                            <motion.button whileTap={{ scale: 0.95 }} onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'cancelar'); }} title="Cancelar Pedido" className="p-2 text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 lya:text-red-500 lya:hover:bg-red-500/10 rounded-lg transition-colors">
                               <Ban size={18} />
-                            </button>
+                            </motion.button>
 
-                            <button 
+                            <motion.button 
+                              whileTap={{ scale: 0.95 }}
                               onClick={(e) => { e.stopPropagation(); pedirConfirmacion(pedido, 'entregar'); }} 
                               disabled={!finanzas.estaLiquidado}
                               title={finanzas.estaLiquidado ? "Marcar como Entregado" : "Debes registrar el pago total antes de entregar"}
                               className={`p-2 rounded-lg transition-colors ${finanzas.estaLiquidado ? 'text-emerald-500 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 lya:text-lya-primary lya:hover:bg-lya-primary/10' : 'text-gray-300 dark:text-gray-600 lya:text-lya-text/30 cursor-not-allowed'}`}
                             >
                               <PackageCheck size={18} />
-                            </button>
+                            </motion.button>
 
                             {!finanzas.estaLiquidado && (
-                              <button onClick={(e) => { e.stopPropagation(); abrirModalAbono(pedido); }} className="bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
+                              <motion.button whileTap={{ scale: 0.95 }} onClick={(e) => { e.stopPropagation(); abrirModalAbono(pedido); }} className="bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
                                 <DollarSign size={14} className="inline mr-1" /> Abonar
-                              </button>
+                              </motion.button>
                             )}
                           </div>
                         </div>
@@ -357,12 +450,13 @@ export default function PasteleriaDashboard() {
                     {showCancelados ? 'Papelera Hoy' : 'Entregados Hoy'}
                   </h2>
                 </div>
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => { setShowCancelados(false); setShowEntregados(false); setActiveTab('activos'); }} 
                   className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   <X size={20} className="text-gray-500" />
-                </button>
+                </motion.button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pb-10">
@@ -387,17 +481,18 @@ export default function PasteleriaDashboard() {
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
-                              <button 
+                              <motion.button 
+                                whileTap={{ scale: 0.95 }}
                                 onClick={(e) => { e.stopPropagation(); handleRestaurarDirecto(pedido); }} 
                                 disabled={restoringId === pedido.id}
-                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Restaurar Pedido"
                               >
                                 {restoringId === pedido.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
                                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
                                   {restoringId === pedido.id ? 'Restaurando...' : 'Restaurar'}
                                 </span>
-                              </button>
+                              </motion.button>
                             </div>
                           </div>
                           <div className="mb-2">
@@ -424,17 +519,18 @@ export default function PasteleriaDashboard() {
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded uppercase">Entregado</span>
-                              <button 
+                              <motion.button 
+                                whileTap={{ scale: 0.95 }}
                                 onClick={(e) => { e.stopPropagation(); handleRestaurarDirecto(pedido); }} 
                                 disabled={restoringId === pedido.id}
-                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Deshacer Entrega"
                               >
                                 {restoringId === pedido.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
                                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
                                   {restoringId === pedido.id ? 'Restaurando...' : 'Deshacer'}
                                 </span>
-                              </button>
+                              </motion.button>
                             </div>
                           </div>
                           <div className="mb-2">
@@ -450,9 +546,9 @@ export default function PasteleriaDashboard() {
                               <span className="bg-green-100 dark:bg-green-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
                                 🕒 {fechaActualizacion}
                               </span>
-                              <button onClick={() => abrirTicket(pedido)} className="text-[10px] font-black px-2 py-1.5 rounded-lg uppercase tracking-widest bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 dark:text-gray-300 transition-colors flex items-center gap-1.5 shadow-sm">
+                              <motion.button whileTap={{ scale: 0.95 }} onClick={() => abrirTicket(pedido)} className="text-[10px] font-black px-2 py-1.5 rounded-lg uppercase tracking-widest bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 dark:text-gray-300 transition-colors flex items-center gap-1.5 shadow-sm">
                                 <FileText size={14} /> Ticket
-                              </button>
+                              </motion.button>
                             </div>
                             <span className="text-base font-black text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">
                               ${parseFloat(pedido.costoTotal).toFixed(2)}
@@ -469,37 +565,26 @@ export default function PasteleriaDashboard() {
         )}
       </AnimatePresence>
 
+      {/* --- CÁPSULA NEO-BENTO DE ÉXITO --- */}
       <AnimatePresence>
-        {successScreen.isOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 lya:bg-black/50 backdrop-blur-sm"
-          >
+        {successScreen?.isOpen && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 10 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 10 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-[#1a1f2e] lya:bg-lya-surface rounded-3xl p-10 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col items-center text-center"
+              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
-              <motion.div 
-                initial={{ scale: 0 }} 
-                animate={{ scale: 1 }} 
-                transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
-                className="w-20 h-20 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 lya:bg-lya-primary/20 lya:text-lya-primary rounded-full flex items-center justify-center mb-5"
-              >
-                <Check size={48} strokeWidth={3} />
-              </motion.div>
-              <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 uppercase tracking-wide">
-                {successScreen.title}
-              </h2>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70">
-                {successScreen.subtitle}
-              </p>
+              <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
+                <CheckCircle2 size={20} className="text-emerald-500 lya:text-lya-primary" />
+              </div>
+              <div className="flex flex-col">
+                  <span className="text-sm text-center">{successScreen.title || 'Acción exitosa'}</span>
+                  {successScreen.subtitle && <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 leading-none mt-0.5 text-center">{successScreen.subtitle}</span>}
+              </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -534,7 +619,8 @@ export default function PasteleriaDashboard() {
                 )}
               </div>
               <div className="flex gap-3">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setModalInputValue('');
                     cerrarConfirmacion();
@@ -543,8 +629,9 @@ export default function PasteleriaDashboard() {
                   className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-bold py-3 rounded-xl transition-colors"
                 >
                   Volver
-                </button>
-                <button 
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     let reason = undefined;
                     if (detallesModal.requireInput) {
@@ -554,10 +641,10 @@ export default function PasteleriaDashboard() {
                     setModalInputValue('');
                   }} 
                   disabled={isSubmitting} 
-                  className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'transform hover:-translate-y-0.5'} ${detallesModal.color}`}
+                  className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'md:hover:-translate-y-0.5'} ${detallesModal.color}`}
                 >
-                  {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={24} /> : 'Confirmar'}
-                </button>
+                  {isSubmitting ? <><Loader2 className="animate-spin" size={18} /><span>Procesando</span></> : 'Confirmar'}
+                </motion.button>
               </div>
             </motion.div>
           </div>
@@ -581,7 +668,6 @@ export default function PasteleriaDashboard() {
         isSubmitting={isSubmitting}
       />
       
-      {/* 🔥 TICKET MODAL SOBRE EL PANEL LATERAL */}
       <div className="relative z-[9999]">
         <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
       </div>
@@ -604,7 +690,6 @@ export default function PasteleriaDashboard() {
             registrarAbono(p.id, abonoForm.monto, abonoForm.metodo);
           };
 
-          // VALIDACIONES ESTRICTAS DE ABONO
           const isMontoAbonoInvalido = montoIngresadoNum <= 0 || montoIngresadoNum > fin.deuda;
           const isRecibidoInvalido = abonoForm.metodo === 'efectivo' && recibidoNum < montoIngresadoNum;
           const isAbonoSubmitDisabled = isSubmitting || isMontoAbonoInvalido || isRecibidoInvalido;
@@ -618,9 +703,9 @@ export default function PasteleriaDashboard() {
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Registrar Pago</h3>
                     <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 lya:text-lya-secondary">Cliente: {p.cliente}</p>
                   </div>
-                  <button onClick={() => setAbonoModal({ isOpen: false, pedido: null })} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:text-lya-text/50 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-full shadow-sm transition-colors">
+                  <motion.button whileTap={{ scale: 0.95 }} onClick={() => setAbonoModal({ isOpen: false, pedido: null })} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white lya:text-lya-text/50 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-full shadow-sm transition-colors">
                     <X size={20} />
-                  </button>
+                  </motion.button>
                 </div>
 
                 <div className="p-6 overflow-y-auto custom-scrollbar">
@@ -645,7 +730,7 @@ export default function PasteleriaDashboard() {
                       <div>
                         <div className="flex justify-between items-center mb-2">
                           <label className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase">Monto a Abonar</label>
-                          <button type="button" onClick={() => setAbonoForm({...abonoForm, monto: fin.deuda.toString()})} className="text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 lya:bg-lya-secondary/20 lya:text-lya-secondary px-2 py-1 rounded-md transition-colors hover:bg-emerald-200">Liquidar Restante</button>
+                          <motion.button whileTap={{ scale: 0.95 }} type="button" onClick={() => setAbonoForm({...abonoForm, monto: fin.deuda.toString()})} className="text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 lya:bg-lya-secondary/20 lya:text-lya-secondary px-2 py-1 rounded-md transition-colors hover:bg-emerald-200">Liquidar Restante</motion.button>
                         </div>
                         <div className="relative">
                           <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -681,13 +766,13 @@ export default function PasteleriaDashboard() {
                               </div>
                               
                               <div className="flex gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
-                                <button type="button" onClick={() => setAbonoForm({...abonoForm, recibido: (parseFloat(abonoForm.monto) || 0).toString()})} className="px-4 py-2 bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 lya:text-lya-secondary border border-emerald-500/20 lya:border-lya-secondary/20 rounded-lg text-xs font-black whitespace-nowrap active:scale-95 transition-transform">
+                                <motion.button whileTap={{ scale: 0.95 }} type="button" onClick={() => setAbonoForm({...abonoForm, recibido: (parseFloat(abonoForm.monto) || 0).toString()})} className="px-4 py-2 bg-emerald-500/10 lya:bg-lya-secondary/10 text-emerald-600 lya:text-lya-secondary border border-emerald-500/20 lya:border-lya-secondary/20 rounded-lg text-xs font-black whitespace-nowrap active:scale-95 transition-transform">
                                   Exacto
-                                </button>
+                                </motion.button>
                                 {[50, 100, 200, 500, 1000].filter(v => v > (parseFloat(abonoForm.monto) || 0)).map(val => (
-                                  <button type="button" key={val} onClick={() => setAbonoForm({...abonoForm, recibido: val.toString()})} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-transform">
+                                  <motion.button whileTap={{ scale: 0.95 }} type="button" key={val} onClick={() => setAbonoForm({...abonoForm, recibido: val.toString()})} className="px-4 py-2 bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-lg text-xs font-bold whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:scale-95 transition-transform">
                                     ${val}
-                                  </button>
+                                  </motion.button>
                                 ))}
                               </div>
                             </div>
@@ -760,7 +845,7 @@ export default function PasteleriaDashboard() {
                 </div>
 
                 <div className="p-6 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0">
-                  <button type="submit" form="abonoForm" disabled={isAbonoSubmitDisabled} className={`w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2 ${isAbonoSubmitDisabled ? 'opacity-70 cursor-not-allowed' : 'transform hover:-translate-y-0.5'}`}>
+                  <motion.button whileTap={{ scale: 0.95 }} type="submit" form="abonoForm" disabled={isAbonoSubmitDisabled} className={`w-full bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 lya:shadow-lya-secondary/30 transition-all flex items-center justify-center gap-2 ${isAbonoSubmitDisabled ? 'opacity-70 cursor-not-allowed' : 'md:hover:-translate-y-0.5'}`}>
                     {isSubmitting ? (
                       <><Loader2 className="animate-spin" size={20} /> Procesando pago...</>
                     ) : isMontoAbonoInvalido ? (
@@ -770,7 +855,7 @@ export default function PasteleriaDashboard() {
                     ) : (
                       <><CheckCircle2 size={20} /> Confirmar Pago</>
                     )}
-                  </button>
+                  </motion.button>
                 </div>
               </motion.div>
             </div>

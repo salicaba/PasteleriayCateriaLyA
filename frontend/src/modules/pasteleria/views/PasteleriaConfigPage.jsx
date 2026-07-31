@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// --- COMPONENTES ARRASTRABLES ---
+// --- COMPONENTES ARRASTRABLES NEO-BENTO ---
 
 const SortableCategoria = ({ cat, setAsDefault, deleteCategoria, processingAction }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
@@ -41,25 +41,26 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria, processingActio
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={`relative flex items-center justify-between p-3 mb-2 rounded-xl border transition-colors ${
+      className={`relative flex items-center justify-between p-3 mb-2 rounded-2xl border transition-colors ${
         cat.isDefault 
           ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30 lya:bg-lya-primary/10 lya:border-lya-primary/40' 
-          : 'bg-white border-gray-100 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40'
+          : 'bg-white border-gray-100 md:hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40'
       } ${isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'} ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-2 overflow-hidden">
-        <div {...attributes} {...listeners} className="text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 lya:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
+        <div {...attributes} {...listeners} className="text-gray-400 md:hover:text-emerald-500 dark:md:hover:text-emerald-400 lya:md:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
           <GripVertical size={18} />
         </div>
 
-        <button 
+        <motion.button 
+          whileTap={!isDisabled ? { scale: 0.95 } : {}}
           onClick={() => setAsDefault(cat.id)} 
           disabled={isDisabled}
           title={cat.isDefault ? "Categoría predeterminada" : "Fijar como predeterminado"} 
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
             cat.isDefault 
               ? 'text-emerald-600 bg-emerald-100 dark:bg-emerald-500/20 dark:text-emerald-400 lya:text-lya-secondary lya:bg-lya-secondary/20 shadow-inner' 
-              : 'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-border/50'
+              : 'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:bg-lya-bg lya:md:hover:bg-lya-border/50'
           }`}
         >
           {isSettingDefault ? (
@@ -68,7 +69,7 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria, processingActio
             <CheckCircle2 size={16} className={cat.isDefault ? 'opacity-100' : 'opacity-40'} /> 
           )}
           <span className="hidden xl:inline">{cat.isDefault ? 'Por defecto' : 'Fijar'}</span>
-        </button>
+        </motion.button>
         
         <span className={`font-bold text-sm truncate ${cat.isDefault ? 'text-emerald-800 dark:text-emerald-300 lya:text-lya-primary' : 'text-gray-700 dark:text-gray-300 lya:text-lya-text'}`}>
           {cat.nombre}
@@ -76,13 +77,14 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria, processingActio
       </div>
 
       <div className="flex items-center shrink-0">
-        <button 
+        <motion.button 
+          whileTap={!isDisabled ? { scale: 0.9 } : {}}
           onClick={() => deleteCategoria(cat.id)} 
           disabled={isDisabled}
-          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+          className="p-2 text-red-400 md:hover:text-red-600 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:md:hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
         >
           {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16}/>}
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -103,12 +105,12 @@ const SortableString = ({ item, field, deleteString, processingAction }) => {
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={`relative flex items-center justify-between p-3 mb-2 rounded-xl border bg-white border-gray-100 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40 transition-colors ${
+      className={`relative flex items-center justify-between p-3 mb-2 rounded-2xl border bg-white border-gray-100 md:hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40 transition-colors ${
         isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'
       } ${isDeleting ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-2 overflow-hidden">
-        <div {...attributes} {...listeners} className="text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 lya:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
+        <div {...attributes} {...listeners} className="text-gray-400 md:hover:text-emerald-500 dark:md:hover:text-emerald-400 lya:md:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
           <GripVertical size={18} />
         </div>
         <span className="font-bold text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text truncate pr-2">
@@ -116,21 +118,22 @@ const SortableString = ({ item, field, deleteString, processingAction }) => {
         </span>
       </div>
       <div className="flex items-center shrink-0">
-        <button 
+        <motion.button 
+          whileTap={!isDeleting ? { scale: 0.9 } : {}}
           onClick={() => deleteString(field, item)} 
           disabled={isDeleting}
-          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 lya:hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+          className="p-2 text-red-400 md:hover:text-red-600 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:md:hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
         >
           {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16}/>}
-        </button>
+        </motion.button>
       </div>
     </div>
   );
 };
 
-// --- COMPONENTE DE CARGA INICIAL ---
+// --- COMPONENTE DE CARGA INICIAL NEO-BENTO ---
 const PasteleriaLoader = () => (
-  <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10">
+  <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10">
     <motion.div
       animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
       transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -169,7 +172,7 @@ export default function PasteleriaConfigPage() {
 
   if (isPageLoading) return <PasteleriaLoader />;
 
-  // Función para mostrar la notificación de éxito
+  // Función para mostrar la notificación de éxito (Pilar 5)
   const showSuccess = (msg) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(''), 3000);
@@ -270,10 +273,11 @@ export default function PasteleriaConfigPage() {
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
-      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative"
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      // PILAR 1: Flexbox estricto
+      className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
     >
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
         <div className="flex items-center space-x-4">
           <div className="bg-emerald-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-emerald-500/20 lya:shadow-lya-primary/20">
             <Tags size={28} />
@@ -285,16 +289,17 @@ export default function PasteleriaConfigPage() {
         </div>
       </header>
 
+      {/* CONTENEDOR PRINCIPAL SCROLLEABLE */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4 min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* COLUMNA CATEGORIAS */}
-          <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-6 shadow-sm flex flex-col relative z-0">
-            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+          <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-[2rem] p-6 shadow-sm flex flex-col relative z-0 h-fit max-h-full">
+            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
                <Tags className="text-emerald-500 lya:text-lya-primary" size={20} />
                <h2 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Categorías</h2>
             </div>
-            <form onSubmit={handleAddCategoria} className="flex gap-2 mb-4">
+            <form onSubmit={handleAddCategoria} className="flex gap-2 mb-4 shrink-0">
                <input 
                  type="text" 
                  placeholder="Nueva Categoría" 
@@ -303,16 +308,17 @@ export default function PasteleriaConfigPage() {
                  onChange={(e)=>setNewCategoria(e.target.value)} 
                  className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text disabled:opacity-50" 
                />
-               <button 
+               <motion.button 
+                 whileTap={!(processingAction === 'add-cat' || !newCategoria.trim()) ? { scale: 0.95 } : {}}
                  type="submit" 
                  disabled={processingAction === 'add-cat' || !newCategoria.trim()}
-                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl md:hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  {processingAction === 'add-cat' ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20}/>}
-               </button>
+               </motion.button>
             </form>
             
-            <div className="flex flex-col mt-2">
+            <div className="flex flex-col mt-2 overflow-y-auto custom-scrollbar pr-1">
                {config.categorias.length === 0 && <p className="text-center text-gray-400 text-xs py-4 font-medium italic">Sin categorías. Agrega una arriba.</p>}
                
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndCategorias}>
@@ -326,12 +332,12 @@ export default function PasteleriaConfigPage() {
           </div>
 
           {/* COLUMNA TAMAÑOS */}
-          <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-6 shadow-sm flex flex-col relative z-0">
-            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+          <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-[2rem] p-6 shadow-sm flex flex-col relative z-0 h-fit max-h-full">
+            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
                <Hash className="text-emerald-500 lya:text-lya-primary" size={20} />
                <h2 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Tamaños</h2>
             </div>
-            <form onSubmit={(e) => handleAddString(e, 'tamanos', newTamano, setNewTamano)} className="flex gap-2 mb-4">
+            <form onSubmit={(e) => handleAddString(e, 'tamanos', newTamano, setNewTamano)} className="flex gap-2 mb-4 shrink-0">
                <input 
                  type="text" 
                  placeholder="Ej. 20 Personas" 
@@ -340,16 +346,17 @@ export default function PasteleriaConfigPage() {
                  onChange={(e)=>setNewTamano(e.target.value)} 
                  className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text disabled:opacity-50" 
                />
-               <button 
+               <motion.button 
+                 whileTap={!(processingAction === 'add-tamanos' || !newTamano.trim()) ? { scale: 0.95 } : {}}
                  type="submit" 
                  disabled={processingAction === 'add-tamanos' || !newTamano.trim()}
-                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl md:hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  {processingAction === 'add-tamanos' ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20}/>}
-               </button>
+               </motion.button>
             </form>
 
-            <div className="flex flex-col mt-2">
+            <div className="flex flex-col mt-2 overflow-y-auto custom-scrollbar pr-1">
                {config.tamanos.length === 0 && <p className="text-center text-gray-400 text-xs py-4 font-medium italic">Sin tamaños. Agrega uno arriba.</p>}
                
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndString('tamanos')}>
@@ -363,12 +370,12 @@ export default function PasteleriaConfigPage() {
           </div>
 
           {/* COLUMNA SABORES */}
-          <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-3xl p-6 shadow-sm flex flex-col relative z-0">
-            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+          <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 rounded-[2rem] p-6 shadow-sm flex flex-col relative z-0 h-fit max-h-full">
+            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
                <Layers className="text-emerald-500 lya:text-lya-primary" size={20} />
                <h2 className="text-xl font-bold text-gray-800 dark:text-white lya:text-lya-text">Sabores</h2>
             </div>
-            <form onSubmit={(e) => handleAddString(e, 'sabores', newSabor, setNewSabor)} className="flex gap-2 mb-4">
+            <form onSubmit={(e) => handleAddString(e, 'sabores', newSabor, setNewSabor)} className="flex gap-2 mb-4 shrink-0">
                <input 
                  type="text" 
                  placeholder="Ej. Chocolate" 
@@ -377,16 +384,17 @@ export default function PasteleriaConfigPage() {
                  onChange={(e)=>setNewSabor(e.target.value)} 
                  className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-white lya:text-lya-text disabled:opacity-50" 
                />
-               <button 
+               <motion.button 
+                 whileTap={!(processingAction === 'add-sabores' || !newSabor.trim()) ? { scale: 0.95 } : {}}
                  type="submit" 
                  disabled={processingAction === 'add-sabores' || !newSabor.trim()}
-                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="bg-emerald-500 lya:bg-lya-primary text-white p-2 rounded-xl md:hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  {processingAction === 'add-sabores' ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20}/>}
-               </button>
+               </motion.button>
             </form>
 
-            <div className="flex flex-col mt-2">
+            <div className="flex flex-col mt-2 overflow-y-auto custom-scrollbar pr-1">
                {config.sabores.length === 0 && <p className="text-center text-gray-400 text-xs py-4 font-medium italic">Sin sabores. Agrega uno arriba.</p>}
                
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndString('sabores')}>
@@ -402,7 +410,7 @@ export default function PasteleriaConfigPage() {
         </div>
       </div>
 
-      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO (TOAST CENTRADO ARRIBA) */}
+      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO NEO-BENTO (PILAR 5) */}
       <AnimatePresence>
         {successMessage && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -410,12 +418,13 @@ export default function PasteleriaConfigPage() {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
-              <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full">
+              <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
                 <CheckCircle2 size={20} className="text-emerald-500 lya:text-lya-primary" />
               </div>
-              {successMessage}
+              <span className="text-sm pr-2">{successMessage}</span>
             </motion.div>
           </div>
         )}
