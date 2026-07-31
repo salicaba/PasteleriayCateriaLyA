@@ -1,9 +1,10 @@
 // frontend/src/modules/client/views/components/ClientServiceShield.jsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Store, Coffee, UtensilsCrossed, Home, RotateCcw } from 'lucide-react';
+import { Store, Coffee, UtensilsCrossed, RotateCcw, QrCode, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-// 🔥 AHORA ES UN COMPONENTE CONTROLADO. Se alimenta puramente de systemConfig de su padre.
+// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Locks Asíncronos + History Purge)
 export const ClientServiceShield = ({ 
   activeOrdersCount = 0, 
   hasActiveSession = false, 
@@ -14,6 +15,8 @@ export const ClientServiceShield = ({
   isStandalone,
   systemConfig = { isQrActive: true, disabledQrs: [] }
 }) => {
+  const navigate = useNavigate();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const globalActive = systemConfig.isQrActive;
   const disabledQrs = systemConfig.disabledQrs || [];
@@ -31,6 +34,23 @@ export const ClientServiceShield = ({
       onForceLogout();
     }
   }, [shouldShowShield, hasActiveSession, onForceLogout]);
+
+  // 🛡️ PILAR 3: Lock Asíncrono y limpieza estricta del historial del enrutador
+  const handleSafeExit = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      if (typeof onForceLogout === 'function') {
+        await Promise.resolve(onForceLogout());
+      }
+      // Reemplazamos el historial para evitar el bug del botón "atrás" en celulares
+      navigate('/client/login', { replace: true });
+    } catch (error) {
+      console.error("Error al ejecutar salida segura:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   let shieldTitle = "Servicio Suspendido";
   let shieldMessage = "Puede que ya haya acabado nuestro horario de servicio y apagamos las peticiones en la App y QR. ¿Estamos abiertos?, pasa y consume sin compromiso.";
@@ -58,6 +78,7 @@ export const ClientServiceShield = ({
           transition={{ duration: 0.5, ease: "easeInOut" }}
           className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 p-6 pointer-events-auto"
         >
+          {/* 🛡️ PILAR 4: Geometría Premium y Entradas Nativas */}
           <motion.div 
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
@@ -83,18 +104,24 @@ export const ClientServiceShield = ({
             <div className="w-full relative z-10 flex flex-col gap-3">
               {isStandalone && (
                 <motion.button 
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onForceLogout} 
-                  className="w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl md:hover:shadow-xl transition-all flex items-center justify-center gap-2 outline-none select-none"
+                  whileTap={!isProcessing ? { scale: 0.95 } : {}}
+                  disabled={isProcessing}
+                  onClick={handleSafeExit} 
+                  className={`w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 outline-none select-none ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'md:hover:shadow-xl'}`}
                 >
-                  <Home size={18} />
-                  Volver al Mapeo
+                  {isProcessing ? (
+                    <Loader2 className="animate-spin" size={20} />
+                  ) : (
+                    <QrCode size={20} />
+                  )}
+                  {isProcessing ? 'Saliendo...' : 'Escanear Nuevo QR'}
                 </motion.button>
               )}
 
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}
+                disabled={isProcessing}
                 className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold py-4 rounded-2xl md:hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 outline-none select-none"
               >
                 <RotateCcw size={18} />

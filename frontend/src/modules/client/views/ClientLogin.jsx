@@ -1,9 +1,10 @@
 // src/modules/client/views/ClientLogin.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Utensils, ShoppingBag, Loader2, CheckCircle2, 
-  AlertTriangle, AlertCircle, Phone, User, ChevronRight, Settings
+  AlertTriangle, AlertCircle, Phone, User, ChevronRight, Settings, ArrowLeft
 } from 'lucide-react';
 import logoLyA from '../../../assets/logo.jpeg';
 
@@ -12,6 +13,7 @@ import ClientSettingsModal from './components/ClientSettingsModal';
 import { THEME_CLASSES, SIZES, getInitialTheme, getInitialSize } from './utils/clientMenuUtils';
 
 export default function ClientLogin({ onLogin, type, tableId }) {
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   
@@ -65,6 +67,12 @@ export default function ClientLogin({ onLogin, type, tableId }) {
     }
   };
 
+  // 🛡️ SOLUCIÓN ENRUTAMIENTO: Ruta estricta de escape al Mapeo
+  const handleBackToMapping = () => {
+    if (isProcessing) return;
+    navigate('/cafeteria/mesas'); 
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -111,7 +119,17 @@ export default function ClientLogin({ onLogin, type, tableId }) {
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative items-center justify-center p-6">
       
-      {/* BOTÓN FLOTANTE DE CONFIGURACIÓN */}
+      {/* 🛡️ BOTÓN FLOTANTE VOLVER AL MAPEO (Izquierda) */}
+      <motion.button 
+        whileTap={!isProcessing ? { scale: 0.95 } : {}}
+        onClick={handleBackToMapping}
+        disabled={isProcessing}
+        className="absolute top-6 left-6 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-40 outline-none disabled:opacity-50"
+      >
+        <ArrowLeft size={20} strokeWidth={2.5} />
+      </motion.button>
+
+      {/* BOTÓN FLOTANTE DE CONFIGURACIÓN (Derecha) */}
       <motion.button 
         whileTap={{ scale: 0.95 }} 
         onClick={() => setShowSettings(true)}
