@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
   Settings, ReceiptText, Loader2, CheckCircle2, AlertTriangle, 
-  Clock, Phone, Flame, Lock, Tag, Gift
+  Clock, Phone, Flame, Lock, Tag, Gift, LogOut
 } from 'lucide-react';
 import client from '../../../api/client'; 
 import ClientOrderSuccess from './ClientOrderSuccess';
@@ -101,6 +101,16 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
+  // 🛡️ PURGADO DE CACHÉ VIEJA (Navegadores móviles congelados)
+  useEffect(() => {
+    const lastAct = parseInt(localStorage.getItem('lya_client_last_activity'));
+    // Si la pestaña lleva más de 4 horas congelada, la purgamos automáticamente al volver a abrirla
+    if (lastAct && (Date.now() - lastAct > 4 * 60 * 60 * 1000)) { 
+       handleLogout();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (typeof setActiveOrdersCount === 'function') {
       setActiveOrdersCount(confirmedSnapshot?.items?.length || 0);
@@ -179,7 +189,9 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInactivity = () => {
-      if (isConfirmed || isSubmitting || finalizedStatus || sessionExpired) return; 
+      // 🛡️ FIX CACHÉ FANTASMA: Si la orden está confirmada pero NO pagada, no expira (están comiendo).
+      // PERO si ya pagaron (isOrderPaid), permitimos que expire para limpiar el navegador.
+      if ((isConfirmed && !isOrderPaid) || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
       if (now - lastActivityRef.current > 1500000) { 
@@ -204,7 +216,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
-  }, [isConfirmed, isSubmitting, finalizedStatus, sessionExpired]);
+  }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
 
   // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE
   useEffect(() => {
@@ -560,7 +572,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           </div>
           <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-4 tracking-tight text-center">Sesión Expirada</h2>
           <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify px-2">
-             {type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
+             {type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada o tu cuenta ya fue pagada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
           </p>
           <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout} className="w-full py-4 bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-lg">Entendido</motion.button>
         </motion.div>
@@ -589,7 +601,39 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           onOpenSettings={() => setShowSettings(true)}
           isQrActive={isServiceActive} 
         />
-        <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
+
+        {/* 🛡️ ESCAPE DE EMERGENCIA: Botón visible inmediatamente si la orden está pagada */}
+        {isOrderPaid && (
+           <motion.div 
+             initial={{ y: 50, opacity: 0 }} 
+             animate={{ y: 0, opacity: 1 }}
+             className="fixed bottom-6 left-0 right-0 px-6 z-40 flex justify-center pointer-events-none"
+           >
+             <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowLogoutConfirm(true)}
+                className="pointer-events-auto bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-4 rounded-full font-black shadow-2xl flex items-center gap-2 border border-gray-700 md:hover:scale-105 transition-transform"
+             >
+                <LogOut size={18} /> Finalizar Sesión
+             </motion.button>
+           </motion.div>
+        )}
+
+        <AnimatePresence>
+          {/* 🛡️ Desbloqueamos el botón de salir en Configuración si ya pagaron */}
+          {showSettings && (
+            <ClientSettingsModal 
+              themeIndex={themeIndex} 
+              sizeIndex={sizeIndex} 
+              cycleTheme={cycleTheme} 
+              cycleSize={cycleSize} 
+              onClose={() => setShowSettings(false)} 
+              showLogout={confirmedSnapshot.items.length === 0 || isOrderPaid} 
+              onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} 
+              onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} 
+            />
+          )}
+        </AnimatePresence>
         <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
       </>
     );
@@ -871,7 +915,21 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
           />
         )}
       </AnimatePresence>
-      <AnimatePresence>{showSettings && <ClientSettingsModal themeIndex={themeIndex} sizeIndex={sizeIndex} cycleTheme={cycleTheme} cycleSize={cycleSize} onClose={() => setShowSettings(false)} showLogout={confirmedSnapshot.items.length === 0} onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} />}</AnimatePresence>
+      <AnimatePresence>
+        {/* 🛡️ Desbloqueamos el botón de salir en Configuración si ya pagaron */}
+        {showSettings && (
+          <ClientSettingsModal 
+            themeIndex={themeIndex} 
+            sizeIndex={sizeIndex} 
+            cycleTheme={cycleTheme} 
+            cycleSize={cycleSize} 
+            onClose={() => setShowSettings(false)} 
+            showLogout={confirmedSnapshot.items.length === 0 || isOrderPaid} 
+            onLogout={() => { setShowSettings(false); setShowLogoutConfirm(true); }} 
+            onLogoutClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }} 
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>{showLogoutConfirm && <ClientLogoutModal isOpen={showLogoutConfirm} show={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={handleLogout} onConfirm={handleLogout} />}</AnimatePresence>
     </div>
   );

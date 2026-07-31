@@ -92,13 +92,6 @@ export default function ClientApp({ type }) {
   });
 
   const { isInstallable, promptInstall, isStandalone } = usePWA();
-
-  // 🔥 MAGIA: Auto-Actualización Silenciosa para usuarios de Navegador (Código QR casual)
-  useEffect(() => {
-    if (needRefresh && !isStandalone) {
-      updateServiceWorker(true);
-    }
-  }, [needRefresh, isStandalone, updateServiceWorker]);
   
   const [standaloneSelection, setStandaloneSelection] = useState(null); 
   const [isProcessingSelection, setIsProcessingSelection] = useState(null); 
@@ -335,8 +328,7 @@ export default function ClientApp({ type }) {
       <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
         
         <AnimatePresence>
-          {/* 🔥 Solo mostramos el modal manual si es un usuario que instaló la PWA */}
-          {needRefresh && isStandalone && (
+          {needRefresh && (
             <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md pointer-events-auto">
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -354,9 +346,10 @@ export default function ClientApp({ type }) {
                     setIsUpdating(true);
                     try { 
                       await updateServiceWorker(true); 
+                      // 🔥 MAGIA: NO lo regresamos a false. 
                       // La página se va a recargar, así que el loader se queda congelado bloqueando los clics.
                     } catch (error) {
-                      setIsUpdating(false); 
+                      setIsUpdating(false); // Solo liberamos si algo falla trágicamente
                     }
                   }} 
                   className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-600 cursor-wait opacity-90 shadow-inner' : 'bg-emerald-500 shadow-lg md:hover:shadow-xl'}`}
@@ -369,7 +362,7 @@ export default function ClientApp({ type }) {
         </AnimatePresence>
 
         <ClientConnectionShield>
-          {/* 🔥 EL FIX: Le pasamos el 'cuentaName' para que el Escudo pregunte correctamente por ESA cuenta, no por toda la mesa */}
+          {/* 🔥 Se le pasan correctamente las props necesarias al escudo */}
           <ClientServiceShield 
             key={`shield-mode-${isGridMode ? 'grid' : 'login'}`} 
             activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
@@ -377,7 +370,6 @@ export default function ClientApp({ type }) {
             onForceLogout={handleClientLogout}
             type={effectiveType} 
             tableId={effectiveTableId} 
-            cuentaName={clientData?.name || clientData?.nombre || clientData?.cuenta} 
             isStandalone={isStandalone}
             isGridMode={isGridMode}
             systemConfig={systemConfig}
