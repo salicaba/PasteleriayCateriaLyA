@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import InventoryItem from './InventoryItem.model.js';
 import InventoryTransaction from './InventoryTransaction.model.js';
 import InventoryReconciliation from './InventoryReconciliation.model.js';
@@ -191,7 +192,6 @@ export const processReconciliation = async (req, res) => {
         totalDifferenceCost: differenceCost 
       }, { transaction: t });
 
-      // 🔥 CORRECCIÓN: Ahora adjuntamos la nota del usuario si existe
       if (difference < 0) {
         const consumedQuantity = Math.abs(difference);
         const consumedCost = consumedQuantity * averageCost;
@@ -206,7 +206,6 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: consumedCost,
           reference: `Arqueo #${reconciliation.id}`,
-          // Si el usuario escribió una nota, la mostramos. Si no, texto por defecto.
           notes: notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'
         }, { transaction: t });
 
@@ -219,7 +218,6 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: Math.abs(differenceCost),
           reference: `Arqueo #${reconciliation.id}`,
-          // Si el usuario escribió una nota, la mostramos. Si no, texto por defecto.
           notes: notes ? `Ajuste positivo: ${notes}` : 'Ajuste positivo por arqueo'
         }, { transaction: t });
       }
@@ -241,5 +239,46 @@ export const processReconciliation = async (req, res) => {
     await t.rollback(); 
     console.error('Error procesando arqueo:', error);
     res.status(400).json({ message: error.message || 'Error al procesar el arqueo.' });
+  }
+};
+
+// =========================================================================
+// KARDEX GLOBAL CON FILTROS
+// =========================================================================
+export const getGlobalHistory = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    let dateFilter = {};
+    
+    if (startDate && endDate) {
+      // Nos aseguramos de cubrir todo el día final añadiendo las horas hasta 23:59:59
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      
+      dateFilter = {
+        createdAt: {
+          [Op.between]: [new Date(startDate), end]
+        }
+      };
+    }
+
+    const transactions = await InventoryTransaction.findAll({
+      where: dateFilter,
+      include: [
+        { model: InventoryItem, as: 'InventoryItem', attributes: ['id', 'name', 'sku', 'unit'] }, 
+        { model: User, as: 'user', attributes: ['id', 'username', 'fullName'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // KPI: Gasto Total en Compras (IN) dentro del periodo filtrado
+    const totalSpent = transactions
+      .filter(t => t.type === 'IN')
+      .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);
+
+    res.status(200).json({ transactions, totalSpent });
+  } catch (error) {
+    console.error('Error fetching global history:', error);
+    res.status(500).json({ message: 'Error al obtener el Kardex global.' });
   }
 };

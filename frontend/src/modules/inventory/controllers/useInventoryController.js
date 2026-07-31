@@ -6,10 +6,14 @@ export const useInventoryController = () => {
   const [inventory, setInventory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Estados para el Kardex Global
+  const [globalKardex, setGlobalKardex] = useState([]);
+  const [globalKpiSpent, setGlobalKpiSpent] = useState(0);
+  const [isKardexLoading, setIsKardexLoading] = useState(false);
 
-  // 1. Obtener el catálogo de inventario (CON PARÁMETRO SILENT)
+  // 1. Obtener el catálogo de inventario
   const fetchInventory = useCallback(async (silent = false) => {
-    // Si NO es silencioso, mostramos la pantalla de carga completa
     if (!silent) setIsLoading(true); 
     try {
       const response = await fetch(`${API_URL}/inventory`);
@@ -25,7 +29,7 @@ export const useInventoryController = () => {
   }, []);
 
   useEffect(() => {
-    fetchInventory(); // Carga inicial ruidosa (muestra loader)
+    fetchInventory(); 
   }, [fetchInventory]);
 
   // 2. Crear un nuevo insumo
@@ -40,14 +44,14 @@ export const useInventoryController = () => {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Error al crear el insumo');
       }
-      await fetchInventory(true); // 🔥 Recarga silenciosa
+      await fetchInventory(true); 
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
     }
   };
 
-  // 3. Obtener historial (Kardex) de un insumo
+  // 3. Obtener historial (Kardex) de un insumo específico
   const getItemHistory = async (itemId) => {
     try {
       const response = await fetch(`${API_URL}/inventory/${itemId}/history`);
@@ -62,7 +66,6 @@ export const useInventoryController = () => {
   // 4. Registrar una transacción (Entrada o Merma)
   const registerTransaction = async (transactionData) => {
     try {
-      // Obtenemos el ID del usuario activo para la auditoría
       const session = localStorage.getItem('lya_pos_session');
       let userId = null;
       if (session) {
@@ -80,7 +83,7 @@ export const useInventoryController = () => {
         throw new Error(errorData.message || 'Error al registrar el movimiento');
       }
       
-      await fetchInventory(true); // 🔥 Recarga silenciosa
+      await fetchInventory(true); 
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -95,7 +98,7 @@ export const useInventoryController = () => {
       });
       if (!response.ok) throw new Error('Error al eliminar el insumo');
       
-      await fetchInventory(true); // 🔥 Recarga silenciosa
+      await fetchInventory(true); 
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -103,11 +106,9 @@ export const useInventoryController = () => {
     }
   };
 
-  // 6. PROCESAR ARQUEO (Corregido y sin parpadeos)
+  // 6. PROCESAR ARQUEO
   const processReconciliation = async (itemsCounted, notes = '') => {
     try {
-      // ELIMINADO: setIsLoading(true); <-- Esto era lo que te destruía el modal de confirmación
-      
       const sessionStr = localStorage.getItem('lya_pos_session');
       let token = localStorage.getItem('lya_token'); 
       let userId = null;
@@ -115,15 +116,11 @@ export const useInventoryController = () => {
       if (sessionStr) {
         const sessionData = JSON.parse(sessionStr);
         userId = sessionData.userData?.id;
-        
-        // Salvavidas: Si por alguna razón el token no está en 'lya_token', 
-        // lo buscamos directamente dentro de los datos de sesión del usuario.
         if (!token && sessionData.userData?.token) {
           token = sessionData.userData.token;
         }
       }
 
-      // Si después de buscar, el token sigue sin existir, detenemos todo para evitar el error 403
       if (!token) {
         throw new Error('Token de seguridad ausente. Por favor, cierra sesión y vuelve a iniciarla.');
       }
@@ -134,11 +131,7 @@ export const useInventoryController = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({
-          items: itemsCounted,
-          notes,
-          userId
-        }),
+        body: JSON.stringify({ items: itemsCounted, notes, userId }),
       });
 
       if (!response.ok) {
@@ -147,18 +140,42 @@ export const useInventoryController = () => {
       }
       
       const data = await response.json();
-      
-      await fetchInventory(true); // 🔥 Recarga silenciosa en segundo plano
-      
+      await fetchInventory(true); 
       return data;
-
     } catch (err) {
       console.error('Error procesando arqueo:', err);
       setError(err.message);
-      throw err; // El frontend lo captura y lo muestra en consola
+      throw err; 
     }
-    // ELIMINADO: finally { setIsLoading(false); } <-- Ya no lo necesitamos aquí, el modal controla su propio "isProcessing"
   };
+
+  // 7. OBTENER KARDEX GLOBAL POR FECHAS (Con retardo artificial anti-parpadeo)
+  const fetchGlobalKardex = useCallback(async (startDate, endDate) => {
+    setIsKardexLoading(true);
+    
+    // 🔥 Creamos un temporizador que obligue a la promesa a esperar 800ms
+    const minLoadTime = new Promise(resolve => setTimeout(resolve, 800));
+    
+    try {
+      let queryParams = '';
+      if (startDate && endDate) {
+        queryParams = `?startDate=${startDate}&endDate=${endDate}`;
+      }
+      const response = await fetch(`${API_URL}/inventory/history/global${queryParams}`);
+      if (!response.ok) throw new Error('Error al cargar el Kardex global');
+      
+      const data = await response.json();
+      setGlobalKardex(data.transactions || []);
+      setGlobalKpiSpent(data.totalSpent || 0);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      // Esperamos a que terminen los 800ms antes de ocultar el loader
+      await minLoadTime;
+      setIsKardexLoading(false);
+    }
+  }, []);
 
   return { 
     inventory, 
@@ -169,6 +186,10 @@ export const useInventoryController = () => {
     getItemHistory,
     registerTransaction,
     deleteItem,
-    processReconciliation 
+    processReconciliation,
+    globalKardex,
+    globalKpiSpent,
+    isKardexLoading,
+    fetchGlobalKardex
   };
 };

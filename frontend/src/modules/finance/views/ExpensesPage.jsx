@@ -98,6 +98,7 @@ export const ExpensesPage = () => {
   
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
+    // Cambia el 1 final por un 0
     return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
   });
 
@@ -123,17 +124,30 @@ export const ExpensesPage = () => {
     setTimeout(() => setNotification(null), 3500);
   };
 
+  // 🔥 MEJORA ANTI-PARPADEO APLICADA AQUÍ
   useEffect(() => {
     const loadData = async () => {
+      const minLoadTime = new Promise(resolve => setTimeout(resolve, 600)); // Retardo de 600ms
+      
       await fetchExpenses(startDate, endDate);
+      await minLoadTime; // Esperamos el tiempo mínimo
+      
       setIsFullScreenLoader(false);
     };
     loadData();
   }, [startDate, endDate, fetchExpenses]);
 
   const handleRangeChange = (val) => {
-    setIsFullScreenLoader(true);
     setTimeRange(val);
+    
+    // 🔥 CORRECCIÓN DEL LIMBO: Si es personalizado, no activamos la pantalla de carga aún.
+    if (val === 'custom') {
+      return; 
+    }
+
+    // Solo activamos la carga para los rangos predefinidos
+    setIsFullScreenLoader(true);
+    
     const now = new Date();
     let start, end;
 
@@ -156,14 +170,13 @@ export const ExpensesPage = () => {
         break;
       case 'this_month':
         start = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Cambia el 1 final por un 0
         end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         break;
       case 'last_month':
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         end = new Date(now.getFullYear(), now.getMonth(), 0);
         break;
-      case 'custom':
-        return; 
       default:
         return;
     }
@@ -173,7 +186,7 @@ export const ExpensesPage = () => {
   };
 
   const handleCustomDateChange = (val, type) => {
-    setIsFullScreenLoader(true);
+    setIsFullScreenLoader(true); // Aquí sí activamos la carga porque ya escogió una fecha
     setTimeRange('custom');
     if (type === 'start') setStartDate(val);
     if (type === 'end') setEndDate(val);
@@ -509,10 +522,8 @@ export const ExpensesPage = () => {
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.95 }}
                               transition={{ type: "spring", stiffness: 300, damping: 24, delay: idx * 0.04 }}
-                              // 🔥 FIX APLICADO AQUÍ: flex-row estricto, items-start y gap-4 inquebrantable
                               className="flex flex-row items-start justify-between p-4 sm:p-5 rounded-[1.5rem] border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/50 shadow-sm transition-all gap-4"
                             >
-                              {/* CAJA IZQUIERDA BLINDADA CONTRA DESBORDES */}
                               <div className="flex flex-row items-start gap-3 sm:gap-4 min-w-0 flex-1">
                                 <div className={`p-3 sm:p-3.5 rounded-xl shrink-0 transition-colors ${catConfig.color}`}>
                                   <Icon size={20} className="sm:w-6 sm:h-6" />
@@ -521,7 +532,6 @@ export const ExpensesPage = () => {
                                   <p className="font-bold text-sm sm:text-base text-gray-800 dark:text-white lya:text-lya-text truncate w-full">
                                     {ex.description}
                                   </p>
-                                  {/* Metadatos flex-wrap para que bajen de línea antes de chocar */}
                                   <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">
                                     <span className="capitalize whitespace-nowrap">{formattedDate}</span>
                                     <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
@@ -533,7 +543,6 @@ export const ExpensesPage = () => {
                                 </div>
                               </div>
                               
-                              {/* CAJA DERECHA ASEGURADA (Monto y Botón) */}
                               <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
                                 <p className="font-black text-lg sm:text-xl text-red-600 dark:text-red-400 lya:text-red-500 transition-colors">
                                   -${parseFloat(ex.amount).toFixed(2)}
@@ -558,7 +567,7 @@ export const ExpensesPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 🔥 MODAL DE CONFIRMACIÓN DE ANULACIÓN (TEMA NEO-BENTO DE QR CONTROL) */}
+      {/* MODAL DE CONFIRMACIÓN DE ANULACIÓN */}
       <AnimatePresence>
         {cancelModal.isOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -632,7 +641,7 @@ export const ExpensesPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 🔥 MODAL DE PAPELERA DE RECICLAJE (TEMA NEO-BENTO DE QR CONTROL) */}
+      {/* MODAL DE PAPELERA DE RECICLAJE */}
       <AnimatePresence>
         {isTrashOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -685,7 +694,6 @@ export const ExpensesPage = () => {
                       return (
                         <div key={ex.id} className="flex flex-row items-start justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 hover:opacity-100 transition-opacity gap-4">
                           
-                          {/* CAJA IZQUIERDA PAPELERA BLINDADA */}
                           <div className="flex flex-row items-start gap-3 flex-1 min-w-0 pr-2">
                             <div className={`h-12 w-12 flex-shrink-0 rounded-[1.25rem] ${catConfig.color} flex items-center justify-center border border-gray-100 dark:border-gray-700 lya:border-transparent`}>
                               <Icon size={20} />
@@ -700,7 +708,6 @@ export const ExpensesPage = () => {
                             </div>
                           </div>
                           
-                          {/* CAJA DERECHA PAPELERA ASEGURADA */}
                           <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
                             <span className="font-black text-base text-red-500 lya:text-red-400">
                               ${parseFloat(ex.amount).toFixed(2)}

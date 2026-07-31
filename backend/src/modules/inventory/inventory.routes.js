@@ -5,10 +5,10 @@ import {
   registerTransaction, 
   getItemHistory, 
   deleteItem,
-  processReconciliation 
+  processReconciliation,
+  getGlobalHistory // 🔥 1. Importamos la nueva función del controlador
 } from './inventory.controller.js';
 
-// 🔥 CORRECCIÓN: Importamos verifyToken (que es el nombre real en tu middleware)
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
@@ -16,10 +16,12 @@ const router = express.Router();
 router.get('/', getInventory);
 router.post('/', createItem);
 
-// 🔥 CORRECCIÓN: Usamos verifyToken para proteger la ruta
-router.post('/reconciliation', verifyToken, processReconciliation);
+// 🔥 2. COLOCAR AQUÍ: La ruta global debe ir antes de cualquier ruta dinámica con parámetros (/:id)
+router.get('/history/global', verifyToken, getGlobalHistory);
 
+router.post('/reconciliation', verifyToken, processReconciliation);
 router.post('/transaction', registerTransaction);
+
 router.get('/:id/history', getItemHistory);
 router.delete('/:id', deleteItem);
 

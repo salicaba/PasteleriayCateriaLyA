@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../../../api/client';
-import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -10,9 +10,14 @@ import autoTable from 'jspdf-autotable';
 export const useReportsController = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
-  const [dateRange, setDateRange] = useState({
-    start: startOfMonth(new Date()),
-    end: endOfMonth(new Date())
+  
+  // 🔥 CORRECCIÓN: Ajustamos a las 00:00:00 para evitar que la zona horaria brinque de día
+  const [dateRange, setDateRange] = useState(() => {
+    const now = new Date();
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    };
   });
   
   const [productFilter, setProductFilter] = useState('5');
@@ -96,13 +101,12 @@ export const useReportsController = () => {
     return {
       dailySales, incomeSource, opexData, paymentMethods, 
       productSales: data.productSales,
-      pasteleriaSales: data.pasteleriaSales, // Agregado
+      pasteleriaSales: data.pasteleriaSales,
       kpis: { totalIncome, totalOpex, totalMermas, netProfit },
       trends
     };
   }, [data]);
 
-  // Lista Procesada de Cafetería
   const processedProducts = useMemo(() => {
     if (!chartData.productSales) return [];
     
@@ -118,7 +122,6 @@ export const useReportsController = () => {
     return list;
   }, [chartData.productSales, productFilter]);
 
-  // Lista Procesada de Pastelería (Exclusiva para reportes combinados)
   const processedPasteleriaProducts = useMemo(() => {
     if (!chartData.pasteleriaSales) return [];
     
@@ -163,7 +166,6 @@ export const useReportsController = () => {
       wsResumen['!cols'] = getAutoWidths(resumenData);
       XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen KPIs');
 
-      // Exportar Cafetería
       const productosData = processedProducts.map(p => ({
         Producto: p.name,
         Departamento: p.departamento,
@@ -176,7 +178,6 @@ export const useReportsController = () => {
       }
       XLSX.utils.book_append_sheet(wb, wsProductos, 'Rendimiento Cafetería');
 
-      // Exportar Pastelería
       const pasteleriaData = processedPasteleriaProducts.map(p => ({
         Categoría: p.name,
         Departamento: p.departamento,
@@ -199,7 +200,7 @@ export const useReportsController = () => {
       }
       XLSX.utils.book_append_sheet(wb, wsGastos, 'Gastos Operativos');
 
-      XLSX.writeFile(wb, `Inteligencia_Negocios_𝓛𝔂𝓪_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      XLSX.writeFile(wb, `Inteligencia_Negocios_LyA_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast.success('Reporte Excel exportado correctamente');
     } catch (error) {
       console.error(error);
@@ -214,7 +215,7 @@ export const useReportsController = () => {
       
       doc.setFontSize(18);
       doc.setTextColor(74, 43, 41);
-      doc.text('Inteligencia de Negocios - 𝓛𝔂𝓪', 14, 22);
+      doc.text('Inteligencia de Negocios - LyA', 14, 22);
       
       doc.setFontSize(11);
       doc.setTextColor(100);
@@ -233,7 +234,6 @@ export const useReportsController = () => {
         headStyles: { fillColor: [249, 115, 22] } 
       });
 
-      // Render Tabla Cafetería
       if (processedProducts.length > 0) {
         doc.setFontSize(14);
         doc.setTextColor(74, 43, 41);
@@ -259,7 +259,6 @@ export const useReportsController = () => {
         });
       }
 
-      // Render Tabla Pastelería
       if (processedPasteleriaProducts.length > 0) {
         let finalY = doc.lastAutoTable.finalY + 15;
         if (finalY > 250) {
@@ -290,7 +289,7 @@ export const useReportsController = () => {
         });
       }
 
-      doc.save(`Inteligencia_Negocios_𝓛𝔂𝓪_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      doc.save(`Inteligencia_Negocios_LyA_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast.success('Reporte PDF exportado correctamente');
     } catch (error) {
       console.error(error);

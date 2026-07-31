@@ -172,20 +172,20 @@ export const ReportsPage = () => {
 
     switch(val) {
       case 'today':
-        start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999); break;
+        start.setHours(0, 0, 0, 0); end.setHours(0, 0, 0, 0); break;
       case 'yesterday':
         start.setDate(now.getDate() - 1); start.setHours(0, 0, 0, 0);
-        end.setDate(now.getDate() - 1); end.setHours(23, 59, 59, 999); break;
+        end.setDate(now.getDate() - 1); end.setHours(0, 0, 0, 0); break;
       case 'this_week':
         const firstDay = now.getDate() - now.getDay();
         start.setDate(firstDay); start.setHours(0, 0, 0, 0);
-        end.setDate(firstDay + 6); end.setHours(23, 59, 59, 999); break;
+        end.setDate(firstDay + 6); end.setHours(0, 0, 0, 0); break;
       case 'this_month':
         start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999); break;
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0); break; // 🔥 El truco del 0 sin horas
       case 'last_month':
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999); break;
+        end = new Date(now.getFullYear(), now.getMonth(), 0); break;
       case 'custom':
         return; 
       default: break;
