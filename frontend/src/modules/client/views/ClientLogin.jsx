@@ -25,6 +25,9 @@ export default function ClientLogin({ onLogin, type, tableId }) {
   const [themeIndex, setThemeIndex] = useState(getInitialTheme);
   const [sizeIndex, setSizeIndex] = useState(getInitialSize);
 
+  // 🛡️ DETECCIÓN DE ENTORNO: Verificamos si estamos en la PWA (App) o en Navegador
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
   // PILAR 5: Cápsulas Neo-Bento para notificaciones
   const triggerNotification = (msg, notifType = 'warning') => {
     setNotification({ msg, type: notifType });
@@ -119,15 +122,17 @@ export default function ClientLogin({ onLogin, type, tableId }) {
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative items-center justify-center p-6">
       
-      {/* 🛡️ BOTÓN FLOTANTE VOLVER AL MAPEO (Izquierda) */}
-      <motion.button 
-        whileTap={!isProcessing ? { scale: 0.95 } : {}}
-        onClick={handleBackToMapping}
-        disabled={isProcessing}
-        className="absolute top-6 left-6 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-40 outline-none disabled:opacity-50"
-      >
-        <ArrowLeft size={20} strokeWidth={2.5} />
-      </motion.button>
+      {/* 🛡️ BOTÓN FLOTANTE VOLVER AL MAPEO (Izquierda) - SOLO VISIBLE EN LA APP (PWA) */}
+      {isStandalone && (
+        <motion.button 
+          whileTap={!isProcessing ? { scale: 0.95 } : {}}
+          onClick={handleBackToMapping}
+          disabled={isProcessing}
+          className="absolute top-6 left-6 w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-40 outline-none disabled:opacity-50"
+        >
+          <ArrowLeft size={20} strokeWidth={2.5} />
+        </motion.button>
+      )}
 
       {/* BOTÓN FLOTANTE DE CONFIGURACIÓN (Derecha) */}
       <motion.button 

@@ -63,7 +63,8 @@ export const ClientServiceShield = ({
       IconToRender = Coffee;
     } else if (isThisMesaDisabled) {
       shieldTitle = "Mesa Fuera de Servicio";
-      shieldMessage = `La Mesa ${tableId} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne otra mesa habilitada.`;
+      // 🛡️ MENSAJE ACTUALIZADO PARA DISTINGUIR ENTRE CLIENTE Y APP
+      shieldMessage = `La Mesa ${tableId} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne otra mesa habilitada. Si estás usando nuestra App, puedes elegir otra mesa o cambiar a Para Llevar usando el botón inferior.`;
       IconToRender = UtensilsCrossed;
     }
   }
@@ -112,9 +113,11 @@ export const ClientServiceShield = ({
                   {isProcessing ? (
                     <Loader2 className="animate-spin" size={20} />
                   ) : (
-                    <QrCode size={20} />
+                    // 🛡️ ÍCONO ACTUALIZADO (Store)
+                    <Store size={20} />
                   )}
-                  {isProcessing ? 'Saliendo...' : 'Escanear Nuevo QR'}
+                  {/* 🛡️ TEXTO ACTUALIZADO PARA LA APP */}
+                  {isProcessing ? 'Saliendo...' : 'Elegir otra Mesa / Llevar'}
                 </motion.button>
               )}
 
