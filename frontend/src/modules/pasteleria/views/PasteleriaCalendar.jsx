@@ -173,7 +173,7 @@ export default function PasteleriaCalendar() {
             
             {days.map(day => {
               const dateOfThisDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-              dateOfThisDay.setHours(0, 0, 0, 0); // Normalizar a medianoche para comparaciones
+              dateOfThisDay.setHours(0, 0, 0, 0); 
               
               const isSelected = dateOfThisDay.toDateString() === selectedDate.toDateString();
               const isToday = dateOfThisDay.toDateString() === hoy.toDateString();
@@ -181,7 +181,6 @@ export default function PasteleriaCalendar() {
               const pedidosDelDia = getPedidosForDate(dateOfThisDay);
               const numPedidos = pedidosDelDia.length;
 
-              // 🔥 LÓGICA DE DÍAS PASADOS: Si es antes de hoy y NO tiene pedidos
               const isPastEmpty = dateOfThisDay < hoy && numPedidos === 0;
 
               let indicatorColor = '';
@@ -200,10 +199,9 @@ export default function PasteleriaCalendar() {
                       setShowMobileList(true); 
                     }
                   }}
-                  // PILAR 2: md:hover para evitar que el hover se pegue en móviles, y estilos para el disabled
-                  className={`relative flex flex-col items-center p-2 rounded-[1.2rem] border transition-all duration-300 min-h-[4rem]
+                  className={`relative flex flex-col items-center p-2 rounded-[1.2rem] border transition-all duration-300 min-h-[4rem] outline-none touch-manipulation
                     ${isPastEmpty 
-                      ? 'opacity-30 cursor-not-allowed bg-transparent border-transparent grayscale' // 🔥 ESTADO INACTIVO PARA EL PASADO VACÍO
+                      ? 'opacity-30 cursor-not-allowed bg-transparent border-transparent grayscale' 
                       : isSelected 
                         ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30 lya:bg-lya-secondary lya:border-lya-secondary lya:shadow-lya-secondary/30 scale-[1.02]' 
                         : isToday 
@@ -272,14 +270,16 @@ export default function PasteleriaCalendar() {
                       exit={{ opacity: 0, scale: 0.95, x: -20 }}
                       transition={{ type: "spring", stiffness: 200, damping: 20 }}
                       key={pedido.id}
-                      className={`p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-colors md:hover:shadow-md
-                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40'}
+                      onClick={() => abrirDetalles(pedido)} // 🔥 FIX: TODA LA TARJETA ABRE LOS DETALLES
+                      whileTap={{ scale: 0.98 }} // 🔥 FIX: BLINDAJE TÁCTIL (PILAR 2)
+                      className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md
+                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5 md:hover:border-rose-400' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-300 lya:md:hover:border-lya-primary/50'}
                       `}
                     >
                       <div className="flex justify-between items-start">
-                        <div className="cursor-pointer flex-1" onClick={() => abrirDetalles(pedido)}>
+                        <div className="flex-1">
                           <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
-                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text md:hover:text-emerald-500 lya:md:hover:text-lya-primary transition-colors">{pedido.cliente}</h4>
+                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text transition-colors">{pedido.cliente}</h4>
                         </div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
                           <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {hora}
@@ -316,11 +316,11 @@ export default function PasteleriaCalendar() {
                         )}
                       </div>
 
-                      <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 line-clamp-2 italic cursor-pointer" onClick={() => abrirDetalles(pedido)}>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 line-clamp-2 italic">
                         "{pedido.descripcion}"
                       </p>
 
-                      <div className="pt-3 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex justify-between items-center">
+                      <div className="pt-3 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex justify-between items-center mt-auto">
                         {finanzas.estaLiquidado ? (
                           <span className="text-xs font-bold text-emerald-500 lya:text-lya-secondary flex items-center gap-1"><CheckCircle2 size={14}/> Liquidado</span>
                         ) : (
@@ -330,8 +330,21 @@ export default function PasteleriaCalendar() {
                         )}
                         
                         <div className="flex gap-2">
-                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => abrirDetalles(pedido)} className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors" title="Ver Detalles"><Eye size={16}/></motion.button>
-                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => abrirTicket(pedido)} className="p-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-xl transition-colors" title="Ver Ticket"><FileText size={16}/></motion.button>
+                          {/* El botón de Ver Detalles se mantiene visualmente, pero la acción ya la hereda la tarjeta completa */}
+                          <div className="p-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-xl" title="Ver Detalles">
+                            <Eye size={16}/>
+                          </div>
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }} 
+                            onClick={(e) => { 
+                              e.stopPropagation(); // 🔥 EVITA QUE EL CLICK SE FILTRE A LA TARJETA Y ABRA LOS DETALLES
+                              abrirTicket(pedido); 
+                            }} 
+                            className="p-2 bg-blue-50 md:hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-xl transition-colors" 
+                            title="Ver Ticket"
+                          >
+                            <FileText size={16}/>
+                          </motion.button>
                         </div>
                       </div>
                     </motion.div>
