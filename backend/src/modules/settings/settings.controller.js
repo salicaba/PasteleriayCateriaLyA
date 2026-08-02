@@ -6,25 +6,25 @@ export const getConfig = async (req, res) => {
   try {
     const configs = await BusinessConfig.findAll();
     
-    // Objeto con valores predeterminados seguros
+    // Objeto con valores predeterminados seguros (Añadimos la pastelería)
     const result = { 
       bank_accounts: [], 
       whatsapp_number: '', 
       printer_config: null, 
       barcode_config: null,
-      disabled_qrs: [] // 🔥 Aseguramos que siempre nazca como Array
+      disabled_qrs: [],
+      pasteleria_config: { categorias: [], tamanos: [], sabores: [] } // 🔥 Valor por defecto
     };
     
     configs.forEach(config => {
-      // 🔥 Añadimos disabled_qrs a la lista de parseo seguro
-      if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs'].includes(config.key)) {
+      // 🔥 Añadimos 'pasteleria_config' a la lista de parseo JSON
+      if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs', 'pasteleria_config'].includes(config.key)) {
         try {
           result[config.key] = JSON.parse(config.value);
         } catch(e) {
           result[config.key] = (config.key === 'bank_accounts' || config.key === 'disabled_qrs') ? [] : {};
         }
       } else {
-        // Configuraciones de texto plano, como whatsapp_number y qr_service_active
         result[config.key] = config.value;
       }
     });
@@ -43,8 +43,8 @@ export const updateConfig = async (req, res) => {
     for (const [key, value] of Object.entries(updates)) {
       let valueToSave = value;
       
-      // Aseguramos que objetos y arreglos se guarden como string JSON
-      if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs'].includes(key) || typeof value === 'object') {
+      // 🔥 Añadimos 'pasteleria_config' a los objetos que deben hacerse string
+      if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs', 'pasteleria_config'].includes(key) || typeof value === 'object') {
         valueToSave = JSON.stringify(value);
       }
       
@@ -54,12 +54,11 @@ export const updateConfig = async (req, res) => {
       });
     }
 
-    // 🚀 INYECCIÓN TIEMPO REAL CORREGIDA: Usamos el Singleton seguro
     const io = getIO();
     if (io) {
       io.emit('config:update', updates);
       io.emit('business_config_updated'); 
-      io.emit('pos:update'); // 🔥 Disparo extra para refrescar mapas de mesas en todo el local
+      io.emit('pos:update'); 
     }
 
     res.json({ message: "Configuración guardada exitosamente" });

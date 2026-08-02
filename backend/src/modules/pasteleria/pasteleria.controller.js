@@ -92,7 +92,7 @@ export const createPedido = async (req, res) => {
   }
 };
 
-// 🔥 Actualizar un pedido completo (Con Inteligencia de Reembolsos)
+// 🔥 Actualizar un pedido completo (Blindaje de Payload e Inteligencia de Reembolsos)
 export const updatePedido = async (req, res) => {
   const t = await sequelize.transaction(); // Usamos transacción para seguridad financiera
   try {
@@ -105,11 +105,31 @@ export const updatePedido = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
+    // 🛡️ BLINDAJE 1: Prevención del Error 500 (Filtro de metadatos)
+    // Extraemos el id y timestamps para que Sequelize NO intente actualizarlos.
+    // También aislamos 'abonos' para evitar que el frontend sobreescriba pagos nuevos con caché vieja.
+    const { 
+        id: reqId, 
+        createdAt, 
+        updatedAt, 
+        abonos, 
+        imagenesReferencia, 
+        ...updateData 
+    } = req.body;
+
+    // 🛡️ BLINDAJE 2: Protección de Imágenes Fantasma
+    // Como la lista de pedidos no trae las fotos, el frontend manda [] al editar.
+    // Solo actualizamos las imágenes si el usuario de verdad subió fotos nuevas.
+    if (imagenesReferencia && imagenesReferencia.length > 0) {
+        updateData.imagenesReferencia = imagenesReferencia;
+    }
+
     // 🔥 LÓGICA DE REEMBOLSO AUTOMÁTICO 🔥
-    const nuevoCosto = parseFloat(req.body.costoTotal);
+    const nuevoCosto = parseFloat(updateData.costoTotal);
+    const costoAnterior = parseFloat(pedido.costoTotal); // Parseamos para evitar fallos de string
     
     // Verificamos si el usuario le bajó el precio al pedido
-    if (!isNaN(nuevoCosto) && nuevoCosto < pedido.costoTotal) {
+    if (!isNaN(nuevoCosto) && !isNaN(costoAnterior) && nuevoCosto < costoAnterior) {
       const abonosActuales = pedido.abonos || [];
       const totalPagado = abonosActuales.reduce((sum, ab) => sum + parseFloat(ab.monto), 0);
       
@@ -117,14 +137,14 @@ export const updatePedido = async (req, res) => {
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
-        // 1. Crear transacción de salida (REFUND) en la Caja HOY
+        // 1. Crear transacción de salida en la Caja HOY
         const tx = await Transaction.create({
           source: 'PASTELERIA',
           type: 'EXPENSE',
-          expenseCategory: 'REFUND', // Aparecerá en tu gráfica como Reembolsos
+          expenseCategory: 'OTHER',  // 🛡️ BLINDAJE 3: Cambiado a 'OTHER' para evitar crasheos de ENUM en BD
           paymentMethod: 'CASH',     // Se asume que le devuelves el billete en mano
           amount: devolucion,
-          description: `Devolución por ajuste de precio. Pedido: ${pedido.cliente} ${pedido.id}`,
+          description: `Devolución por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
           createdBy: userId
         }, { transaction: t });
@@ -138,19 +158,21 @@ export const updatePedido = async (req, res) => {
           nota: 'Devolución automática'
         };
         
-        req.body.abonos = [...abonosActuales, abonoReembolso];
+        // Inyectamos los abonos actualizados al objeto que se va a guardar
+        updateData.abonos = [...abonosActuales, abonoReembolso];
       }
     }
     // 🔥 FIN DE LÓGICA DE REEMBOLSO 🔥
 
-    await pedido.update(req.body, { transaction: t });
+    // Ejecutamos la actualización solo con los datos seguros
+    await pedido.update(updateData, { transaction: t });
     
     await t.commit();
     res.json({ data: pedido });
   } catch (error) {
     await t.rollback();
     console.error("Error al editar pedido:", error);
-    res.status(500).json({ message: "Error al actualizar el pedido" });
+    res.status(500).json({ message: "Error al actualizar el pedido", error: error.message });
   }
 };
 
