@@ -347,7 +347,7 @@ export default function PasteleriaDashboard() {
                       {/* 🔥 ETIQUETAS DE PRODUCCIÓN (BADGES) */}
                       {isAtrasado && <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10">ATRASADO</div>}
                       {isHoy && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10 animate-pulse flex items-center gap-1"><Flame size={12}/> ¡ENTREGAR HOY!</div>}
-                      {isManana && <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10 flex items-center gap-1"><Timer size={12}/> PREPARAR HOY</div>}
+                      {isManana && <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm z-10 flex items-center gap-1"><Timer size={12}/> AVANZAR HOY</div>}
 
                       <div>
                         <div className="flex justify-between items-start mb-4">
