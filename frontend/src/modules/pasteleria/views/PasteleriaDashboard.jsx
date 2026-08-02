@@ -107,14 +107,13 @@ export default function PasteleriaDashboard() {
     let manana = 0;
     let proximos7 = 0;
 
-    // 🔥 2. AHORA LEEMOS DE "pedidos" (todos), NO DE "pedidosFiltrados"
     (pedidos || []).forEach(p => {
       // Si ya se entregó o canceló, lo ignoramos
       if (p.estado === 'entregado' || p.estado === 'cancelado') return;
       
       const fechaEntrega = new Date(p.fechaEntrega);
       
-      // Si el pedido ya está atrasado (es del pasado), no debe salir en el radar de "Hoy" ni "Mañana"
+      // Si el pedido ya está atrasado (es del pasado), no debe salir en el radar
       if (fechaEntrega < today) return; 
       
       if (fechaEntrega >= today && fechaEntrega < tomorrow) {
@@ -123,13 +122,14 @@ export default function PasteleriaDashboard() {
         manana++;
       }
       
-      if (fechaEntrega >= today && fechaEntrega <= next7Days) {
+      // 🔥 FIX: Radar de 7 días estrictamente contando a partir de MAÑANA
+      if (fechaEntrega >= tomorrow && fechaEntrega <= next7Days) {
         proximos7++;
       }
     });
 
     return { hoy, manana, proximos7, today, tomorrow, dayAfterTomorrow };
-  }, [pedidos]); // 🔥 3. DEPENDEMOS DE "pedidos", NO DE "pedidosFiltrados"
+  }, [pedidos]);
 
   if (loading) return <PasteleriaLoader />; 
 
