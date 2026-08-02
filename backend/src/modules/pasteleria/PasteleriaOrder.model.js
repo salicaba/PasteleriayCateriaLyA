@@ -16,8 +16,25 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     allowNull: true,
   },
   categoria: { 
+    // 🔥 EL FIX: Volvemos a STRING para no hacer enojar a PostgreSQL, 
+    // pero usamos interceptores para que el Frontend siga viendo un Array.
     type: DataTypes.STRING,
     defaultValue: 'Pastel',
+    get() {
+      const rawValue = this.getDataValue('categoria');
+      try {
+        // Intentamos parsearlo por si ya está guardado como '["Pastel","Boda"]'
+        const parsed = JSON.parse(rawValue);
+        return Array.isArray(parsed) ? parsed : [rawValue];
+      } catch (e) {
+        // Si falla, es un pedido viejo con texto normal como "Pastel". Lo volvemos lista.
+        return rawValue ? [rawValue] : [];
+      }
+    },
+    set(val) {
+      // Cuando el frontend mande el array, lo guardamos como texto stringificado
+      this.setDataValue('categoria', Array.isArray(val) ? JSON.stringify(val) : String(val));
+    }
   },
   descripcion: {
     type: DataTypes.TEXT,
@@ -55,7 +72,7 @@ const PasteleriaOrder = sequelize.define('PasteleriaOrder', {
     type: DataTypes.JSON, 
     defaultValue: [],
   },
-  imagenesReferencia: { // 🔥 CAMPO ACTUALIZADO A JSON ARRAY
+  imagenesReferencia: {
     type: DataTypes.JSON,
     defaultValue: [],
   }
