@@ -104,7 +104,7 @@ export const PosModal = ({
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
-    releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture // <-- Restaurados los de promociones
+    releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture 
   } = usePosController(mesa, isOpen, todasLasMesas, showToast); 
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
@@ -199,11 +199,23 @@ export const PosModal = ({
     }
   };
 
+  // 🔥 EL CUELLO DE BOTELLA RESUELTO: Atajo Universal de Cobro
   const handleOpenCheckout = () => {
-    if (!isVitrina && !validateAllDelivered()) { 
-      showToast("Todos los productos deben estar marcados como ENTREGADOS antes de cobrar.", "warning");
+    // Obtenemos las cuentas reales que aún tienen productos sin pagar
+    const cuentasActivas = Array.from(new Set(
+      cart.filter(i => i.status !== 'CANCELLED' && !cuentasPagadasReales.includes(i.cuenta || 'General'))
+          .map(i => i.cuenta || 'General')
+    ));
+    
+    // Evaluamos si TODA la mesa está lista, o si AL MENOS UNA cuenta individual lo está
+    const isMesaCompletaLista = validateAllDelivered();
+    const isAlgunaCuentaLista = cuentasActivas.some(cuenta => validateAllDelivered(cuenta));
+
+    if (!isVitrina && !isMesaCompletaLista && !isAlgunaCuentaLista) { 
+      showToast("Debes tener al menos una cuenta con todos sus productos ENTREGADOS para poder cobrar.", "warning");
       return; 
     }
+    
     if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
     setCheckoutTarget({ type: 'full', cuentaName: null, amount: total });
     setShowCheckout(true); 
@@ -224,7 +236,6 @@ export const PosModal = ({
   const handleFinalizePayment = async (paymentDetails) => {
     const { amountPaid, targetType, cuentaName, isLastInBatch } = paymentDetails;
     
-    // 🔥 EL MANEJADOR INTELIGENTE (Detecta si es un cobro por lote)
     if (targetType === 'partial' || targetType === 'silent_partial') { 
       await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
@@ -309,7 +320,7 @@ export const PosModal = ({
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
     nombreCliente: isLlevar ? nombreParaSidebar : null,
-    onReleaseAccount: releaseAccount, // <--- AÑADIDO AQUÍ
+    onReleaseAccount: releaseAccount,
     showToast 
   };
 
@@ -575,6 +586,7 @@ export const PosModal = ({
                       cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} 
                       onConfirmPayment={handleFinalizePayment} 
                       orderType={isVitrina ? 'mostrador' : isLlevar ? 'llevar' : 'salon'}
+                      validateAllDelivered={validateAllDelivered} // 🔥 AÑADE ESTA LÍNEA AQUÍ
                     />
                   )}
 

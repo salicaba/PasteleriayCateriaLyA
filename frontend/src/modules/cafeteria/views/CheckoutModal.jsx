@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/CheckoutModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle } from 'lucide-react';
+import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle, Lock, Clock } from 'lucide-react';
 import client from '../../../api/client'; 
 
 const parseAccountName = (str) => {
@@ -29,7 +29,8 @@ export const CheckoutModal = ({
   initialTarget, 
   cuentasResumen = [], 
   onConfirmPayment,
-  orderType = 'salon' 
+  orderType = 'salon',
+  validateAllDelivered // 🔥 INYECCIÓN: Recibimos el cerebro validador del padre
 }) => {
   const [method, setMethod] = useState('efectivo');
   const [amountReceived, setAmountReceived] = useState('');
@@ -48,6 +49,9 @@ export const CheckoutModal = ({
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
   };
 
+  // 🔥 EVALUACIÓN GENERAL DE LA MESA
+  const isTableFullyDelivered = validateAllDelivered ? validateAllDelivered() : true;
+
   useEffect(() => {
     if (isOpen) {
       setMethod('efectivo');
@@ -58,7 +62,12 @@ export const CheckoutModal = ({
       setIsProcessing(false); 
       setToast({ show: false, message: '', type: 'error' }); 
 
-      if (initialTarget?.type === 'partial' && orderType === 'salon') {
+      // 🔥 LÓGICA DE CADENERO: Redirige forzosamente a "Por Cuentas" si hay pendientes
+      if (orderType === 'salon' && !isTableFullyDelivered) {
+        setCobroMode('nominal');
+        const isInitialDelivered = initialTarget?.cuentaName && validateAllDelivered ? validateAllDelivered(initialTarget.cuentaName) : true;
+        setSelectedCuentas(initialTarget?.cuentaName && isInitialDelivered ? [initialTarget.cuentaName] : []);
+      } else if (initialTarget?.type === 'partial' && orderType === 'salon') {
         setCobroMode('nominal');
         setSelectedCuentas(initialTarget.cuentaName ? [initialTarget.cuentaName] : []);
       } else {
@@ -67,7 +76,7 @@ export const CheckoutModal = ({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, orderType]);
+  }, [isOpen, orderType, isTableFullyDelivered, initialTarget]);
 
   useEffect(() => {
     if (isOpen && method === 'transferencia') {
@@ -105,8 +114,11 @@ export const CheckoutModal = ({
 
   const selectAllCuentas = () => {
     if (isProcessing) return;
-    const todas = cuentasResumen.filter(c => c.subtotal > 0).map(c => c.nombre);
-    setSelectedCuentas(todas);
+    // 🔥 SOLO SELECCIONA LAS QUE YA ESTÁN ENTREGADAS Y CON SALDO > 0
+    const todasListas = cuentasResumen
+      .filter(c => c.subtotal > 0 && (validateAllDelivered ? validateAllDelivered(c.nombre) : true))
+      .map(c => c.nombre);
+    setSelectedCuentas(todasListas);
   };
 
   const handlePayment = async () => {
@@ -130,7 +142,6 @@ export const CheckoutModal = ({
               });
           }
       } else if (cobroMode === 'full' && orderType === 'salon') {
-          // 🔥 EL FIX SUPREMO: Cobramos las cuentas en silencio para sincronizar la BD exacta.
           for (let i = 0; i < cuentasResumen.length; i++) {
               const c = cuentasResumen[i];
               if (c.subtotal > 0) {
@@ -219,16 +230,23 @@ export const CheckoutModal = ({
 
         <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-5">
           
+          {/* 🔥 PESTAÑAS DE COBRO BLINDADAS */}
           <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-gray-800/80 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-inner">
             <motion.button 
-              whileTap={!isProcessing ? { scale: 0.95 } : {}}
+              whileTap={(!isProcessing && (isTableFullyDelivered || orderType !== 'salon')) ? { scale: 0.95 } : {}}
               onClick={() => setCobroMode('full')} 
-              disabled={isProcessing}
+              disabled={isProcessing || (!isTableFullyDelivered && orderType === 'salon')}
               className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all outline-none ${
-                cobroMode === 'full' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
-              }`}
+                cobroMode === 'full' 
+                  ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' 
+                  : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
+              } ${(!isTableFullyDelivered && orderType === 'salon') ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
-              <LayoutList size={18}/> <span className="text-center px-1">{getFullModeTextBtn()}</span>
+              <LayoutList size={18}/> 
+              <span className="text-center px-1 flex items-center justify-center gap-1">
+                {getFullModeTextBtn()}
+                {!isTableFullyDelivered && orderType === 'salon' && <Lock size={10} className="text-gray-400" />}
+              </span>
             </motion.button>
             
             {orderType === 'salon' && (
@@ -240,19 +258,26 @@ export const CheckoutModal = ({
                   cobroMode === 'nominal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
                 }`}
               >
-                <User size={18}/> Por Cuentas
+                <User size={18}/> 
+                <span className="text-center px-1">Por Cuentas</span>
               </motion.button>
             )}
             
             <motion.button 
-              whileTap={!isProcessing ? { scale: 0.95 } : {}}
+              whileTap={(!isProcessing && (isTableFullyDelivered || orderType !== 'salon')) ? { scale: 0.95 } : {}}
               onClick={() => setCobroMode('equal')} 
-              disabled={isProcessing}
+              disabled={isProcessing || (!isTableFullyDelivered && orderType === 'salon')}
               className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all outline-none ${
-                cobroMode === 'equal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
-              }`}
+                cobroMode === 'equal' 
+                  ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' 
+                  : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
+              } ${(!isTableFullyDelivered && orderType === 'salon') ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
-              <PieChart size={18}/> Dividir
+              <PieChart size={18}/> 
+              <span className="text-center px-1 flex items-center justify-center gap-1">
+                Dividir
+                {!isTableFullyDelivered && orderType === 'salon' && <Lock size={10} className="text-gray-400" />}
+              </span>
             </motion.button>
           </div>
 
@@ -264,6 +289,7 @@ export const CheckoutModal = ({
                 </motion.div>
               )}
               
+              {/* 🔥 LISTA DE CUENTAS BLINDADA */}
               {cobroMode === 'nominal' && orderType === 'salon' && (
                 <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-col gap-2">
                   <div className="flex justify-between items-center px-1">
@@ -275,21 +301,33 @@ export const CheckoutModal = ({
                       <span className="text-xs font-medium text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg w-full text-center">No hay cuentas pendientes.</span>
                     ) : (
                        cuentasResumen.map(cuenta => {
+                         const isCuentaDelivered = validateAllDelivered ? validateAllDelivered(cuenta.nombre) : true;
                          const isSelected = selectedCuentas.includes(cuenta.nombre);
+                         const isSelectable = cuenta.subtotal > 0 && isCuentaDelivered;
+
                          return (
                            <motion.button 
-                              whileTap={!isProcessing && cuenta.subtotal > 0 ? { scale: 0.95 } : {}}
+                              whileTap={!isProcessing && isSelectable ? { scale: 0.95 } : {}}
                               key={cuenta.nombre} 
                               onClick={() => toggleCuentaSelection(cuenta.nombre)} 
-                              disabled={cuenta.subtotal === 0 || isProcessing}
-                              className={`px-3 py-2 flex flex-col rounded-xl text-xs font-black border-2 transition-all disabled:opacity-40 disabled:scale-100 outline-none ${
-                                isSelected 
-                                  ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 lya:border-lya-primary lya:text-lya-primary lya:bg-lya-primary/10 shadow-sm' 
-                                  : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:border-orange-300 dark:md:hover:border-orange-700'
+                              disabled={!isSelectable || isProcessing}
+                              className={`px-3 py-2 flex flex-col rounded-xl text-xs font-black border-2 transition-all disabled:scale-100 outline-none ${
+                                !isSelectable 
+                                  ? 'opacity-50 border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-400 bg-gray-50 dark:bg-gray-800 cursor-not-allowed'
+                                  : isSelected 
+                                    ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 lya:border-lya-primary lya:text-lya-primary lya:bg-lya-primary/10 shadow-sm' 
+                                    : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:border-orange-300 dark:md:hover:border-orange-700'
                               }`}
                             >
                               {parseAccountName(cuenta.nombre)} 
                               <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'opacity-100' : 'opacity-60'}`}>${cuenta.subtotal.toFixed(2)}</span>
+                              
+                              {/* AVISO DE PRODUCTOS PENDIENTES */}
+                              {!isCuentaDelivered && (
+                                <span className="flex items-center gap-1 text-[9px] text-amber-500 mt-1 uppercase tracking-wider">
+                                  <Clock size={10} /> En cocina
+                                </span>
+                              )}
                            </motion.button>
                          )
                        })
