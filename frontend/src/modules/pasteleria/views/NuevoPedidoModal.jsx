@@ -1,4 +1,4 @@
-// src/modules/pasteleria/views/NuevoPedidoModal.jsx
+// frontend/src/modules/pasteleria/views/NuevoPedidoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, DollarSign, Calendar, Truck, Store, Camera, Layers, Hash, Clock, Smartphone, Banknote, Tag, Loader2, Calculator, MessageCircle } from 'lucide-react'; 
@@ -55,7 +55,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
           imagenesReferencia: Array.isArray(pedidoAEditar.imagenesReferencia) ? pedidoAEditar.imagenesReferencia : []
         });
         
-        // Cargar arrays existentes o convertir strings viejos a arrays
         setCategoriasTags(Array.isArray(pedidoAEditar.categoria) ? pedidoAEditar.categoria : (pedidoAEditar.categoria ? [pedidoAEditar.categoria] : []));
         setPorcionesTags(Array.isArray(pedidoAEditar.porciones) ? pedidoAEditar.porciones : []);
         setSaboresTags(Array.isArray(pedidoAEditar.saborPan) ? pedidoAEditar.saborPan : []);
@@ -100,7 +99,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
   }, [isOpen, metodoPagoAnticipo, pedidoAEditar]);
 
-  // Cálculo automático del cambio
   useEffect(() => {
     if (metodoPagoAnticipo === 'efectivo') {
       const received = parseFloat(amountReceived) || 0;
@@ -119,11 +117,33 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
   };
 
+  // 🔥 VALIDACIÓN DE NÚMEROS DE TELÉFONO
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'telefono') {
+      // Reemplaza cualquier cosa que no sea número por nada
+      const soloNumeros = value.replace(/\D/g, '');
+      if (soloNumeros.length <= 10) {
+        setFormData({ ...formData, [name]: soloNumeros });
+      }
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (isCompressing) return; 
+    if (isCompressing || isTelefonoInvalido) return; 
 
     let datosFinales = { ...formData };
+    
+    // 🔥 FIX DE ZONA HORARIA:
+    // Creamos un Date real desde la hora local, y sacamos su ISOString oficial.
+    // Esto asegura que la base de datos lo procese y lo devuelva correctamente.
+    if (formData.fechaEntrega) {
+      const localDate = new Date(formData.fechaEntrega);
+      datosFinales.fechaEntrega = localDate.toISOString();
+    }
     
     // Inyectamos las listas múltiples al objeto final
     datosFinales.categoria = categoriasTags;
@@ -135,8 +155,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     }
     onSave(datosFinales);
   };
-
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   // Extracción de Fecha y Hora separadas
   const datePart = formData.fechaEntrega ? formData.fechaEntrega.split('T')[0] : '';
@@ -255,12 +273,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
     </div>
   );
 
-  // VALIDACIONES ESTRICTAS FINANCIERAS Y DE FECHAS
+  // VALIDACIONES ESTRICTAS
   const isAnticipoExcedido = !pedidoAEditar && anticipo > costo;
   const isMontoInvalido = !pedidoAEditar && anticipo > 0 && metodoPagoAnticipo === 'efectivo' && (parseFloat(amountReceived) || 0) < anticipo;
   
-  // Bloqueo de botón
-  const isButtonDisabled = isSubmitting || isCompressing || isMontoInvalido || isAnticipoExcedido || isTimeInvalid || isFechaInvalida;
+  // 🔥 LÓGICA DE TELÉFONO: Si escribió algo, DEBEN ser exactamente 10 números
+  const isTelefonoInvalido = formData.telefono && formData.telefono.length > 0 && formData.telefono.length !== 10;
+  
+  // Bloqueo de botón maestro
+  const isButtonDisabled = isSubmitting || isCompressing || isMontoInvalido || isAnticipoExcedido || isTimeInvalid || isFechaInvalida || isTelefonoInvalido;
 
   return (
     <AnimatePresence>
@@ -287,7 +308,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   
                   <div className="grid grid-cols-2 gap-4">
                     <input type="text" name="cliente" required placeholder="Nombre del Cliente" value={formData.cliente} onChange={handleChange} disabled={isSubmitting || isCompressing} className="col-span-2 bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 font-medium" />
-                    <input type="tel" name="telefono" placeholder="Teléfono" value={formData.telefono} onChange={handleChange} disabled={isSubmitting || isCompressing} className="col-span-2 bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 font-medium" />
+                    
+                    {/* INPUT TELÉFONO CON VALIDACIÓN VISUAL */}
+                    <div className="col-span-2 relative">
+                      <input 
+                        type="tel" 
+                        name="telefono" 
+                        placeholder="Teléfono (10 dígitos)" 
+                        value={formData.telefono} 
+                        onChange={handleChange} 
+                        disabled={isSubmitting || isCompressing} 
+                        className={`w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 disabled:opacity-50 font-medium transition-colors ${isTelefonoInvalido ? 'border-red-500 focus:ring-red-500/50' : 'border-gray-200 dark:border-gray-800 lya:border-lya-border/40 focus:ring-emerald-500/50'}`} 
+                      />
+                      {isTelefonoInvalido && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500">{formData.telefono.length}/10</span>}
+                    </div>
                   </div>
 
                   {/* 🔥 CATEGORÍA MÚLTIPLE */}
@@ -528,6 +562,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   'Efectivo Recibido Insuficiente'
                 ) : isTimeInvalid || isFechaInvalida ? (
                   'Elige una fecha y hora futura'
+                ) : isTelefonoInvalido ? ( // 🔥 NUEVA ALERTA
+                  'El teléfono debe tener 10 dígitos'
                 ) : (
                   pedidoAEditar ? 'Guardar Cambios' : 'Confirmar y Agendar'
                 )}
