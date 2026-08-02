@@ -44,18 +44,44 @@ export const getPedidoById = async (req, res) => {
 export const createPedido = async (req, res) => {
   try {
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
-    const { abonos, ...pedidoData } = req.body;
+    
+    // 🛡️ FIX MASIVO: Extraemos el anticipo que viene desde el modal del frontend
+    const { abonos, anticipo, metodoPagoAnticipo, ...pedidoData } = req.body;
 
     const randomNum = Math.floor(100 + Math.random() * 900);
     const newId = `PED-${Date.now().toString().slice(-6)}${randomNum}`;
 
     let abonosParaGuardar = [];
 
+    // 🔥 1. Registramos el anticipo inicial en la Caja (El dinero ya no se esfuma)
+    const montoAnticipo = parseFloat(anticipo);
+    if (montoAnticipo > 0) {
+      let dbMethod = 'CASH';
+      if (metodoPagoAnticipo === 'transferencia') dbMethod = 'TRANSFER';
+      else if (metodoPagoAnticipo === 'tarjeta') dbMethod = 'CARD'; 
+
+      const tx = await Transaction.create({
+        source: 'PASTELERIA',
+        paymentMethod: dbMethod, 
+        amount: montoAnticipo,
+        description: `Anticipo Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
+        referenceId: newId,
+        createdBy: userId
+      });
+      
+      abonosParaGuardar.push({
+        id: tx.id,
+        fecha: new Date().toISOString(),
+        monto: montoAnticipo,
+        metodo: metodoPagoAnticipo || 'efectivo' 
+      });
+    }
+
+    // 2. Procesamos cualquier otro abono extra
     if (abonos && Array.isArray(abonos) && abonos.length > 0) {
       for (const abono of abonos) {
         const montoAbono = parseFloat(abono.monto);
         if (montoAbono > 0) {
-          
           let dbMethod = 'CASH';
           if (abono.metodo === 'transferencia') dbMethod = 'TRANSFER';
           else if (abono.metodo === 'tarjeta') dbMethod = 'CARD'; 
@@ -64,7 +90,7 @@ export const createPedido = async (req, res) => {
             source: 'PASTELERIA',
             paymentMethod: dbMethod, 
             amount: montoAbono,
-            description: `Anticipo Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
+            description: `Abono Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
             referenceId: newId,
             createdBy: userId
           });
@@ -87,12 +113,12 @@ export const createPedido = async (req, res) => {
 
     res.status(201).json({ data: nuevoPedido });
   } catch (error) {
-    console.error("Error al crear pedido:", error);
-    res.status(500).json({ message: "Error al crear el pedido" });
+    console.error("🔥 Error crítico al crear pedido:", error);
+    res.status(500).json({ message: "Error al crear el pedido", details: error.message });
   }
 };
 
-// 🔥 Actualizar un pedido completo (Blindaje de Payload e Inteligencia de Reembolsos)
+// 🔥 Actualizar un pedido completo (Con Inteligencia de Reembolsos)
 export const updatePedido = async (req, res) => {
   const t = await sequelize.transaction(); // Usamos transacción para seguridad financiera
   try {
@@ -105,28 +131,27 @@ export const updatePedido = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    // 🛡️ BLINDAJE 1: Prevención del Error 500 (Filtro de metadatos)
-    // Extraemos el id y timestamps para que Sequelize NO intente actualizarlos.
-    // También aislamos 'abonos' para evitar que el frontend sobreescriba pagos nuevos con caché vieja.
+    // 🛡️ BLINDAJE 1: Limpieza del Payload
+    // Eliminamos anticipo y metodoPagoAnticipo para que Sequelize no intente guardarlos y colapse
     const { 
         id: reqId, 
         createdAt, 
         updatedAt, 
         abonos, 
         imagenesReferencia, 
+        anticipo, 
+        metodoPagoAnticipo, 
         ...updateData 
     } = req.body;
 
-    // 🛡️ BLINDAJE 2: Protección de Imágenes Fantasma
-    // Como la lista de pedidos no trae las fotos, el frontend manda [] al editar.
-    // Solo actualizamos las imágenes si el usuario de verdad subió fotos nuevas.
+    // 🛡️ BLINDAJE 2: Protección de Fotos
     if (imagenesReferencia && imagenesReferencia.length > 0) {
         updateData.imagenesReferencia = imagenesReferencia;
     }
 
     // 🔥 LÓGICA DE REEMBOLSO AUTOMÁTICO 🔥
     const nuevoCosto = parseFloat(updateData.costoTotal);
-    const costoAnterior = parseFloat(pedido.costoTotal); // Parseamos para evitar fallos de string
+    const costoAnterior = parseFloat(pedido.costoTotal);
     
     // Verificamos si el usuario le bajó el precio al pedido
     if (!isNaN(nuevoCosto) && !isNaN(costoAnterior) && nuevoCosto < costoAnterior) {
@@ -137,14 +162,12 @@ export const updatePedido = async (req, res) => {
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
-        // 1. Crear transacción de salida en la Caja HOY
+        // 1. Crear transacción de salida (100% compatible con tu modelo)
         const tx = await Transaction.create({
           source: 'PASTELERIA',
-          type: 'EXPENSE',
-          expenseCategory: 'OTHER',  // 🛡️ BLINDAJE 3: Cambiado a 'OTHER' para evitar crasheos de ENUM en BD
           paymentMethod: 'CASH',     // Se asume que le devuelves el billete en mano
           amount: devolucion,
-          description: `Devolución por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
+          description: `Devolución de saldo a favor por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
           createdBy: userId
         }, { transaction: t });
@@ -158,21 +181,20 @@ export const updatePedido = async (req, res) => {
           nota: 'Devolución automática'
         };
         
-        // Inyectamos los abonos actualizados al objeto que se va a guardar
         updateData.abonos = [...abonosActuales, abonoReembolso];
       }
     }
     // 🔥 FIN DE LÓGICA DE REEMBOLSO 🔥
 
-    // Ejecutamos la actualización solo con los datos seguros
     await pedido.update(updateData, { transaction: t });
     
     await t.commit();
     res.json({ data: pedido });
   } catch (error) {
     await t.rollback();
-    console.error("Error al editar pedido:", error);
-    res.status(500).json({ message: "Error al actualizar el pedido", error: error.message });
+    // Inyectamos el log detallado para que nos diga en consola exactamente por qué falla si vuelve a ocurrir
+    console.error("🔥 Error al editar pedido:", error.message, error.sql);
+    res.status(500).json({ message: "Error al actualizar el pedido", details: error.message });
   }
 };
 
