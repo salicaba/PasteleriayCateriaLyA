@@ -1,7 +1,7 @@
 // frontend/src/modules/client/ClientApp.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast'; // 🔥 Añadido toast para avisos de red
 import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -63,12 +63,19 @@ export default function ClientApp({ type }) {
     return () => observer.disconnect();
   }, []);
 
+  // 🔥 1. BLINDAJE DEL ATRAPA-ERRORES (Ignorar fallos de red del PWA)
   useEffect(() => {
     const handleError = (event) => {
+      if (event.message?.includes('Failed to update a ServiceWorker')) return;
       setRuntimeError(event.message || String(event.error || 'Error desconocido de JavaScript'));
     };
     const handleRejection = (event) => {
-      setRuntimeError(event.reason?.message || String(event.reason || 'Promesa rechazada no manejada'));
+      const msg = event.reason?.message || String(event.reason || '');
+      // Silenciador táctico: Si es un error del Service Worker o de red ("Failed to fetch"), lo ignoramos
+      if (msg.includes('Failed to update a ServiceWorker') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        return; 
+      }
+      setRuntimeError(msg || 'Promesa rechazada no manejada');
     };
 
     window.addEventListener('error', handleError);
@@ -80,13 +87,22 @@ export default function ClientApp({ type }) {
     };
   }, []);
 
+  // 🔥 2. RADAR DE CONEXIÓN PARA EL ACTUALIZADOR EN SEGUNDO PLANO
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
       if (r) {
-        setInterval(() => r.update(), 60 * 1000); 
+        setInterval(() => {
+          // Solo intentamos buscar actualizaciones si el celular tiene conexión real
+          if (navigator.onLine) {
+            r.update().catch(() => {
+              // Si la red se cae en este milisegundo exacto, fallamos silenciosamente.
+              // El Escudo de Conexión se encargará de mostrar la "Señal Débil".
+            });
+          }
+        }, 60 * 1000); 
       }
     }
   });
@@ -127,13 +143,11 @@ export default function ClientApp({ type }) {
   }, [themeIndex]);
 
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
-    // 🔥 SILENCIADOR NINJA: Solo mostramos loader si es la primera carga
     if (isInitialLoad) {
       setIsLoadingTables(true);
     }
     
     try {
-      // Burlar la caché con la hora actual
       const ts = Date.now();
       const [tablesRes, settingsRes] = await Promise.all([
         api.get(`/pos/public/tables?_t=${ts}`).catch(() => api.get(`/pos/tables?_t=${ts}`)),
@@ -159,7 +173,6 @@ export default function ClientApp({ type }) {
     } catch (error) {
       console.error('Error al cargar configuración:', error);
     } finally {
-      // 🔥 SILENCIADOR NINJA: Solo quitamos loader si lo pusimos
       if (isInitialLoad) {
         setIsLoadingTables(false);
         setTimeout(() => setIsAppReady(true), 600);
@@ -171,7 +184,6 @@ export default function ClientApp({ type }) {
     fetchStoreData(true);
   }, [fetchStoreData]);
 
-  // 🔥 Múltiples eventos atrapados para garantizar recepción
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
 
@@ -324,7 +336,6 @@ export default function ClientApp({ type }) {
         )}
       </AnimatePresence>
 
-      {/* 🔥 REGLA 1: Anti-Ghost Scroll estricto aplicado aquí */}
       <div className="h-[100dvh] w-full flex flex-col transition-colors duration-300 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-900 dark:text-gray-100 lya:text-lya-text relative overflow-hidden">
         
         <AnimatePresence>
@@ -343,13 +354,16 @@ export default function ClientApp({ type }) {
                   whileTap={isUpdating ? {} : { scale: 0.95 }}
                   disabled={isUpdating}
                   onClick={async () => {
+                    if (!navigator.onLine) {
+                      toast.error("Sin conexión. Conéctate a internet para actualizar.", { icon: <WifiOff size={16}/> });
+                      return;
+                    }
                     setIsUpdating(true);
                     try { 
                       await updateServiceWorker(true); 
-                      // 🔥 MAGIA: NO lo regresamos a false. 
-                      // La página se va a recargar, así que el loader se queda congelado bloqueando los clics.
                     } catch (error) {
-                      setIsUpdating(false); // Solo liberamos si algo falla trágicamente
+                      setIsUpdating(false); 
+                      toast.error("Fallo al actualizar. Tu internet es inestable.");
                     }
                   }} 
                   className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-600 cursor-wait opacity-90 shadow-inner' : 'bg-emerald-500 shadow-lg md:hover:shadow-xl'}`}
@@ -362,7 +376,6 @@ export default function ClientApp({ type }) {
         </AnimatePresence>
 
         <ClientConnectionShield>
-          {/* 🔥 Se le pasan correctamente las props necesarias al escudo */}
           <ClientServiceShield 
             key={`shield-mode-${isGridMode ? 'grid' : 'login'}`} 
             activeOrdersCount={!clientData ? 0 : activeOrdersCount} 
