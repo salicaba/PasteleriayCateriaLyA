@@ -1,3 +1,4 @@
+// backend/src/modules/inventory/inventory.controller.js
 import { Op } from 'sequelize';
 import InventoryItem from './InventoryItem.model.js';
 import InventoryTransaction from './InventoryTransaction.model.js';
@@ -5,6 +6,7 @@ import InventoryReconciliation from './InventoryReconciliation.model.js';
 import InventoryReconciliationDetail from './InventoryReconciliationDetail.model.js';
 import sequelize from '../../config/database.js';
 import User from '../users/User.model.js';
+import { getIO } from '../../config/socket.js'; // 🔥 FIX: Importar Sockets
 
 // 1. Obtener todo el inventario activo
 export const getInventory = async (req, res) => {
@@ -100,6 +102,12 @@ export const registerTransaction = async (req, res) => {
 
     await t.commit(); 
 
+    // 🔥 FIX: Emitir el cambio de stock en tiempo real
+    getIO().emit('stock:update', [{
+      id: inventoryItemId,
+      stock: newStock
+    }]);
+
     res.status(201).json({ 
       message: 'Transacción registrada con éxito', 
       currentStock: newStock, 
@@ -169,6 +177,7 @@ export const processReconciliation = async (req, res) => {
     }, { transaction: t });
 
     let totalCOGS = 0;
+    const stockUpdates = []; // 🔥 FIX: Recolector de emisiones
 
     for (const count of items) {
       const { inventoryItemId, physicalStock } = count;
@@ -223,11 +232,22 @@ export const processReconciliation = async (req, res) => {
       }
 
       await item.update({ currentStock: parsedPhysical }, { transaction: t });
+
+      // 🔥 FIX: Guardar para emitir masivamente
+      stockUpdates.push({
+        id: item.id,
+        stock: parsedPhysical
+      });
     }
 
     await reconciliation.update({ totalConsumptionValue: totalCOGS }, { transaction: t });
 
     await t.commit();
+
+    // 🔥 FIX: Emitimos todos los cambios de inventario al sistema de una vez
+    if (stockUpdates.length > 0) {
+      getIO().emit('stock:update', stockUpdates);
+    }
 
     res.status(201).json({ 
       message: 'Arqueo procesado con éxito',
@@ -251,7 +271,6 @@ export const getGlobalHistory = async (req, res) => {
     let dateFilter = {};
     
     if (startDate && endDate) {
-      // Nos aseguramos de cubrir todo el día final añadiendo las horas hasta 23:59:59
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       
@@ -271,7 +290,6 @@ export const getGlobalHistory = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // KPI: Gasto Total en Compras (IN) dentro del periodo filtrado
     const totalSpent = transactions
       .filter(t => t.type === 'IN')
       .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);

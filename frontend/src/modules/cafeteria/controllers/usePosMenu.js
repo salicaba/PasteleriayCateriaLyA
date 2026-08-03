@@ -1,4 +1,4 @@
-// src/modules/cafeteria/controllers/usePosMenu.js
+// frontend/src/modules/cafeteria/controllers/usePosMenu.js
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import client from '../../../api/client.js';
 import { socket } from '../../../api/socket.js';
@@ -55,7 +55,7 @@ export const usePosMenu = (isVitrina) => {
       
       setDbCategories(finalCats);
     } catch (error) {
-      console.error("Error al cargar menú y promociones en POS", error);
+      console.error("🔥 Error al cargar menú y promociones en POS", error);
     }
   }, []);
 
@@ -68,7 +68,12 @@ export const usePosMenu = (isVitrina) => {
       setDbProducts(prevProducts => prevProducts.map(p => {
         const update = updates.find(u => u.id === p.id);
         if (update) {
-          return { ...p, stock: update.stock, isAgotado: update.isAgotado };
+          return { 
+            ...p, 
+            stock: update.stock, 
+            // Blindaje: Solo sobreescribir isAgotado si viene en el payload
+            isAgotado: update.isAgotado !== undefined ? update.isAgotado : p.isAgotado 
+          };
         }
         return p;
       }));
@@ -81,22 +86,21 @@ export const usePosMenu = (isVitrina) => {
         const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
         setActivePromotions(list);
       } catch (err) {
-        console.error('Error sincronizando promos vía socket:', err);
+        console.error('🔥 Error sincronizando promos vía socket:', err);
       }
     };
 
+    // 🔥 FIX: Suscripciones correctas alineadas con el backend
     socket.on('stock:update', handleStockUpdate);
-    socket.on('promotion_created', handlePromoChange);
-    socket.on('promotion_updated', handlePromoChange);
-    socket.on('promotion_deleted', handlePromoChange);
+    socket.on('menu:promotions_updated', handlePromoChange);
+    socket.on('pos:update', loadData); // Soporte nativo para refresco global forzado
 
     return () => {
       socket.off('stock:update', handleStockUpdate);
-      socket.off('promotion_created', handlePromoChange);
-      socket.off('promotion_updated', handlePromoChange);
-      socket.off('promotion_deleted', handlePromoChange);
+      socket.off('menu:promotions_updated', handlePromoChange);
+      socket.off('pos:update', loadData);
     };
-  }, []);
+  }, [loadData]);
 
   const filteredProducts = useMemo(() => {
     return dbProducts.filter(p => {
