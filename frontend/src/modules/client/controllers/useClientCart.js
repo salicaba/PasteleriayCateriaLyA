@@ -30,6 +30,7 @@ export const useClientCart = (triggerNotification) => {
     isOpen: false, message: '', onConfirm: null, onCancel: null
   });
 
+  // 1. CARGA INICIAL Y ESCUCHA DE SOCKETS
   useEffect(() => {
     const fetchPromos = async () => {
       try {
@@ -45,16 +46,13 @@ export const useClientCart = (triggerNotification) => {
     fetchPromos();
     const handlePromoUpdate = () => fetchPromos();
 
+    // 🔥 FIX: Suscripción exacta al canal del backend
     socket.on('menu:promotions_updated', handlePromoUpdate);
-    socket.on('promotion_created', handlePromoUpdate);
-    socket.on('promotion_updated', handlePromoUpdate);
-    socket.on('promotion_deleted', handlePromoUpdate);
+    socket.on('pos:update', handlePromoUpdate); // Refresco por si apagan el producto base
 
     return () => {
       socket.off('menu:promotions_updated', handlePromoUpdate);
-      socket.off('promotion_created', handlePromoUpdate);
-      socket.off('promotion_updated', handlePromoUpdate);
-      socket.off('promotion_deleted', handlePromoUpdate);
+      socket.off('pos:update', handlePromoUpdate);
     };
   }, []);
 
@@ -353,6 +351,16 @@ export const useClientCart = (triggerNotification) => {
     return cleanCart;
   };
 
+  // 🔥 EL CEREBRO DE LA REACTIVIDAD: Auto-sincronización del carrito
+  // Si las promociones cambian en el servidor, recalcula el carrito de forma pasiva e instantánea.
+  useEffect(() => {
+    _setCart(prevCart => {
+      if (prevCart.length === 0) return prevCart;
+      return syncPromotions(prevCart, promotions);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promotions]); 
+
   const setCart = (action) => {
     _setCart(prev => {
       const nextCart = typeof action === 'function' ? action(prev) : action;
@@ -369,7 +377,6 @@ export const useClientCart = (triggerNotification) => {
       const getNormalQtys = (cartState) => {
         const qtys = {};
         cartState.forEach(item => {
-          // 🔥 CORRECCIÓN: La rebaja directa no se cuenta como fantasma en la ruptura
           const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
           if (isTrueGhost || Number(item.precioUnitario) === 0) return;
           const key = String(item.id);
@@ -453,7 +460,6 @@ export const useClientCart = (triggerNotification) => {
 
         newItem.cartItemId = uniqueCartId;
         
-        // 🔥 CORRECCIÓN: Permitimos que las "OFERTAS" (FIXED) se agrupen y no se dupliquen
         const existing = prev.find(item => item.cartItemId === uniqueCartId && (!item.isAutoPromo || item.promoLabel === 'OFERTA'));
         
         if (existing) {
@@ -475,7 +481,6 @@ export const useClientCart = (triggerNotification) => {
     try {
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
-        // 🔥 CORRECCIÓN: Permitimos restar OFERTAS Directas
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
         
         if (existing.qty === 1) return prev.filter(item => item.cartItemId !== cartItemId);
@@ -495,7 +500,6 @@ export const useClientCart = (triggerNotification) => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
         
-        // 🔥 EL BASURERO SUPREMO: Elimina el producto principal y todos sus clones/fantasmas atados
         const baseId = String(cartItemId).replace('-promo', '');
         return prev.filter(item => String(item.cartItemId).replace('-promo', '') !== baseId);
       });
@@ -510,7 +514,6 @@ export const useClientCart = (triggerNotification) => {
 
     try {
       const existing = _cart.find(item => item.cartItemId === cartItemId);
-      // 🔥 CORRECCIÓN: Permitimos sumar OFERTAS Directas
       if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return; 
 
       const currentTotalQty = _cart.filter(item => item.id === existing.id).reduce((acc, item) => acc + item.qty, 0);
@@ -524,60 +527,6 @@ export const useClientCart = (triggerNotification) => {
       isProcessingRef.current = false;
     }
   };
-
-  useEffect(() => {
-    const handleStockAdjustment = (updates) => {
-      setCart(prevCart => {
-        let modifiedCart = [...prevCart];
-        let notificationsToFire = new Set();
-
-        modifiedCart = modifiedCart.map(item => {
-          const update = updates.find(u => u.id === item.id);
-          return update ? { ...item, stock: update.stock } : item;
-        });
-
-        for (const update of updates) {
-          const itemsOfProduct = modifiedCart.filter(i => i.id === update.id);
-          if (itemsOfProduct.length === 0 || !itemsOfProduct[0].controlarStock) continue;
-
-          let currentTotalQty = itemsOfProduct.reduce((sum, i) => sum + i.qty, 0);
-          
-          if (currentTotalQty > update.stock) {
-            if (update.stock === 0) {
-              notificationsToFire.add({ msg: `Un producto de tu carrito se agotó y fue removido.`, type: 'error' });
-              modifiedCart = modifiedCart.filter(i => i.id !== update.id);
-            } else {
-              notificationsToFire.add({ msg: `Ajustamos la cantidad de un producto por disponibilidad.`, type: 'warning' });
-              for (let i = modifiedCart.length - 1; i >= 0; i--) {
-                const item = modifiedCart[i];
-                if (item.id === update.id) {
-                  const excess = currentTotalQty - update.stock;
-                  if (excess >= item.qty) {
-                    currentTotalQty -= item.qty;
-                    modifiedCart.splice(i, 1);
-                  } else {
-                    modifiedCart[i] = { ...item, qty: item.qty - excess };
-                    currentTotalQty -= excess;
-                  }
-                  if (currentTotalQty <= update.stock) break;
-                }
-              }
-            }
-          }
-        }
-
-        if (triggerNotification) {
-          setTimeout(() => {
-            notificationsToFire.forEach(notif => triggerNotification(notif.msg, notif.type));
-          }, 0);
-        }
-        return modifiedCart;
-      });
-    };
-
-    socket.on('stock:update', handleStockAdjustment);
-    return () => socket.off('stock:update', handleStockAdjustment);
-  }, [triggerNotification, promotions]); 
 
   const totalCart = useMemo(() => 
     _cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0), 

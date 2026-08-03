@@ -1,5 +1,5 @@
 // frontend/src/modules/client/views/ClientMenu.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Utensils, Plus, Image as ImageIcon, 
@@ -104,9 +104,8 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
   // 🛡️ PURGADO DE CACHÉ VIEJA (Navegadores móviles congelados)
   useEffect(() => {
     const lastAct = parseInt(localStorage.getItem('lya_client_last_activity'));
-    // Si la pestaña lleva más de 4 horas congelada, la purgamos automáticamente al volver a abrirla
     if (lastAct && (Date.now() - lastAct > 4 * 60 * 60 * 1000)) { 
-       handleLogout();
+        handleLogout();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -189,8 +188,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInactivity = () => {
-      // 🛡️ FIX CACHÉ FANTASMA: Si la orden está confirmada pero NO pagada, no expira (están comiendo).
-      // PERO si ya pagaron (isOrderPaid), permitimos que expire para limpiar el navegador.
       if ((isConfirmed && !isOrderPaid) || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
@@ -218,7 +215,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     };
   }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
 
-  // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE
+  // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE (Estados de Orden)
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -236,7 +233,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
-        // 🔥 AHORA SÍ LEEMOS EL ESTADO 'CLOSED' DE LA CUENTA INDIVIDUAL
         } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED') {
             finalStatus = accountStatus;
         } else {
@@ -318,72 +314,87 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     window.open(url, '_blank');
   };
 
+  // 🔥 NUEVA CARGA DE MENÚ (Silenciosa y Optimizada)
+  const loadMenuData = useCallback(async (isBackground = false) => {
+    try {
+      if (!isBackground) setIsLoading(true);
+      const [catsRes, prodsRes] = await Promise.all([ 
+        client.get('/menu/categories').catch(() => ({ data: [] })), 
+        client.get('/menu/products').catch(() => ({ data: [] })) 
+      ]);
+      
+      const rawCats = catsRes.data?.data || catsRes.data || [];
+      const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
+      
+      const hasTodas = fetchedCats.some(c => c.id === 'todas' || (c.name && c.name.trim().toLowerCase() === 'todas'));
+      const catsData = hasTodas ? fetchedCats : [{ id: 'todas', name: 'Todas' }, ...fetchedCats];
+      setCategories(catsData);
+      
+      const rawProds = prodsRes.data?.data || prodsRes.data || [];
+      const prodsData = Array.isArray(rawProds) ? rawProds : [];
+      
+      const activeProducts = prodsData.filter(p => {
+        const estado = p.isActive !== undefined ? p.isActive : p.disponible;
+        if (estado === false || estado === 0 || estado === '0') return false;
+        return true;
+      }).map(p => ({
+        ...p,
+        nombre: p.name || p.nombre || 'Sin Nombre',
+        precio: parseFloat(p.basePrice || p.precio || 0),
+        imagen: p.imageUrl || p.image || p.imagen || null,
+        categoria: p.categoryId || p.categoria,
+        stock: p.stockQuantity ?? p.stock ?? 0,
+        controlarStock: p.controlarStock || false,
+        isAgotado: p.isAgotado || false
+      }));
+      
+      setProducts(activeProducts);
+      if (!isBackground) setActiveCategory('todas');
+    } catch (error) {
+      console.error("🔥 Error al cargar el menú real:", error);
+    } finally {
+      if (!isBackground) setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadMenuData = async () => {
-      try {
-        setIsLoading(true);
-        const [catsRes, prodsRes] = await Promise.all([ 
-          client.get('/menu/categories').catch(() => ({ data: [] })), 
-          client.get('/menu/products').catch(() => ({ data: [] })) 
-        ]);
-        
-        const rawCats = catsRes.data?.data || catsRes.data || [];
-        const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
-        
-        const hasTodas = fetchedCats.some(c => c.id === 'todas' || (c.name && c.name.trim().toLowerCase() === 'todas'));
-        const catsData = hasTodas ? fetchedCats : [{ id: 'todas', name: 'Todas' }, ...fetchedCats];
-        setCategories(catsData);
-        
-        const rawProds = prodsRes.data?.data || prodsRes.data || [];
-        const prodsData = Array.isArray(rawProds) ? rawProds : [];
-        
-        const activeProducts = prodsData.filter(p => {
-          const estado = p.isActive !== undefined ? p.isActive : p.disponible;
-          if (estado === false || estado === 0 || estado === '0') return false;
-          return true;
-        }).map(p => ({
-          ...p,
-          nombre: p.name || p.nombre || 'Sin Nombre',
-          precio: parseFloat(p.basePrice || p.precio || 0),
-          imagen: p.imageUrl || p.image || p.imagen || null,
-          categoria: p.categoryId || p.categoria,
-          stock: p.stockQuantity ?? p.stock ?? 0,
-          controlarStock: p.controlarStock || false,
-          isAgotado: p.isAgotado || false
-        }));
-        
-        setProducts(activeProducts);
-        setActiveCategory('todas');
-      } catch (error) {
-        console.error("Error al cargar el menú real:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     if (!sessionExpired) {
-      loadMenuData();
+      loadMenuData(false);
     } else {
       setIsLoading(false);
     }
-  }, [sessionExpired]);
+  }, [sessionExpired, loadMenuData]);
 
+  // 🔥 BLINDAJE SOCKET STOCK: Lógica estricta de actualización
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
       if (!Array.isArray(updates)) return;
       setProducts(prevProducts => prevProducts.map(p => {
         const update = updates.find(u => u.id === p.id);
         if (update) {
-          const newStock = update.stock;
-          const isAgotado = p.isAgotado === true || (p.controlarStock && newStock <= 0);
-          return { ...p, stock: newStock, isAgotado };
+          const newStock = update.stock !== undefined ? update.stock : p.stock;
+          let incomingAgotado = update.isAgotado !== undefined ? update.isAgotado : p.isAgotado;
+          
+          if (p.controlarStock && newStock <= 0) {
+             incomingAgotado = true;
+          }
+          
+          return { ...p, stock: newStock, isAgotado: incomingAgotado };
         }
         return p;
       }));
     };
 
+    const handleBackgroundSync = () => loadMenuData(true);
+
     socket.on('stock:update', handleStockAdjustment);
-    return () => socket.off('stock:update', handleStockAdjustment);
-  }, []);
+    socket.on('pos:update', handleBackgroundSync); // Sincroniza si apagan/editan un producto en el Admin
+    
+    return () => {
+      socket.off('stock:update', handleStockAdjustment);
+      socket.off('pos:update', handleBackgroundSync);
+    };
+  }, [loadMenuData]);
 
   const activeCatObj = categories.find(c => c.id === activeCategory);
   const isTodasCategory = !activeCategory || activeCategory === 'todas' || (activeCatObj && activeCatObj.name?.trim().toLowerCase() === 'todas');
