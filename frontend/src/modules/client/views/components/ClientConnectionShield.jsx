@@ -65,15 +65,23 @@ export default function ClientConnectionShield({ children }) {
     // Verificación inicial automática al montar el cliente
     verifyRealConnectivity().finally(() => setHasCheckedOnce(true));
 
-    // Intervalo de seguridad pasivo cada 15 segundos para prever caídas silenciosas
+    // 🔥 FIX: Radar Activo de Auto-Recuperación
     const interval = setInterval(() => {
-      if (navigator.onLine && !isSlowConnection) {
-        // Chequeo rápido en segundo plano sin alterar loaders si todo está correcto
-        fetch('/index.html', { method: 'HEAD', cache: 'no-store' }).catch(() => {
-          setIsSlowConnection(true);
-        });
+      if (!navigator.onLine) return;
+
+      if (isSlowConnection) {
+        // Si está en pantalla de Señal Débil, intentamos recuperarlo activamente en el fondo
+        verifyRealConnectivity();
+      } else {
+        // Si todo está bien, vigila que no haya caídas silenciosas
+        const start = performance.now();
+        fetch('/index.html', { method: 'HEAD', cache: 'no-store' })
+          .then(() => {
+            if (performance.now() - start > 2200) setIsSlowConnection(true);
+          })
+          .catch(() => setIsSlowConnection(true));
       }
-    }, 15000);
+    }, 8000); // 8 segundos para auto-recuperarse rápido sin saturar la red
 
     return () => {
       window.removeEventListener('online', handleOnline);
