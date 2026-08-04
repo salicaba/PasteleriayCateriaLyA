@@ -447,10 +447,17 @@ export const checkOrderStatus = async (req, res) => {
     }
     
     let accountStatus = order.status;
+    let clientItems = []; // 🔥 NUEVO: Array para mandar los items reales
     
-    if (cuenta) {
-      // ⚠️ Solo buscamos items de esa cuenta, ignorando estado para ver si fueron anulados
-      const itemsCuenta = await OrderItem.findAll({ where: { orderId, cuenta } });
+    // 🔥 FIX INTELIGENTE: Si es Llevar, la BD lo guarda en la cuenta 'General'
+    const targetCuenta = order.orderType === 'LLEVAR' ? 'General' : cuenta;
+    
+    if (targetCuenta) {
+      // Incluimos el modelo Product para mandar imagen y nombre al celular
+      const itemsCuenta = await OrderItem.findAll({ 
+        where: { orderId, cuenta: targetCuenta },
+        include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+      });
       
       if (itemsCuenta.length > 0) {
          const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
@@ -462,22 +469,26 @@ export const checkOrderStatus = async (req, res) => {
              } catch(e) { return false; }
          });
 
-         // 🔥 SOLUCIÓN BUG 1: Si todos los items están en status CANCELLED, matar la sesión del cliente de inmediato
          if (allCancelled) {
              accountStatus = 'CANCELLED';
          } else if (isReleased) {
              accountStatus = 'CLOSED';
-         } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(cuenta)) {
+         } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(targetCuenta)) {
              accountStatus = 'PAID';
          } else {
              accountStatus = 'OPEN';
+             
+             // 🔥 ESPECISMO: Solo mandamos los items si la cuenta está abierta y activa
+             const activeItems = itemsCuenta.filter(i => i.status === 'ACTIVE');
+             clientItems = activeItems.map(extractPromoMeta).filter(i => !i._isReleased);
          }
-      } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(cuenta)) {
+      } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(targetCuenta)) {
          accountStatus = 'PAID';
       }
     }
     
-    res.json({ status: order.status, accountStatus });
+    // 🔥 Enviamos status, accountStatus Y LOS ITEMS REALES ACTUALIZADOS
+    res.json({ status: order.status, accountStatus, items: clientItems });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });
   }

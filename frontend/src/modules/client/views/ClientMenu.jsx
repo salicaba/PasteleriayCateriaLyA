@@ -217,7 +217,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     };
   }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
 
-  // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE (Estados de Orden)
+  // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE (Sincronización de Carrito y Espejo)
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -230,16 +230,71 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         const data = res?.data || {};
         const globalStatus = data.status;
         const accountStatus = data.accountStatus;
+        const serverItems = data.items; // 🔥 MAGIA: Extraemos los items del server
         
         let finalStatus = 'OPEN';
         
-        // 🔥 FIX: AHORA SÍ DETECTA SI LA CUENTA INDIVIDUAL FUE CANCELADA
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
         } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') { 
             finalStatus = accountStatus;
         } else {
             finalStatus = 'OPEN'; 
+        }
+
+        // 🔥 SINCRONIZADOR DE CARRITO EN TIEMPO REAL (Espejo del POS del empleado)
+        if (serverItems && Array.isArray(serverItems) && finalStatus === 'OPEN') {
+            let newItems = [];
+            
+            // Reconstruimos el carrito exactamente como lo espera ClientOrderSuccess
+            serverItems.forEach(serverItem => {
+                let parsedNotes = [];
+                try { parsedNotes = JSON.parse(serverItem.notes || '[]'); } catch(e){}
+                
+                const precioUnitario = Number(serverItem.subtotal) / serverItem.quantity;
+                
+                // Desglosamos por unidad y reagrupamos por si el empleado agregó cosas separadas
+                for(let i = 0; i < serverItem.quantity; i++) {
+                    const note = parsedNotes[i] || {};
+                    const newItem = {
+                        id: serverItem.productId,
+                        nombre: serverItem.product?.name || 'Producto',
+                        imagen: serverItem.product?.imageUrl || null,
+                        precioUnitario: precioUnitario,
+                        qty: 1,
+                        detalles: note,
+                        isTakeaway: serverItem.isTakeaway,
+                        isAutoPromo: serverItem.isAutoPromo,
+                        promoLabel: serverItem.promoLabel,
+                        precioOriginal: serverItem.precioOriginal
+                    };
+                    
+                    const detailStr = JSON.stringify(newItem.detalles || {});
+                    const existingIdx = newItems.findIndex(x => 
+                        x.id === newItem.id && 
+                        x.isTakeaway === newItem.isTakeaway && 
+                        !!x.isAutoPromo === !!newItem.isAutoPromo &&
+                        JSON.stringify(x.detalles || {}) === detailStr
+                    );
+                    
+                    if (existingIdx >= 0) {
+                        newItems[existingIdx].qty += 1;
+                    } else {
+                        newItems.push(newItem);
+                    }
+                }
+            });
+
+            const newTotal = newItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
+            
+            // Comparamos si hubo cambios reales para evitar re-renders innecesarios
+            const currentSnapshotStr = localStorage.getItem('lya_client_snapshot');
+            const newSnapshotStr = JSON.stringify({ items: newItems, total: newTotal });
+            
+            if (currentSnapshotStr !== newSnapshotStr) {
+                setConfirmedSnapshot({ items: newItems, total: newTotal });
+                localStorage.setItem('lya_client_snapshot', newSnapshotStr);
+            }
         }
         
         if (finalStatus === 'PAID') {
@@ -251,7 +306,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         } else if (finalStatus === 'CLOSED') {
            triggerFinalized('CLOSED');
         } else if (finalStatus === 'CANCELLED' || finalStatus === 'DELETED') {
-           // ESTO DISPARARÁ LA PANTALLA ROJA Y EL MINUTO DE AUTODESTRUCCIÓN
            triggerFinalized('CANCELLED');
         }
       } catch (error) {
