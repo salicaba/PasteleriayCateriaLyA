@@ -14,6 +14,14 @@ export const usePWA = () => {
   } = useRegisterSW({
     onRegistered(r) {
       console.log('SW Registrado correctamente:', r);
+      
+      // 🔥 EL SECRETO: Forzar al SW a buscar actualizaciones cada minuto (60000ms).
+      // Como el POS nunca se recarga (F5), esto obliga al sistema a detectar tus deploys casi al instante.
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 60000); 
+      }
     },
     onRegisterError(error) {
       console.error('Error en el registro del SW:', error);
