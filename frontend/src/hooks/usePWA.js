@@ -1,10 +1,24 @@
 // frontend/src/hooks/usePWA.js
 import { useState, useEffect } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 export const usePWA = () => {
   const [isInstallable, setIsInstallable] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
+
+  // 🔥 INTERCEPTOR DEL SERVICE WORKER PARA ACTUALIZACIONES
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      console.log('SW Registrado correctamente:', r);
+    },
+    onRegisterError(error) {
+      console.error('Error en el registro del SW:', error);
+    },
+  });
 
   useEffect(() => {
     // 1. Detección de entorno Standalone (App instalada Y ejecutándose como app)
@@ -56,5 +70,12 @@ export const usePWA = () => {
     return outcome;
   };
 
-  return { isInstallable, promptInstall, isStandalone };
+  // Exponemos los métodos y estados del Service Worker al ecosistema
+  return { 
+    isInstallable, 
+    promptInstall, 
+    isStandalone, 
+    needRefresh, 
+    updateServiceWorker 
+  };
 };

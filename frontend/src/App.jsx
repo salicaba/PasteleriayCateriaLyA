@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download } from 'lucide-react';
+// 🔥 Agregamos RefreshCw para el ícono de actualización
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -37,8 +38,12 @@ const getInitials = (name) => {
 };
 
 function App() {
-  const { isInstallable, promptInstall, isStandalone } = usePWA();
+  // 🔥 Extraemos needRefresh y updateServiceWorker del hook
+  const { isInstallable, promptInstall, isStandalone, needRefresh, updateServiceWorker } = usePWA();
   const navigate = useNavigate();
+
+  // 🔥 PILAR 3: Estado de bloqueo para la actualización de la PWA
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // 🔥 SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
   useEffect(() => {
@@ -607,13 +612,63 @@ function App() {
               {activeTab === 'reportes' && <ReportsPage />}
             </main>
 
+            {/* 🔥 PILARES 4 Y 5: MODAL DE ACTUALIZACIÓN DE SISTEMA (NEO-BENTO) */}
+            <AnimatePresence>
+              {needRefresh && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-blue-500/20 dark:border-blue-500/30 lya:border-lya-primary/30 text-center flex flex-col items-center"
+                  >
+                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-500/20 text-blue-500 lya:text-lya-primary rounded-full flex items-center justify-center mb-4">
+                      <RefreshCw size={32} strokeWidth={2.5} />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">
+                      ¡Actualización del Sistema!
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm text-center px-2">
+                      Hay una nueva versión de LyA POS con mejoras en rendimiento. Por favor, actualiza ahora para seguir operando sin problemas.
+                    </p>
+                    <motion.button
+                      whileTap={!isUpdating ? { scale: 0.95 } : {}}
+                      onClick={async () => {
+                        setIsUpdating(true);
+                        try {
+                          await updateServiceWorker(true);
+                        } finally {
+                          setIsUpdating(false);
+                        }
+                      }}
+                      disabled={isUpdating}
+                      className="w-full py-3 rounded-2xl font-bold text-white bg-blue-500 lya:bg-lya-primary md:hover:bg-blue-600 lya:md:hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" />
+                          <span>Actualizando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={20} />
+                          <span>Actualizar Ahora</span>
+                        </>
+                      )}
+                    </motion.button>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
+            {/* MODAL DE CERRAR SESIÓN */}
             <AnimatePresence>
               {showLogoutModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
                     className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 text-center flex flex-col items-center"
                   >
                     <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-4">
