@@ -233,9 +233,10 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         
         let finalStatus = 'OPEN';
         
+        // 🔥 FIX: AHORA SÍ DETECTA SI LA CUENTA INDIVIDUAL FUE CANCELADA
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
-        } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED') {
+        } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') { 
             finalStatus = accountStatus;
         } else {
             finalStatus = 'OPEN'; 
@@ -250,6 +251,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         } else if (finalStatus === 'CLOSED') {
            triggerFinalized('CLOSED');
         } else if (finalStatus === 'CANCELLED' || finalStatus === 'DELETED') {
+           // ESTO DISPARARÁ LA PANTALLA ROJA Y EL MINUTO DE AUTODESTRUCCIÓN
            triggerFinalized('CANCELLED');
         }
       } catch (error) {
@@ -651,6 +653,23 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       </>
     );
   }
+
+  {/* 🛡️ ESCAPE DE EMERGENCIA: Botón visible inmediatamente si la orden está pagada */}
+        {isOrderPaid && (
+           <motion.div 
+             initial={{ y: 50, opacity: 0 }} 
+             animate={{ y: 0, opacity: 1 }}
+             className="fixed bottom-6 left-0 right-0 px-6 z-40 flex justify-center pointer-events-none"
+           >
+             <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowLogoutConfirm(true)}
+                className="pointer-events-auto bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-4 rounded-full font-black shadow-2xl flex items-center gap-2 border border-gray-700 md:hover:scale-105 transition-transform"
+             >
+                <LogOut size={18} /> Ya me retiro (Cerrar)
+             </motion.button>
+           </motion.div>
+        )}
 
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative">

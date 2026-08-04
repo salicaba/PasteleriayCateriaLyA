@@ -1,4 +1,3 @@
-// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
@@ -107,8 +106,41 @@ export const PosModal = ({
     releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture 
   } = usePosController(mesa, isOpen, todasLasMesas, showToast); 
 
+  // 🔥 DEFINIMOS CUENTAS PAGADAS PRIMERO
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
+
+  // 🔥 FILTROS ANTI-FANTASMAS Y ORDENAMIENTO CRONOLÓGICO
+  const activeCart = cart.filter(item => item.status !== 'CANCELLED');
+
+  const cleanCuentasDisponibles = cuentasDisponibles.filter(cuenta => {
+    const itemsDeCuenta = cart.filter(i => (i.cuenta || 'General') === cuenta);
+    if (itemsDeCuenta.length === 0) return true; // Cuenta nueva y vacía (esperando pedido)
+    const todosCancelados = itemsDeCuenta.every(i => i.status === 'CANCELLED');
+    return !todosCancelados; // Ocultar cuenta si TODOS sus productos están cancelados
+  }).sort((a, b) => {
+    // 1. Las pagadas siempre van al final
+    const isAPaid = cuentasPagadasReales.includes(a);
+    const isBPaid = cuentasPagadasReales.includes(b);
+
+    if (isAPaid && !isBPaid) return 1;
+    if (!isAPaid && isBPaid) return -1;
+
+    // 2. Orden de aparición en el carrito (el que pidió primero va arriba)
+    const indexA = activeCart.findIndex(item => (item.cuenta || 'General') === a);
+    const indexB = activeCart.findIndex(item => (item.cuenta || 'General') === b);
+
+    // Si la cuenta es recién creada y no tiene productos, su index es -1 (le damos peso infinito para que baje)
+    const weightA = indexA === -1 ? Infinity : indexA;
+    const weightB = indexB === -1 ? Infinity : indexB;
+
+    if (weightA !== weightB) {
+      return weightA - weightB;
+    }
+
+    // 3. Fallback a orden alfabético si hay un empate (ej. ambas acaban de ser creadas)
+    return a.localeCompare(b);
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -199,15 +231,12 @@ export const PosModal = ({
     }
   };
 
-  // 🔥 EL CUELLO DE BOTELLA RESUELTO: Atajo Universal de Cobro
   const handleOpenCheckout = () => {
-    // Obtenemos las cuentas reales que aún tienen productos sin pagar
     const cuentasActivas = Array.from(new Set(
-      cart.filter(i => i.status !== 'CANCELLED' && !cuentasPagadasReales.includes(i.cuenta || 'General'))
+      activeCart.filter(i => !cuentasPagadasReales.includes(i.cuenta || 'General'))
           .map(i => i.cuenta || 'General')
     ));
     
-    // Evaluamos si TODA la mesa está lista, o si AL MENOS UNA cuenta individual lo está
     const isMesaCompletaLista = validateAllDelivered();
     const isAlgunaCuentaLista = cuentasActivas.some(cuenta => validateAllDelivered(cuenta));
 
@@ -216,7 +245,7 @@ export const PosModal = ({
       return; 
     }
     
-    if (cart.length === 0 && (!mesa.total || mesa.total === 0)) return;
+    if (activeCart.length === 0 && (!mesa.total || mesa.total === 0)) return;
     setCheckoutTarget({ type: 'full', cuentaName: null, amount: total });
     setShowCheckout(true); 
   };
@@ -245,7 +274,6 @@ export const PosModal = ({
           setTimeout(() => setPaymentSuccessData(null), 2000);
         }
         
-        // Solo cerramos la caja si es el último del lote
         if (isLastInBatch) {
           setShowCheckout(false); 
         }
@@ -294,11 +322,12 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
+  // 🔥 Le inyectamos los datos limpios y purgados al Sidebar
   const sidebarProps = {
-    cart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
+    cart: activeCart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
-    cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
+    cuentaActiva, setCuentaActiva, cuentasDisponibles: cleanCuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
     orderStatus, paidAccounts, 
     onPrintTicket: (c) => {
@@ -324,7 +353,8 @@ export const PosModal = ({
     showToast 
   };
 
-  const totalItemsInCart = cart.filter(item => item.status !== 'CANCELLED').reduce((acc, curr) => acc + curr.qty, 0);
+  // 🔥 El carrito total ahora ignora de verdad a los fantasmas
+  const totalItemsInCart = activeCart.reduce((acc, curr) => acc + curr.qty, 0);
 
   const posContent = (
     <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 overflow-hidden ${!inline ? 'md:rounded-[2.5rem] shadow-2xl lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`}>
@@ -377,8 +407,9 @@ export const PosModal = ({
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
             >
               {filteredProducts.map(product => {
-                const currentCartQty = cart
-                  .filter(item => item.id === product.id && !item.enviadoCocina && item.status !== 'CANCELLED' && !item.isAutoPromo)
+                // 🔥 También purgado aquí
+                const currentCartQty = activeCart
+                  .filter(item => item.id === product.id && !item.enviadoCocina && !item.isAutoPromo)
                   .reduce((acc, item) => acc + item.qty, 0);
 
                 return (
@@ -534,7 +565,7 @@ export const PosModal = ({
                 <TicketPreviewModal 
                   isOpen={!!previewTicketData} 
                   onClose={() => setPreviewTicketData(null)} 
-                  cart={cart} 
+                  cart={activeCart} 
                   mesa={mesa} 
                   cuentaName={previewTicketData?.cuentaName} 
                   telefonoPredeterminado={previewTicketData?.telefono}
@@ -583,10 +614,10 @@ export const PosModal = ({
                       onClose={() => setShowCheckout(false)} 
                       total={total} 
                       initialTarget={checkoutTarget} 
-                      cuentasResumen={cuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} 
+                      cuentasResumen={cleanCuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} 
                       onConfirmPayment={handleFinalizePayment} 
                       orderType={isVitrina ? 'mostrador' : isLlevar ? 'llevar' : 'salon'}
-                      validateAllDelivered={validateAllDelivered} // 🔥 AÑADE ESTA LÍNEA AQUÍ
+                      validateAllDelivered={validateAllDelivered}
                     />
                   )}
 
