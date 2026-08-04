@@ -44,9 +44,10 @@ export const useKitchenController = () => {
           id: item.id,
           nombre: item.product?.name || 'Producto',
           qty: item.quantity,
-          status: item.status, // 🔥 AGREGADO: Leemos si está CANCELLED
+          status: item.status, 
           isTakeaway: item.isTakeaway, 
-          requiereCocina: item.product?.requiereCocina !== false, 
+          requiereCocina: item.product?.requiereCocina !== false,
+          createdAt: item.createdAt || order.createdAt, // 🔥 Extraemos el tiempo exacto de ESTE producto
           preparaciones: preps.map((p, i) => ({
             idPrep: `${item.id}-${i}`,
             tamano: p.tamano || 'Estándar',
@@ -58,7 +59,23 @@ export const useKitchenController = () => {
         });
       });
 
-      setOrders(Object.values(groupedOrders));
+      // 🔥 Calculamos el tiempo base de la comanda usando el producto más antiguo que NO esté cancelado
+      const parsedOrders = Object.values(groupedOrders).map(group => {
+        const activeItems = group.items.filter(i => i.status !== 'CANCELLED');
+        const itemsToConsider = activeItems.length > 0 ? activeItems : group.items;
+        
+        const oldestTime = itemsToConsider.reduce((min, i) => {
+          const time = new Date(i.createdAt).getTime();
+          return time < min ? time : min;
+        }, new Date(itemsToConsider[0].createdAt).getTime());
+
+        return {
+          ...group,
+          oldestItemTime: oldestTime // Fecha que dicta la urgencia de esta tanda
+        };
+      });
+
+      setOrders(parsedOrders);
     } catch (error) { 
       console.error("Error KDS:", error); 
     } finally {
@@ -73,7 +90,8 @@ export const useKitchenController = () => {
   }, [fetchKitchenOrders]);
 
   return {
-    orders: [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    // 🔥 Ahora ordenamos (FIFO) basados estrictamente en el producto activo más antiguo
+    orders: [...orders].sort((a, b) => a.oldestItemTime - b.oldestItemTime),
     loading,
     processingItems,
     processingOrders,
@@ -90,17 +108,15 @@ export const useKitchenController = () => {
         }
 
         const isCancelled = item.status === 'CANCELLED';
-        // 🔥 Si está cancelado y le damos click, lo marcamos como READY para que desaparezca del KDS
         const newStatus = isCancelled ? 'READY' : (item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING');
         
-        // Optimistic UI
         if (isCancelled) {
              setOrders(prev => prev.map(o => {
                 if (o.id === orderId) {
                     return { ...o, items: o.items.filter(i => i.id !== itemId) };
                 }
                 return o;
-             }).filter(o => o.items.length > 0)); // Si era el único, borramos la orden
+             }).filter(o => o.items.length > 0));
         } else {
              setOrders(prev => prev.map(o => o.id === orderId ? {
                 ...o,
@@ -129,7 +145,6 @@ export const useKitchenController = () => {
           return;
         }
 
-        // Optimistic UI (Excluimos los cancelados)
         setOrders(prev => prev.map(o => o.id === orderId ? {
             ...o,
             items: o.items.map(i => i.status === 'CANCELLED' ? i : { ...i, kitchenStatus: 'PREPARING' })
@@ -137,7 +152,7 @@ export const useKitchenController = () => {
 
         try {
             const promises = order.items
-                .filter(i => i.kitchenStatus !== 'PREPARING' && i.status !== 'CANCELLED') // 🔥 Excluimos cancelados
+                .filter(i => i.kitchenStatus !== 'PREPARING' && i.status !== 'CANCELLED')
                 .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'PREPARING' }));
             await Promise.all(promises);
             fetchKitchenOrders(true);
@@ -159,11 +174,9 @@ export const useKitchenController = () => {
           return;
         }
 
-        // Optimistic UI
         setOrders(prev => prev.filter(o => o.id !== orderId));
 
         try {
-            // Esto mandará a READY tanto los normales como los cancelados (para limpiar pantalla)
             const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
             await Promise.all(promises);
             fetchKitchenOrders(true); 

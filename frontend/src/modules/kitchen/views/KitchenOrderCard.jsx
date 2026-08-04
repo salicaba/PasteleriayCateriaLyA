@@ -51,7 +51,8 @@ export const KitchenOrderCard = ({
 
   useEffect(() => {
     const calculateTime = () => {
-      const start = new Date(order.createdAt);
+      // 🔥 CRONÓMETRO BASADO EN EL PRODUCTO MÁS ANTIGUO DE ESTA TANDA
+      const start = new Date(order.oldestItemTime || order.createdAt);
       const now = new Date();
       const diffMs = now.getTime() - start.getTime();
       const diffMins = Math.floor(diffMs / 60000);
@@ -115,7 +116,7 @@ export const KitchenOrderCard = ({
     calculateTime();
     const timer = setInterval(calculateTime, 1000);
     return () => clearInterval(timer);
-  }, [order.createdAt, allReady, allCancelled]);
+  }, [order.oldestItemTime, order.createdAt, allReady, allCancelled]);
 
   return (
     <motion.div
@@ -143,7 +144,6 @@ export const KitchenOrderCard = ({
       </div>
 
       <div className="flex-1 px-3 pb-3 space-y-2">
-        {/* 🔥 ORDEN ESTRICTO: Reacomodo anulado, los productos se quedan petrificados en su lugar */}
         {order.items.slice().sort((a, b) => {
             const idA = String(a.id || '');
             const idB = String(b.id || '');
@@ -296,4 +296,4 @@ export const KitchenOrderCard = ({
       </div>
     </motion.div>
   );
-}
+};
