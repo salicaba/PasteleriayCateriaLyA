@@ -18,7 +18,7 @@ import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
 import { ClientServiceShield } from './components/ClientServiceShield';
 import { 
   THEME_CLASSES, SIZES, getInitialTheme, getInitialSize, 
-  getProductModifiers, getDefaultCustomizations 
+  getProductModifiers 
 } from './utils/clientMenuUtils';
 
 // Importación del Cerebro Matemático (Custom Hook)
@@ -683,7 +683,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
                 onClick={() => setShowLogoutConfirm(true)}
                 className="pointer-events-auto bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-4 rounded-full font-black shadow-2xl flex items-center gap-2 border border-gray-700 md:hover:scale-105 transition-transform"
              >
-                <LogOut size={18} /> Finalizar Sesión
+                <LogOut size={18} /> Ya me retiro (Cerrar)
              </motion.button>
            </motion.div>
         )}
@@ -707,23 +707,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
       </>
     );
   }
-
-  {/* 🛡️ ESCAPE DE EMERGENCIA: Botón visible inmediatamente si la orden está pagada */}
-        {isOrderPaid && (
-           <motion.div 
-             initial={{ y: 50, opacity: 0 }} 
-             animate={{ y: 0, opacity: 1 }}
-             className="fixed bottom-6 left-0 right-0 px-6 z-40 flex justify-center pointer-events-none"
-           >
-             <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowLogoutConfirm(true)}
-                className="pointer-events-auto bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-4 rounded-full font-black shadow-2xl flex items-center gap-2 border border-gray-700 md:hover:scale-105 transition-transform"
-             >
-                <LogOut size={18} /> Ya me retiro (Cerrar)
-             </motion.button>
-           </motion.div>
-        )}
 
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative">
@@ -1002,7 +985,6 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {/* 🛡️ Desbloqueamos el botón de salir en Configuración si ya pagaron */}
         {showSettings && (
           <ClientSettingsModal 
             themeIndex={themeIndex} 
