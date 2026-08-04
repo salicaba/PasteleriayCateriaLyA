@@ -33,20 +33,12 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
     }
 
-    // --- 🕒 CÁLCULO DE EXPIRACIÓN A LA MEDIANOCHE (12:00 AM) ---
-    const now = new Date();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0); // Apunta a las 00:00:00 del día siguiente
-
-    // jwt.sign requiere el tiempo en segundos si pasamos un número
-    const secondsUntilMidnight = Math.floor((midnight.getTime() - now.getTime()) / 1000);
-    // ----------------------------------------------------------
-
     // 3. Generar el Token (JWT)
+    // 🔥 FIX: Vida útil estática de 24h. El frontend se encarga del cierre exacto a medianoche.
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
       process.env.JWT_SECRET,
-      { expiresIn: secondsUntilMidnight } // 🎃 Expira exactamente a la medianoche
+      { expiresIn: '24h' } 
     );
 
     // Devolvemos la info al frontend
