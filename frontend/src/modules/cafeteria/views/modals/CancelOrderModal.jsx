@@ -9,6 +9,36 @@ export const CancelOrderModal = ({
   isCanceling, 
   onConfirm 
 }) => {
+
+  // 🔥 FILTRO INTELIGENTE: Extrae exclusivamente el nombre limpio de la cuenta
+  const getCleanName = (rawString) => {
+    if (!rawString) return 'Desconocida';
+    
+    let clean = rawString;
+    
+    // Formato con guiones (ej. Llevar #123 - vdvdf - 555...)
+    if (clean.includes(' - ')) {
+      const parts = clean.split(' - ');
+      // Tomamos la segunda parte (el nombre) si existe
+      clean = parts.length > 1 ? parts[1].trim() : parts[0];
+    } 
+    // Formato con barras (ej. Cuenta: Pedro | Cel: 123...)
+    else if (clean.includes(' | ')) {
+      const parts = clean.split(' | ');
+      clean = parts[0].trim();
+    }
+
+    // Limpieza de prefijos redundantes ("la cuenta Cuenta: Juan" -> "la cuenta Juan")
+    clean = clean.replace(/Cuenta:\s*/i, '').replace(/Cta:\s*/i, '');
+
+    // Si después de todo sigue siendo el puro folio de llevar, le ponemos "General"
+    if (clean.toUpperCase().startsWith('LLEVAR #')) {
+      return 'General';
+    }
+
+    return clean;
+  };
+
   return (
     <AnimatePresence>
       {orderToCancel && (
@@ -39,7 +69,7 @@ export const CancelOrderModal = ({
             </h3>
             
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed">
-              Estás a punto de cancelar y enviar a la papelera la cuenta <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{orderToCancel.numero}</span>.
+              Estás a punto de cancelar y enviar a la papelera la cuenta <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">{getCleanName(orderToCancel.numero)}</span>.
             </p>
             
             <div className="flex gap-3 w-full">

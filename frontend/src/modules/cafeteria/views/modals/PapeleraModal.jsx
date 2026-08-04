@@ -15,6 +15,80 @@ export const PapeleraModal = ({
   onRestoreItem,
   restoringItemId
 }) => {
+
+  // 🔥 HELPER INTELIGENTE: Separa Origen, Nombre y Celular de cadenas complejas
+  const parseTicketData = (ticketId, fallbackName) => {
+    let origin = ticketId;
+    let name = fallbackName || 'General';
+    let phone = '';
+
+    if (!ticketId) return { origin: 'Desconocido', name, phone };
+
+    if (ticketId.toUpperCase().includes('MOSTRADOR')) {
+        const parts = ticketId.split(' ');
+        origin = 'Cuenta Mostrador';
+        name = `Folio: ${parts[1] || 'Express'}`;
+    } else if (ticketId.toUpperCase().includes('LLEVAR')) {
+        const separator = ticketId.includes(' - ') ? ' - ' : ' | ';
+        const parts = ticketId.split(separator);
+        
+        origin = parts[0].trim();
+        origin = origin.toUpperCase().includes('PEDIDO') ? origin : `Pedido ${origin}`;
+        
+        if (parts.length > 1) name = parts[1].trim();
+        if (parts.length > 2) phone = parts[2].trim();
+    } else {
+        const separator = ticketId.includes(' - ') ? ' - ' : ' | ';
+        const parts = ticketId.split(separator);
+        origin = parts[0].trim();
+        if (parts.length > 1) name = parts[1].trim();
+        if (parts.length > 2) phone = parts[2].trim();
+    }
+
+    // Limpieza final de redundancias
+    if (name.toUpperCase().startsWith('LLEVAR')) name = 'General';
+    
+    if (name.includes(' | ')) {
+        const parts = name.split(' | ');
+        name = parts[0].trim();
+        if(!phone && parts[1]) phone = parts[1].replace(/Cel:/i, '').trim();
+    } else if (name.includes(' - ')) {
+        const parts = name.split(' - ');
+        name = parts[0].trim();
+        if(!phone && parts[1]) phone = parts[1].replace(/Cel:/i, '').trim();
+    }
+    
+    return { origin, name, phone };
+  };
+
+  // 🔥 CREACIÓN DE ÓRDENES VIRTUALES: Para cuentas de mesa canceladas (donde la mesa sigue abierta)
+  const fullyCancelledOrderIds = dailySummary.cancelledOrders.map(o => o.id);
+  const orphanedItems = dailySummary.cancelledItems.filter(item => !fullyCancelledOrderIds.includes(item.orderId));
+
+  const virtualOrdersMap = {};
+  orphanedItems.forEach(item => {
+    const cuenta = item.cuenta || 'General';
+    const key = `${item.orderId}_${cuenta}`;
+    if (!virtualOrdersMap[key]) {
+        const parentOrder = item.parentOrder || [...mesasSalon, ...mesasLlevar, selectedMesa, ...dailySummary.vendidosOrders].filter(Boolean).find(o => (o.orderId || o.id) === item.orderId);
+        virtualOrdersMap[key] = {
+            id: key, // ID Falso para renderizar la tarjeta
+            isVirtual: true,
+            realOrderId: item.orderId,
+            cuenta: cuenta,
+            cancelReason: item.cancelReason,
+            cancelledAt: item.cancelledAt,
+            table: parentOrder?.table,
+            ticketId: parentOrder?.ticketId,
+            parentOrder: parentOrder
+        };
+    }
+  });
+
+  const virtualOrders = Object.values(virtualOrdersMap);
+  // Unimos las reales (Para Llevar / Mesas Completas) con las virtuales (Cuentas de Mesas)
+  const allCancelledAccounts = [...dailySummary.cancelledOrders, ...virtualOrders].sort((a, b) => new Date(b.cancelledAt) - new Date(a.cancelledAt));
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -30,31 +104,32 @@ export const PapeleraModal = ({
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
-              {dailySummary.cancelledOrders.length > 0 && (
+              {/* ========================================================================= */}
+              {/* CUENTAS CANCELADAS (REALES + VIRTUALES) */}
+              {/* ========================================================================= */}
+              {allCancelledAccounts.length > 0 && (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Cuentas Canceladas</h3>
                   <div className="space-y-3">
-                    {dailySummary.cancelledOrders.map(order => {
-                      const nombreCuenta = order.cuenta || order.customerName || order.name || 'Cuenta General';
-                      const numMesa = order.table?.numero || order.table?.number || '?';
+                    {allCancelledAccounts.map(order => {
+                      const numMesa = order.table?.numero || order.table?.number || order.parentOrder?.table?.numero || '?';
                       const esMesaCompleta = order.cancelReason?.includes('Mesa Completa');
 
-                      let tituloPrincipal = order.ticketId ? order.ticketId : `Mesa #${numMesa}`;
-                      let textoInsignia = esMesaCompleta ? 'MESA COMPLETA' : `CUENTA: ${nombreCuenta}`;
+                      const fallbackName = order.cuenta || order.customerName || order.name || order.nombreCliente || 'General';
+                      const rawTicketId = order.ticketId || `Mesa #${numMesa}`;
+                      
+                      // 🔥 Usamos la función inteligente para extraer los datos limpios
+                      const { origin: tituloPrincipal, name: cNameAcc, phone: cPhoneAcc } = parseTicketData(rawTicketId, fallbackName);
 
-                      if (tituloPrincipal.toUpperCase().includes('MOSTRADOR')) {
-                        const partesTicket = tituloPrincipal.split(' ');
-                        tituloPrincipal = `Cuenta Mostrador`;
-                        textoInsignia = `Folio: ${partesTicket[1] || 'Express'}`;
-                      } else if (order.ticketId && order.ticketId.includes(' - ')) {
-                        const partesTicket = order.ticketId.split(' - ');
-                        tituloPrincipal = `Cuenta: ${partesTicket[0]}`; 
-                        
-                        if (partesTicket.length > 1) {
-                          const nombreCliente = partesTicket[1];
-                          const telefonoCliente = partesTicket[2];
-                          textoInsignia = `CUENTA: ${nombreCliente}${telefonoCliente ? ` | CEL: ${telefonoCliente}` : ''}`;
-                        }
+                      let textoInsignia = '';
+                      if (esMesaCompleta) {
+                          textoInsignia = 'MESA COMPLETA';
+                      } else if (cNameAcc.toUpperCase().includes('FOLIO:')) {
+                          textoInsignia = cNameAcc;
+                      } else if (cNameAcc.toUpperCase() === 'GENERAL' || cNameAcc.toUpperCase() === 'CUENTA GENERAL') {
+                          textoInsignia = 'Cuenta General';
+                      } else {
+                          textoInsignia = `Cta: ${cNameAcc}${cPhoneAcc ? ` | Cel: ${cPhoneAcc}` : ''}`;
                       }
 
                       let cuentasInvolucradas = '';
@@ -82,21 +157,29 @@ export const PapeleraModal = ({
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
-                              <button 
-                                onClick={() => onRestoreOrder(order.id)} 
-                                disabled={restoringOrderId === order.id}
-                                className={`px-2 py-1.5 rounded-lg shadow-sm border transition-all flex items-center gap-1.5 ${
-                                  restoringOrderId === order.id 
-                                    ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
-                                    : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
-                                }`} 
-                                title="Restaurar Cuenta Completa"
-                              >
-                                {restoringOrderId === order.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
-                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
-                                  {restoringOrderId === order.id ? 'Restaurando...' : 'Restaurar'}
+                              
+                              {/* 🔥 Si es virtual, pedimos restaurar por producto para evitar errores. Si es real, botón de restaurar completo */}
+                              {order.isVirtual ? (
+                                <span className="px-2 py-1.5 rounded-lg border border-orange-200 dark:border-orange-800/50 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                                  👇 Restaurar abajo
                                 </span>
-                              </button>
+                              ) : (
+                                <button 
+                                  onClick={() => onRestoreOrder(order.id)} 
+                                  disabled={restoringOrderId === order.id}
+                                  className={`px-2 py-1.5 rounded-lg shadow-sm border transition-all flex items-center gap-1.5 ${
+                                    restoringOrderId === order.id 
+                                      ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
+                                      : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
+                                  }`} 
+                                  title="Restaurar Cuenta Completa"
+                                >
+                                  {restoringOrderId === order.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
+                                  <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
+                                    {restoringOrderId === order.id ? 'Restaurando...' : 'Restaurar'}
+                                  </span>
+                                </button>
+                              )}
                             </div>
                           </div>
                           <div className="mb-2">
@@ -124,6 +207,9 @@ export const PapeleraModal = ({
                 </div>
               )}
 
+              {/* ========================================================================= */}
+              {/* PRODUCTOS CANCELADOS INDIVIDUALMENTE */}
+              {/* ========================================================================= */}
               {dailySummary.cancelledItems.length > 0 && (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Productos Cancelados</h3>
@@ -134,41 +220,34 @@ export const PapeleraModal = ({
                           .find(o => (o.orderId || o.id) === item.orderId);
 
                       const canRestore = ordenRef && ordenRef.status !== 'CANCELLED' && ordenRef.status !== 'CLOSED';
-                      let nombreOrigen = 'Origen Desconocido';
-                      let orderTypeContext = 'SALON'; 
-                      let cuentaMostrar = item.cuenta || 'General';
-
-                      if (ordenRef) {
-                          const ticketId = ordenRef.ticketId || '';
-                          
-                          if (ticketId.toUpperCase().includes('MOSTRADOR')) {
-                              orderTypeContext = 'MOSTRADOR';
-                              const partes = ticketId.split(' ');
-                              nombreOrigen = `Cuenta Mostrador`;
-                              cuentaMostrar = `Folio: ${partes[1] || 'Express'}`;
-                          } else if (ticketId.includes(' - ')) {
-                              orderTypeContext = 'LLEVAR';
-                              const partes = ticketId.split(' - ');
-                              nombreOrigen = `Cuenta: ${partes[0]}`; 
-                              if (partes.length > 1 && cuentaMostrar === 'General') {
-                                  cuentaMostrar = partes[1]; 
-                              }
-                          } else if (ticketId.toUpperCase().includes('LLEVAR')) {
-                              orderTypeContext = 'LLEVAR';
-                              nombreOrigen = `Cuenta: ${ticketId}`;
-                              if (cuentaMostrar === 'General') {
-                                  cuentaMostrar = ordenRef.nombreCliente || ordenRef.customerName || ordenRef.name || 'General';
-                              }
-                          } else {
-                              orderTypeContext = 'SALON';
-                              nombreOrigen = `Mesa #${ordenRef.table?.numero || ordenRef.table?.number || ordenRef.numero || '?'}`;
-                              if (cuentaMostrar === 'General') {
-                                 cuentaMostrar = 'Cuenta General';
-                              }
-                          }
+                      
+                      let fallbackName = item.cuenta || 'General';
+                      if (ordenRef && fallbackName === 'General') {
+                          fallbackName = ordenRef.nombreCliente || ordenRef.customerName || ordenRef.name || ordenRef.cuenta || 'General';
                       }
 
-                      let textoCerrado = orderTypeContext === 'SALON' ? 'Mesa Cerrada' : 'Cuenta Cerrada';
+                      let tituloPrincipal = 'Origen Desconocido';
+                      let cNameAcc = fallbackName;
+                      let cPhoneAcc = '';
+
+                      if (ordenRef) {
+                          const rawTicketId = ordenRef.ticketId || `Mesa #${ordenRef.table?.numero || ordenRef.table?.number || '?'}`;
+                          const parsed = parseTicketData(rawTicketId, fallbackName);
+                          tituloPrincipal = parsed.origin;
+                          cNameAcc = parsed.name;
+                          cPhoneAcc = parsed.phone;
+                      }
+
+                      let textoInsignia = '';
+                      if (cNameAcc.toUpperCase().includes('FOLIO:')) {
+                          textoInsignia = cNameAcc;
+                      } else if (cNameAcc.toUpperCase() === 'GENERAL' || cNameAcc.toUpperCase() === 'CUENTA GENERAL') {
+                          textoInsignia = 'Cuenta General';
+                      } else {
+                          textoInsignia = `Cta: ${cNameAcc}${cPhoneAcc ? ` | Cel: ${cPhoneAcc}` : ''}`;
+                      }
+
+                      let textoCerrado = tituloPrincipal.toUpperCase().includes('MESA') ? 'Mesa Cerrada' : 'Cuenta Cerrada';
                       let motivoLimpioItem = item.cancelReason || 'Sin especificar';
                       if (motivoLimpioItem.includes(' - Motivo: ')) {
                         motivoLimpioItem = motivoLimpioItem.split(' - Motivo: ')[1] || 'Cancelación desde POS';
@@ -183,10 +262,10 @@ export const PapeleraModal = ({
                           <div className="flex-1 pr-3">
                             <p className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm"><span className="text-red-500">{item.quantity}x</span> {item.product?.name}</p>
                             <div className="mt-1.5 mb-1 inline-flex items-center bg-gray-100 dark:bg-gray-700/50 lya:bg-lya-surface rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30">
-                              <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{nombreOrigen}</span>
+                              <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{tituloPrincipal}</span>
                               <span className="mx-1.5 text-gray-300 dark:text-gray-600">•</span>
                               <span className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-                                {orderTypeContext === 'MOSTRADOR' ? cuentaMostrar : `Cta: ${cuentaMostrar}`}
+                                {textoInsignia}
                               </span>
                             </div>
                             <p className="text-[11px] text-gray-500 leading-snug mt-1">Motivo: {motivoLimpioItem}</p>
@@ -230,7 +309,7 @@ export const PapeleraModal = ({
                 </div>
               )}
 
-              {dailySummary.cancelledOrders.length === 0 && dailySummary.cancelledItems.length === 0 && (
+              {allCancelledAccounts.length === 0 && dailySummary.cancelledItems.length === 0 && (
                 <div className="text-center text-gray-400 mt-10">
                   <CheckCircle size={40} className="mx-auto mb-3 opacity-30" />
                   <p className="font-bold">Día limpio</p>

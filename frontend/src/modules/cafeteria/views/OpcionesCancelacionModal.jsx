@@ -163,7 +163,8 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                           >
                             {!cuentaSeleccionada && <option value="" disabled>Seleccione...</option>}
                             {cuentas?.map(acc => (
-                              <option key={acc} value={acc}>Cuenta: {acc}</option>
+                              // 🔥 FIX: Se aplica split para omitir el teléfono en la visualización
+                              <option key={acc} value={acc}>Cuenta: {acc.split(' | ')[0]}</option>
                             ))}
                           </select>
                         </div>
