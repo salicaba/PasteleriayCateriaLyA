@@ -43,16 +43,20 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   // 4. EL ORQUESTADOR DE SINCRONIZACIÓN (Base de Datos a UI)
   const { setCart } = cartLogic;
-  const { setPaidAccounts, setNombresCuentas, setCuentaActiva, setCuentasTelefonos } = accounts;
+  const { 
+    setPaidAccounts, 
+    setNombresCuentas, 
+    setCuentaActiva, 
+    setCuentasTelefonos,
+    sincronizarCuentas // 🔥 EXTRAEMOS EL PURGADOR DE FANTASMAS
+  } = accounts;
 
-  // 🔥 CIRUGÍA ANTI-BUCLE: Extraemos valores primitivos para el useEffect
-  // Esto evita que React se confunda con referencias de memoria y cicle el renderizado.
+  // Variables Primitivas para useEffect
   const mesaId = mesaActual?.id;
   const mesaEstado = mesaActual?.estado;
   const mesaOrderId = mesaActual?.orderId;
   const mesaOrderStatus = mesaActual?.orderStatus;
   
-  // Convertimos a string para detectar cambios REALES en los datos, no en las referencias
   const dbItemsString = JSON.stringify(mesaActual?.items || []);
   const paidAccountsString = JSON.stringify(mesaActual?.paidAccounts || []);
 
@@ -67,8 +71,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         setCuentasTelefonos({});
         return;
     }
-
-    let nuevasCuentas = new Set(['General']);
 
     if (mesaEstado === 'ocupada') {
         setActiveOrderId(mesaOrderId);
@@ -126,22 +128,41 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             const localItems = prev.filter(p => !p.enviadoCocina);
             const sentButNotLoaded = prev.filter(p => p.enviadoCocina && !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId));
             const finalCart = [...loadedCart, ...sentButNotLoaded, ...localItems];
-            finalCart.forEach(c => nuevasCuentas.add(c.cuenta));
+            
+            // 🔥 INYECCIÓN DE LA SOLUCIÓN AL BUG 2:
+            // Ejecutamos el purgador con la "verdad absoluta" combinando BD y Locales
+            if (sincronizarCuentas) {
+                sincronizarCuentas({
+                    // Forzamos status ACTIVE para que el hook de cuentas reconozca los locales
+                    items: finalCart.map(i => ({ ...i, status: 'ACTIVE' })),
+                    paidAccounts: loadedPaidAccounts
+                });
+            } else {
+                // Fallback de seguridad estricta
+                const reales = new Set(['General', ...loadedPaidAccounts, ...finalCart.map(i => i.cuenta || 'General')]);
+                setNombresCuentas(prevN => {
+                    const purgadas = prevN.filter(c => reales.has(c));
+                    return purgadas.length > 0 ? purgadas : ['General'];
+                });
+                setCuentaActiva(prevA => reales.has(prevA) ? prevA : 'General');
+            }
+
             return finalCart;
         });
-
-        loadedPaidAccounts.forEach(pa => nuevasCuentas.add(pa));
         
     } else {
-        setCart(prev => { 
-          prev.forEach(c => nuevasCuentas.add(c.cuenta)); 
-          return prev; 
+        // Mesa libre (sin BD) -> Solo usamos el carrito local
+        setCart(prev => {
+            if (sincronizarCuentas) {
+                sincronizarCuentas({
+                    items: prev.map(i => ({ ...i, status: 'ACTIVE' })),
+                    paidAccounts: []
+                });
+            }
+            return prev;
         });
     }
 
-    setNombresCuentas(prev => Array.from(new Set([...prev, ...Array.from(nuevasCuentas)])));
-
-  // 🔥 SOLUCIÓN ESTRICTA: Solo dependemos de primitivas inmutables. 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString]);
 
@@ -201,7 +222,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     cancelItem: mutations.cancelItem, 
     cancelFullOrder: mutations.cancelFullOrder, 
     cancelAccountItems: mutations.cancelAccountItems, 
-    releaseAccount: mutations.releaseAccount, // <--- AÑADIR ESTA LÍNEA
+    releaseAccount: mutations.releaseAccount,
     
     // Dominio: Notificaciones UI
     notification, 

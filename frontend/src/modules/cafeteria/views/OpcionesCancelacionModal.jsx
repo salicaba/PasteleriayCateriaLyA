@@ -1,4 +1,4 @@
-// src/modules/cafeteria/views/OpcionesCancelacionModal.jsx
+// frontend/src/modules/cafeteria/views/OpcionesCancelacionModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
@@ -11,26 +11,23 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Detectamos si es una cuenta única (Como las de Para Llevar que internamente son "General")
   const hasMultipleAccounts = cuentas?.length > 1;
   const isTakeawayGeneral = !hasMultipleAccounts && cuentas?.[0] === 'General';
 
-  // 🔥 FIX: Se elimina 'cuentas' de las dependencias para evitar que los re-renders
-  // del POS reinicien la selección a 'mesa' mientras el modal está abierto.
   useEffect(() => {
     if (isOpen) {
       setTipoCancelacion('mesa'); 
+      // Nos aseguramos de seleccionar la primera cuenta válida por defecto
       setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
       setMotivo(''); 
       setIsProcessing(false);
       setErrorMessage('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); 
 
-  // Mantiene sincronizada la cuenta si la lista cambia, pero sin reiniciar los radio buttons
   useEffect(() => {
-    if (isOpen && cuentas?.length > 0 && !cuentaSeleccionada) {
+    // Si la cuenta seleccionada ya no existe en el array purgado, la reiniciamos
+    if (isOpen && cuentas?.length > 0 && (!cuentaSeleccionada || !cuentas.includes(cuentaSeleccionada))) {
       setCuentaSeleccionada(cuentas[0]);
     }
   }, [cuentas, isOpen, cuentaSeleccionada]);
@@ -41,11 +38,15 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   };
 
   const handleConfirmar = async () => {
+    if (isProcessing) return; // PILAR 3: Bloqueo extra por seguridad
     setIsProcessing(true);
     setErrorMessage('');
+    
     try {
       const finalMotivo = motivo.trim() || 'Cancelación desde POS';
       await onConfirmar(tipoCancelacion, cuentaSeleccionada, finalMotivo);
+      // Cerramos el modal tras éxito síncrono
+      onClose();
     } catch (error) {
       console.error("Error al cancelar:", error);
       showError(error?.response?.data?.message || error.message || "Ocurrió un error al procesar la cancelación.");
@@ -163,7 +164,6 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                           >
                             {!cuentaSeleccionada && <option value="" disabled>Seleccione...</option>}
                             {cuentas?.map(acc => (
-                              // 🔥 FIX: Se aplica split para omitir el teléfono en la visualización
                               <option key={acc} value={acc}>Cuenta: {acc.split(' | ')[0]}</option>
                             ))}
                           </select>

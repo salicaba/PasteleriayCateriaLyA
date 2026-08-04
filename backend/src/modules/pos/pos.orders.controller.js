@@ -205,13 +205,9 @@ export const getActiveOrderByTable = async (req, res) => {
     const validOrder = orders.length > 0 ? orders[0].toJSON() : null;
     
     if (validOrder && validOrder.items) {
-        // 🔥 FILTRO NINJA: Quitamos los liberados de la lista
         validOrder.items = validOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
-        
-        // 🔥 FIX: Actualizamos el total visual ($460 -> $160)
         validOrder.totalAmount = validOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
         
-        // 🔥 FIX: Limpiamos las cuentas pagadas para que no cuente a los fantasmas (5 cuentas -> 2 cuentas)
         if (validOrder.paidAccounts && Array.isArray(validOrder.paidAccounts)) {
             const visibleAccounts = new Set(validOrder.items.map(i => i.cuenta || 'General'));
             validOrder.paidAccounts = validOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
@@ -244,7 +240,7 @@ export const closeOrder = async (req, res) => {
 };
 
 // ==========================================
-// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta) [EL FIX NINJA 🥷]
+// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta)
 // ==========================================
 export const closeAccount = async (req, res) => {
   try {
@@ -321,13 +317,9 @@ export const getActiveOrders = async (req, res) => {
       
       const plainOrder = order.toJSON();
       if (plainOrder.items) {
-          // 🔥 FILTRO NINJA: Quitamos los liberados
           plainOrder.items = plainOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
-          
-          // 🔥 FIX: Actualizamos el total para la tarjetita visual
           plainOrder.totalAmount = plainOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
           
-          // 🔥 FIX: Limpiamos los fantasmas del conteo de cuentas
           if (plainOrder.paidAccounts && Array.isArray(plainOrder.paidAccounts)) {
               const visibleAccounts = new Set(plainOrder.items.map(i => i.cuenta || 'General'));
               plainOrder.paidAccounts = plainOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
@@ -457,10 +449,10 @@ export const checkOrderStatus = async (req, res) => {
     let accountStatus = order.status;
     
     if (cuenta) {
+      // ⚠️ Solo buscamos items de esa cuenta, ignorando estado para ver si fueron anulados
       const itemsCuenta = await OrderItem.findAll({ where: { orderId, cuenta } });
       
       if (itemsCuenta.length > 0) {
-         const hasActive = itemsCuenta.some(i => i.status === 'ACTIVE');
          const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
          
          const isReleased = !allCancelled && itemsCuenta.filter(i => i.status === 'ACTIVE').every(item => {
@@ -470,7 +462,10 @@ export const checkOrderStatus = async (req, res) => {
              } catch(e) { return false; }
          });
 
-         if (isReleased) {
+         // 🔥 SOLUCIÓN BUG 1: Si todos los items están en status CANCELLED, matar la sesión del cliente de inmediato
+         if (allCancelled) {
+             accountStatus = 'CANCELLED';
+         } else if (isReleased) {
              accountStatus = 'CLOSED';
          } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(cuenta)) {
              accountStatus = 'PAID';
