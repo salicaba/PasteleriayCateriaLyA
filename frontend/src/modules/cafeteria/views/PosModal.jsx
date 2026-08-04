@@ -1,3 +1,4 @@
+// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
@@ -115,30 +116,24 @@ export const PosModal = ({
 
   const cleanCuentasDisponibles = cuentasDisponibles.filter(cuenta => {
     const itemsDeCuenta = cart.filter(i => (i.cuenta || 'General') === cuenta);
-    if (itemsDeCuenta.length === 0) return true; // Cuenta nueva y vacía (esperando pedido)
+    if (itemsDeCuenta.length === 0) return true; 
     const todosCancelados = itemsDeCuenta.every(i => i.status === 'CANCELLED');
-    return !todosCancelados; // Ocultar cuenta si TODOS sus productos están cancelados
+    return !todosCancelados; 
   }).sort((a, b) => {
-    // 1. Las pagadas siempre van al final
     const isAPaid = cuentasPagadasReales.includes(a);
     const isBPaid = cuentasPagadasReales.includes(b);
 
     if (isAPaid && !isBPaid) return 1;
     if (!isAPaid && isBPaid) return -1;
 
-    // 2. Orden de aparición en el carrito (el que pidió primero va arriba)
     const indexA = activeCart.findIndex(item => (item.cuenta || 'General') === a);
     const indexB = activeCart.findIndex(item => (item.cuenta || 'General') === b);
 
-    // Si la cuenta es recién creada y no tiene productos, su index es -1 (le damos peso infinito para que baje)
     const weightA = indexA === -1 ? Infinity : indexA;
     const weightB = indexB === -1 ? Infinity : indexB;
 
-    if (weightA !== weightB) {
-      return weightA - weightB;
-    }
+    if (weightA !== weightB) return weightA - weightB;
 
-    // 3. Fallback a orden alfabético si hay un empate (ej. ambas acaban de ser creadas)
     return a.localeCompare(b);
   });
 
@@ -262,9 +257,11 @@ export const PosModal = ({
     }
   };
 
+  // 🔥 EL FIX MAESTRO PARA PAGOS DE MESAS
   const handleFinalizePayment = async (paymentDetails) => {
     const { amountPaid, targetType, cuentaName, isLastInBatch } = paymentDetails;
     
+    // 1. PAGO PARCIAL (Flujo normal por cuenta)
     if (targetType === 'partial' || targetType === 'silent_partial') { 
       await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
@@ -281,13 +278,58 @@ export const PosModal = ({
       return; 
     }
     
+    // 2. PAGO COMPLETO
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
     
-    await handleCheckout(paymentDetails, () => {
-       setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `El total ha sido pagado exitosamente.` });
-       setTimeout(() => setPaymentSuccessData(null), 2000);
-       setShowCheckout(false); 
-    });
+    // Si es Mostrador o Llevar, cerramos toda la orden globalmente (porque nadie más se unirá)
+    if (isLlevar || isVitrina) {
+      await handleCheckout(paymentDetails, () => {
+         setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `El total ha sido pagado exitosamente.` });
+         setTimeout(() => setPaymentSuccessData(null), 2000);
+         setShowCheckout(false); 
+      });
+      return;
+    }
+
+    // 🔥 FIX: Si es SALÓN, Iteramos cuenta por cuenta y pagamos silenciosamente.
+    // Así evitamos cerrar la Orden Global y evitamos que los nuevos clientes se vean como "Pagados".
+    const cuentasActivas = Array.from(new Set(
+      activeCart.filter(i => !cuentasPagadasReales.includes(i.cuenta || 'General'))
+          .map(i => i.cuenta || 'General')
+    ));
+
+    setIsProcessingAction(true);
+    try {
+      for (let i = 0; i < cuentasActivas.length; i++) {
+        const cName = cuentasActivas[i];
+        const subtotalCuenta = getSubtotalByCuenta(cName);
+        
+        // Fabricamos un paymentDetails por cada cuenta sin cerrar el checkout
+        const partialPaymentDetails = {
+          ...paymentDetails,
+          amountPaid: subtotalCuenta, // Paga exactamente lo que debe esa cuenta
+          targetType: 'silent_partial',
+          cuentaName: cName,
+          isLastInBatch: i === cuentasActivas.length - 1
+        };
+        
+        await new Promise((resolve, reject) => {
+          payCuenta(cName, partialPaymentDetails, () => {
+             if (onPagoParcial) onPagoParcial(mesa.id, subtotalCuenta);
+             resolve();
+          }).catch(reject);
+        });
+      }
+      
+      setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `Todas las cuentas han sido pagadas exitosamente.` });
+      setTimeout(() => setPaymentSuccessData(null), 2000);
+      setShowCheckout(false); 
+    } catch (error) {
+      console.error("Error al cobrar cuentas por lote:", error);
+      showToast("Error al cobrar algunas cuentas", "error");
+    } finally {
+      setIsProcessingAction(false);
+    }
   };
 
   const finalizeTable = async () => { 
@@ -322,7 +364,6 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
-  // 🔥 Le inyectamos los datos limpios y purgados al Sidebar
   const sidebarProps = {
     cart: activeCart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
@@ -353,7 +394,6 @@ export const PosModal = ({
     showToast 
   };
 
-  // 🔥 El carrito total ahora ignora de verdad a los fantasmas
   const totalItemsInCart = activeCart.reduce((acc, curr) => acc + curr.qty, 0);
 
   const posContent = (
@@ -407,7 +447,6 @@ export const PosModal = ({
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
             >
               {filteredProducts.map(product => {
-                // 🔥 También purgado aquí
                 const currentCartQty = activeCart
                   .filter(item => item.id === product.id && !item.enviadoCocina && !item.isAutoPromo)
                   .reduce((acc, item) => acc + item.qty, 0);
