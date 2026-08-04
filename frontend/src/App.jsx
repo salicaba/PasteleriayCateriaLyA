@@ -634,11 +634,22 @@ function App() {
                     <motion.button
                       whileTap={!isUpdating ? { scale: 0.95 } : {}}
                       onClick={async () => {
+                        if (isUpdating) return; // Bloqueo absoluto anti-doble clic
                         setIsUpdating(true);
                         try {
+                          // 1. Pequeño delay visual para que el usuario note inmediatamente la reacción del sistema
+                          await new Promise(resolve => setTimeout(resolve, 600));
+                          
+                          // 2. Disparamos la actualización (esto descargará el nuevo SW y recargará la app)
                           await updateServiceWorker(true);
-                        } finally {
-                          setIsUpdating(false);
+                          
+                          // 🔥 CRÍTICO: NO liberamos el estado aquí (no hay setIsUpdating(false)).
+                          // El botón se quedará congelado en "Actualizando sistema..." protegiendo 
+                          // la interfaz hasta que el navegador complete el refresh automáticamente.
+                        } catch (error) {
+                          console.error("Error al actualizar la PWA:", error);
+                          setIsUpdating(false); // Solo liberamos el botón si la actualización falla
+                          toast.error("Error al actualizar. Intenta recargar manualmente.");
                         }
                       }}
                       disabled={isUpdating}
@@ -647,7 +658,7 @@ function App() {
                       {isUpdating ? (
                         <>
                           <Loader2 size={20} className="animate-spin" />
-                          <span>Actualizando...</span>
+                          <span>Actualizando sistema...</span>
                         </>
                       ) : (
                         <>
