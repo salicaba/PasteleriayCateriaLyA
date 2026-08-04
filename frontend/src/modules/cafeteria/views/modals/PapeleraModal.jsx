@@ -18,21 +18,19 @@ export const PapeleraModal = ({
   // 🔥 ESTADO LOCAL: Controla la carga cuando restauramos una cuenta virtual completa
   const [restoringVirtualId, setRestoringVirtualId] = useState(null);
 
-  // 🔥 HELPER INTELIGENTE: Separa Origen, Nombre y Celular de cadenas complejas
-  const parseTicketData = (ticketId, fallbackName) => {
-    let origin = ticketId;
+  // 🔥 HELPER INTELIGENTE MEJORADO: Siempre exige el número de mesa como respaldo
+  const parseTicketData = (ticketId, fallbackName, tableNum) => {
+    let origin = ticketId || '';
     let name = fallbackName || 'General';
     let phone = '';
 
-    if (!ticketId) return { origin: 'Desconocido', name, phone };
-
-    if (ticketId.toUpperCase().includes('MOSTRADOR')) {
-        const parts = ticketId.split(' ');
+    if (origin.toUpperCase().includes('MOSTRADOR')) {
+        const parts = origin.split(' ');
         origin = 'Cuenta Mostrador';
         name = `Folio: ${parts[1] || 'Express'}`;
-    } else if (ticketId.toUpperCase().includes('LLEVAR')) {
-        const separator = ticketId.includes(' - ') ? ' - ' : ' | ';
-        const parts = ticketId.split(separator);
+    } else if (origin.toUpperCase().includes('LLEVAR')) {
+        const separator = origin.includes(' - ') ? ' - ' : ' | ';
+        const parts = origin.split(separator);
         
         origin = parts[0].trim();
         origin = origin.toUpperCase().includes('PEDIDO') ? origin : `Pedido ${origin}`;
@@ -40,11 +38,8 @@ export const PapeleraModal = ({
         if (parts.length > 1) name = parts[1].trim();
         if (parts.length > 2) phone = parts[2].trim();
     } else {
-        const separator = ticketId.includes(' - ') ? ' - ' : ' | ';
-        const parts = ticketId.split(separator);
-        origin = parts[0].trim();
-        if (parts.length > 1) name = parts[1].trim();
-        if (parts.length > 2) phone = parts[2].trim();
+        // 🔥 FIX: Si no es Llevar ni Mostrador, ES SALÓN. Forzamos el título de la Mesa.
+        origin = `Mesa #${tableNum || '?'}`;
     }
 
     if (name.toUpperCase().startsWith('LLEVAR')) name = 'General';
@@ -70,7 +65,6 @@ export const PapeleraModal = ({
       (item.cuenta || 'General') === virtualOrder.cuenta
     );
 
-    // Restauramos uno por uno con una pequeñísima pausa para no saturar el servidor
     for (const item of itemsToRestore) {
       try {
         await onRestoreItem(item.orderId, item.id);
@@ -123,6 +117,9 @@ export const PapeleraModal = ({
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
+              {/* ========================================================================= */}
+              {/* CUENTAS CANCELADAS (REALES + VIRTUALES) */}
+              {/* ========================================================================= */}
               {allCancelledAccounts.length > 0 && (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Cuentas Canceladas</h3>
@@ -132,9 +129,10 @@ export const PapeleraModal = ({
                       const esMesaCompleta = order.cancelReason?.includes('Mesa Completa');
 
                       const fallbackName = order.cuenta || order.customerName || order.name || order.nombreCliente || 'General';
-                      const rawTicketId = order.ticketId || `Mesa #${numMesa}`;
+                      const rawTicketId = order.ticketId || '';
                       
-                      const { origin: tituloPrincipal, name: cNameAcc, phone: cPhoneAcc } = parseTicketData(rawTicketId, fallbackName);
+                      // 🔥 Pasamos numMesa al filtro para que siempre sepa de dónde viene
+                      const { origin: tituloPrincipal, name: cNameAcc, phone: cPhoneAcc } = parseTicketData(rawTicketId, fallbackName, numMesa);
 
                       let textoInsignia = '';
                       if (esMesaCompleta) {
@@ -173,7 +171,6 @@ export const PapeleraModal = ({
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
                               
-                              {/* 🔥 BOTÓN INTELIGENTE: Si es virtual ejecuta el motor, si es real usa el método nativo */}
                               {order.isVirtual ? (
                                 <button 
                                   onClick={() => handleRestoreVirtualAccount(order)} 
@@ -234,6 +231,9 @@ export const PapeleraModal = ({
                 </div>
               )}
 
+              {/* ========================================================================= */}
+              {/* PRODUCTOS CANCELADOS INDIVIDUALMENTE */}
+              {/* ========================================================================= */}
               {dailySummary.cancelledItems.length > 0 && (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Productos Cancelados</h3>
@@ -255,8 +255,9 @@ export const PapeleraModal = ({
                       let cPhoneAcc = '';
 
                       if (ordenRef) {
-                          const rawTicketId = ordenRef.ticketId || `Mesa #${ordenRef.table?.numero || ordenRef.table?.number || '?'}`;
-                          const parsed = parseTicketData(rawTicketId, fallbackName);
+                          const numMesa = ordenRef.table?.numero || ordenRef.table?.number || '?';
+                          const rawTicketId = ordenRef.ticketId || '';
+                          const parsed = parseTicketData(rawTicketId, fallbackName, numMesa);
                           tituloPrincipal = parsed.origin;
                           cNameAcc = parsed.name;
                           cPhoneAcc = parsed.phone;
