@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/modals/PapeleraModal.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, X, RotateCcw, Loader2, CheckCircle } from 'lucide-react';
 
@@ -15,6 +15,8 @@ export const PapeleraModal = ({
   onRestoreItem,
   restoringItemId
 }) => {
+  // 🔥 ESTADO LOCAL: Controla la carga cuando restauramos una cuenta virtual completa
+  const [restoringVirtualId, setRestoringVirtualId] = useState(null);
 
   // 🔥 HELPER INTELIGENTE: Separa Origen, Nombre y Celular de cadenas complejas
   const parseTicketData = (ticketId, fallbackName) => {
@@ -45,7 +47,6 @@ export const PapeleraModal = ({
         if (parts.length > 2) phone = parts[2].trim();
     }
 
-    // Limpieza final de redundancias
     if (name.toUpperCase().startsWith('LLEVAR')) name = 'General';
     
     if (name.includes(' | ')) {
@@ -61,7 +62,26 @@ export const PapeleraModal = ({
     return { origin, name, phone };
   };
 
-  // 🔥 CREACIÓN DE ÓRDENES VIRTUALES: Para cuentas de mesa canceladas (donde la mesa sigue abierta)
+  // 🔥 FUNCIÓN MAESTRA: Restaura todos los items de una cuenta virtual automáticamente
+  const handleRestoreVirtualAccount = async (virtualOrder) => {
+    setRestoringVirtualId(virtualOrder.id);
+    const itemsToRestore = dailySummary.cancelledItems.filter(item => 
+      item.orderId === virtualOrder.realOrderId && 
+      (item.cuenta || 'General') === virtualOrder.cuenta
+    );
+
+    // Restauramos uno por uno con una pequeñísima pausa para no saturar el servidor
+    for (const item of itemsToRestore) {
+      try {
+        await onRestoreItem(item.orderId, item.id);
+        await new Promise(r => setTimeout(r, 200)); 
+      } catch (error) {
+        console.error("Error al restaurar item virtual:", error);
+      }
+    }
+    setRestoringVirtualId(null);
+  };
+
   const fullyCancelledOrderIds = dailySummary.cancelledOrders.map(o => o.id);
   const orphanedItems = dailySummary.cancelledItems.filter(item => !fullyCancelledOrderIds.includes(item.orderId));
 
@@ -72,7 +92,7 @@ export const PapeleraModal = ({
     if (!virtualOrdersMap[key]) {
         const parentOrder = item.parentOrder || [...mesasSalon, ...mesasLlevar, selectedMesa, ...dailySummary.vendidosOrders].filter(Boolean).find(o => (o.orderId || o.id) === item.orderId);
         virtualOrdersMap[key] = {
-            id: key, // ID Falso para renderizar la tarjeta
+            id: key, 
             isVirtual: true,
             realOrderId: item.orderId,
             cuenta: cuenta,
@@ -86,7 +106,6 @@ export const PapeleraModal = ({
   });
 
   const virtualOrders = Object.values(virtualOrdersMap);
-  // Unimos las reales (Para Llevar / Mesas Completas) con las virtuales (Cuentas de Mesas)
   const allCancelledAccounts = [...dailySummary.cancelledOrders, ...virtualOrders].sort((a, b) => new Date(b.cancelledAt) - new Date(a.cancelledAt));
 
   return (
@@ -104,9 +123,6 @@ export const PapeleraModal = ({
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
-              {/* ========================================================================= */}
-              {/* CUENTAS CANCELADAS (REALES + VIRTUALES) */}
-              {/* ========================================================================= */}
               {allCancelledAccounts.length > 0 && (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Cuentas Canceladas</h3>
@@ -118,7 +134,6 @@ export const PapeleraModal = ({
                       const fallbackName = order.cuenta || order.customerName || order.name || order.nombreCliente || 'General';
                       const rawTicketId = order.ticketId || `Mesa #${numMesa}`;
                       
-                      // 🔥 Usamos la función inteligente para extraer los datos limpios
                       const { origin: tituloPrincipal, name: cNameAcc, phone: cPhoneAcc } = parseTicketData(rawTicketId, fallbackName);
 
                       let textoInsignia = '';
@@ -158,11 +173,23 @@ export const PapeleraModal = ({
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
                               
-                              {/* 🔥 Si es virtual, pedimos restaurar por producto para evitar errores. Si es real, botón de restaurar completo */}
+                              {/* 🔥 BOTÓN INTELIGENTE: Si es virtual ejecuta el motor, si es real usa el método nativo */}
                               {order.isVirtual ? (
-                                <span className="px-2 py-1.5 rounded-lg border border-orange-200 dark:border-orange-800/50 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                                  👇 Restaurar abajo
-                                </span>
+                                <button 
+                                  onClick={() => handleRestoreVirtualAccount(order)} 
+                                  disabled={restoringVirtualId === order.id}
+                                  className={`px-2 py-1.5 rounded-lg shadow-sm border transition-all flex items-center gap-1.5 ${
+                                    restoringVirtualId === order.id 
+                                      ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
+                                      : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
+                                  }`} 
+                                  title="Restaurar Cuenta Específica"
+                                >
+                                  {restoringVirtualId === order.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
+                                  <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
+                                    {restoringVirtualId === order.id ? 'Restaurando...' : 'Restaurar'}
+                                  </span>
+                                </button>
                               ) : (
                                 <button 
                                   onClick={() => onRestoreOrder(order.id)} 
@@ -207,9 +234,6 @@ export const PapeleraModal = ({
                 </div>
               )}
 
-              {/* ========================================================================= */}
-              {/* PRODUCTOS CANCELADOS INDIVIDUALMENTE */}
-              {/* ========================================================================= */}
               {dailySummary.cancelledItems.length > 0 && (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">Productos Cancelados</h3>
