@@ -86,8 +86,6 @@ export const getDashboardData = async (req, res) => {
     }).sort((a, b) => b.cantidad - a.cantidad);
 
     // 4. Ventas/Rendimiento de Pastelería (Pedidos Entregados)
-    // LÓGICA CRÍTICA: Al exigir estado='entregado', cualquier anulación o cancelación ('cancelado') 
-    // se descuenta automáticamente del conteo y del ingreso bruto del reporte.
     const pasteleriaSalesRaw = await PasteleriaOrder.findAll({
       where: { 
         createdAt: { [Op.between]: [start, end] },
@@ -187,5 +185,67 @@ export const getDashboardData = async (req, res) => {
   } catch (error) {
     console.error('Error en getDashboardData:', error);
     res.status(500).json({ success: false, message: 'Error generando reportes' });
+  }
+};
+
+// 🔥 NUEVO ENDPOINT: Analíticas específicas por Producto
+export const getProductStats = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { period } = req.query; // 'today', 'yesterday', 'week', 'month', 'all'
+
+    let dateFilter = {};
+    if (period && period !== 'all') {
+      const now = new Date();
+      let start, end;
+      
+      if (period === 'today') {
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      } else if (period === 'yesterday') {
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+      } else if (period === 'week') {
+        const day = now.getDay() || 7; 
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - day), 23, 59, 59, 999);
+      } else if (period === 'month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      }
+
+      if (start && end) {
+        dateFilter = { createdAt: { [Op.between]: [start, end] } };
+      }
+    }
+
+    const soldItems = await OrderItem.findAll({
+      where: { 
+        productId,
+        status: 'ACTIVE',
+        ...dateFilter
+      },
+      include: [{
+        model: Order,
+        as: 'order',
+        attributes: [],
+        where: { 
+          status: { [Op.in]: ['PAID', 'CLOSED'] } 
+        }
+      }],
+      attributes: [
+        [fn('SUM', col('quantity')), 'totalQuantity'],
+        [fn('SUM', col('subtotal')), 'totalRevenue']
+      ],
+      raw: true
+    });
+
+    const qty = soldItems[0]?.totalQuantity ? parseInt(soldItems[0].totalQuantity) : 0;
+    const rev = soldItems[0]?.totalRevenue ? parseFloat(soldItems[0].totalRevenue) : 0;
+
+    res.json({ success: true, data: { cantidad: qty, ingreso: rev } });
+  } catch (error) {
+    console.error('Error en getProductStats:', error);
+    res.status(500).json({ success: false, message: 'Error generando estadísticas del producto' });
   }
 };

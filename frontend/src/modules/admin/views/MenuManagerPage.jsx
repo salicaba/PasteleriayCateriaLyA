@@ -1,9 +1,9 @@
-// src/modules/admin/views/MenuManagerPage.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore, Package, Tag } from 'lucide-react';
+// 🔥 Agregamos TrendingUp para el botón de analíticas
+import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore, Package, Tag, TrendingUp } from 'lucide-react';
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
@@ -53,7 +53,13 @@ export const MenuManagerPage = () => {
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
     isLoading,
-    processingActions 
+    processingActions,
+    
+    // 🔥 Desestructuramos los nuevos estados del BI
+    isStatsModalOpen, setIsStatsModalOpen, 
+    selectedProductForStats, productStats, 
+    isFetchingStats, statsPeriod, 
+    openStatsModal, fetchProductStats
   } = useMenuManagerController({ showToast }); 
 
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -425,6 +431,16 @@ export const MenuManagerPage = () => {
                             </div>
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
+                              
+                              {/* 🔥 BOTÓN DE ESTADÍSTICAS DEL PRODUCTO */}
+                              <button 
+                                onClick={() => openStatsModal(product)} 
+                                className="p-2.5 rounded-xl transition-colors active:scale-90 outline-none text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 lya:text-lya-secondary lya:bg-lya-secondary/10 md:hover:bg-indigo-100 dark:md:hover:bg-indigo-900/40"
+                                title="Estadísticas de Venta"
+                              >
+                                <TrendingUp size={16} />
+                              </button>
+
                               <button 
                                 onClick={() => handleOpenPromoList(product)} 
                                 className={`p-2.5 rounded-xl transition-colors active:scale-90 outline-none ${
@@ -708,6 +724,84 @@ export const MenuManagerPage = () => {
                   )
                 })}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔥 CÁPSULA NEO-BENTO: ANALÍTICAS DE PRODUCTO */}
+      <AnimatePresence>
+        {isStatsModalOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative overflow-hidden"
+            >
+              {/* Decoración de fondo */}
+              <div className="absolute top-0 left-0 right-0 h-32 bg-indigo-50 dark:bg-indigo-900/20 lya:bg-lya-secondary/10 z-0"></div>
+
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-500/20 lya:bg-lya-secondary/20 text-indigo-600 dark:text-indigo-400 lya:text-lya-secondary rounded-full flex items-center justify-center mb-4 z-10 border-4 border-white dark:border-gray-900 lya:border-lya-surface shadow-sm">
+                <TrendingUp size={28} strokeWidth={2.5} />
+              </div>
+              
+              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text text-center z-10 w-full truncate px-4">
+                {selectedProductForStats?.nombre || 'Producto'}
+              </h3>
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-widest mb-6 z-10">Métricas de Venta</p>
+
+              {/* Filtros de Fecha (Píldoras) */}
+              <div className="flex flex-wrap justify-center gap-2 mb-6 w-full z-10">
+                {[
+                  { id: 'today', label: 'Hoy' },
+                  { id: 'yesterday', label: 'Ayer' },
+                  { id: 'week', label: 'Semana' },
+                  { id: 'month', label: 'Mes' },
+                  { id: 'all', label: 'Siempre' }
+                ].map(period => (
+                  <button
+                    key={period.id}
+                    disabled={isFetchingStats}
+                    onClick={() => fetchProductStats(selectedProductForStats?.id, period.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all outline-none ${
+                      statsPeriod === period.id
+                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 md:hover:bg-gray-200 dark:md:hover:bg-gray-700'
+                    } ${isFetchingStats ? 'opacity-50 cursor-wait' : 'active:scale-95'}`}
+                  >
+                    {period.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tarjetas de Datos */}
+              <div className="w-full grid grid-cols-2 gap-3 mb-6 z-10">
+                <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 p-4 rounded-2xl flex flex-col items-center justify-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Unidades</p>
+                  {isFetchingStats ? (
+                    <Loader2 size={24} className="animate-spin text-indigo-500" />
+                  ) : (
+                    <span className="text-2xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">{productStats.cantidad}</span>
+                  )}
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 p-4 rounded-2xl flex flex-col items-center justify-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ingreso Bruto</p>
+                  {isFetchingStats ? (
+                    <Loader2 size={24} className="animate-spin text-emerald-500" />
+                  ) : (
+                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">${productStats.ingreso.toFixed(2)}</span>
+                  )}
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setIsStatsModalOpen(false)}
+                className="w-full py-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 outline-none z-10"
+              >
+                Cerrar
+              </button>
             </motion.div>
           </motion.div>
         )}

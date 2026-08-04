@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminMenuModel } from '../models/adminMenuModel';
+import api from '../../../api/client'; // 🔥 Importamos la API para llamadas directas
 
 // 🔥 AHORA RECIBE LA FUNCIÓN DE NOTIFICACIONES NEO-BENTO
 export const useMenuManagerController = ({ showToast }) => {
@@ -18,6 +19,13 @@ export const useMenuManagerController = ({ showToast }) => {
   const [categoryToEdit, setCategoryToEdit] = useState(null); 
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
+
+  // 🔥 NUEVOS ESTADOS PARA ANALÍTICAS DE PRODUCTO
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [selectedProductForStats, setSelectedProductForStats] = useState(null);
+  const [productStats, setProductStats] = useState({ cantidad: 0, ingreso: 0 });
+  const [isFetchingStats, setIsFetchingStats] = useState(false);
+  const [statsPeriod, setStatsPeriod] = useState('month');
 
   const loadData = useCallback(async (showLoadingScreen = true) => {
     try {
@@ -38,6 +46,30 @@ export const useMenuManagerController = ({ showToast }) => {
   }, [showToast]);
 
   useEffect(() => { loadData(true); }, [loadData]);
+
+  // ==========================================
+  // GESTIÓN DE ANALÍTICAS (BUSINESS INTELLIGENCE)
+  // ==========================================
+  const openStatsModal = async (product) => {
+    setSelectedProductForStats(product);
+    setStatsPeriod('month');
+    setIsStatsModalOpen(true);
+    await fetchProductStats(product.id, 'month');
+  };
+
+  const fetchProductStats = async (productId, period) => {
+    setIsFetchingStats(true);
+    try {
+      const res = await api.get(`/reports/product/${productId}/stats?period=${period}`);
+      setProductStats(res.data.data);
+      setStatsPeriod(period);
+    } catch(e) {
+      showToast('Error al cargar métricas del producto', 'error');
+      setProductStats({ cantidad: 0, ingreso: 0 });
+    } finally {
+      setIsFetchingStats(false);
+    }
+  };
 
   // ==========================================
   // GESTIÓN DE CATEGORÍAS
@@ -241,6 +273,12 @@ export const useMenuManagerController = ({ showToast }) => {
     processingActions, // 🔥 Exportamos el nuevo objeto
     
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
-    isLoading
+    isLoading,
+
+    // 🔥 Exportamos funciones de analíticas
+    isStatsModalOpen, setIsStatsModalOpen, 
+    selectedProductForStats, productStats, 
+    isFetchingStats, statsPeriod, 
+    openStatsModal, fetchProductStats
   };
 };
