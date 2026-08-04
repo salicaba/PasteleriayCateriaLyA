@@ -111,7 +111,7 @@ export const PosModal = ({
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
 
-  // 🔥 FILTROS ANTI-FANTASMAS Y ORDENAMIENTO CRONOLÓGICO
+  // 🔥 FILTROS ANTI-FANTASMAS Y ORDENAMIENTO CRONOLÓGICO ESTRICTO
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
 
   const cleanCuentasDisponibles = cuentasDisponibles.filter(cuenta => {
@@ -123,18 +123,16 @@ export const PosModal = ({
     const isAPaid = cuentasPagadasReales.includes(a);
     const isBPaid = cuentasPagadasReales.includes(b);
 
+    // 1. Regla de oro: Las cuentas PAGADAS siempre se hunden al fondo
     if (isAPaid && !isBPaid) return 1;
     if (!isAPaid && isBPaid) return -1;
 
-    const indexA = activeCart.findIndex(item => (item.cuenta || 'General') === a);
-    const indexB = activeCart.findIndex(item => (item.cuenta || 'General') === b);
+    // 2. Regla de estabilidad: Conservar el orden cronológico original.
+    // Ignoramos el estado del producto (Entregado/Preparando). Solo usamos el índice original de creación.
+    const originalIndexA = cuentasDisponibles.indexOf(a);
+    const originalIndexB = cuentasDisponibles.indexOf(b);
 
-    const weightA = indexA === -1 ? Infinity : indexA;
-    const weightB = indexB === -1 ? Infinity : indexB;
-
-    if (weightA !== weightB) return weightA - weightB;
-
-    return a.localeCompare(b);
+    return originalIndexA - originalIndexB;
   });
 
   useEffect(() => {
