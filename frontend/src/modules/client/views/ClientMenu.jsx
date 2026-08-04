@@ -1,4 +1,3 @@
-// frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -176,6 +175,7 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     }
   }, []);
 
+  // 🔥 SOLUCIÓN TEMPORIZADOR DE INACTIVIDAD
   useEffect(() => {
     const updateActivity = () => {
       if (sessionExpired || isConfirmed || finalizedStatus) return;
@@ -188,10 +188,12 @@ export default function ClientMenu({ clientData, type, tableId, onLogout, setAct
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInactivity = () => {
-      if ((isConfirmed && !isOrderPaid) || isSubmitting || finalizedStatus || sessionExpired) return; 
+      // 🔥 FIX CLAVE: Si ya confirmó el pedido, si ya está pagado, o si la cuenta está liberada (finalizedStatus),
+      // DESACTIVAMOS POR COMPLETO el cronómetro de sesión expirada. ¡La mesa es suya!
+      if (isConfirmed || isOrderPaid || isSubmitting || finalizedStatus || sessionExpired) return; 
 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) { 
+      if (now - lastActivityRef.current > 1500000) {  // 25 minutos
         localStorage.setItem('lya_client_session_expired', 'true');
         setSessionExpired(true);
       }
