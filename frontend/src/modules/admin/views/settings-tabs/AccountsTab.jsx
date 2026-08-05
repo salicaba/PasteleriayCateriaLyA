@@ -11,6 +11,10 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
   const [isSavingWhatsapp, setIsSavingWhatsapp] = useState(false);
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   
+  // --- NUEVOS ESTADOS PARA ELIMINACIÓN SEGURA ---
+  const [accountToDelete, setAccountToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const [fetching, setFetching] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ id: '', bank_name: '', account_number: '', account_holder: '', clabe: '' });
@@ -57,7 +61,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
 
   const handleSaveWhatsapp = async () => {
     if (!whatsappNumber.trim()) {
-      return showNotification('error', "El número de WhatsApp no puede estar vacío");
+      return showNotification('error', "El número de WhatsApp no puede estar vacío.");
     }
     setIsSavingWhatsapp(true);
     try {
@@ -68,10 +72,18 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
   };
 
   const handleAddOrUpdate = async () => {
-    if (!form.bank_name || !form.account_number) {
-      return showNotification('error', "Completa los campos obligatorios");
+    if (!form.bank_name || !form.account_holder || !form.account_number || !form.clabe) {
+      return showNotification('error', "Debes llenar todos los campos obligatorios (Banco, Titular, Cuenta y CLABE).");
     }
     
+    if (form.account_number.length < 10 || form.account_number.length > 16) {
+      return showNotification('warning', "El número de cuenta o tarjeta debe tener entre 10 y 16 dígitos.");
+    }
+
+    if (form.clabe.length !== 18) {
+      return showNotification('warning', "La CLABE interbancaria debe tener exactamente 18 dígitos.");
+    }
+
     setIsSavingAccount(true);
     let newAccounts;
     if (editingId) {
@@ -84,7 +96,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       await saveSettingsToDB({ bank_accounts: newAccounts });
       setAccounts(newAccounts); 
       resetForm(); 
-    } catch (err) {} finally {
+    } catch (err) {
+    } finally {
       setIsSavingAccount(false);
     }
   };
@@ -99,13 +112,25 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     setForm({ id: '', bank_name: '', account_number: '', account_holder: '', clabe: '' }); 
   };
   
-  const deleteAccount = async (id) => { 
-    const newAccounts = accounts.filter(a => a.id !== id);
+  // --- NUEVA LÓGICA DE ELIMINACIÓN CON LOCK ASÍNCRONO ---
+  const confirmDeleteAccount = (acc) => {
+    setAccountToDelete(acc);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!accountToDelete) return;
+    setIsDeleting(true);
+    const newAccounts = accounts.filter(a => a.id !== accountToDelete.id);
     try {
       await saveSettingsToDB({ bank_accounts: newAccounts });
       setAccounts(newAccounts); 
-    } catch (err) {}
+      setAccountToDelete(null); // Cierra el modal solo si tuvo éxito
+    } catch (err) {
+    } finally {
+      setIsDeleting(false); // Libera el botón siempre
+    }
   };
+  // ------------------------------------------------------
 
   const executePrint = () => {
     const cantidad = parseInt(printQuantity);
@@ -193,7 +218,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
+      className={`transition-all duration-300 ${globalScroll ? 'w-full flex flex-col space-y-6' : 'h-full w-full flex-1 flex flex-col overflow-hidden'}`}
     >
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
         <div className="bg-emerald-500 lya:bg-lya-primary p-4 rounded-[1.5rem] text-white shadow-lg shrink-0">
@@ -229,14 +254,15 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               placeholder="Ej. 961 123 4567" 
               className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-bold" 
             />
-            <button 
+            <motion.button 
+              whileTap={!isSavingWhatsapp ? { scale: 0.95 } : {}}
               onClick={handleSaveWhatsapp} 
               disabled={isSavingWhatsapp}
-              className="h-[56px] px-5 min-w-[56px] bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center disabled:opacity-50" 
+              className="h-[56px] px-5 min-w-[56px] bg-gray-900 md:hover:bg-black dark:bg-emerald-500 dark:md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-colors shadow-md flex items-center justify-center disabled:opacity-50" 
               title="Guardar Número"
             >
               {isSavingWhatsapp ? <Loader2 className="animate-spin w-6 h-6"/> : <Save size={24}/>}
-            </button>
+            </motion.button>
           </div>
         </motion.div>
 
@@ -266,20 +292,33 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[11px] font-black uppercase text-gray-400 mb-2 block ml-2">Número de Cuenta</label>
-                    <input type="text" value={form.account_number} onChange={e => setForm({...form, account_number: e.target.value})} placeholder="10 a 16 dígitos"
-                      className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-mono" />
+                    <input 
+                      type="text" 
+                      value={form.account_number} 
+                      onChange={e => setForm({...form, account_number: e.target.value.replace(/\D/g, '')})} 
+                      maxLength={16}
+                      placeholder="10 a 16 dígitos"
+                      className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-mono" 
+                    />
                   </div>
                   <div>
                     <label className="text-[11px] font-black uppercase text-gray-400 mb-2 block ml-2">CLABE (18 dígitos)</label>
-                    <input type="text" value={form.clabe} onChange={e => setForm({...form, clabe: e.target.value})} placeholder="Opcional"
-                      className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-mono" />
+                    <input 
+                      type="text" 
+                      value={form.clabe} 
+                      onChange={e => setForm({...form, clabe: e.target.value.replace(/\D/g, '')})} 
+                      maxLength={18}
+                      placeholder="18 dígitos"
+                      className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-mono" 
+                    />
                   </div>
                 </div>
 
-                <button 
+                <motion.button 
+                  whileTap={!isSavingAccount ? { scale: 0.95 } : {}}
                   onClick={handleAddOrUpdate} 
-                  disabled={isSavingAccount || !form.bank_name || !form.account_number} 
-                  className="w-full py-4 bg-emerald-500 lya:bg-lya-primary text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                  disabled={isSavingAccount} 
+                  className="w-full py-4 bg-emerald-500 lya:bg-lya-primary text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 md:hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:md:hover:scale-100"
                 >
                   {isSavingAccount ? (
                       <><Loader2 className="animate-spin" size={20}/> Procesando...</>
@@ -288,12 +327,16 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   ) : (
                       <><Plus size={20}/> Guardar Cuenta</>
                   )}
-                </button>
+                </motion.button>
                 
                 {editingId && (
-                  <button onClick={resetForm} className="w-full text-sm text-gray-400 font-bold hover:text-red-500 transition-colors">
+                  <motion.button 
+                    whileTap={{ scale: 0.95 }}
+                    onClick={resetForm} 
+                    className="w-full text-sm text-gray-400 font-bold md:hover:text-red-500 transition-colors"
+                  >
                     Cancelar edición
-                  </button>
+                  </motion.button>
                 )}
               </div>
             </div>
@@ -329,11 +372,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                         animate={{ opacity: 1, y: 0 }} 
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.4, ease: "easeOut" }}
-                        whileHover={{ y: -4, scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="group relative p-5 rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/30 transition-all flex justify-between items-start"
+                        className="group relative p-5 rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 md:hover:shadow-md md:hover:border-gray-200 dark:md:hover:border-gray-600 lya:md:hover:border-lya-primary/30 transition-all flex justify-between items-start"
                       >
-                        {/* 🔥 AQUÍ ESTÁ LA MAGIA: min-w-0 para que el texto se pueda truncar y no empuje los botones */}
                         <div className="flex-1 pr-2 sm:pr-4 space-y-2 min-w-0">
                           <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight flex items-center gap-2">
                             <Landmark size={16} className="text-emerald-500 lya:text-lya-primary shrink-0" /> 
@@ -362,14 +402,22 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                           )}
                         </div>
 
-                        {/* 🔥 AGREGAMOS shrink-0 y ml-2 para asegurar que los botones tengan su espacio protegido */}
                         <div className="flex gap-2 flex-col shrink-0 ml-2">
-                          <button onClick={() => editAccount(acc)} className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => editAccount(acc)} 
+                            className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 md:hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40"
+                          >
                             <Edit2 size={18}/>
-                          </button>
-                          <button onClick={() => deleteAccount(acc.id)} className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
+                          </motion.button>
+                          {/* BOTÓN QUE ABRE EL MODAL DE ELIMINACIÓN */}
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => confirmDeleteAccount(acc)} 
+                            className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 md:hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40"
+                          >
                             <Trash2 size={18}/>
-                          </button>
+                          </motion.button>
                         </div>
                       </motion.div>
                     ))
@@ -378,12 +426,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               </div>
 
               <div className="pt-6 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/20 shrink-0">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => accounts.length > 0 ? setShowPrintModal(true) : showNotification('error', "No hay cuentas para imprimir")}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-2xl text-sm font-bold shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-all active:scale-95"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-2xl text-sm font-bold shadow-sm md:hover:bg-gray-100 dark:md:hover:bg-gray-600 transition-colors"
                 >
                   <Printer size={20} /> Imprimir Tickets de Transferencia
-                </button>
+                </motion.button>
               </div>
             </div>
           </section>
@@ -420,36 +469,97 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               </p>
               
               <div className="flex items-center justify-center gap-6 mb-10">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
                   onClick={() => setPrintQuantity(Math.max(1, printQuantity - 1))} 
-                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text active:scale-90 transition-transform flex items-center justify-center"
+                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors"
                 >
                   -
-                </button>
+                </motion.button>
                 <span className="text-4xl font-black dark:text-white lya:text-lya-text w-16 text-center">
                   {printQuantity}
                 </span>
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
                   onClick={() => setPrintQuantity(printQuantity + 1)} 
-                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text active:scale-90 transition-transform flex items-center justify-center"
+                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors"
                 >
                   +
-                </button>
+                </motion.button>
               </div>
               
               <div className="flex gap-4">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowPrintModal(false)} 
-                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors"
                 >
                   Cancelar
-                </button>
-                <button 
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={executePrint} 
-                  className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg active:scale-95 transition-all"
+                  className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg transition-all"
                 >
                   Imprimir
-                </button>
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MODAL NEO-BENTO DE CONFIRMACIÓN DE ELIMINACIÓN --- */}
+      <AnimatePresence>
+        {accountToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => !isDeleting && setAccountToDelete(null)} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+            >
+              <div className="mx-auto bg-red-500/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
+                <Trash2 size={40} className="text-red-500" />
+              </div>
+              
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">
+                ¿Eliminar Cuenta?
+              </h3>
+              
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-center leading-relaxed">
+                Estás a punto de eliminar la cuenta de <strong>{accountToDelete.bank_name}</strong>. Esta acción no se puede deshacer.
+              </p>
+              
+              <div className="flex gap-4">
+                <motion.button 
+                  whileTap={!isDeleting ? { scale: 0.95 } : {}}
+                  onClick={() => setAccountToDelete(null)} 
+                  disabled={isDeleting}
+                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </motion.button>
+                <motion.button 
+                  whileTap={!isDeleting ? { scale: 0.95 } : {}}
+                  onClick={handleDeleteConfirm} 
+                  disabled={isDeleting}
+                  className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <><Loader2 className="animate-spin" size={20} /> Eliminando...</>
+                  ) : (
+                    "Eliminar"
+                  )}
+                </motion.button>
               </div>
             </motion.div>
           </div>
