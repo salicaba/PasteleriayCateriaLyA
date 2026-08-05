@@ -465,22 +465,22 @@ export const shareOrderTicket = async (req, res) => {
             <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
           </div>
 
-          <div class="space-y-1.5 text-sm font-medium text-slate-600 mb-6 px-1">
-            <div class="flex justify-between items-start">
-              <span>Expedición:</span>
+          <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
+            <div class="flex justify-between items-start gap-4">
+              <span class="shrink-0">Expedición:</span>
               <span class="text-slate-900 font-bold text-right">${dateStr}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Atendido por:</span>
-              <span class="text-slate-900 font-bold capitalize">${cashierName}</span>
+            <div class="flex justify-between items-center gap-4">
+              <span class="shrink-0">Atendido por:</span>
+              <span class="text-slate-900 font-bold capitalize text-right break-words">${cashierName}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Cliente:</span>
-              <span class="text-slate-900 font-bold capitalize truncate max-w-[60%] text-right">${nombreCliente}</span>
+            <div class="flex justify-between items-start gap-4">
+              <span class="shrink-0">Cliente:</span>
+              <span class="text-slate-900 font-bold capitalize text-right break-words">${nombreCliente}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Servicio:</span>
-              <span class="text-slate-900 font-black uppercase tracking-wide">${identificadorMesa}</span>
+            <div class="flex justify-between items-center gap-4">
+              <span class="shrink-0">Servicio:</span>
+              <span class="text-slate-900 font-black uppercase tracking-wide text-right">${identificadorMesa}</span>
             </div>
           </div>
 
@@ -519,7 +519,7 @@ export const shareOrderTicket = async (req, res) => {
               });
 
               return `
-                <div class="space-y-3">
+                <div class="space-y-4">
                   ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
                     <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg uppercase tracking-wider text-center">
                       — Cuenta: ${parseAccountName(accName)} —
@@ -531,11 +531,11 @@ export const shareOrderTicket = async (req, res) => {
                     try { preps = JSON.parse(item.notes); } catch(e){}
 
                     return `
-                    <div class="flex items-start gap-3 text-sm px-1">
-                      <span class="font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-xs mt-0.5">${item.quantity}x</span>
+                    <div class="flex items-start gap-3 text-sm px-1 mb-2">
+                      <span class="font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
                       <div class="flex-1 min-w-0">
                         <p class="font-bold text-slate-900 break-words leading-tight">
-                          ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded">🛍️ Llevar</span>' : ''}
+                          ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded shrink-0">🛍️ Llevar</span>' : ''}
                           ${item.product?.name || 'Producto'}
                         </p>
                         ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-1 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
@@ -558,9 +558,9 @@ export const shareOrderTicket = async (req, res) => {
               ${cuentasAVisualizar.map(accName => {
                 const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
                 return `
-                  <div class="flex justify-between">
-                    <span class="uppercase">${parseAccountName(accName)}:</span>
-                    <span class="font-bold text-slate-800">$${subTotalAcc.toFixed(2)}</span>
+                  <div class="flex justify-between items-center gap-4">
+                    <span class="uppercase break-words">${parseAccountName(accName)}:</span>
+                    <span class="font-bold text-slate-800 shrink-0">$${subTotalAcc.toFixed(2)}</span>
                   </div>
                 `;
               }).join('')}
@@ -569,9 +569,9 @@ export const shareOrderTicket = async (req, res) => {
           ` : ''}
 
           <div class="flex flex-col gap-2 mb-2">
-            <div class="flex justify-between items-baseline">
-              <span class="text-sm font-black text-slate-600 uppercase tracking-tight">Total Consumido</span>
-              <span class="text-3xl font-black text-slate-900 tracking-tighter">$${totalAmount.toFixed(2)}</span>
+            <div class="flex justify-between items-baseline gap-4">
+              <span class="text-sm font-black text-slate-600 uppercase tracking-tight shrink-0">Total Consumido</span>
+              <span class="text-3xl font-black text-slate-900 tracking-tighter text-right break-words">$${totalAmount.toFixed(2)}</span>
             </div>
           </div>
 
@@ -611,21 +611,35 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightMm = (element.scrollHeight * 0.264583) + 5;
+          // 🔥 BUFFER AUMENTADO (+25) para que NUNCA parta la hoja a la mitad
+          const heightMm = (element.offsetHeight * 0.264583) + 25;
           const options = {
             margin: 0,
             filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
-            html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff' },
-            jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
-            pagebreak: { mode: 'avoid-all' }
+            html2canvas: { 
+              scale: 3, 
+              useCORS: true, 
+              backgroundColor: '#ffffff',
+              windowWidth: element.scrollWidth // Evita que se colapse el Flexbox
+            },
+            jsPDF: { 
+              unit: 'mm', 
+              format: [80, Math.max(heightMm, 150)], // Tira infinita
+              orientation: 'portrait' 
+            }
           };
           html2pdf().set(options).from(element).save();
         }
 
         function descargarImagen() {
           const element = document.getElementById('ticket-card');
-          html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+          html2canvas(element, { 
+            scale: 3, 
+            useCORS: true, 
+            backgroundColor: '#ffffff',
+            windowWidth: element.scrollWidth 
+          }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_${ticketFolioFile}.png';
             link.href = canvas.toDataURL('image/png');
