@@ -1,8 +1,8 @@
 // frontend/src/modules/client/ClientApp.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Toaster, toast } from 'react-hot-toast'; // 🔥 Añadido toast para avisos de red
-import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, WifiOff } from 'lucide-react';
+import { Toaster, toast } from 'react-hot-toast';
+import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, WifiOff, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -35,6 +35,10 @@ export default function ClientApp({ type }) {
   const [runtimeError, setRuntimeError] = useState(null);
   
   const [isAppReady, setIsAppReady] = useState(false);
+  
+  // 🔥 ESTADOS DEL GUARDIA DE ENRUTAMIENTO (Active Session Recovery)
+  const [isGuarding, setIsGuarding] = useState(false);
+  const [guardMessage, setGuardMessage] = useState(null);
 
   // SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function ClientApp({ type }) {
     return () => observer.disconnect();
   }, []);
 
-  // 🔥 1. BLINDAJE DEL ATRAPA-ERRORES (Ignorar fallos de red del PWA)
+  // 1. BLINDAJE DEL ATRAPA-ERRORES
   useEffect(() => {
     const handleError = (event) => {
       if (event.message?.includes('Failed to update a ServiceWorker')) return;
@@ -71,7 +75,6 @@ export default function ClientApp({ type }) {
     };
     const handleRejection = (event) => {
       const msg = event.reason?.message || String(event.reason || '');
-      // Silenciador táctico: Si es un error del Service Worker o de red ("Failed to fetch"), lo ignoramos
       if (msg.includes('Failed to update a ServiceWorker') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
         return; 
       }
@@ -87,7 +90,7 @@ export default function ClientApp({ type }) {
     };
   }, []);
 
-  // 🔥 2. RADAR DE CONEXIÓN PARA EL ACTUALIZADOR EN SEGUNDO PLANO
+  // 2. RADAR DE CONEXIÓN PARA EL ACTUALIZADOR
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -95,12 +98,8 @@ export default function ClientApp({ type }) {
     onRegistered(r) {
       if (r) {
         setInterval(() => {
-          // Solo intentamos buscar actualizaciones si el celular tiene conexión real
           if (navigator.onLine) {
-            r.update().catch(() => {
-              // Si la red se cae en este milisegundo exacto, fallamos silenciosamente.
-              // El Escudo de Conexión se encargará de mostrar la "Señal Débil".
-            });
+            r.update().catch(() => {});
           }
         }, 60 * 1000); 
       }
@@ -143,9 +142,7 @@ export default function ClientApp({ type }) {
   }, [themeIndex]);
 
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
-    if (isInitialLoad) {
-      setIsLoadingTables(true);
-    }
+    if (isInitialLoad) setIsLoadingTables(true);
     
     try {
       const ts = Date.now();
@@ -186,21 +183,13 @@ export default function ClientApp({ type }) {
 
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
-
     const socketEvents = [
-      'config:update', 
-      'business_config_updated', 
-      'settings:updated',
-      'settings_updated',
-      'qr:status_changed', 
-      'service_status_changed', 
-      'pos:update', 
-      'table_status_updated',
-      'table:updated'
+      'config:update', 'business_config_updated', 'settings:updated',
+      'settings_updated', 'qr:status_changed', 'service_status_changed', 
+      'pos:update', 'table_status_updated', 'table:updated'
     ];
 
     socketEvents.forEach(event => socket.on(event, handleUpdate));
-    
     return () => {
       socketEvents.forEach(event => socket.off(event, handleUpdate));
     };
@@ -208,30 +197,68 @@ export default function ClientApp({ type }) {
 
   const handleClientLogout = React.useCallback(() => {
     localStorage.removeItem('lya_client_session');
+    localStorage.removeItem('lya_client_order_id');
     setClientData(null);
     setActiveOrdersCount(0);
     setStandaloneSelection(null); 
   }, []);
 
+  // 🔥 3. EL GUARDIA DE ENRUTAMIENTO ESTRICTO (Interceptor Asíncrono)
   useEffect(() => {
-    if (clientData) {
+    const validateActiveSession = async () => {
+      if (!clientData) return;
+      
       const { type: sessionType, tableId: sessionTableId } = clientData;
-      let needsRedirect = false;
-      let targetPath = '';
+      let isCollision = false;
+      let recoveryPath = '';
 
+      // Detección de colisión entre la URL escaneada y la caché
       if (sessionType && sessionType !== effectiveType) {
-        needsRedirect = true;
-        targetPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
+        isCollision = true;
+        recoveryPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
       } else if (sessionType === 'mesa' && effectiveType === 'mesa' && sessionTableId && sessionTableId !== urlTableId) {
-        needsRedirect = true;
-        targetPath = `/m/${sessionTableId}`;
+        isCollision = true;
+        recoveryPath = `/m/${sessionTableId}`;
       }
 
-      if (needsRedirect && targetPath) {
-        navigate(targetPath, { replace: true });
+      if (isCollision) {
+        setIsGuarding(true);
+        const activeOrderId = localStorage.getItem('lya_client_order_id');
+        
+        if (activeOrderId) {
+          try {
+            // Consulta directa a la fuente de la verdad (Backend)
+            const res = await api.get(`/pos/orders/${activeOrderId}/status`, {
+              params: { cuenta: clientData?.name }
+            });
+            const { status, accountStatus } = res.data || {};
+            
+            // Si la orden sigue viva, bloqueamos el acceso y redirigimos
+            if (status === 'OPEN' || accountStatus === 'PAID') {
+              const locationName = sessionType === 'mesa' ? `Mesa ${sessionTableId}` : 'Para Llevar';
+              setGuardMessage(`Tienes una sesión activa en ${locationName}. Redirigiendo...`);
+              
+              // Lock visual (Neo-Bento) por 2.5s antes del redirect
+              setTimeout(() => {
+                navigate(recoveryPath, { replace: true });
+                setIsGuarding(false);
+                setGuardMessage(null);
+              }, 2500);
+              return; 
+            }
+          } catch (error) {
+            console.error("Fallo al validar sesión con backend, procediendo a purga.", error);
+          }
+        }
+        
+        // Si no hay orden o el backend dice que está muerta, purgamos silenciosamente
+        handleClientLogout();
+        setIsGuarding(false);
       }
-    }
-  }, [clientData, effectiveType, urlTableId, navigate]);
+    };
+
+    validateActiveSession();
+  }, [clientData, effectiveType, urlTableId, navigate, handleClientLogout]);
 
   useEffect(() => {
     if (isStandalone) {
@@ -311,6 +338,29 @@ export default function ClientApp({ type }) {
 
   return (
     <>
+      {/* CÁPSULA NEO-BENTO DE REDIRECCIÓN */}
+      <AnimatePresence>
+        {guardMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -30, scale: 0.9 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="fixed top-8 left-0 right-0 z-[9999999] flex justify-center pointer-events-none px-4"
+          >
+            <div className="bg-amber-100 dark:bg-amber-900/95 border border-amber-300 dark:border-amber-700 rounded-full shadow-2xl px-6 py-3 flex items-center gap-4 max-w-sm w-full">
+              <div className="w-8 h-8 rounded-full bg-amber-200 dark:bg-amber-800 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-300" />
+              </div>
+              <p className="text-amber-900 dark:text-amber-100 text-sm font-bold text-center flex-1 leading-tight">
+                {guardMessage}
+              </p>
+              <Loader2 className="w-5 h-5 text-amber-600 dark:text-amber-400 animate-spin shrink-0" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {!isAppReady && (
           <motion.div
@@ -318,7 +368,7 @@ export default function ClientApp({ type }) {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="fixed inset-0 z-[9999999] bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg flex flex-col items-center justify-center"
+            className="fixed inset-0 z-[9999998] bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg flex flex-col items-center justify-center"
           >
             <motion.div 
               animate={{ scale: [0.95, 1.05, 0.95] }}
@@ -366,7 +416,7 @@ export default function ClientApp({ type }) {
                       toast.error("Fallo al actualizar. Tu internet es inestable.");
                     }
                   }} 
-                  className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all ${isUpdating ? 'bg-emerald-600 cursor-wait opacity-90 shadow-inner' : 'bg-emerald-500 shadow-lg md:hover:shadow-xl'}`}
+                  className={`w-full text-white font-black py-4 rounded-2xl text-lg flex items-center justify-center gap-2 uppercase tracking-wider outline-none transition-all md:hover:shadow-xl ${isUpdating ? 'bg-emerald-600 cursor-wait opacity-90 shadow-inner' : 'bg-emerald-500 shadow-lg'}`}
                 >
                   {isUpdating ? <><Loader2 size={24} className="animate-spin" /> Actualizando...</> : 'Actualizar Ahora'}
                 </motion.button>
@@ -391,7 +441,18 @@ export default function ClientApp({ type }) {
           
           <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10 overflow-hidden">
             <AnimatePresence mode="wait">
-              {!clientData ? (
+              {/* BLOQUEO TOTAL SI ESTAMOS VALIDANDO LA SESIÓN (Evita renderizar componentes hijos) */}
+              {isGuarding ? (
+                <motion.div
+                  key="guarding"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm z-[9000]"
+                >
+                  <Loader2 className="w-12 h-12 text-amber-500 animate-spin mb-4" />
+                </motion.div>
+              ) : !clientData ? (
                 isGridMode ? (
                   <motion.div
                     key="grid"
