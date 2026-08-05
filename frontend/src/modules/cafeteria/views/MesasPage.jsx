@@ -112,22 +112,34 @@ export const MesasPage = () => {
     return () => { socket.off('pos:update', fetchSummary); };
   }, []);
 
-  const activeOrderIds = [...mesasSalon, ...mesasLlevar].map(m => m.orderId || m.id).filter(Boolean);
-
+  // 🔥 AUTO-ACTUALIZADOR DE MESA (Escudo contra cierres forzosos)
   useEffect(() => {
     if (selectedMesa && !isLoading) {
-      const currentId = selectedMesa.orderId || selectedMesa.id;
-      const isActive = activeOrderIds.includes(currentId);
+      const todasLasMesas = [...mesasSalon, ...mesasLlevar];
       
-      if (isActive) {
+      // Buscamos la versión más reciente de la mesa que estamos viendo
+      const mesaActualizada = todasLasMesas.find(m => 
+        m.id === selectedMesa.id || 
+        (m.orderId && selectedMesa.orderId && m.orderId === selectedMesa.orderId)
+      );
+
+      if (mesaActualizada) {
         wasActiveRef.current = true;
-      } else if (wasActiveRef.current && !isActive) {
+        // Si la mesa cambió de estado (ej. de libre a ocupada porque un cliente pidió),
+        // inyectamos los nuevos datos silenciosamente SIN cerrar el modal
+        if (mesaActualizada.orderId !== selectedMesa.orderId || mesaActualizada.estado !== selectedMesa.estado) {
+          setSelectedMesa(mesaActualizada);
+        }
+      } else if (wasActiveRef.current) {
+        // Si la mesa YA NO EXISTE en la lista (ej. una cuenta "Llevar" que se cobró y desapareció)
+        // ENTONCES sí cerramos el modal automáticamente por seguridad.
         setSelectedMesa(null);
+        wasActiveRef.current = false;
       }
     } else {
       wasActiveRef.current = false;
     }
-  }, [activeOrderIds, selectedMesa, isLoading]);
+  }, [mesasSalon, mesasLlevar, selectedMesa, isLoading]);
 
   const ingresosTotales = dailySummary.transactions?.filter(t => t.type === 'INCOME') || [];
 
