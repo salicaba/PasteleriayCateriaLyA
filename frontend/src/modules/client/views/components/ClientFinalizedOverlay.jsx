@@ -129,15 +129,18 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
         </div>
 
         <div className="w-full space-y-3">
-          <motion.button 
-            whileTap={{ scale: 0.95 }} 
-            onClick={onDownloadTicket} 
-            disabled={isDownloading || isLoggingOut}
-            className={`w-full py-4 bg-white ${isClosed ? 'text-emerald-700' : 'text-red-700'} rounded-2xl font-black shadow-xl outline-none flex items-center justify-center gap-2 transition-all md:hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isDownloading ? <Loader2 size={20} className="animate-spin" /> : <FileText size={20} />}
-            {isDownloading ? 'Generando...' : 'Bajar Comprobante'}
-          </motion.button>
+          {/* 🔥 Renderizado condicional: Solo aparece si la cuenta fue PAGADA/CERRADA */}
+          {isClosed && (
+            <motion.button 
+              whileTap={{ scale: 0.95 }} 
+              onClick={onDownloadTicket} 
+              disabled={isDownloading || isLoggingOut}
+              className="w-full py-4 bg-white text-emerald-700 rounded-2xl font-black shadow-xl outline-none flex items-center justify-center gap-2 transition-all md:hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDownloading ? <Loader2 size={20} className="animate-spin" /> : <FileText size={20} />}
+              {isDownloading ? 'Generando...' : 'Bajar Comprobante'}
+            </motion.button>
+          )}
           
           <motion.button 
             whileTap={{ scale: 0.95 }} 
