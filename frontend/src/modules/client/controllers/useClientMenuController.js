@@ -301,14 +301,23 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     }
   }, [onLogout]);
 
-  const handleDownloadTicket = () => {
+  const handleDownloadTicket = async () => {
     if (!activeOrderId) return;
+    
+    // 1. Feedback visual inmediato en la UI
+    triggerNotification('Generando comprobante digital...', 'success');
+    
+    // 2. Pausa táctica de 800ms para que el botón muestre el loader y el usuario lea el mensaje
+    await new Promise(resolve => setTimeout(resolve, 800));
+
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
     if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
       baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
     }
     const shortId = activeOrderId.split('-')[0];
     const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(clientData?.name || '')}`;
+    
+    // 3. El navegador abre la pestaña (la pantalla negra ahora tendrá contexto para el usuario)
     window.open(url, '_blank');
   };
 
