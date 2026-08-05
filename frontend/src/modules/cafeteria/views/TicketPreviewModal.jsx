@@ -258,7 +258,10 @@ export const TicketPreviewModal = ({
 
                 <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                   <Coffee size={32} className="mx-auto mb-2 text-gray-800" />
-                  <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
+                  {/* Agregamos block, h-8, flex, leading-none y overflow-hidden para encerrar la tipografía rebelde */}
+<div className="h-8 flex items-center justify-center overflow-hidden mb-1">
+  <h2 className="text-xl font-black uppercase tracking-widest leading-none" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
+</div>
                   <p className="text-xs font-bold text-gray-600 uppercase mt-1">Cafetería</p>
                   <p className="text-xs text-gray-500 mt-1">Comprobante de Venta</p>
                   
@@ -350,7 +353,12 @@ export const TicketPreviewModal = ({
                             {groupedItems.map((item, idx) => (
                               <React.Fragment key={`${accName}-${idx}`}>
                                 <tr>
-                                  <td className="font-bold align-top pt-2 text-black">{item.qty}x</td>
+                                  <td className="align-top pt-2 pr-2">
+                                    {/* flex-shrink-0 y medidas w-7 h-7 estrictas evitan que el canvas lo aplaste */}
+                                    <div className="bg-gray-100 rounded-md w-7 h-7 flex-shrink-0 flex items-center justify-center font-bold text-black text-xs">
+                                      {item.qty}x
+                                    </div>
+                                  </td>
                                   <td className="align-top pt-2 pr-1 break-words leading-tight">
                                     {item.isTakeaway && <span className="text-orange-500 mr-1 text-[10px] uppercase tracking-tighter">🛍️</span>}
                                     {item.nombre}

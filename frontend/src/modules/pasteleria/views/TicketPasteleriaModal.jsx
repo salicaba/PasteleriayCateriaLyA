@@ -166,7 +166,10 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       
                       <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                         <Cake size={32} className="mx-auto mb-2 text-gray-800" />
-                        <h2 className="text-xl font-black uppercase tracking-widest" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
+                        {/* Agregamos block, h-8, flex, leading-none y overflow-hidden para encerrar la tipografía rebelde */}
+<div className="h-8 flex items-center justify-center overflow-hidden mb-1">
+  <h2 className="text-xl font-black uppercase tracking-widest leading-none" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
+</div>
                         <p className="text-xs font-bold text-gray-600 uppercase">Pastelería & Cafetería</p>
                         <p className="text-xs text-gray-500 mt-1">Comprobante de Pedido</p>
                         <p className="text-lg font-bold mt-2 text-black">{pedido.id}</p>
