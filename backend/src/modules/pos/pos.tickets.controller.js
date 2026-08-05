@@ -459,7 +459,9 @@ export const shareOrderTicket = async (req, res) => {
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">☕</div>
               <!-- 🔥 FIX LYA: Se eliminó el line-height aplastado y se agregó margen inferior (mb-3) 🔥 -->
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider mb-3" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+              <div class="h-16 flex items-center justify-center overflow-hidden mb-2">
+                <h1 class="text-6xl font-black text-slate-900 tracking-wider leading-none m-0 p-0" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+              </div>
               <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
               <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
             </div>
@@ -527,7 +529,9 @@ export const shareOrderTicket = async (req, res) => {
 
                       return `
                       <div class="flex items-start gap-3 text-sm px-1 mb-3">
-                        <span class="font-black text-slate-800 bg-slate-100 min-w-[28px] h-6 flex items-center justify-center rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
+                        <div class="w-7 h-7 bg-slate-100 rounded-md flex items-center justify-center shrink-0 mt-0.5">
+  <span class="font-black text-slate-800 text-xs">${item.quantity}x</span>
+</div>
                         <div class="flex-1 min-w-0">
                           <p class="font-bold text-slate-900 break-words leading-tight">
                             ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded shrink-0">🛍️ Llevar</span>' : ''}

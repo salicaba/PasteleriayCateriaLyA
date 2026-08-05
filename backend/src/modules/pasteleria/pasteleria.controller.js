@@ -510,7 +510,9 @@ export const sharePedidoTicket = async (req, res) => {
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">🎂</div>
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider mb-3" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+              <div class="h-16 flex items-center justify-center overflow-hidden mb-2">
+  <h1 class="text-6xl font-black text-slate-900 tracking-wider leading-none m-0 p-0" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
+</div>
               <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Pastelería</p>
               <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
             </div>
@@ -584,9 +586,9 @@ export const sharePedidoTicket = async (req, res) => {
               </div>
               <div class="flex justify-between items-center mt-2 gap-4">
                 <span class="text-xs font-bold text-slate-500 shrink-0">Estado de Cuenta:</span>
-                <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800 shrink-0 text-center">
-                  ${estadoLiquidacion}
-                </span>
+                <div class="w-28 h-7 flex items-center justify-center rounded border-2 border-slate-800 shrink-0">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-slate-800">${estadoLiquidacion}</span>
+                </div>
               </div>
             </div>
 
