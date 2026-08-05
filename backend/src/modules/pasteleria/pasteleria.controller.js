@@ -504,127 +504,128 @@ export const sharePedidoTicket = async (req, res) => {
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
-      <!-- 🔥 CONTENEDOR CON SCROLL PARA EVITAR RECORTES EN MÓVIL 🔥 -->
       <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
-        <!-- 🔥 TICKET FORZADO A 380px PARA RENDERIZADO PERFECTO 🔥 -->
-        <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px; margin: 0 auto;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
-          
-          <div class="text-center mb-6">
-            <div class="text-4xl mb-2 text-slate-800">🎂</div>
-            <h1 class="text-5xl font-black text-slate-900 mb-1 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
-            <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Pastelería</p>
-            <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
-          </div>
-
-          <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
-            <div class="flex justify-between items-start gap-4">
-              <span class="shrink-0">Expedición:</span>
-              <span class="text-slate-900 font-bold text-right">${expedicionStr}</span>
-            </div>
-            <div class="flex justify-between items-start gap-4">
-              <span class="shrink-0">Entrega:</span>
-              <span class="text-slate-900 font-bold text-right">${entregaStr}</span>
-            </div>
-            <div class="flex justify-between items-center gap-4">
-              <span class="shrink-0">Atendido por:</span>
-              <span class="text-slate-900 font-bold capitalize text-right break-words">Caja Pastelería</span>
-            </div>
-            <div class="flex justify-between items-start gap-4">
-              <span class="shrink-0">Cliente:</span>
-              <span class="text-slate-900 font-bold capitalize text-right break-words">${pedido.cliente || 'Público General'}</span>
-            </div>
-            <div class="flex justify-between items-center gap-4">
-              <span class="shrink-0">Servicio:</span>
-              <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
-            </div>
-          </div>
-
-          <div class="border-t border-slate-200 my-5"></div>
-
-          <div class="space-y-3 mb-6">
-            <h3 class="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-3 text-center">— Detalles del Producto —</h3>
-            <div class="flex justify-between items-start text-sm gap-4">
-              <span class="font-bold text-slate-500 shrink-0">Categoría:</span>
-              <span class="font-bold text-slate-900 text-right break-words">${pedido.categoria || 'Pastel'}</span>
-            </div>
-            ${porcionesHtml ? `
-            <div class="flex justify-between items-start text-sm gap-4">
-              <span class="font-bold text-slate-500 shrink-0">Tamaño:</span>
-              <span class="font-bold text-slate-900 text-right break-words">${porcionesHtml}</span>
-            </div>` : ''}
-            ${saboresHtml ? `
-            <div class="flex justify-between items-start text-sm gap-4">
-              <span class="font-bold text-slate-500 shrink-0">Sabores:</span>
-              <span class="font-bold text-slate-900 text-right break-words">${saboresHtml}</span>
-            </div>` : ''}
+        <!-- 🔥 CENTRADOR FIJO 🔥 -->
+        <div class="w-full flex justify-center">
+          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
-            ${pedido.descripcion ? `
-            <div class="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Notas:</p>
-              <p class="text-xs text-slate-700 italic font-medium leading-relaxed break-words">"${pedido.descripcion}"</p>
-            </div>` : ''}
-          </div>
-
-          <div class="border-t border-slate-200 my-5"></div>
-
-          <div class="space-y-2 mb-4 px-1">
-            <div class="flex justify-between items-center text-sm gap-4">
-              <span class="font-bold text-slate-500 shrink-0">Subtotal:</span>
-              <span class="font-bold text-slate-800 text-right break-words">$${costoTotal.toFixed(2)}</span>
+            <div class="flex flex-col items-center mb-6 text-center">
+              <div class="text-4xl mb-2 text-slate-800">🎂</div>
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Pastelería</p>
+              <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
             </div>
-            <div class="flex justify-between items-center text-sm gap-4">
-              <span class="font-bold text-slate-500 shrink-0">Anticipo:</span>
-              <span class="font-bold text-slate-800 text-right break-words">$${totalPagado.toFixed(2)}</span>
+
+            <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
+              <div class="flex justify-between items-start gap-4">
+                <span class="shrink-0">Expedición:</span>
+                <span class="text-slate-900 font-bold text-right">${expedicionStr}</span>
+              </div>
+              <div class="flex justify-between items-start gap-4">
+                <span class="shrink-0">Entrega:</span>
+                <span class="text-slate-900 font-bold text-right">${entregaStr}</span>
+              </div>
+              <div class="flex justify-between items-center gap-4">
+                <span class="shrink-0">Atendido por:</span>
+                <span class="text-slate-900 font-bold capitalize text-right break-words">Caja Pastelería</span>
+              </div>
+              <div class="flex justify-between items-start gap-4">
+                <span class="shrink-0">Cliente:</span>
+                <span class="text-slate-900 font-bold capitalize text-right break-words">${pedido.cliente || 'Público General'}</span>
+              </div>
+              <div class="flex justify-between items-center gap-4">
+                <span class="shrink-0">Servicio:</span>
+                <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
+              </div>
             </div>
-          </div>
 
-          <div class="flex flex-col gap-2 mb-2">
-            <div class="flex justify-between items-baseline pt-3 border-t border-slate-100 gap-2">
-              <span class="text-base font-black text-slate-900 uppercase tracking-tight shrink-0">Restante</span>
-              <span class="text-3xl font-black text-slate-900 tracking-tighter text-right break-all">$${deuda.toFixed(2)}</span>
+            <div class="border-t border-slate-200 my-5"></div>
+
+            <div class="space-y-3 mb-6">
+              <h3 class="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-3 text-center">— Detalles del Producto —</h3>
+              <div class="flex justify-between items-start text-sm gap-4">
+                <span class="font-bold text-slate-500 shrink-0">Categoría:</span>
+                <span class="font-bold text-slate-900 text-right break-words">${pedido.categoria || 'Pastel'}</span>
+              </div>
+              ${porcionesHtml ? `
+              <div class="flex justify-between items-start text-sm gap-4">
+                <span class="font-bold text-slate-500 shrink-0">Tamaño:</span>
+                <span class="font-bold text-slate-900 text-right break-words">${porcionesHtml}</span>
+              </div>` : ''}
+              ${saboresHtml ? `
+              <div class="flex justify-between items-start text-sm gap-4">
+                <span class="font-bold text-slate-500 shrink-0">Sabores:</span>
+                <span class="font-bold text-slate-900 text-right break-words">${saboresHtml}</span>
+              </div>` : ''}
+              
+              ${pedido.descripcion ? `
+              <div class="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Notas:</p>
+                <p class="text-xs text-slate-700 italic font-medium leading-relaxed break-words">"${pedido.descripcion}"</p>
+              </div>` : ''}
             </div>
-            <div class="flex justify-between items-center mt-2 gap-4">
-              <span class="text-xs font-bold text-slate-500 shrink-0">Estado de Cuenta:</span>
-              <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800 shrink-0 text-center">
-                ${estadoLiquidacion}
-              </span>
+
+            <div class="border-t border-slate-200 my-5"></div>
+
+            <div class="space-y-2 mb-4 px-1">
+              <div class="flex justify-between items-center text-sm gap-4">
+                <span class="font-bold text-slate-500 shrink-0">Subtotal:</span>
+                <span class="font-bold text-slate-800 text-right break-words">$${costoTotal.toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between items-center text-sm gap-4">
+                <span class="font-bold text-slate-500 shrink-0">Anticipo:</span>
+                <span class="font-bold text-slate-800 text-right break-words">$${totalPagado.toFixed(2)}</span>
+              </div>
             </div>
-          </div>
 
-          ${deuda > 0 && bankAccounts.length > 0 ? `
-            <div class="bg-slate-100 border border-slate-200 p-4 rounded-2xl my-6">
-               <p class="text-[10px] font-black text-slate-600 uppercase text-center mb-3 tracking-widest">Datos para Depósito / Transferencia</p>
-               <div class="space-y-3">
-                 ${bankAccounts.map(acc => `
-                   <div class="text-[11px] bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                      <p class="font-black uppercase text-slate-900 mb-1">${acc.bank_name}</p>
-                      ${acc.account_holder ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">Titular:</span><span class="font-bold text-slate-800 text-right break-words">${acc.account_holder}</span></div>` : ''}
-                      ${acc.account_number ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">Cuenta:</span><span class="font-bold text-slate-800 text-right break-words">${acc.account_number}</span></div>` : ''}
-                      ${acc.clabe ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">CLABE:</span><span class="font-bold text-slate-800 text-right break-words">${acc.clabe}</span></div>` : ''}
-                   </div>
-                 `).join('')}
-               </div>
-               <p class="text-[10px] text-center mt-3 text-slate-600 font-bold italic">Importante: En concepto colocar folio <span class="bg-slate-200 text-slate-900 px-1 rounded">${pedido.id}</span></p>
+            <div class="flex flex-col gap-2 mb-2">
+              <div class="flex justify-between items-baseline pt-3 border-t border-slate-100 gap-4">
+                <span class="text-base font-black text-slate-900 uppercase tracking-tight shrink-0">Restante</span>
+                <span class="text-3xl font-black text-slate-900 tracking-tighter text-right break-all">$${deuda.toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between items-center mt-2 gap-4">
+                <span class="text-xs font-bold text-slate-500 shrink-0">Estado de Cuenta:</span>
+                <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800 shrink-0 text-center">
+                  ${estadoLiquidacion}
+                </span>
+              </div>
             </div>
-          ` : ''}
 
-          <div class="border-t border-slate-200 my-5"></div>
+            ${deuda > 0 && bankAccounts.length > 0 ? `
+              <div class="bg-slate-100 border border-slate-200 p-4 rounded-2xl my-6">
+                 <p class="text-[10px] font-black text-slate-600 uppercase text-center mb-3 tracking-widest">Datos para Depósito / Transferencia</p>
+                 <div class="space-y-3">
+                   ${bankAccounts.map(acc => `
+                     <div class="text-[11px] bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="font-black uppercase text-slate-900 mb-1">${acc.bank_name}</p>
+                        ${acc.account_holder ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">Titular:</span><span class="font-bold text-slate-800 text-right break-words">${acc.account_holder}</span></div>` : ''}
+                        ${acc.account_number ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">Cuenta:</span><span class="font-bold text-slate-800 text-right break-words">${acc.account_number}</span></div>` : ''}
+                        ${acc.clabe ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">CLABE:</span><span class="font-bold text-slate-800 text-right break-words">${acc.clabe}</span></div>` : ''}
+                     </div>
+                   `).join('')}
+                 </div>
+                 <p class="text-[10px] text-center mt-3 text-slate-600 font-bold italic">Importante: En concepto colocar folio <span class="bg-slate-200 text-slate-900 px-1 rounded">${pedido.id}</span></p>
+              </div>
+            ` : ''}
 
-          <div class="text-center space-y-2 mb-6 bg-slate-50/80 p-4 rounded-2xl">
-            <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Ubicación de entrega / Sucursal</p>
-            <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
-              Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
-            </p>
-            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
-              📍 Ver en Google Maps
-            </a>
+            <div class="border-t border-slate-200 my-5"></div>
+
+            <div class="text-center space-y-2 mb-6 bg-slate-50/80 p-4 rounded-2xl">
+              <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Ubicación de entrega / Sucursal</p>
+              <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
+                Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
+              </p>
+              <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
+                📍 Ver en Google Maps
+              </a>
+            </div>
+
+            <div class="text-center mt-8 space-y-1">
+              <p class="font-black text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
+              <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Comprobante Digital de Pedido</p>
+            </div>
+
           </div>
-
-          <div class="text-center mt-8 space-y-1">
-            <p class="font-black text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
-            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Comprobante Digital de Pedido</p>
-          </div>
-
         </div>
       </div>
 
@@ -644,21 +645,19 @@ export const sharePedidoTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          // 🔥 BUFFER AUMENTADO (+15) para evitar cortes
-          const heightMm = (element.offsetHeight * 0.264583) + 15;
+          const heightInInches = (element.offsetHeight / 96) + 0.4;
           const options = {
-            margin: [2, 2, 2, 2], // Margen para que no pegue a las orillas
+            margin: [0.2, 0, 0.2, 0],
             filename: 'Ticket_Lya_Pasteleria_${pedido.id}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff',
-              windowWidth: 420 // Fuerza a canvas a capturar a lo ancho
+              backgroundColor: '#ffffff'
             },
             jsPDF: { 
-              unit: 'mm', 
-              format: [84, Math.max(heightMm, 120)], // 84mm (Tira ancha)
+              unit: 'in', 
+              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket
               orientation: 'portrait' 
             }
           };
@@ -670,8 +669,7 @@ export const sharePedidoTicket = async (req, res) => {
           html2canvas(element, { 
             scale: 3, 
             useCORS: true, 
-            backgroundColor: '#ffffff',
-            windowWidth: 420 // Fuerza a canvas a capturar a lo ancho
+            backgroundColor: '#ffffff'
           }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_Pasteleria_${pedido.id}.png';

@@ -437,7 +437,6 @@ export const shareOrderTicket = async (req, res) => {
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
-      <!-- 🔥 CONTENEDOR CON SCROLL PARA EVITAR RECORTES EN MÓVIL 🔥 -->
       <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
         
         ${(cuentasDisponibles.length > 1 && cuentaSeleccionada === 'Todas') ? `
@@ -450,150 +449,147 @@ export const shareOrderTicket = async (req, res) => {
                 <option value="${c}" ${cuentaSeleccionada === c ? 'selected' : ''}>👤 Cuenta: ${parseAccountName(c)}</option>
               `).join('')}
             </select>
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-              <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-            </div>
           </div>
         </div>
         ` : ''}
 
-        <!-- 🔥 TICKET FORZADO A 380px PARA RENDERIZADO PERFECTO 🔥 -->
-        <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px; margin: 0 auto;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
-          
-          <div class="text-center mb-6">
-            <div class="text-4xl mb-2 text-slate-800">☕</div>
-            <h1 class="text-5xl font-black text-slate-900 mb-1 leading-normal tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
-            <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Cafetería</p>
-            <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
-          </div>
-
-          <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
-            <div class="flex justify-between items-start gap-4">
-              <span class="shrink-0">Expedición:</span>
-              <span class="text-slate-900 font-bold text-right">${dateStr}</span>
+        <!-- 🔥 CENTRADOR FIJO (Evita que el PDF se aviente a la izquierda) 🔥 -->
+        <div class="w-full flex justify-center">
+          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+            
+            <div class="flex flex-col items-center mb-6 text-center">
+              <div class="text-4xl mb-2 text-slate-800">☕</div>
+              <!-- 🔥 FIX LYA (Separado de la palabra cafetería) 🔥 -->
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
+              <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
             </div>
-            <div class="flex justify-between items-center gap-4">
-              <span class="shrink-0">Atendido por:</span>
-              <span class="text-slate-900 font-bold capitalize text-right break-words">${cashierName}</span>
+
+            <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
+              <div class="flex justify-between items-start gap-4">
+                <span class="shrink-0">Expedición:</span>
+                <span class="text-slate-900 font-bold text-right">${dateStr}</span>
+              </div>
+              <div class="flex justify-between items-center gap-4">
+                <span class="shrink-0">Atendido por:</span>
+                <span class="text-slate-900 font-bold capitalize text-right break-words">${cashierName}</span>
+              </div>
+              <div class="flex justify-between items-start gap-4">
+                <span class="shrink-0">Cliente:</span>
+                <span class="text-slate-900 font-bold capitalize text-right break-words">${nombreCliente}</span>
+              </div>
+              <div class="flex justify-between items-center gap-4">
+                <span class="shrink-0">Servicio:</span>
+                <span class="text-slate-900 font-black uppercase tracking-wide text-right">${identificadorMesa}</span>
+              </div>
             </div>
-            <div class="flex justify-between items-start gap-4">
-              <span class="shrink-0">Cliente:</span>
-              <span class="text-slate-900 font-bold capitalize text-right break-words">${nombreCliente}</span>
-            </div>
-            <div class="flex justify-between items-center gap-4">
-              <span class="shrink-0">Servicio:</span>
-              <span class="text-slate-900 font-black uppercase tracking-wide text-right">${identificadorMesa}</span>
-            </div>
-          </div>
 
-          <div class="border-t border-slate-200 my-5"></div>
+            <div class="border-t border-slate-200 my-5"></div>
 
-          <div class="space-y-4">
-            ${cuentasAVisualizar.map(accName => {
-              const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
-              if (accountItemsRaw.length === 0) return '';
-
-              const groupedAccountItems = [];
-              accountItemsRaw.forEach(item => {
-                let notes = '[]';
-                try { 
-                  const parsed = JSON.parse(item.notes || '[]');
-                  notes = JSON.stringify(Array.isArray(parsed) ? parsed : [parsed]);
-                } catch(e){}
-                
-                const key = `${item.productId}-${item.isTakeaway}-${notes}`;
-                const existing = groupedAccountItems.find(g => g.key === key);
-                
-                if (existing) {
-                  existing.quantity += item.quantity;
-                  existing.subtotal += Number(item.subtotal);
-                } else {
-                  groupedAccountItems.push({
-                    key,
-                    product: item.product,
-                    quantity: item.quantity,
-                    subtotal: Number(item.subtotal),
-                    unitPrice: Number(item.subtotal) / item.quantity,
-                    isTakeaway: item.isTakeaway || false,
-                    notes: notes
-                  });
-                }
-              });
-
-              return `
-                <div class="space-y-4">
-                  ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
-                    <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg uppercase tracking-wider text-center">
-                      — Cuenta: ${parseAccountName(accName)} —
-                    </div>
-                  ` : ''}
-                  
-                  ${groupedAccountItems.map(item => {
-                    let preps = [];
-                    try { preps = JSON.parse(item.notes); } catch(e){}
-
-                    return `
-                    <div class="flex items-start gap-3 text-sm px-1 mb-3">
-                      <span class="font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
-                      <div class="flex-1 min-w-0">
-                        <p class="font-bold text-slate-900 break-words leading-tight">
-                          ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded shrink-0">🛍️ Llevar</span>' : ''}
-                          ${item.product?.name || 'Producto'}
-                        </p>
-                        ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-1 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
-                        ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-500 font-medium mt-0.5">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
-                      </div>
-                      <span class="font-black text-slate-900 shrink-0 text-base">$${Number(item.subtotal).toFixed(2)}</span>
-                    </div>
-                    `;
-                  }).join('')}
-                </div>
-              `;
-            }).join('')}
-          </div>
-
-          <div class="border-t border-slate-200 my-5"></div>
-
-          ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
-            <div class="space-y-2 text-xs font-semibold text-slate-500 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <p class="font-black text-slate-400 uppercase tracking-wider mb-3 text-[10px] text-center">Resumen por Cuentas</p>
+            <div class="space-y-4">
               ${cuentasAVisualizar.map(accName => {
-                const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+                const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
+                if (accountItemsRaw.length === 0) return '';
+
+                const groupedAccountItems = [];
+                accountItemsRaw.forEach(item => {
+                  let notes = '[]';
+                  try { 
+                    const parsed = JSON.parse(item.notes || '[]');
+                    notes = JSON.stringify(Array.isArray(parsed) ? parsed : [parsed]);
+                  } catch(e){}
+                  
+                  const key = `${item.productId}-${item.isTakeaway}-${notes}`;
+                  const existing = groupedAccountItems.find(g => g.key === key);
+                  
+                  if (existing) {
+                    existing.quantity += item.quantity;
+                    existing.subtotal += Number(item.subtotal);
+                  } else {
+                    groupedAccountItems.push({
+                      key, product: item.product, quantity: item.quantity,
+                      subtotal: Number(item.subtotal), unitPrice: Number(item.subtotal) / item.quantity,
+                      isTakeaway: item.isTakeaway || false, notes: notes
+                    });
+                  }
+                });
+
                 return `
-                  <div class="flex justify-between items-center gap-4">
-                    <span class="uppercase break-words">${parseAccountName(accName)}:</span>
-                    <span class="font-bold text-slate-800 shrink-0">$${subTotalAcc.toFixed(2)}</span>
+                  <div class="space-y-4">
+                    ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
+                      <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg uppercase tracking-wider text-center">
+                        — Cuenta: ${parseAccountName(accName)} —
+                      </div>
+                    ` : ''}
+                    
+                    ${groupedAccountItems.map(item => {
+                      let preps = [];
+                      try { preps = JSON.parse(item.notes); } catch(e){}
+
+                      return `
+                      <div class="flex items-start gap-3 text-sm px-1 mb-3">
+                        <!-- 🔥 FIX CANTIDADES (Cuadro fijo min-w-[28px]) 🔥 -->
+                        <span class="font-black text-slate-800 bg-slate-100 min-w-[28px] h-6 flex items-center justify-center rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-bold text-slate-900 break-words leading-tight">
+                            ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded shrink-0">🛍️ Llevar</span>' : ''}
+                            ${item.product?.name || 'Producto'}
+                          </p>
+                          ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-1 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
+                          ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-500 font-medium mt-0.5">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
+                        </div>
+                        <span class="font-black text-slate-900 shrink-0 text-base">$${Number(item.subtotal).toFixed(2)}</span>
+                      </div>
+                      `;
+                    }).join('')}
                   </div>
                 `;
               }).join('')}
             </div>
+
             <div class="border-t border-slate-200 my-5"></div>
-          ` : ''}
 
-          <div class="flex flex-col gap-2 mb-2">
-            <div class="flex justify-between items-baseline gap-2">
-              <span class="text-sm font-black text-slate-600 uppercase tracking-tight shrink-0">Total Consumido</span>
-              <span class="text-2xl font-black text-slate-900 tracking-tighter text-right break-words">$${totalAmount.toFixed(2)}</span>
+            ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
+              <div class="space-y-2 text-xs font-semibold text-slate-500 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p class="font-black text-slate-400 uppercase tracking-wider mb-3 text-[10px] text-center">Resumen por Cuentas</p>
+                ${cuentasAVisualizar.map(accName => {
+                  const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+                  return `
+                    <div class="flex justify-between items-center gap-4">
+                      <span class="uppercase break-words">${parseAccountName(accName)}:</span>
+                      <span class="font-bold text-slate-800 shrink-0">$${subTotalAcc.toFixed(2)}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+              <div class="border-t border-slate-200 my-5"></div>
+            ` : ''}
+
+            <div class="flex flex-col gap-2 mb-2">
+              <div class="flex justify-between items-baseline gap-2">
+                <span class="text-sm font-black text-slate-600 uppercase tracking-tight shrink-0">Total Consumido</span>
+                <span class="text-2xl font-black text-slate-900 tracking-tighter text-right break-words">$${totalAmount.toFixed(2)}</span>
+              </div>
             </div>
+
+            <div class="border-t border-slate-200 my-5"></div>
+
+            <div class="text-center space-y-2 mb-6 bg-slate-50/80 p-4 rounded-2xl">
+              <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest">Ubicación</p>
+              <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
+                Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
+              </p>
+              <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
+                📍 Ver en Google Maps
+              </a>
+            </div>
+
+            <div class="text-center mt-8 space-y-1">
+              <p class="font-black text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
+              <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Comprobante Digital de Caja</p>
+            </div>
+
           </div>
-
-          <div class="border-t border-slate-200 my-5"></div>
-
-          <div class="text-center space-y-2 mb-6 bg-slate-50/80 p-4 rounded-2xl">
-            <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest">Ubicación</p>
-            <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
-              Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
-            </p>
-            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
-              📍 Ver en Google Maps
-            </a>
-          </div>
-
-          <div class="text-center mt-8 space-y-1">
-            <p class="font-black text-slate-800 text-sm">¡Gracias por celebrar con nosotros!</p>
-            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Comprobante Digital de Caja</p>
-          </div>
-
         </div>
       </div>
 
@@ -611,22 +607,22 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
+        // 🔥 FIX MOTOR RENDERING: Configuramos la hoja del PDF como Pulgadas (inches) y evitamos espacios blancos
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightMm = (element.offsetHeight * 0.264583) + 15;
+          const heightInInches = (element.offsetHeight / 96) + 0.4; // Altura precisa en pulgadas
           const options = {
-            margin: [2, 2, 2, 2], // 🔥 Margen de 2mm en todos los bordes
+            margin: [0.2, 0, 0.2, 0], // Margen de 0.2 pulgadas arriba y abajo
             filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
-              scale: 2, // Escala óptima sin saturar memoria
+              scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff',
-              windowWidth: 420 // 🔥 Engaña al motor haciéndole creer que la pantalla es ancha
+              backgroundColor: '#ffffff'
             },
             jsPDF: { 
-              unit: 'mm', 
-              format: [84, Math.max(heightMm, 120)], // 🔥 84mm (Tira continua ancha)
+              unit: 'in', // Pulgadas (inches)
+              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket (4.1 pulgadas)
               orientation: 'portrait' 
             }
           };
@@ -638,8 +634,7 @@ export const shareOrderTicket = async (req, res) => {
           html2canvas(element, { 
             scale: 3, 
             useCORS: true, 
-            backgroundColor: '#ffffff',
-            windowWidth: 420 // 🔥 Engaña al motor haciéndole creer que la pantalla es ancha
+            backgroundColor: '#ffffff'
           }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_${ticketFolioFile}.png';
