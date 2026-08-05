@@ -48,7 +48,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     setNombresCuentas, 
     setCuentaActiva, 
     setCuentasTelefonos,
-    sincronizarCuentas // 🔥 EXTRAEMOS EL PURGADOR DE FANTASMAS
+    sincronizarCuentas 
   } = accounts;
 
   // Variables Primitivas para useEffect
@@ -60,6 +60,21 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const dbItemsString = JSON.stringify(mesaActual?.items || []);
   const paidAccountsString = JSON.stringify(mesaActual?.paidAccounts || []);
 
+  // 🔥 EFECTO 1: EL BORRADOR INMORTAL (Auto-Save en tiempo real)
+  useEffect(() => {
+    if (isOpen && mesaId) {
+      // Filtramos solo lo que el empleado ha tecleado pero NO ha enviado a cocina
+      const unsentDraft = cartLogic.cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED');
+      if (unsentDraft.length > 0) {
+        localStorage.setItem(`lya_draft_${mesaId}`, JSON.stringify(unsentDraft));
+      } else {
+        // Si el carrito está vacío o todo ya fue enviado, limpiamos el borrador
+        localStorage.removeItem(`lya_draft_${mesaId}`);
+      }
+    }
+  }, [cartLogic.cart, isOpen, mesaId]);
+
+  // 🔥 EFECTO 2: ORQUESTADOR PRINCIPAL (Fusión de BD + Borrador)
   useEffect(() => {
     if (!isOpen) {
         setCart([]); 
@@ -72,6 +87,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         return;
     }
 
+    // RECUPERAR EL BORRADOR DE LOCALSTORAGE
+    let recoveredDraft = [];
+    try {
+      const draftStr = localStorage.getItem(`lya_draft_${mesaId}`);
+      if (draftStr) recoveredDraft = JSON.parse(draftStr);
+    } catch (e) {}
+
     if (mesaEstado === 'ocupada') {
         setActiveOrderId(mesaOrderId);
         setOrderStatus(mesaOrderStatus || 'OPEN');
@@ -80,11 +102,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         try { loadedPaidAccounts = JSON.parse(paidAccountsString); } catch(e) {}
 
         if (mesaOrderId) {
-            // RECUPERAR TELÉFONOS
             const storedPhones = localStorage.getItem(`lya_phones_${mesaOrderId}`);
             if (storedPhones) try { setCuentasTelefonos(JSON.parse(storedPhones)); } catch(e) {}
 
-            // ESCUDO CONTRA AMNESIA DE BD: RECUPERAR PAGOS LOCALES
             const storedPaid = localStorage.getItem(`lya_paid_${mesaOrderId}`);
             if (storedPaid) {
                 try {
@@ -126,19 +146,18 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
+            // 🔥 FUSIÓN BINDADA: Si el estado local se borró (porque te sacó el sistema), usamos el borrador rescatado
+            const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
+
             const sentButNotLoaded = prev.filter(p => p.enviadoCocina && !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId));
-            const finalCart = [...loadedCart, ...sentButNotLoaded, ...localItems];
+            const finalCart = [...loadedCart, ...sentButNotLoaded, ...activeLocals];
             
-            // 🔥 INYECCIÓN DE LA SOLUCIÓN AL BUG 2:
-            // Ejecutamos el purgador con la "verdad absoluta" combinando BD y Locales
             if (sincronizarCuentas) {
                 sincronizarCuentas({
-                    // Forzamos status ACTIVE para que el hook de cuentas reconozca los locales
                     items: finalCart.map(i => ({ ...i, status: 'ACTIVE' })),
                     paidAccounts: loadedPaidAccounts
                 });
             } else {
-                // Fallback de seguridad estricta
                 const reales = new Set(['General', ...loadedPaidAccounts, ...finalCart.map(i => i.cuenta || 'General')]);
                 setNombresCuentas(prevN => {
                     const purgadas = prevN.filter(c => reales.has(c));
@@ -151,15 +170,18 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
         
     } else {
-        // Mesa libre (sin BD) -> Solo usamos el carrito local
+        // Mesa libre (sin BD) -> Solo usamos el carrito local o el borrador recuperado
         setCart(prev => {
+            const localItems = prev.filter(p => !p.enviadoCocina);
+            const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
+
             if (sincronizarCuentas) {
                 sincronizarCuentas({
-                    items: prev.map(i => ({ ...i, status: 'ACTIVE' })),
+                    items: activeLocals.map(i => ({ ...i, status: 'ACTIVE' })),
                     paidAccounts: []
                 });
             }
-            return prev;
+            return activeLocals;
         });
     }
 
@@ -173,7 +195,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   // 6. RETORNO DE API PÚBLICA (Compatibilidad 100% garantizada)
   return { 
-    // Dominio: Carrito
     cart: cartLogic.cart, 
     total: cartLogic.total, 
     unsentTotal: cartLogic.unsentTotal, 
@@ -185,12 +206,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     getProductQty: cartLogic.getProductQty,
     getSubtotalByCuenta: cartLogic.getSubtotalByCuenta,
     
-    // Dominio del Escudo Poka-Yoke (Promociones)
     promoWarning: cartLogic.promoWarning,
     confirmPromoRupture: cartLogic.confirmPromoRupture,
     cancelPromoRupture: cartLogic.cancelPromoRupture,
     
-    // Dominio: Menú
     filtroTexto: menu.filtroTexto, 
     setFiltroTexto: menu.setFiltroTexto, 
     categoriaActiva: menu.categoriaActiva, 
@@ -198,7 +217,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     filteredProducts: menu.filteredProducts, 
     dbCategories: menu.dbCategories,
     
-    // Dominio: Cuentas
     cuentaActiva: accounts.cuentaActiva, 
     setCuentaActiva: accounts.setCuentaActiva, 
     cuentasDisponibles, 
@@ -206,7 +224,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     paidAccounts: accounts.paidAccounts,
     cuentasTelefonos: accounts.cuentasTelefonos,
     
-    // Dominio: Mutaciones (Pedidos/Cocina) y Estado Global
     orderStatus,
     isSuccess: mutations.isSuccess, 
     isProcessing: mutations.isProcessing,
@@ -224,7 +241,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     cancelAccountItems: mutations.cancelAccountItems, 
     releaseAccount: mutations.releaseAccount,
     
-    // Dominio: Notificaciones UI
     notification, 
     triggerNotification: showToast || triggerNotification 
   };
