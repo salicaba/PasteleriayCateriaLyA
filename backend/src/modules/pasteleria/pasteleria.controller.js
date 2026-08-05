@@ -505,13 +505,12 @@ export const sharePedidoTicket = async (req, res) => {
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
-        <!-- 🔥 CENTRADOR FIJO 🔥 -->
         <div class="w-full flex justify-center">
           <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">🎂</div>
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider mb-3" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
               <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Pastelería</p>
               <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
             </div>
@@ -615,9 +614,6 @@ export const sharePedidoTicket = async (req, res) => {
               <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
                 Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
               </p>
-              <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
-                📍 Ver en Google Maps
-              </a>
             </div>
 
             <div class="text-center mt-8 space-y-1">
@@ -643,22 +639,27 @@ export const sharePedidoTicket = async (req, res) => {
       </div>
 
       <script>
+        // 🔥 FIX MOTOR RENDERING: 0 MÁRGENES, MEDIDAS EXACTAS EN PIXELES
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightInInches = (element.offsetHeight / 96) + 0.4;
+          const heightPx = element.offsetHeight + 10;
+          
           const options = {
-            margin: [0.2, 0, 0.2, 0],
+            margin: 0,
             filename: 'Ticket_Lya_Pasteleria_${pedido.id}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff'
+              backgroundColor: '#ffffff',
+              scrollY: 0, 
+              scrollX: 0
             },
             jsPDF: { 
-              unit: 'in', 
-              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket
-              orientation: 'portrait' 
+              unit: 'px', 
+              format: [380, Math.max(heightPx, 500)], 
+              orientation: 'portrait',
+              hotfixes: ["px_scaling"]
             }
           };
           html2pdf().set(options).from(element).save();
@@ -669,7 +670,9 @@ export const sharePedidoTicket = async (req, res) => {
           html2canvas(element, { 
             scale: 3, 
             useCORS: true, 
-            backgroundColor: '#ffffff'
+            backgroundColor: '#ffffff',
+            scrollY: 0,
+            scrollX: 0
           }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_Pasteleria_${pedido.id}.png';
