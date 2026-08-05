@@ -502,10 +502,12 @@ export const sharePedidoTicket = async (req, res) => {
         @media print { .no-print { display: none !important; } }
       </style>
     </head>
-    <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
+    <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
-      <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
-        <div id="ticket-card" class="w-full bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+      <!-- 🔥 CONTENEDOR CON SCROLL PARA EVITAR RECORTES EN MÓVIL 🔥 -->
+      <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
+        <!-- 🔥 TICKET FORZADO A 380px PARA RENDERIZADO PERFECTO 🔥 -->
+        <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px; margin: 0 auto;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
             <div class="text-4xl mb-2 text-slate-800">🎂</div>
@@ -514,26 +516,26 @@ export const sharePedidoTicket = async (req, res) => {
             <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
           </div>
 
-          <div class="space-y-1.5 text-sm font-medium text-slate-600 mb-6 px-1">
-            <div class="flex justify-between items-start">
-              <span>Expedición:</span>
+          <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
+            <div class="flex justify-between items-start gap-4">
+              <span class="shrink-0">Expedición:</span>
               <span class="text-slate-900 font-bold text-right">${expedicionStr}</span>
             </div>
-            <div class="flex justify-between items-start">
-              <span>Entrega:</span>
+            <div class="flex justify-between items-start gap-4">
+              <span class="shrink-0">Entrega:</span>
               <span class="text-slate-900 font-bold text-right">${entregaStr}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Atendido por:</span>
-              <span class="text-slate-900 font-bold capitalize">Caja Pastelería</span>
+            <div class="flex justify-between items-center gap-4">
+              <span class="shrink-0">Atendido por:</span>
+              <span class="text-slate-900 font-bold capitalize text-right break-words">Caja Pastelería</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Cliente:</span>
-              <span class="text-slate-900 font-bold capitalize truncate max-w-[60%] text-right">${pedido.cliente || 'Público General'}</span>
+            <div class="flex justify-between items-start gap-4">
+              <span class="shrink-0">Cliente:</span>
+              <span class="text-slate-900 font-bold capitalize text-right break-words">${pedido.cliente || 'Público General'}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Servicio:</span>
-              <span class="text-slate-900 font-black uppercase tracking-wide">${pedido.tipoEntrega || 'sucursal'}</span>
+            <div class="flex justify-between items-center gap-4">
+              <span class="shrink-0">Servicio:</span>
+              <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
             </div>
           </div>
 
@@ -541,49 +543,49 @@ export const sharePedidoTicket = async (req, res) => {
 
           <div class="space-y-3 mb-6">
             <h3 class="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-3 text-center">— Detalles del Producto —</h3>
-            <div class="flex justify-between text-sm">
-              <span class="font-bold text-slate-500">Categoría:</span>
-              <span class="font-bold text-slate-900">${pedido.categoria || 'Pastel'}</span>
+            <div class="flex justify-between items-start text-sm gap-4">
+              <span class="font-bold text-slate-500 shrink-0">Categoría:</span>
+              <span class="font-bold text-slate-900 text-right break-words">${pedido.categoria || 'Pastel'}</span>
             </div>
             ${porcionesHtml ? `
-            <div class="flex justify-between text-sm">
-              <span class="font-bold text-slate-500">Tamaño:</span>
-              <span class="font-bold text-slate-900 text-right max-w-[70%]">${porcionesHtml}</span>
+            <div class="flex justify-between items-start text-sm gap-4">
+              <span class="font-bold text-slate-500 shrink-0">Tamaño:</span>
+              <span class="font-bold text-slate-900 text-right break-words">${porcionesHtml}</span>
             </div>` : ''}
             ${saboresHtml ? `
-            <div class="flex justify-between text-sm">
-              <span class="font-bold text-slate-500">Sabores:</span>
-              <span class="font-bold text-slate-900 text-right max-w-[70%]">${saboresHtml}</span>
+            <div class="flex justify-between items-start text-sm gap-4">
+              <span class="font-bold text-slate-500 shrink-0">Sabores:</span>
+              <span class="font-bold text-slate-900 text-right break-words">${saboresHtml}</span>
             </div>` : ''}
             
             ${pedido.descripcion ? `
             <div class="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
               <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Notas:</p>
-              <p class="text-xs text-slate-700 italic font-medium leading-relaxed">"${pedido.descripcion}"</p>
+              <p class="text-xs text-slate-700 italic font-medium leading-relaxed break-words">"${pedido.descripcion}"</p>
             </div>` : ''}
           </div>
 
           <div class="border-t border-slate-200 my-5"></div>
 
           <div class="space-y-2 mb-4 px-1">
-            <div class="flex justify-between text-sm">
-              <span class="font-bold text-slate-500">Subtotal:</span>
-              <span class="font-bold text-slate-800">$${costoTotal.toFixed(2)}</span>
+            <div class="flex justify-between items-center text-sm gap-4">
+              <span class="font-bold text-slate-500 shrink-0">Subtotal:</span>
+              <span class="font-bold text-slate-800 text-right break-words">$${costoTotal.toFixed(2)}</span>
             </div>
-            <div class="flex justify-between text-sm">
-              <span class="font-bold text-slate-500">Anticipo:</span>
-              <span class="font-bold text-slate-800">$${totalPagado.toFixed(2)}</span>
+            <div class="flex justify-between items-center text-sm gap-4">
+              <span class="font-bold text-slate-500 shrink-0">Anticipo:</span>
+              <span class="font-bold text-slate-800 text-right break-words">$${totalPagado.toFixed(2)}</span>
             </div>
           </div>
 
           <div class="flex flex-col gap-2 mb-2">
-            <div class="flex justify-between items-baseline pt-3 border-t border-slate-100">
-              <span class="text-base font-black text-slate-900 uppercase tracking-tight">Restante</span>
-              <span class="text-3xl font-black text-slate-900 tracking-tighter">$${deuda.toFixed(2)}</span>
+            <div class="flex justify-between items-baseline pt-3 border-t border-slate-100 gap-2">
+              <span class="text-base font-black text-slate-900 uppercase tracking-tight shrink-0">Restante</span>
+              <span class="text-3xl font-black text-slate-900 tracking-tighter text-right break-all">$${deuda.toFixed(2)}</span>
             </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs font-bold text-slate-500">Estado de Cuenta:</span>
-              <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800">
+            <div class="flex justify-between items-center mt-2 gap-4">
+              <span class="text-xs font-bold text-slate-500 shrink-0">Estado de Cuenta:</span>
+              <span class="text-xs font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-slate-800 text-slate-800 shrink-0 text-center">
                 ${estadoLiquidacion}
               </span>
             </div>
@@ -596,9 +598,9 @@ export const sharePedidoTicket = async (req, res) => {
                  ${bankAccounts.map(acc => `
                    <div class="text-[11px] bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                       <p class="font-black uppercase text-slate-900 mb-1">${acc.bank_name}</p>
-                      ${acc.account_holder ? `<div class="flex justify-between text-slate-600"><span class="font-medium">Titular:</span><span class="font-bold text-slate-800">${acc.account_holder}</span></div>` : ''}
-                      ${acc.account_number ? `<div class="flex justify-between text-slate-600"><span class="font-medium">Cuenta:</span><span class="font-bold text-slate-800">${acc.account_number}</span></div>` : ''}
-                      ${acc.clabe ? `<div class="flex justify-between text-slate-600"><span class="font-medium">CLABE:</span><span class="font-bold text-slate-800">${acc.clabe}</span></div>` : ''}
+                      ${acc.account_holder ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">Titular:</span><span class="font-bold text-slate-800 text-right break-words">${acc.account_holder}</span></div>` : ''}
+                      ${acc.account_number ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">Cuenta:</span><span class="font-bold text-slate-800 text-right break-words">${acc.account_number}</span></div>` : ''}
+                      ${acc.clabe ? `<div class="flex justify-between items-start gap-4 text-slate-600"><span class="font-medium shrink-0">CLABE:</span><span class="font-bold text-slate-800 text-right break-words">${acc.clabe}</span></div>` : ''}
                    </div>
                  `).join('')}
                </div>
@@ -629,7 +631,7 @@ export const sharePedidoTicket = async (req, res) => {
       <div class="h-32 w-full shrink-0 no-print"></div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
-        <div class="flex gap-3 w-full max-w-sm px-4">
+        <div class="flex gap-3 w-full max-w-[380px] px-2 mx-auto">
           <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             📥 PDF
           </button>
@@ -642,21 +644,35 @@ export const sharePedidoTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightMm = (element.scrollHeight * 0.264583) + 5;
+          // 🔥 BUFFER AUMENTADO (+15) para evitar cortes
+          const heightMm = (element.offsetHeight * 0.264583) + 15;
           const options = {
-            margin: 0,
+            margin: [2, 2, 2, 2], // Margen para que no pegue a las orillas
             filename: 'Ticket_Lya_Pasteleria_${pedido.id}.pdf',
             image: { type: 'jpeg', quality: 1 },
-            html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff' },
-            jsPDF: { unit: 'mm', format: [80, heightMm], orientation: 'portrait' },
-            pagebreak: { mode: 'avoid-all' }
+            html2canvas: { 
+              scale: 2, 
+              useCORS: true, 
+              backgroundColor: '#ffffff',
+              windowWidth: 420 // Fuerza a canvas a capturar a lo ancho
+            },
+            jsPDF: { 
+              unit: 'mm', 
+              format: [84, Math.max(heightMm, 120)], // 84mm (Tira ancha)
+              orientation: 'portrait' 
+            }
           };
           html2pdf().set(options).from(element).save();
         }
 
         function descargarImagen() {
           const element = document.getElementById('ticket-card');
-          html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+          html2canvas(element, { 
+            scale: 3, 
+            useCORS: true, 
+            backgroundColor: '#ffffff',
+            windowWidth: 420 // Fuerza a canvas a capturar a lo ancho
+          }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_Pasteleria_${pedido.id}.png';
             link.href = canvas.toDataURL('image/png');

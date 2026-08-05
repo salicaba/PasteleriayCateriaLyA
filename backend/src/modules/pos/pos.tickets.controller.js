@@ -435,12 +435,13 @@ export const shareOrderTicket = async (req, res) => {
         @media print { .no-print { display: none !important; } }
       </style>
     </head>
-    <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-4 sm:px-6 select-none bg-slate-50">
+    <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
-      <div id="ticket-download-area" class="w-full max-w-md flex flex-col items-center justify-center p-2 bg-transparent">
+      <!-- 🔥 CONTENEDOR CON SCROLL PARA EVITAR RECORTES EN MÓVIL 🔥 -->
+      <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
         
         ${(cuentasDisponibles.length > 1 && cuentaSeleccionada === 'Todas') ? `
-        <div class="w-full mb-4 no-print bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200 shadow-sm">
+        <div class="w-full max-w-[380px] mb-4 no-print bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200 shadow-sm mx-auto">
           <label class="block text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 text-center">👀 Ver cuenta de:</label>
           <div class="relative">
             <select onchange="window.location.href='?cuenta=' + encodeURIComponent(this.value)" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 appearance-none text-center shadow-sm cursor-pointer">
@@ -456,7 +457,8 @@ export const shareOrderTicket = async (req, res) => {
         </div>
         ` : ''}
 
-        <div id="ticket-card" class="w-full bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+        <!-- 🔥 TICKET FORZADO A 380px PARA RENDERIZADO PERFECTO 🔥 -->
+        <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px; margin: 0 auto;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
           
           <div class="text-center mb-6">
             <div class="text-4xl mb-2 text-slate-800">☕</div>
@@ -531,7 +533,7 @@ export const shareOrderTicket = async (req, res) => {
                     try { preps = JSON.parse(item.notes); } catch(e){}
 
                     return `
-                    <div class="flex items-start gap-3 text-sm px-1 mb-2">
+                    <div class="flex items-start gap-3 text-sm px-1 mb-3">
                       <span class="font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
                       <div class="flex-1 min-w-0">
                         <p class="font-bold text-slate-900 break-words leading-tight">
@@ -541,7 +543,7 @@ export const shareOrderTicket = async (req, res) => {
                         ${item.quantity > 1 ? `<p class="text-[10px] font-bold text-slate-500 mt-1 mb-0.5">Unitario: $${item.unitPrice.toFixed(2)}</p>` : ''}
                         ${preps.map(p => p.tamano ? `<p class="text-[11px] text-slate-500 font-medium mt-0.5">- ${p.tamano} ${p.leche ? `• ${p.leche}` : ''}</p>` : '').join('')}
                       </div>
-                      <span class="font-black text-slate-900 shrink-0">$${Number(item.subtotal).toFixed(2)}</span>
+                      <span class="font-black text-slate-900 shrink-0 text-base">$${Number(item.subtotal).toFixed(2)}</span>
                     </div>
                     `;
                   }).join('')}
@@ -569,9 +571,9 @@ export const shareOrderTicket = async (req, res) => {
           ` : ''}
 
           <div class="flex flex-col gap-2 mb-2">
-            <div class="flex justify-between items-baseline gap-4">
+            <div class="flex justify-between items-baseline gap-2">
               <span class="text-sm font-black text-slate-600 uppercase tracking-tight shrink-0">Total Consumido</span>
-              <span class="text-3xl font-black text-slate-900 tracking-tighter text-right break-words">$${totalAmount.toFixed(2)}</span>
+              <span class="text-2xl font-black text-slate-900 tracking-tighter text-right break-words">$${totalAmount.toFixed(2)}</span>
             </div>
           </div>
 
@@ -598,7 +600,7 @@ export const shareOrderTicket = async (req, res) => {
       <div class="h-32 w-full shrink-0 no-print"></div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
-        <div class="flex gap-3 w-full max-w-sm px-4">
+        <div class="flex gap-3 w-full max-w-[380px] px-2 mx-auto">
           <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             📥 PDF
           </button>
@@ -611,21 +613,20 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          // 🔥 BUFFER AUMENTADO (+25) para que NUNCA parta la hoja a la mitad
-          const heightMm = (element.offsetHeight * 0.264583) + 25;
+          const heightMm = (element.offsetHeight * 0.264583) + 15;
           const options = {
-            margin: 0,
+            margin: [2, 2, 2, 2], // 🔥 Margen de 2mm en todos los bordes
             filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
-              scale: 3, 
+              scale: 2, // Escala óptima sin saturar memoria
               useCORS: true, 
               backgroundColor: '#ffffff',
-              windowWidth: element.scrollWidth // Evita que se colapse el Flexbox
+              windowWidth: 420 // 🔥 Engaña al motor haciéndole creer que la pantalla es ancha
             },
             jsPDF: { 
               unit: 'mm', 
-              format: [80, Math.max(heightMm, 150)], // Tira infinita
+              format: [84, Math.max(heightMm, 120)], // 🔥 84mm (Tira continua ancha)
               orientation: 'portrait' 
             }
           };
@@ -638,7 +639,7 @@ export const shareOrderTicket = async (req, res) => {
             scale: 3, 
             useCORS: true, 
             backgroundColor: '#ffffff',
-            windowWidth: element.scrollWidth 
+            windowWidth: 420 // 🔥 Engaña al motor haciéndole creer que la pantalla es ancha
           }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_${ticketFolioFile}.png';
