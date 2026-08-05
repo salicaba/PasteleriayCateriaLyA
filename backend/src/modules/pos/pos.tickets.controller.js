@@ -453,15 +453,14 @@ export const shareOrderTicket = async (req, res) => {
         </div>
         ` : ''}
 
+        <!-- 🔥 CENTRADOR FIJO (Evita que el PDF se aviente a la izquierda) 🔥 -->
         <div class="w-full flex justify-center">
           <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">☕</div>
-              <!-- 🔥 FIX LYA: Se eliminó el line-height aplastado y se agregó margen inferior (mb-3) 🔥 -->
-              <div class="h-16 flex items-center justify-center overflow-hidden mb-2">
-                <h1 class="text-6xl font-black text-slate-900 tracking-wider leading-none m-0 p-0" style="font-family: 'Times New Roman', serif; font-style: italic;">𝓛𝔂𝓪</h1>
-              </div>
+              <!-- 🔥 FIX LYA (Separado de la palabra cafetería) 🔥 -->
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
               <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
               <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
             </div>
@@ -529,9 +528,8 @@ export const shareOrderTicket = async (req, res) => {
 
                       return `
                       <div class="flex items-start gap-3 text-sm px-1 mb-3">
-                        <div class="w-7 h-7 bg-slate-100 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-  <span class="font-black text-slate-800 text-xs">${item.quantity}x</span>
-</div>
+                        <!-- 🔥 FIX CANTIDADES (Cuadro fijo min-w-[28px]) 🔥 -->
+                        <span class="font-black text-slate-800 bg-slate-100 min-w-[28px] h-6 flex items-center justify-center rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
                         <div class="flex-1 min-w-0">
                           <p class="font-bold text-slate-900 break-words leading-tight">
                             ${item.isTakeaway ? '<span class="text-orange-600 mr-1 text-[10px] uppercase tracking-tighter bg-orange-50 px-1 py-0.5 rounded shrink-0">🛍️ Llevar</span>' : ''}
@@ -581,6 +579,9 @@ export const shareOrderTicket = async (req, res) => {
               <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
                 Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
               </p>
+              <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
+                📍 Ver en Google Maps
+              </a>
             </div>
 
             <div class="text-center mt-8 space-y-1">
@@ -595,38 +596,31 @@ export const shareOrderTicket = async (req, res) => {
       <div class="h-32 w-full shrink-0 no-print"></div>
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
-        <div class="flex gap-3 w-full max-w-[380px] px-2 mx-auto">
-          <button onclick="descargarPDF()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-            📥 PDF
-          </button>
-          <button onclick="descargarImagen()" class="flex-1 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-black py-3.5 rounded-2xl shadow-xl shadow-slate-200/50 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-            📸 Imagen
+        <div class="w-full max-w-[380px] px-2 mx-auto">
+          <button onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+            📥 Descargar Comprobante PDF
           </button>
         </div>
       </div>
 
       <script>
-        // 🔥 FIX MOTOR RENDERING: 0 MÁRGENES, MEDIDAS EXACTAS EN PIXELES
+        // 🔥 FIX MOTOR RENDERING: Configuramos la hoja del PDF como Pulgadas (inches) y evitamos espacios blancos
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightPx = element.offsetHeight + 10; // Alto exacto de la tarjeta blanca + colchoncito
-          
+          const heightInInches = (element.offsetHeight / 96) + 0.4; // Altura precisa en pulgadas
           const options = {
-            margin: 0, // Cero margen para evitar saltos a hoja 2
+            margin: [0.2, 0, 0.2, 0], // Margen de 0.2 pulgadas arriba y abajo
             filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff',
-              scrollY: 0, // Evita espacios blancos arriba si se hizo scroll
-              scrollX: 0
+              backgroundColor: '#ffffff'
             },
             jsPDF: { 
-              unit: 'px', // Usamos la misma unidad matemática de HTML
-              format: [380, Math.max(heightPx, 500)], // Ancho forzado, alto calculado dinámico
-              orientation: 'portrait',
-              hotfixes: ["px_scaling"] // Previene encogimiento en móviles
+              unit: 'in', // Pulgadas (inches)
+              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket (4.1 pulgadas)
+              orientation: 'portrait' 
             }
           };
           html2pdf().set(options).from(element).save();
@@ -637,9 +631,7 @@ export const shareOrderTicket = async (req, res) => {
           html2canvas(element, { 
             scale: 3, 
             useCORS: true, 
-            backgroundColor: '#ffffff',
-            scrollY: 0,
-            scrollX: 0
+            backgroundColor: '#ffffff'
           }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_${ticketFolioFile}.png';
