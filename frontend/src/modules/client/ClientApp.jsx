@@ -203,20 +203,20 @@ export default function ClientApp({ type }) {
     setStandaloneSelection(null); 
   }, []);
 
-  // 🔥 3. EL GUARDIA DE ENRUTAMIENTO ESTRICTO (Interceptor Asíncrono)
+  // 🔥 3. EL GUARDIA DE ENRUTAMIENTO UNIFICADO (Active Session Recovery)
   useEffect(() => {
-    const validateActiveSession = async () => {
+    const validateAndRouteSession = async () => {
       if (!clientData) return;
       
       const { type: sessionType, tableId: sessionTableId } = clientData;
       let isCollision = false;
       let recoveryPath = '';
 
-      // Detección de colisión entre la URL escaneada y la caché
+      // Detección inteligente de colisión usando 'effectiveTableId' para soportar el Mapeo
       if (sessionType && sessionType !== effectiveType) {
         isCollision = true;
         recoveryPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
-      } else if (sessionType === 'mesa' && effectiveType === 'mesa' && sessionTableId && sessionTableId !== urlTableId) {
+      } else if (sessionType === 'mesa' && effectiveType === 'mesa' && sessionTableId && sessionTableId !== effectiveTableId) {
         isCollision = true;
         recoveryPath = `/m/${sessionTableId}`;
       }
@@ -254,11 +254,19 @@ export default function ClientApp({ type }) {
         // Si no hay orden o el backend dice que está muerta, purgamos silenciosamente
         handleClientLogout();
         setIsGuarding(false);
+        return; // Salimos para no ejecutar la redirección normal
+      }
+
+      // 🚦 Si NO hay colisión, alineamos la URL limpiamente (Migración de Mapeo a URL correcta)
+      if (!isCollision && sessionType === 'mesa' && urlTableId !== sessionTableId) {
+        navigate(`/m/${sessionTableId}`, { replace: true });
+      } else if (!isCollision && sessionType === 'llevar' && window.location.pathname !== '/llevar') {
+        navigate('/llevar', { replace: true });
       }
     };
 
-    validateActiveSession();
-  }, [clientData, effectiveType, urlTableId, navigate, handleClientLogout]);
+    validateAndRouteSession();
+  }, [clientData, effectiveType, effectiveTableId, urlTableId, navigate, handleClientLogout]);
 
   useEffect(() => {
     if (isStandalone) {
