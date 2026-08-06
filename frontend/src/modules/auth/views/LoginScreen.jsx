@@ -39,21 +39,6 @@ export const LoginScreen = ({ onLogin }) => {
   
   const [timeLeft, setTimeLeft] = useState('');
 
-  // 🔥 Generador Robusto (Con Plan B para móviles en red local)
-  const getDeviceId = () => {
-    let deviceId = localStorage.getItem('lyA_deviceId');
-    if (!deviceId) {
-      if (window.crypto && window.crypto.randomUUID) {
-        deviceId = crypto.randomUUID();
-      } else {
-        // Plan B matemático si el móvil bloquea el motor crypto por estar en HTTP
-        deviceId = 'dev-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-      }
-      localStorage.setItem('lyA_deviceId', deviceId);
-    }
-    return deviceId;
-  };
-
   const triggerNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3500);
@@ -124,7 +109,7 @@ export const LoginScreen = ({ onLogin }) => {
     e.preventDefault();
 
     if (blockedUntil) {
-      return triggerNotification(`Equipo bloqueado. Espera ${timeLeft}`, 'warning');
+      return triggerNotification(`Cuenta bloqueada. Espera ${timeLeft}`, 'warning');
     }
 
     if (!username || !password) {
@@ -134,12 +119,8 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // 🔥 Ahora mandamos el deviceId DENTRO de los datos, como si fuera un campo más
-      const response = await client.post('/auth/login', { 
-        username, 
-        password,
-        deviceId: getDeviceId() 
-      });
+      // Petición completamente limpia, sin headers extraños
+      const response = await client.post('/auth/login', { username, password });
       
       if (response.data && response.data.user) {
         localStorage.setItem('lya_token', response.data.token);
@@ -162,7 +143,7 @@ export const LoginScreen = ({ onLogin }) => {
         const localBlockTimestamp = Date.now() + error.response.data.remainingMs;
         setBlockedUntil(localBlockTimestamp);
         localStorage.setItem('lya_blockedUntil', localBlockTimestamp.toString());
-        triggerNotification("Límite de intentos excedido. Red bloqueada.", 'error');
+        triggerNotification("Límite de intentos excedido. Cuenta protegida.", 'error');
       } else {
         const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
         if (errorMsg.includes('Intentos restantes')) {
@@ -309,7 +290,7 @@ export const LoginScreen = ({ onLogin }) => {
                     Acceso Restringido
                   </h3>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                    Múltiples intentos fallidos detectados. Por seguridad, el acceso desde este dispositivo ha sido bloqueado.
+                    Múltiples intentos fallidos detectados. Por seguridad, el acceso a esta cuenta ha sido bloqueado temporalmente.
                   </p>
                   <div className="bg-gradient-to-r from-red-100 to-rose-50 dark:from-red-900/40 dark:to-rose-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 px-8 py-4 rounded-[1.5rem] shadow-inner flex items-center gap-3">
                     <Sparkles size={20} className="animate-spin-slow opacity-50" />

@@ -3,23 +3,35 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import User from '../users/User.model.js';
-import DeviceSecurityService from './deviceSecurity.service.js';
+import AuthSecurityService from './authSecurity.service.js';
+
+// Utilidad para extraer la IP limpia (soporta local y Vercel)
+const getCleanIp = (req) => {
+  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+  if (ip) {
+    ip = ip.split(',')[0].trim();
+    if (ip.startsWith('::ffff:')) {
+      ip = ip.substring(7);
+    }
+  }
+  return ip || 'unknown-ip';
+};
 
 export const login = async (req, res) => {
   try {
-    // 🔥 Ahora recibimos el deviceId directamente del body, evadiendo los bloqueos de headers en Vercel
-    const { username, password, deviceId } = req.body; 
+    const { username, password } = req.body;
+    
+    const clientIp = getCleanIp(req);
+    // 🔥 Creamos la Llave Combinada (en minúsculas para evitar evasión por mayúsculas)
+    const normalizedUsername = (username || '').toLowerCase().trim();
+    const securityKey = `${clientIp}:${normalizedUsername}`;
 
-    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | Dispositivo: ${deviceId || 'Desconocido'}`);
+    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | IP: ${clientIp}`);
 
-    if (!deviceId) {
-      return res.status(400).json({ message: 'Device ID es requerido para seguridad.' });
-    }
-
-    const blockStatus = DeviceSecurityService.checkBlock(deviceId);
+    const blockStatus = AuthSecurityService.checkBlock(securityKey);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
-        message: 'Demasiados intentos. Equipo bloqueado temporalmente.',
+        message: 'Demasiados intentos. Acceso a esta cuenta bloqueado temporalmente.',
         remainingMs: blockStatus.remainingMs
       });
     }
@@ -36,11 +48,11 @@ export const login = async (req, res) => {
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
     if (!user || !user.isActive || !isMatch) {
-      const secStatus = DeviceSecurityService.registerFailure(deviceId);
+      const secStatus = AuthSecurityService.registerFailure(securityKey);
 
       if (secStatus.blockedUntil) {
         return res.status(429).json({
-          message: 'Límite de intentos excedido. Equipo bloqueado por seguridad.',
+          message: 'Límite de intentos excedido. Cuenta protegida por seguridad.',
           remainingMs: secStatus.blockedUntil - Date.now()
         });
       }
@@ -50,7 +62,8 @@ export const login = async (req, res) => {
       });
     }
 
-    DeviceSecurityService.resetDevice(deviceId);
+    // Login exitoso, limpiamos los bloqueos de esa llave
+    AuthSecurityService.reset(securityKey);
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
