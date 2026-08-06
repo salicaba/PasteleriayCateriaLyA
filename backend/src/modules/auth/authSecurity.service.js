@@ -1,6 +1,5 @@
 /**
- * Servicio en memoria para prevención de fuerza bruta COMBINADA (IP + Username).
- * Reglas: 5 intentos -> 30 min bloqueo -> +5 intentos -> 60 min -> 120 min, etc.
+ * Servicio en memoria para prevención de fuerza bruta COMBINADA (Device-ID + Username).
  */
 const blockStore = new Map();
 
@@ -27,7 +26,6 @@ export default class AuthSecurityService {
       };
     }
 
-    // Si el tiempo expiró, quitamos el bloqueo pero el multiplicador se queda
     if (status.blockedUntil && status.blockedUntil <= Date.now()) {
       status.blockedUntil = null;
       blockStore.set(securityKey, status);

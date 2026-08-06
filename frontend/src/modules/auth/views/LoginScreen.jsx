@@ -39,6 +39,20 @@ export const LoginScreen = ({ onLogin }) => {
   
   const [timeLeft, setTimeLeft] = useState('');
 
+  // Generador de Huella de Dispositivo robusto
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('lyA_deviceId');
+    if (!deviceId) {
+      if (window.crypto && window.crypto.randomUUID) {
+        deviceId = crypto.randomUUID();
+      } else {
+        deviceId = 'dev-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      }
+      localStorage.setItem('lyA_deviceId', deviceId);
+    }
+    return deviceId;
+  };
+
   const triggerNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3500);
@@ -109,7 +123,7 @@ export const LoginScreen = ({ onLogin }) => {
     e.preventDefault();
 
     if (blockedUntil) {
-      return triggerNotification(`Cuenta bloqueada. Espera ${timeLeft}`, 'warning');
+      return triggerNotification(`Dispositivo bloqueado para este usuario. Espera ${timeLeft}`, 'warning');
     }
 
     if (!username || !password) {
@@ -119,8 +133,12 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // Petición completamente limpia, sin headers extraños
-      const response = await client.post('/auth/login', { username, password });
+      // Enviamos el deviceId en el cuerpo de la petición
+      const response = await client.post('/auth/login', { 
+        username, 
+        password,
+        deviceId: getDeviceId() 
+      });
       
       if (response.data && response.data.user) {
         localStorage.setItem('lya_token', response.data.token);
@@ -143,7 +161,7 @@ export const LoginScreen = ({ onLogin }) => {
         const localBlockTimestamp = Date.now() + error.response.data.remainingMs;
         setBlockedUntil(localBlockTimestamp);
         localStorage.setItem('lya_blockedUntil', localBlockTimestamp.toString());
-        triggerNotification("Límite de intentos excedido. Cuenta protegida.", 'error');
+        triggerNotification("Límite de intentos excedido. Dispositivo bloqueado.", 'error');
       } else {
         const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
         if (errorMsg.includes('Intentos restantes')) {
@@ -290,7 +308,7 @@ export const LoginScreen = ({ onLogin }) => {
                     Acceso Restringido
                   </h3>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                    Múltiples intentos fallidos detectados. Por seguridad, el acceso a esta cuenta ha sido bloqueado temporalmente.
+                    Múltiples intentos fallidos detectados. Por seguridad, el acceso a esta cuenta desde este dispositivo ha sido bloqueado.
                   </p>
                   <div className="bg-gradient-to-r from-red-100 to-rose-50 dark:from-red-900/40 dark:to-rose-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 px-8 py-4 rounded-[1.5rem] shadow-inner flex items-center gap-3">
                     <Sparkles size={20} className="animate-spin-slow opacity-50" />
@@ -405,7 +423,7 @@ export const LoginScreen = ({ onLogin }) => {
                     initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}
                     className="flex flex-col items-center text-center space-y-6"
                   >
-                    <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-rose-50 dark:from-red-900/40 dark:to-rose-900/10 text-red-500 rounded-[1.5rem] shadow-inner flex items-center justify-center mb-2">
+                    <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-rose-50 dark:from-red-900/40 dark:to-red-900/10 text-red-500 rounded-[1.5rem] shadow-inner flex items-center justify-center mb-2">
                       <ShieldAlert size={32} />
                     </div>
                     
