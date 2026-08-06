@@ -5,7 +5,7 @@ import { Op } from 'sequelize';
 import User from '../users/User.model.js';
 import AuthSecurityService from './authSecurity.service.js';
 
-// Utilidad para extraer la IP limpia (soporta local y Vercel)
+// Función para obtener la IP limpia, ya sea en local o en producción (Vercel)
 const getCleanIp = (req) => {
   let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
   if (ip) {
@@ -17,17 +17,19 @@ const getCleanIp = (req) => {
   return ip || 'unknown-ip';
 };
 
+// POST: Iniciar sesión
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    // 1. Crear la llave combinada (IP + Usuario en minúsculas)
     const clientIp = getCleanIp(req);
-    // 🔥 Creamos la Llave Combinada (en minúsculas para evitar evasión por mayúsculas)
     const normalizedUsername = (username || '').toLowerCase().trim();
     const securityKey = `${clientIp}:${normalizedUsername}`;
 
     console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | IP: ${clientIp}`);
 
+    // 2. Verificar si ESTA cuenta en ESTA red está bloqueada
     const blockStatus = AuthSecurityService.checkBlock(securityKey);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
@@ -36,6 +38,7 @@ export const login = async (req, res) => {
       });
     }
 
+    // 3. Buscar al usuario en la base de datos
     const user = await User.findOne({ 
       where: { 
         [Op.or]: [
@@ -45,8 +48,10 @@ export const login = async (req, res) => {
       } 
     });
     
+    // Resolvemos la contraseña de manera segura
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
+    // 4. Si falla la autenticación
     if (!user || !user.isActive || !isMatch) {
       const secStatus = AuthSecurityService.registerFailure(securityKey);
 
@@ -62,7 +67,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Login exitoso, limpiamos los bloqueos de esa llave
+    // 5. Login exitoso -> Limpiar historial de esa llave
     AuthSecurityService.reset(securityKey);
 
     const token = jwt.sign(
@@ -88,14 +93,34 @@ export const login = async (req, res) => {
   }
 };
 
+// POST: Registro de prueba (Oculto/Temporal)
 export const registerTestUser = async (req, res) => {
   try {
     const { fullName, username, password, role } = req.body;
-    if (!fullName) return res.status(400).json({ message: 'El nombre completo es requerido.' });
+
+    if (!fullName) {
+      return res.status(400).json({ message: 'El nombre completo es requerido.' });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const newUser = await User.create({ fullName, username, password: hashedPassword, role: role || 'Empleado' });
-    res.status(201).json({ message: 'Usuario creado', user: { id: newUser.id, fullName: newUser.fullName, username: newUser.username, role: newUser.role } });
+
+    const newUser = await User.create({
+      fullName,
+      username,
+      password: hashedPassword,
+      role: role || 'Empleado'
+    });
+
+    res.status(201).json({
+      message: 'Usuario maestro/prueba creado con éxito',
+      user: {
+        id: newUser.id,
+        fullName: newUser.fullName,
+        username: newUser.username,
+        role: newUser.role
+      }
+    });
   } catch (error) {
     res.status(400).json({ message: 'Error al crear usuario', error: error.message });
   }
