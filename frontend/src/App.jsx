@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
-// 🔥 Agregamos RefreshCw para el ícono de actualización
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw } from 'lucide-react';
+// 🔥 Agregamos Shield para el ícono de los accesos
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -227,6 +227,7 @@ function App() {
     year: 'numeric' 
   });
 
+  // 🔥 NUEVA ESTRUCTURA DEL MENÚ
   const menuConfig = [
     { id: 'caja', label: 'Caja', icon: Wallet },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
@@ -269,8 +270,18 @@ function App() {
       icon: PieChart, 
       isGroup: true,
       children: [
+        { id: 'cuentas', label: 'Cuentas Bancarias', icon: Landmark }, 
         { id: 'egresos', label: 'Gastos Operativos', icon: Briefcase },
         { id: 'dashboard', label: 'Ganancias Netas', icon: Landmark },
+      ]
+    },
+    {
+      id: 'personal_group',
+      label: 'Personal',
+      icon: Users,
+      isGroup: true,
+      children: [
+        { id: 'usuarios', label: 'Accesos y Roles', icon: Shield }, 
       ]
     },
     {
@@ -279,8 +290,6 @@ function App() {
       icon: Settings,
       isGroup: true,
       children: [
-        { id: 'cuentas', label: 'Cuentas', icon: Landmark },
-        { id: 'usuarios', label: 'Usuarios', icon: Users },
         { id: 'interfaz', label: 'Pantalla', icon: Palette },
         { id: 'hardware', label: 'Hardware', icon: Printer },
       ]
@@ -313,15 +322,19 @@ function App() {
     document.title = currentTitle;
   }, [activeTab, user]);
 
+  // 🔥 VALIDACIÓN DE SEGURIDAD PARA OCULTAR GRUPOS
   const visibleMenuConfig = menuConfig.filter(group => {
-    if (group.id === 'sistema_group' && user?.role === 'Empleado') {
+    if (['sistema_group', 'finanzas_group', 'personal_group'].includes(group.id) && user?.role === 'Empleado') {
       return false;
     }
     return true;
   });
 
+  // 🔥 VALIDACIÓN DE SEGURIDAD PARA REDIRECCIONAR RUTAS
   useEffect(() => {
-    if (user?.role === 'Empleado' && ['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab)) {
+    const adminOnlyTabs = ['usuarios', 'interfaz', 'cuentas', 'hardware', 'egresos', 'dashboard'];
+    
+    if (user?.role === 'Empleado' && adminOnlyTabs.includes(activeTab)) {
       setActiveTab('mesas'); 
     }
   }, [user, activeTab]);

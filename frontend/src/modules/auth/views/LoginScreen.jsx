@@ -1,7 +1,8 @@
 // src/modules/auth/views/LoginScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle, AlertCircle, Sparkles } from 'lucide-react';
+// 🔥 Agregamos toda la panadería: ChefHat, IceCream, CupSoda, UtensilsCrossed
+import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle, AlertCircle, Sparkles, Cake, Coffee, Croissant, Cookie, ChefHat, IceCream, CupSoda, UtensilsCrossed } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import logoLyA from '../../../assets/logo.jpeg'; 
 import client from '../../../api/client'; 
@@ -133,7 +134,6 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // Enviamos el deviceId en el cuerpo de la petición
       const response = await client.post('/auth/login', { 
         username, 
         password,
@@ -185,49 +185,101 @@ export const LoginScreen = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-[#FDFBF7] dark:bg-gray-950 lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-500">
+    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-gray-50 dark:bg-[#0f172a] lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-500">
       
+      {/* 🔥 ARTE DE FONDO EXTERNO: MUCHAS MÁS FIGURITAS FLOTANTES */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        
+        {/* Lado Derecho */}
         <motion.div 
-          animate={{ scale: [1, 1.2, 1], x: [0, 50, 0], y: [0, 30, 0] }}
-          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] bg-amber-400/20 dark:bg-orange-600/20 lya:bg-lya-primary/20 rounded-full blur-[100px]" 
-        />
+          animate={{ y: [-15, 15, -15], rotate: [-5, 5, -5] }} 
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} 
+          className="absolute top-[12%] right-[15%] text-gray-300 dark:text-gray-800 lya:text-lya-primary/20"
+        >
+          <Croissant size={110} strokeWidth={1.5} />
+        </motion.div>
+
         <motion.div 
-          animate={{ scale: [1, 1.3, 1], x: [0, -60, 0], y: [0, 50, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-orange-500/20 dark:bg-rose-900/30 lya:bg-lya-secondary/20 rounded-full blur-[120px]" 
-        />
+          animate={{ x: [-15, 15, -15], rotate: [-10, 15, -10] }} 
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }} 
+          className="absolute top-[50%] right-[8%] text-gray-300 dark:text-gray-800 lya:text-lya-secondary/20"
+        >
+          <CupSoda size={85} strokeWidth={1.5} />
+        </motion.div>
+
         <motion.div 
-          animate={{ scale: [1, 1.5, 1], y: [0, -40, 0] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 5 }}
-          className="absolute top-[20%] left-[20%] w-[40vw] h-[40vw] bg-rose-300/15 dark:bg-amber-800/15 rounded-full blur-[90px]" 
-        />
+          animate={{ y: [10, -10, 10], rotate: [0, 20, 0] }} 
+          transition={{ duration: 16, repeat: Infinity, ease: "easeInOut", delay: 1 }} 
+          className="absolute bottom-[20%] right-[12%] text-gray-300 dark:text-gray-800 lya:text-lya-primary/20"
+        >
+          <IceCream size={100} strokeWidth={1.5} />
+        </motion.div>
+
+        {/* Lado Izquierdo */}
+        <motion.div 
+          animate={{ y: [-10, 10, -10], rotate: [-10, 10, -10] }} 
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 3 }} 
+          className="absolute top-[15%] left-[12%] text-gray-300 dark:text-gray-800 lya:text-lya-secondary/20"
+        >
+          <ChefHat size={95} strokeWidth={1.5} />
+        </motion.div>
+
+        <motion.div 
+          animate={{ x: [15, -15, 15], rotate: [15, -15, 15] }} 
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 4 }} 
+          className="absolute top-[45%] left-[6%] text-gray-300 dark:text-gray-800 lya:text-lya-primary/20"
+        >
+          <UtensilsCrossed size={80} strokeWidth={1.5} />
+        </motion.div>
+        
+        <motion.div 
+          animate={{ y: [15, -15, 15], rotate: [0, -15, 0] }} 
+          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut", delay: 0.5 }} 
+          className="absolute bottom-[15%] left-[10%] text-gray-300 dark:text-gray-800 lya:text-lya-secondary/20"
+        >
+          <Cookie size={130} strokeWidth={1.5} />
+        </motion.div>
+
+        {/* Chispitas/Sparkles animadas */}
+        <motion.div 
+          animate={{ scale: [1, 1.15, 1], rotate: [0, 10, 0] }} 
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }} 
+          className="absolute top-[30%] left-[25%] text-gray-300 dark:text-gray-800 lya:text-lya-primary/20"
+        >
+          <Sparkles size={60} strokeWidth={1.5} />
+        </motion.div>
+        
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], rotate: [0, -10, 0] }} 
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 0.5 }} 
+          className="absolute bottom-[35%] right-[28%] text-gray-300 dark:text-gray-800 lya:text-lya-secondary/20"
+        >
+          <Sparkles size={75} strokeWidth={1.5} />
+        </motion.div>
       </div>
 
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
             <motion.div 
-              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
-              animate={{ opacity: 1, y: 0, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              className={`bg-white/90 dark:bg-gray-900/90 lya:bg-lya-surface/90 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
-                notification.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30' :
-                notification.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30' :
-                'border-red-200/50 dark:border-red-900/30'
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className={`bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center justify-center gap-3 font-semibold tracking-tight border pointer-events-auto max-w-md w-full sm:w-auto text-center ${
+                notification.type === 'error' ? 'border-red-100 dark:border-red-900/30' : 
+                notification.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30' :
+                'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
             >
-              <div className={`p-2 rounded-full shrink-0 shadow-inner ${
-                notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500' :
+              <div className={`p-1 rounded-full shrink-0 ${
+                notification.type === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 
                 notification.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500' :
-                'bg-red-100 dark:bg-red-500/20 text-red-500'
+                'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
               }`}>
-                {notification.type === 'success' ? <CheckCircle2 size={18} strokeWidth={3} /> : 
-                 notification.type === 'warning' ? <AlertTriangle size={18} strokeWidth={3} /> : 
-                 <AlertCircle size={18} strokeWidth={3} />}
+                {notification.type === 'error' ? <AlertCircle size={20} /> : notification.type === 'warning' ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
               </div>
-              <span className="text-sm tracking-wide text-center">{notification.msg}</span>
+              <span className="text-sm">{notification.msg}</span>
             </motion.div>
           </div>
         )}
@@ -240,14 +292,14 @@ export const LoginScreen = ({ onLogin }) => {
             key="splash"
             initial={{ opacity: 0, filter: "blur(10px)" }}
             animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
-            transition={{ duration: 0.6, ease: "easeInOut" }}
+            exit={{ opacity: 0, scale: 1.05, filter: "blur(5px)" }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
             className="flex flex-col items-center justify-center relative z-10 my-auto shrink-0"
           >
             <motion.div 
-              animate={{ boxShadow: ["0px 0px 0px rgba(0,0,0,0)", "0px 20px 60px rgba(249,115,22,0.3)", "0px 0px 0px rgba(0,0,0,0)"] }}
+              animate={{ y: [0, -10, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden border-[6px] border-white/80 dark:border-gray-800/80 backdrop-blur-md shadow-2xl mb-8"
+              className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] overflow-hidden border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-xl mb-6 bg-white"
             >
               <img src={logoLyA} alt="Pastelería 𝓛𝔂𝓪" className="w-full h-full object-cover" />
             </motion.div>
@@ -256,9 +308,9 @@ export const LoginScreen = ({ onLogin }) => {
               𝓛𝔂𝓪
             </h1>
 
-            <div className="flex flex-col items-center gap-4 bg-white/40 dark:bg-gray-800/40 backdrop-blur-lg px-8 py-4 rounded-3xl border border-white/30 dark:border-gray-700/30">
-              <Loader2 size={24} className="text-orange-500 lya:text-lya-primary animate-spin" />
-              <p className="text-sm font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text/80 animate-pulse text-center max-w-[250px]">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 size={24} className="text-blue-500 lya:text-lya-primary animate-spin" />
+              <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/70 animate-pulse text-center max-w-[250px]">
                 {phrase}
               </p>
             </div>
@@ -269,18 +321,18 @@ export const LoginScreen = ({ onLogin }) => {
           <motion.div 
             key="error"
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-sm bg-white/70 dark:bg-gray-900/70 lya:bg-lya-surface/70 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.1)] border border-white/50 dark:border-gray-700/50 p-10 text-center z-10 my-auto shrink-0"
+            className="w-full max-w-sm bg-white dark:bg-[#1e293b] lya:bg-lya-surface rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 p-10 text-center z-10 my-auto shrink-0"
           >
-            <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/40 dark:to-red-900/10 text-red-500 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
+            <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
               <WifiOff size={36} strokeWidth={2.5} />
             </div>
             <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">Sin Conexión</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-8 leading-relaxed text-justify px-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed text-justify px-2">
               El sistema de 𝓛𝔂𝓪 no puede comunicarse con el servidor. Revisa tu internet o asegúrate de que el equipo central esté encendido.
             </p>
             <motion.button 
               whileTap={{ scale: 0.95 }} onClick={runSystemCheck}
-              className="w-full py-4 bg-gray-900 md:hover:bg-black dark:bg-orange-500 text-white font-black rounded-[1.5rem] shadow-xl flex items-center justify-center gap-2 outline-none"
+              className="w-full py-4 bg-gray-900 md:hover:bg-black dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-primary lya:md:hover:opacity-90 text-white font-black rounded-[1.5rem] shadow-md flex items-center justify-center gap-2 outline-none transition-all"
             >
               <RefreshCw size={18} /> Reintentar Conexión
             </motion.button>
@@ -290,27 +342,48 @@ export const LoginScreen = ({ onLogin }) => {
         {bootState === 'ready' && (
           <motion.div 
             key="login"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-[420px] bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] border border-white/60 dark:border-gray-700/50 overflow-hidden relative z-10 my-auto shrink-0"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="w-full max-w-[420px] bg-white dark:bg-[#1e293b] lya:bg-lya-surface rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10 my-auto shrink-0"
           >
+            {/* 🔥 INNER WATERMARK: 4 ICONOS REPARTIDOS DENTRO DEL CUADRO */}
+            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden rounded-[2.5rem]">
+              <Cake 
+                className="absolute -top-8 -right-8 w-44 h-44 text-gray-900/[0.04] dark:text-white/[0.04] lya:text-lya-primary/[0.07] -rotate-12" 
+                strokeWidth={1.5} 
+              />
+              <Coffee 
+                className="absolute -bottom-8 -left-10 w-44 h-44 text-gray-900/[0.04] dark:text-white/[0.04] lya:text-lya-secondary/[0.07] rotate-12" 
+                strokeWidth={1.5} 
+              />
+              <Cookie 
+                className="absolute -top-10 -left-6 w-36 h-36 text-gray-900/[0.04] dark:text-white/[0.03] lya:text-lya-secondary/[0.06] -rotate-[15deg]" 
+                strokeWidth={1.5} 
+              />
+              <ChefHat 
+                className="absolute -bottom-4 -right-6 w-32 h-32 text-gray-900/[0.04] dark:text-white/[0.03] lya:text-lya-primary/[0.06] rotate-[20deg]" 
+                strokeWidth={1.5} 
+              />
+            </div>
+
             <AnimatePresence>
               {blockedUntil && (
                 <motion.div 
-                  initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                  animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
-                  exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                  className="absolute inset-0 z-50 bg-white/80 dark:bg-gray-950/80 flex flex-col items-center justify-center p-8 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-50 bg-white/95 dark:bg-[#1e293b]/95 lya:bg-lya-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
                 >
-                  <div className="bg-red-50 dark:bg-red-900/20 p-5 rounded-full mb-6 shadow-inner">
+                  <div className="bg-red-50 dark:bg-red-900/20 p-5 rounded-[1.5rem] mb-6 relative z-10">
                     <Lock className="w-12 h-12 text-red-500 animate-pulse" />
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight relative z-10">
                     Acceso Restringido
                   </h3>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed relative z-10">
                     Múltiples intentos fallidos detectados. Por seguridad, el acceso a esta cuenta desde este dispositivo ha sido bloqueado.
                   </p>
-                  <div className="bg-gradient-to-r from-red-100 to-rose-50 dark:from-red-900/40 dark:to-rose-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 px-8 py-4 rounded-[1.5rem] shadow-inner flex items-center gap-3">
+                  <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 px-8 py-4 rounded-[1.5rem] flex items-center gap-3 relative z-10">
                     <Sparkles size={20} className="animate-spin-slow opacity-50" />
                     <span className="font-mono text-3xl font-black tracking-widest">{timeLeft}</span>
                   </div>
@@ -319,18 +392,14 @@ export const LoginScreen = ({ onLogin }) => {
             </AnimatePresence>
 
             <div className="p-8 sm:p-10 relative z-10">
-              <div className="flex flex-col items-center mb-10">
-                <motion.div 
-                  whileHover={{ scale: 1.05, rotate: 5 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  className="w-24 h-24 rounded-[2rem] overflow-hidden border-4 border-white/80 dark:border-gray-700/80 shadow-lg mb-5"
-                >
+              <div className="flex flex-col items-center mb-8">
+                <div className="w-20 h-20 rounded-[1.5rem] overflow-hidden border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-sm mb-5 bg-white relative z-10">
                   <img src={logoLyA} alt="LyA" className="w-full h-full object-cover" />
-                </motion.div>
-                <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight text-center" style={{ letterSpacing: '-0.05em' }}>
+                </div>
+                <h1 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight text-center" style={{ letterSpacing: '-0.05em' }}>
                   Bienvenido a 𝓛𝔂𝓪
                 </h1>
-                <p className="text-xs font-bold text-orange-500/80 dark:text-orange-400/80 uppercase tracking-[0.2em] text-center mt-2">
+                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] text-center mt-2">
                   Terminal de Servicio
                 </p>
               </div>
@@ -339,14 +408,14 @@ export const LoginScreen = ({ onLogin }) => {
                 {!showForgotMode ? (
                   <motion.form 
                     key="login-form"
-                    variants={containerVariants} initial="hidden" animate="show" exit={{ opacity: 0, x: -20 }}
+                    variants={containerVariants} initial="hidden" animate="show" exit={{ opacity: 0, x: -10 }}
                     onSubmit={handleSubmit} 
-                    className="space-y-6"
+                    className="space-y-5"
                   >
                     <div className="space-y-4">
                       <motion.div variants={itemVariants} className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none transition-colors group-focus-within:text-orange-500">
-                          <User size={18} className="text-gray-400 dark:text-gray-500 group-focus-within:text-orange-500 transition-colors" />
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none transition-colors">
+                          <User size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 group-focus-within:text-blue-500 lya:group-focus-within:text-lya-primary transition-colors" />
                         </div>
                         <input 
                           type="text" 
@@ -355,13 +424,13 @@ export const LoginScreen = ({ onLogin }) => {
                           onFocus={handleFocus}
                           placeholder="Usuario o Correo" 
                           disabled={isLoading || blockedUntil}
-                          className="w-full pl-12 pr-5 py-4 bg-white/70 dark:bg-gray-900/70 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 focus:border-orange-500/50 dark:focus:border-orange-400/50 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white text-sm font-bold shadow-inner placeholder-gray-400 disabled:opacity-50 focus:ring-4 focus:ring-orange-500/10"
+                          className="w-full pl-12 pr-5 py-4 bg-gray-50/90 dark:bg-[#0f172a]/90 lya:bg-lya-bg/90 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 focus:border-blue-500/50 lya:focus:border-lya-primary/50 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold placeholder-gray-400 disabled:opacity-50 focus:ring-4 focus:ring-blue-500/10 lya:focus:ring-lya-primary/10 relative z-10 backdrop-blur-sm"
                         />
                       </motion.div>
 
                       <motion.div variants={itemVariants} className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                          <Lock size={18} className="text-gray-400 dark:text-gray-500 group-focus-within:text-orange-500 transition-colors" />
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none z-20">
+                          <Lock size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 group-focus-within:text-blue-500 lya:group-focus-within:text-lya-primary transition-colors" />
                         </div>
                         <input 
                           type={showPassword ? "text" : "password"} 
@@ -370,25 +439,25 @@ export const LoginScreen = ({ onLogin }) => {
                           onFocus={handleFocus}
                           placeholder="Contraseña" 
                           disabled={isLoading || blockedUntil}
-                          className="w-full pl-12 pr-12 py-4 bg-white/70 dark:bg-gray-900/70 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 focus:border-orange-500/50 dark:focus:border-orange-400/50 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white text-sm font-bold shadow-inner placeholder-gray-400 disabled:opacity-50 focus:ring-4 focus:ring-orange-500/10"
+                          className="w-full pl-12 pr-12 py-4 bg-gray-50/90 dark:bg-[#0f172a]/90 lya:bg-lya-bg/90 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 focus:border-blue-500/50 lya:focus:border-lya-primary/50 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold placeholder-gray-400 disabled:opacity-50 focus:ring-4 focus:ring-blue-500/10 lya:focus:ring-lya-primary/10 relative z-10 backdrop-blur-sm"
                         />
                         <button
                           type="button"
                           disabled={isLoading || blockedUntil}
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-200 transition-colors focus:outline-none disabled:opacity-50"
+                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-300 lya:md:hover:text-lya-primary transition-colors focus:outline-none disabled:opacity-50 z-20"
                         >
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </motion.div>
                     </div>
 
-                    <motion.div variants={itemVariants} className="flex items-center justify-center">
+                    <motion.div variants={itemVariants} className="flex items-center justify-center py-1">
                       <button 
                         type="button" 
                         disabled={isLoading || blockedUntil}
                         onClick={() => setShowForgotMode(true)} 
-                        className="text-[12px] font-bold text-gray-500 md:hover:text-orange-500 transition-colors outline-none disabled:opacity-50 underline underline-offset-4 decoration-gray-300 md:hover:decoration-orange-300"
+                        className="text-[11px] font-bold text-gray-500 dark:text-gray-400 md:hover:text-blue-500 lya:md:hover:text-lya-primary transition-colors outline-none disabled:opacity-50 underline underline-offset-4 decoration-gray-200 dark:decoration-gray-700 md:hover:decoration-blue-300 lya:md:hover:decoration-lya-primary/50 relative z-10"
                       >
                         ¿Necesitas ayuda con tu acceso?
                       </button>
@@ -399,13 +468,11 @@ export const LoginScreen = ({ onLogin }) => {
                         whileTap={!isLoading && !blockedUntil ? { scale: 0.95 } : {}}
                         type="submit" 
                         disabled={isLoading || blockedUntil}
-                        className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 md:hover:from-orange-600 md:hover:to-amber-600 text-white font-black rounded-[1.5rem] shadow-lg shadow-orange-500/30 transition-all disabled:opacity-70 disabled:shadow-none flex items-center justify-center gap-2 outline-none relative overflow-hidden group"
+                        className="w-full py-4 bg-blue-600 md:hover:bg-blue-700 lya:bg-lya-primary lya:md:hover:opacity-90 text-white font-black rounded-[1.5rem] shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2 outline-none relative z-10"
                       >
-                        <div className="absolute inset-0 w-full h-full bg-white/20 transform -translate-x-full md:group-hover:animate-[shimmer_1.5s_infinite]" />
-                        
                         {isLoading ? (
                           <>
-                            <Loader2 size={20} className="animate-spin" />
+                            <Loader2 size={18} className="animate-spin" />
                             <span>Validando...</span>
                           </>
                         ) : (
@@ -420,25 +487,25 @@ export const LoginScreen = ({ onLogin }) => {
                 ) : (
                   <motion.div 
                     key="forgot-form"
-                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}
-                    className="flex flex-col items-center text-center space-y-6"
+                    initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}
+                    className="flex flex-col items-center text-center space-y-5"
                   >
-                    <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-rose-50 dark:from-red-900/40 dark:to-red-900/10 text-red-500 rounded-[1.5rem] shadow-inner flex items-center justify-center mb-2">
+                    <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-[1.5rem] flex items-center justify-center mb-2 relative z-10">
                       <ShieldAlert size={32} />
                     </div>
                     
-                    <div>
-                      <h3 className="text-xl font-black text-gray-900 dark:text-white mb-3">Acceso Restringido</h3>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-relaxed px-2 text-justify">
+                    <div className="relative z-10">
+                      <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-3">Acceso Restringido</h3>
+                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed px-2 text-justify">
                         Por protocolos de seguridad internos, los empleados no pueden modificar sus credenciales de manera externa.
                         <br /><br />
-                        Por favor, contacta al <b className="text-gray-800 dark:text-gray-200 font-black">Administrador de la sucursal</b> para reestablecer tu contraseña en el sistema central.
+                        Por favor, contacta al <b className="text-gray-800 dark:text-gray-200 lya:text-lya-text font-black">Administrador de la sucursal</b> para reestablecer tu contraseña en el sistema central.
                       </p>
                     </div>
 
                     <motion.button 
                       whileTap={{ scale: 0.95 }} onClick={() => setShowForgotMode(false)} 
-                      className="w-full py-4 bg-white/80 dark:bg-gray-800/80 md:hover:bg-white dark:md:hover:bg-gray-700 text-gray-800 dark:text-white font-black rounded-[1.5rem] shadow-sm md:hover:shadow-md transition-all flex items-center justify-center gap-2 mt-4 outline-none border border-gray-200 dark:border-gray-700"
+                      className="w-full py-4 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg lya:md:hover:bg-lya-border/40 text-gray-700 dark:text-gray-200 lya:text-lya-text font-black rounded-[1.5rem] transition-all flex items-center justify-center gap-2 mt-2 outline-none relative z-10"
                     >
                       <ArrowLeft size={18} /> Volver al Login
                     </motion.button>
@@ -451,7 +518,7 @@ export const LoginScreen = ({ onLogin }) => {
       </AnimatePresence>
       
       <div className="absolute bottom-6 text-center w-full pointer-events-none z-10">
-        <p className="text-[10px] font-bold text-gray-400/80 dark:text-gray-500/80 tracking-[0.2em]">
+        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-600 lya:text-lya-text/40 tracking-[0.2em]">
           SISTEMA POS <b>𝓛𝔂𝓪</b> • v1.0.0
         </p>
       </div>
