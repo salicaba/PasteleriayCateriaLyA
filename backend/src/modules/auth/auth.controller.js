@@ -1,28 +1,24 @@
-// backend/src/modules/auth/auth.controller.js
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import User from '../users/User.model.js';
-import DeviceSecurityService from './deviceSecurity.service.js';
+import IpSecurityService from './ipSecurity.service.js';
 
 // POST: Iniciar sesión
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
-    const deviceId = req.headers['x-device-id'];
+    
+    // 🔥 Capturamos la IP del cliente automáticamente
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}"`);
+    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | IP: ${clientIp}`);
 
-    // 🔥 BLINDAJE: Verificar si el dispositivo envió su huella
-    if (!deviceId) {
-      return res.status(400).json({ message: 'Device ID es requerido para autenticación.' });
-    }
-
-    // 🔥 BLINDAJE: Verificar si el dispositivo ya está bloqueado antes de tocar la BD
-    const blockStatus = DeviceSecurityService.checkBlock(deviceId);
+    // 🔥 Verificar si la IP ya está bloqueada antes de tocar la BD
+    const blockStatus = IpSecurityService.checkBlock(clientIp);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
-        message: 'Demasiados intentos. Equipo bloqueado temporalmente.',
+        message: 'Demasiados intentos. Red bloqueada temporalmente.',
         blockedUntil: blockStatus.blockedUntil
       });
     }
@@ -37,17 +33,17 @@ export const login = async (req, res) => {
       } 
     });
     
-    // Resolvemos la contraseña de manera segura para evitar ataques de timing
+    // Resolvemos la contraseña de manera segura
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
     // Si no existe, está inactivo, o la contraseña no coincide
     if (!user || !user.isActive || !isMatch) {
-      // 🔥 BLINDAJE: Registrar el fallo en el dispositivo
-      const secStatus = DeviceSecurityService.registerFailure(deviceId);
+      // 🔥 Registrar el fallo a esa IP específica
+      const secStatus = IpSecurityService.registerFailure(clientIp);
 
       if (secStatus.blockedUntil) {
         return res.status(429).json({
-          message: 'Límite de intentos excedido. Equipo bloqueado por seguridad.',
+          message: 'Límite de intentos excedido. IP bloqueada por seguridad.',
           blockedUntil: secStatus.blockedUntil
         });
       }
@@ -58,11 +54,10 @@ export const login = async (req, res) => {
       });
     }
 
-    // 🔥 BLINDAJE: Si el login es exitoso, reseteamos el contador de ese dispositivo
-    DeviceSecurityService.resetDevice(deviceId);
+    // 🔥 Si el login es exitoso, reseteamos el contador de esa IP
+    IpSecurityService.resetIp(clientIp);
 
     // 3. Generar el Token (JWT)
-    // FIX: Vida útil estática de 24h. El frontend se encarga del cierre exacto a medianoche.
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
       process.env.JWT_SECRET,

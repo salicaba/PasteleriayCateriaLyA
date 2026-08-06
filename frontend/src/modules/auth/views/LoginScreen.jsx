@@ -48,29 +48,19 @@ export const LoginScreen = ({ onLogin }) => {
   const [bootState, setBootState] = useState('booting'); 
   const [phrase, setPhrase] = useState('');
   
-  // 🔥 Cápsulas Neo-Bento de notificación local
+  // Cápsulas Neo-Bento de notificación local
   const [notification, setNotification] = useState(null);
 
-  // 🔥 Estados para el Bloqueo de Seguridad (Fuerza Bruta)
+  // Estados para el Bloqueo de Seguridad (Fuerza Bruta)
   const [blockedUntil, setBlockedUntil] = useState(null);
   const [timeLeft, setTimeLeft] = useState('');
-
- // 1. Obtener o generar Device ID (Usando Web Crypto API nativa)
-  const getDeviceId = () => {
-    let deviceId = localStorage.getItem('lyA_deviceId');
-    if (!deviceId) {
-      deviceId = crypto.randomUUID(); // <-- Cambiamos uuidv4() por la API nativa
-      localStorage.setItem('lyA_deviceId', deviceId);
-    }
-    return deviceId;
-  };
 
   const triggerNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 2. Efecto del temporizador de bloqueo
+  // Efecto del temporizador de bloqueo
   useEffect(() => {
     if (!blockedUntil) return;
 
@@ -147,11 +137,8 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // 🔥 Mandamos la huella del dispositivo en los Headers
-      const response = await client.post('/auth/login', 
-        { username, password },
-        { headers: { 'x-device-id': getDeviceId() } }
-      );
+      // 🔥 Petición limpia (El backend captura la IP automáticamente)
+      const response = await client.post('/auth/login', { username, password });
       
       if (response.data && response.data.user) {
         localStorage.setItem('lya_token', response.data.token);
@@ -173,7 +160,7 @@ export const LoginScreen = ({ onLogin }) => {
       // 🔥 Interceptar error de Bloqueo 429
       if (error.response?.status === 429 && error.response?.data?.blockedUntil) {
         setBlockedUntil(error.response.data.blockedUntil);
-        triggerNotification("Límite de intentos excedido. Equipo bloqueado.", 'error');
+        triggerNotification("Límite de intentos excedido. IP bloqueada.", 'error');
       } else {
         const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
         triggerNotification(errorMsg, 'error');
@@ -186,7 +173,7 @@ export const LoginScreen = ({ onLogin }) => {
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-300">
       
-      {/* NOTIFICACIONES CÁPSULA NEO-BENTO (Pilar 5) */}
+      {/* NOTIFICACIONES CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -215,7 +202,6 @@ export const LoginScreen = ({ onLogin }) => {
         )}
       </AnimatePresence>
 
-      {/* Fondos Decorativos */}
       <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-orange-500/20 lya:bg-lya-primary/20 rounded-full blur-[100px] pointer-events-none z-0" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/20 lya:bg-lya-secondary/20 rounded-full blur-[100px] pointer-events-none z-0" />
 
@@ -287,7 +273,7 @@ export const LoginScreen = ({ onLogin }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10 my-auto shrink-0"
           >
-            {/* 🔥 Overlay de Bloqueo Visual (Capa superior de la tarjeta) */}
+            {/* 🔥 Overlay de Bloqueo Visual por IP */}
             <AnimatePresence>
               {blockedUntil && (
                 <motion.div 
@@ -298,10 +284,10 @@ export const LoginScreen = ({ onLogin }) => {
                 >
                   <Lock className="w-16 h-16 text-red-500 lya:text-red-500 mb-4 animate-pulse" />
                   <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2">
-                    Equipo Bloqueado
+                    Acceso Suspendido
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 text-center">
-                    Por seguridad, este terminal ha sido restringido temporalmente por múltiples intentos fallidos.
+                    Se han detectado múltiples intentos fallidos desde esta red. Por seguridad, el acceso ha sido bloqueado.
                   </p>
                   <div className="bg-red-100 dark:bg-red-900/30 lya:bg-red-500/20 text-red-600 dark:text-red-400 lya:text-red-400 px-6 py-3 rounded-2xl font-mono text-2xl font-bold tracking-widest shadow-inner">
                     {timeLeft}
