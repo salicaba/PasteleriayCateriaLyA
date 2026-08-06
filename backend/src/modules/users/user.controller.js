@@ -11,6 +11,13 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Helper de validación de seguridad (Política Estricta)
+const isValidPassword = (password) => {
+  // Min 8 chars, 1 mayúscula, 1 minúscula, 1 número, 1 símbolo especial
+  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  return regex.test(password);
+};
+
 // GET: Obtener todos los usuarios
 export const getUsers = async (req, res) => {
   try {
@@ -33,6 +40,13 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ message: 'El nombre de usuario ya está en uso.' });
     }
 
+    // VALIDACIÓN ESTRICTA DE CONTRASEÑA
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ 
+        message: 'La contraseña no cumple con las políticas de seguridad requeridas (Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 símbolo).' 
+      });
+    }
+
     // ENVIAR CORREO ANTES DE HASHEAR LA CONTRASEÑA
     if (email && process.env.MAIL_USER) {
       const mailOptions = {
@@ -42,7 +56,7 @@ export const createUser = async (req, res) => {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
             <h2 style="color: #ea580c; text-align: center;">¡Hola, ${fullName}!</h2>
-            <p style="font-size: 14px; color: #475569; line-height: 1.5;">
+            <p style="font-size: 14px; color: #475569; line-height: 1.5; text-align: justify;">
               Se ha creado tu cuenta en el Sistema de Punto de Venta de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Estas son tus credenciales de acceso:
             </p>
             <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
@@ -106,10 +120,8 @@ export const updateUser = async (req, res) => {
     let passwordChanged = false;
     let changesMade = false;
 
-    // Convertimos el string vacío a null para evitar errores de validación en la BD
     const parsedEmail = email === '' ? null : email;
 
-    // Detectamos si algo realmente cambió comparando con el nuevo parsedEmail
     if (fullName && fullName !== user.fullName) { user.fullName = fullName; changesMade = true; }
     if (username && username !== user.username) { user.username = username; changesMade = true; }
     if (parsedEmail !== undefined && parsedEmail !== user.email) { user.email = parsedEmail; changesMade = true; }
@@ -117,13 +129,18 @@ export const updateUser = async (req, res) => {
     if (isActive !== undefined && isActive !== user.isActive) { user.isActive = isActive; changesMade = true; }
 
     if (password) {
+      // VALIDACIÓN ESTRICTA EN ACTUALIZACIÓN
+      if (!isValidPassword(password)) {
+        return res.status(400).json({ 
+          message: 'La nueva contraseña no cumple con las políticas de seguridad requeridas.' 
+        });
+      }
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
       passwordChanged = true;
       changesMade = true;
     }
 
-    // Si no detectó ningún cambio, cortamos la ejecución aquí
     if (!changesMade) {
       return res.json({ 
         changed: false, 
@@ -132,10 +149,8 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    // Si sí hubo cambios, guardamos en la base de datos
     await user.save();
 
-    // ENVIAR CORREO DE ACTUALIZACIÓN
     const targetEmail = parsedEmail || user.email; 
     if (changesMade && targetEmail && process.env.MAIL_USER) {
       const mailOptions = {
@@ -145,7 +160,7 @@ export const updateUser = async (req, res) => {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
             <h2 style="color: #ea580c; text-align: center;">¡Hola, ${user.fullName}!</h2>
-            <p style="font-size: 14px; color: #475569; line-height: 1.5;">
+            <p style="font-size: 14px; color: #475569; line-height: 1.5; text-align: justify;">
               El administrador ha actualizado la información de tu cuenta en el Sistema de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Aquí están tus datos vigentes:
             </p>
             <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">

@@ -1,13 +1,14 @@
 // src/modules/admin/views/settings-tabs/UsersTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Shield, Mail, Eye, EyeOff, Loader2, Save, Edit2, UserX, UserCheck, Info, List, ArchiveRestore, X } from 'lucide-react';
+// Agregada la importación de "Check"
+import { Users, Shield, Mail, Eye, EyeOff, Loader2, Save, Edit2, UserX, UserCheck, Info, List, ArchiveRestore, X, Check } from 'lucide-react';
 import client from '../../../../api/client';
 
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
     onClick={onClick}
-    className={`bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-2xl p-4 shadow-sm border-l-4 flex justify-between items-center transition-all ${onClick ? 'cursor-pointer active:scale-95 hover:shadow-md' : ''} ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-90 hover:opacity-100'}`}
+    className={`bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-2xl p-4 shadow-sm border-l-4 flex justify-between items-center transition-all ${onClick ? 'cursor-pointer active:scale-95 md:hover:shadow-md' : ''} ${borderClass} ${isActive ? 'ring-1 ring-gray-200 dark:ring-gray-700 lya:ring-lya-border/50 shadow-md opacity-100 scale-[1.02]' : 'opacity-90 md:hover:opacity-100'}`}
   >
     <div>
       <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-widest mb-1">{title}</p>
@@ -19,11 +20,35 @@ const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, 
   </div>
 );
 
+// COMPONENTE VISUAL NEO-BENTO PARA EL CHECKLIST
+const RequirementItem = ({ isValid, text }) => (
+  <div className="flex items-center gap-2">
+    <motion.div
+      initial={false}
+      animate={{
+        backgroundColor: isValid ? '#10b981' : '#f3f4f6', 
+        color: isValid ? '#ffffff' : '#9ca3af',
+        scale: isValid ? [1, 1.2, 1] : 1
+      }}
+      transition={{ duration: 0.3 }}
+      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 dark:bg-gray-700"
+    >
+      {isValid ? <Check size={10} strokeWidth={4} /> : <X size={10} strokeWidth={3} />}
+    </motion.div>
+    <span className={`text-[11px] transition-colors ${isValid ? 'text-gray-800 dark:text-white font-bold' : 'text-gray-400 dark:text-gray-500 font-medium'}`}>
+      {text}
+    </span>
+  </div>
+);
+
 export const UsersTab = ({ showNotification, globalScroll }) => {
   const [systemUsers, setSystemUsers] = useState([]);
   const [userForm, setUserForm] = useState({ id: '', fullName: '', username: '', email: '', password: '', role: 'Empleado', isActive: true });
   const [editingUserId, setEditingUserId] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // ESTADOS DEL CHECKLIST DE CONTRASEÑA
+  const [pwdReqs, setPwdReqs] = useState({ length: false, upper: false, lower: false, number: false, special: false });
   
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -35,6 +60,20 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
   useEffect(() => {
     fetchUsers(true);
   }, []);
+
+  // EVALUADOR EN TIEMPO REAL
+  useEffect(() => {
+    const pwd = userForm.password;
+    setPwdReqs({
+      length: pwd.length >= 8,
+      upper: /[A-Z]/.test(pwd),
+      lower: /[a-z]/.test(pwd),
+      number: /\d/.test(pwd),
+      special: /[\W_]/.test(pwd)
+    });
+  }, [userForm.password]);
+
+  const isPasswordValid = pwdReqs.length && pwdReqs.upper && pwdReqs.lower && pwdReqs.number && pwdReqs.special;
 
   const fetchUsers = async (isInitialLoad = false) => {
     if (isInitialLoad) setFetching(true);
@@ -59,11 +98,20 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
   };
 
   const handleUserSubmit = async () => {
+    // PREVENCIÓN ANTI-DOBLE CLIC (Lock sincrónico antes del backend)
+    if (loading) return;
+
     if (!userForm.fullName || !userForm.username) {
       return showNotification('error', "Nombre completo y nombre de usuario requeridos");
     }
+    
+    // VALIDACIONES DE CONTRASEÑA FRONTEND
     if (!editingUserId && !userForm.password) {
-      return showNotification('error', "La contraseña es requerida para nuevos usuarios");
+      return showNotification('error', "La contraseña es obligatoria para nuevos usuarios");
+    }
+    
+    if ((!editingUserId || userForm.password.length > 0) && !isPasswordValid) {
+      return showNotification('warning', "La contraseña no cumple con los requisitos de seguridad obligatorios.");
     }
 
     setLoading(true);
@@ -92,6 +140,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
   };
 
   const toggleUserStatus = async (id, currentStatus) => {
+    if (actionLoadingId) return; // Anti-doble clic en lista
     setActionLoadingId(id);
     try {
       const nextStatus = !currentStatus;
@@ -132,7 +181,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
 
   if (fetching) {
     return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center">
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center overflow-hidden">
         <motion.div
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -155,7 +204,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
+      className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full flex-1 overflow-hidden'}`}
     >
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
         <div className="bg-blue-600 lya:bg-lya-primary p-4 rounded-[1.5rem] text-white shadow-lg shrink-0">
@@ -172,7 +221,8 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
       </div>
 
       <div className="lg:hidden flex bg-gray-200/50 dark:bg-gray-800 lya:bg-lya-surface p-1 rounded-2xl shrink-0 mb-4 mx-1">
-        <button 
+        <motion.button 
+          whileTap={{ scale: 0.95 }}
           onClick={() => setMobileView('list')}
           className={`flex-1 py-3 text-sm font-bold rounded-[14px] flex items-center justify-center gap-2 transition-all ${
             mobileView === 'list' 
@@ -181,8 +231,9 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
           }`}
         >
           <List size={16} /> Lista
-        </button>
-        <button 
+        </motion.button>
+        <motion.button 
+          whileTap={{ scale: 0.95 }}
           onClick={() => { resetUserForm(); setMobileView('form'); }}
           className={`flex-1 py-3 text-sm font-bold rounded-[14px] flex items-center justify-center gap-2 transition-all ${
             mobileView === 'form' 
@@ -191,7 +242,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
           }`}
         >
           <Shield size={16} /> Agregar
-        </button>
+        </motion.button>
       </div>
 
       <div className={`flex-1 w-full relative flex flex-col ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
@@ -260,17 +311,40 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     type={showPassword ? "text" : "password"} 
                     value={userForm.password} 
                     onChange={e => setUserForm({...userForm, password: e.target.value})} 
-                    placeholder={editingUserId ? "Dejar vacío para no cambiar" : "Mínimo 6 caracteres"}
+                    placeholder={editingUserId ? "Dejar vacío para no cambiar" : "Mínimo 8 caracteres"}
                     className="w-full pl-5 pr-12 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm" 
                   />
                   <button 
                     type="button" 
                     onClick={() => setShowPassword(!showPassword)} 
-                    className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 lya:hover:text-lya-primary transition-colors outline-none"
+                    className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 lya:hover:text-lya-primary transition-colors outline-none md:hover:scale-105 active:scale-95"
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+
+                {/* MODAL NEO-BENTO DE CHECKLIST INTERACTIVO */}
+                <AnimatePresence>
+                  {(!editingUserId || userForm.password.length > 0) && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg/80 rounded-[1.5rem] p-4 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner overflow-hidden"
+                    >
+                      <p className="text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 mb-3 tracking-wide">
+                        Requisitos de Seguridad
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-1">
+                        <RequirementItem isValid={pwdReqs.length} text="Mínimo 8 caracteres" />
+                        <RequirementItem isValid={pwdReqs.upper} text="Una mayúscula" />
+                        <RequirementItem isValid={pwdReqs.lower} text="Una minúscula" />
+                        <RequirementItem isValid={pwdReqs.number} text="Un número" />
+                        <RequirementItem isValid={pwdReqs.special} text="Un símbolo (ej. @$!%)" />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div>
@@ -295,19 +369,21 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
               </div>
 
               <div className="pt-4 flex gap-3">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={resetUserForm} 
-                  className={`flex-1 py-4 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-500 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 ${(!editingUserId && mobileView !== 'form') ? 'hidden lg:block' : ''}`}
+                  className={`flex-1 py-4 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-500 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl text-sm md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors ${(!editingUserId && mobileView !== 'form') ? 'hidden lg:block' : ''}`}
                 >
                   Cancelar
-                </button>
-                <button 
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleUserSubmit} 
-                  disabled={loading || !userForm.fullName || !userForm.username || (!editingUserId && !userForm.password)}
-                  className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-bold rounded-2xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-blue-600"
+                  disabled={loading || !userForm.fullName || !userForm.username || (!editingUserId && !userForm.password) || ((!editingUserId || userForm.password.length > 0) && !isPasswordValid)}
+                  className="flex-[2] py-4 bg-blue-600 md:hover:bg-blue-700 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white font-bold rounded-2xl text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:md:hover:scale-100 disabled:md:hover:bg-blue-600"
                 >
                   {loading ? <><Loader2 className="animate-spin" size={18} /> Procesando...</> : <><Save size={18} /> {editingUserId ? 'Guardar Cambios' : 'Crear Usuario'}</>}
-                </button>
+                </motion.button>
               </div>
             </div>
           </div>
@@ -343,7 +419,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <AnimatePresence mode="popLayout">
                 {activeUsers.length === 0 ? (
-                  <div className="col-span-1 sm:col-span-2 p-8 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
+                  <div className="col-span-1 sm:col-span-2 p-8 text-center bg-gray-50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
                     <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">No hay usuarios activos. Crea uno en el formulario.</p>
                   </div>
                 ) : (
@@ -355,7 +431,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.4, ease: "easeOut" }}
-                      className="p-6 rounded-[2rem] border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between hover:shadow-md border-gray-100 dark:border-gray-700 lya:border-lya-border/40 hover:border-blue-200 lya:hover:border-lya-primary/30"
+                      className="p-6 rounded-[2rem] border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between md:hover:shadow-md border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-blue-200 lya:md:hover:border-lya-primary/30"
                     >
                       <div className="flex items-start justify-between mb-5">
                         
@@ -378,22 +454,24 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                         </div>
 
                         <div className="flex flex-col gap-1.5 shrink-0 ml-2">
-                          <button 
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => editUser(usr)} 
                             disabled={actionLoadingId === usr.id}
-                            className="p-2.5 bg-gray-50 hover:bg-blue-50 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-bg rounded-xl text-blue-500 lya:text-lya-primary transition-all active:scale-90 border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 disabled:opacity-50" 
+                            className="p-2.5 bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg rounded-xl text-blue-500 lya:text-lya-primary transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 disabled:opacity-50" 
                             title="Editar usuario"
                           >
                             <Edit2 size={16} />
-                          </button>
-                          <button 
+                          </motion.button>
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => toggleUserStatus(usr.id, usr.isActive)} 
                             disabled={actionLoadingId === usr.id}
-                            className="p-2.5 rounded-xl transition-all active:scale-90 border bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-red-500 hover:bg-red-50 dark:hover:bg-gray-600 border-gray-100 dark:border-gray-600 lya:border-lya-border/40 disabled:opacity-50 flex items-center justify-center" 
+                            className="p-2.5 rounded-xl transition-all border bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-red-500 md:hover:bg-red-50 dark:md:hover:bg-gray-600 border-gray-100 dark:border-gray-600 lya:border-lya-border/40 disabled:opacity-50 flex items-center justify-center" 
                             title="Desactivar Acceso"
                           >
                             {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin text-gray-500" /> : <UserX size={16} />}
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
 
@@ -448,7 +526,13 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Personal con acceso bloqueado al sistema</p>
                   </div>
                 </div>
-                <button onClick={() => setIsTrashModalOpen(false)} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 lya:hover:text-lya-text rounded-full transition-colors"><X size={24} /></button>
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsTrashModalOpen(false)} 
+                  className="p-2 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 lya:md:hover:text-lya-text rounded-full transition-colors"
+                >
+                  <X size={24} />
+                </motion.button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
@@ -460,10 +544,10 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {inactiveUsers.map((usr) => (
-                      <div key={usr.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 opacity-80 hover:opacity-100 transition-opacity">
+                      <div key={usr.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 opacity-80 md:hover:opacity-100 transition-opacity">
                         
                         <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                          <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
+                          <div className="h-12 w-12 flex-shrink-0 rounded-[1rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
                             {getInitials(usr.fullName)}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -473,27 +557,29 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                         </div>
                         
                         <div className="flex gap-2 shrink-0 ml-2">
-                           <button 
+                           <motion.button 
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => {
                               editUser(usr);
                               setIsTrashModalOpen(false);
                             }} 
                             disabled={actionLoadingId === usr.id}
-                            className="p-2.5 bg-gray-50 hover:bg-blue-50 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg rounded-xl text-blue-500 transition-all active:scale-90 disabled:opacity-50" 
+                            className="p-2.5 bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg rounded-xl text-blue-500 transition-all disabled:opacity-50" 
                             title="Editar usuario"
                           >
                             <Edit2 size={16} />
-                          </button>
-                          <button 
+                          </motion.button>
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => toggleUserStatus(usr.id, usr.isActive)}
                             disabled={actionLoadingId === usr.id}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 active:scale-95 disabled:opacity-50"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50"
                           >
                             {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
                             <span className="hidden sm:inline">
                               {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
                             </span>
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     ))}
