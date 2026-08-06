@@ -71,12 +71,10 @@ export const createUser = async (req, res) => {
         `
       };
 
-      try {
-        await transporter.sendMail(mailOptions);
-        console.log(`Correo enviado exitosamente a ${email}`);
-      } catch (mailError) {
-        console.error("Error al enviar el correo:", mailError);
-      }
+      // 🔥 FIRE AND FORGET: Quitamos el "await" para no congelar el frontend
+      transporter.sendMail(mailOptions)
+        .then(() => console.log(`Correo enviado exitosamente a ${targetEmail || email}`))
+        .catch((mailError) => console.error("Error en segundo plano (Nodemailer):", mailError.message));
     }
 
     const salt = await bcrypt.genSalt(10);
