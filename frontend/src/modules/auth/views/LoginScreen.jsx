@@ -1,8 +1,8 @@
-// src/modules/auth/views/LoginScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { v4 as uuidv4 } from 'uuid'; // 🔥 IMPORTANTE: Necesitas instalar uuid (npm install uuid)
 import logoLyA from '../../../assets/logo.jpeg'; 
 import client from '../../../api/client'; 
 
@@ -49,13 +49,58 @@ export const LoginScreen = ({ onLogin }) => {
   const [bootState, setBootState] = useState('booting'); 
   const [phrase, setPhrase] = useState('');
   
-  // 🔥 Nuevo estado para Cápsulas Neo-Bento de notificación local
+  // 🔥 Cápsulas Neo-Bento de notificación local
   const [notification, setNotification] = useState(null);
+
+  // 🔥 Estados para el Bloqueo de Seguridad (Fuerza Bruta)
+  const [blockedUntil, setBlockedUntil] = useState(null);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  // 1. Obtener o generar Device ID
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('lyA_deviceId');
+    if (!deviceId) {
+      deviceId = uuidv4();
+      localStorage.setItem('lyA_deviceId', deviceId);
+    }
+    return deviceId;
+  };
 
   const triggerNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3500);
   };
+
+  // 2. Efecto del temporizador de bloqueo
+  useEffect(() => {
+    if (!blockedUntil) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const difference = blockedUntil - now;
+
+      if (difference <= 0) {
+        setBlockedUntil(null);
+        setTimeLeft('');
+        clearInterval(interval);
+        return;
+      }
+
+      const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((difference / 1000 / 60) % 60);
+      const seconds = Math.floor((difference / 1000) % 60);
+
+      const formattedTime = [
+        hours > 0 ? `${hours}h` : null,
+        `${minutes}m`,
+        `${seconds}s`
+      ].filter(Boolean).join(' ');
+
+      setTimeLeft(formattedTime);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [blockedUntil]);
 
   const runSystemCheck = async () => {
     setBootState('booting');
@@ -82,7 +127,6 @@ export const LoginScreen = ({ onLogin }) => {
     runSystemCheck();
   }, []);
 
-  // 🔥 SOLUCIÓN: Empuje del teclado en móviles
   const handleFocus = (e) => {
     const target = e.target;
     setTimeout(() => {
@@ -92,6 +136,11 @@ export const LoginScreen = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (blockedUntil) {
+      return triggerNotification(`Equipo bloqueado. Espera ${timeLeft}`, 'warning');
+    }
+
     if (!username || !password) {
       return triggerNotification("Ingresa tus credenciales completas", 'warning');
     }
@@ -99,7 +148,11 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      const response = await client.post('/auth/login', { username, password });
+      // 🔥 Mandamos la huella del dispositivo en los Headers
+      const response = await client.post('/auth/login', 
+        { username, password },
+        { headers: { 'x-device-id': getDeviceId() } }
+      );
       
       if (response.data && response.data.user) {
         localStorage.setItem('lya_token', response.data.token);
@@ -107,7 +160,6 @@ export const LoginScreen = ({ onLogin }) => {
         const loggedUser = response.data.user;
         const firstName = loggedUser.fullName ? loggedUser.fullName.split(' ')[0] : loggedUser.username;
         
-        // Usamos toast global para éxito porque el componente se destruirá inmediatamente al cambiar de vista
         if (loggedUser.role === 'Administrador') {
           toast.success(`¡Bienvenido de vuelta, ${firstName}!`);
         } else {
@@ -118,16 +170,21 @@ export const LoginScreen = ({ onLogin }) => {
       }
     } catch (error) {
       console.error("Error en inicio de sesión:", error);
-      const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
-      // Usamos la Cápsula Neo-Bento para los errores
-      triggerNotification(errorMsg, 'error');
+      
+      // 🔥 Interceptar error de Bloqueo 429
+      if (error.response?.status === 429 && error.response?.data?.blockedUntil) {
+        setBlockedUntil(error.response.data.blockedUntil);
+        triggerNotification("Límite de intentos excedido. Equipo bloqueado.", 'error');
+      } else {
+        const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
+        triggerNotification(errorMsg, 'error');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    // 🔥 Pilar 1: min-h-[100dvh], pb-32 y overflow-y-auto para el Anti-Ghost Scroll y teclado móvil
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-300">
       
       {/* NOTIFICACIONES CÁPSULA NEO-BENTO (Pilar 5) */}
@@ -211,7 +268,6 @@ export const LoginScreen = ({ onLogin }) => {
               <WifiOff size={36} strokeWidth={2.5} />
             </div>
             <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-3 text-center">Sin Conexión</h2>
-            {/* 🔥 Pilar 4: Tipografía (Textos descriptivos justificados) */}
             <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed text-justify px-2">
               El sistema de 𝓛𝔂𝓪 no puede comunicarse con el servidor. Revisa tu internet o asegúrate de que el equipo central esté encendido.
             </p>
@@ -232,8 +288,30 @@ export const LoginScreen = ({ onLogin }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10 my-auto shrink-0"
           >
-            <div className="p-8 sm:p-10">
-              
+            {/* 🔥 Overlay de Bloqueo Visual (Capa superior de la tarjeta) */}
+            <AnimatePresence>
+              {blockedUntil && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-50 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
+                >
+                  <Lock className="w-16 h-16 text-red-500 lya:text-red-500 mb-4 animate-pulse" />
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2">
+                    Equipo Bloqueado
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 text-center">
+                    Por seguridad, este terminal ha sido restringido temporalmente por múltiples intentos fallidos.
+                  </p>
+                  <div className="bg-red-100 dark:bg-red-900/30 lya:bg-red-500/20 text-red-600 dark:text-red-400 lya:text-red-400 px-6 py-3 rounded-2xl font-mono text-2xl font-bold tracking-widest shadow-inner">
+                    {timeLeft}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="p-8 sm:p-10 relative z-10">
               <div className="flex flex-col items-center mb-8">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 lya:border-lya-surface shadow-xl mb-6">
                   <img src={logoLyA} alt="Pastelería 𝓛𝔂𝓪" className="w-full h-full object-cover" />
@@ -259,14 +337,13 @@ export const LoginScreen = ({ onLogin }) => {
                         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                           <User size={18} className="text-gray-400 dark:text-gray-500" />
                         </div>
-                        {/* 🔥 Pilar 4: Geometry Premium y handleFocus para el teclado */}
                         <input 
                           type="text" 
                           value={username} 
                           onChange={(e) => setUsername(e.target.value)} 
                           onFocus={handleFocus}
                           placeholder="Usuario o Correo Electrónico" 
-                          disabled={isLoading}
+                          disabled={isLoading || blockedUntil}
                           className="w-full pl-12 pr-5 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-[1.5rem] border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
                         />
                       </div>
@@ -281,13 +358,14 @@ export const LoginScreen = ({ onLogin }) => {
                           onChange={(e) => setPassword(e.target.value)} 
                           onFocus={handleFocus}
                           placeholder="Contraseña" 
-                          disabled={isLoading}
+                          disabled={isLoading || blockedUntil}
                           className="w-full pl-12 pr-12 py-4 bg-gray-50/50 dark:bg-gray-900/50 lya:bg-lya-bg/50 rounded-[1.5rem] border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:bg-white dark:focus:bg-gray-800 outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold shadow-inner placeholder-gray-400 disabled:opacity-50"
                         />
                         <button
                           type="button"
+                          disabled={isLoading || blockedUntil}
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-200 lya:md:hover:text-lya-primary transition-colors focus:outline-none"
+                          className="absolute inset-y-0 right-0 pr-5 flex items-center text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-200 lya:md:hover:text-lya-primary transition-colors focus:outline-none disabled:opacity-50"
                         >
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
@@ -298,18 +376,18 @@ export const LoginScreen = ({ onLogin }) => {
                       <motion.button 
                         whileTap={{ scale: 0.95 }}
                         type="button" 
+                        disabled={isLoading || blockedUntil}
                         onClick={() => setShowForgotMode(true)} 
-                        className="text-[11px] font-bold text-gray-500 md:hover:text-orange-500 lya:md:hover:text-lya-primary transition-colors outline-none"
+                        className="text-[11px] font-bold text-gray-500 md:hover:text-orange-500 lya:md:hover:text-lya-primary transition-colors outline-none disabled:opacity-50"
                       >
                         ¿Olvidaste tus datos?
                       </motion.button>
                     </div>
 
-                    {/* 🔥 Pilar 3: Prevención Anti-Doble Clic (Loader2 y bloqueo) */}
                     <motion.button 
-                      whileTap={!isLoading ? { scale: 0.95 } : {}}
+                      whileTap={!isLoading && !blockedUntil ? { scale: 0.95 } : {}}
                       type="submit" 
-                      disabled={isLoading}
+                      disabled={isLoading || blockedUntil}
                       className="w-full py-4 bg-gray-900 md:hover:bg-black dark:bg-orange-500 dark:md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white font-black rounded-[1.5rem] shadow-xl shadow-gray-900/20 dark:shadow-orange-500/20 lya:shadow-lya-primary/20 transition-all disabled:opacity-70 disabled:shadow-none flex items-center justify-center gap-2 outline-none"
                     >
                       {isLoading ? (
@@ -337,7 +415,6 @@ export const LoginScreen = ({ onLogin }) => {
                     
                     <div>
                       <h3 className="text-lg font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">Acceso Restringido</h3>
-                      {/* 🔥 Pilar 4: Tipografía (Textos descriptivos justificados) */}
                       <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed px-4 text-justify">
                         Por protocolos de seguridad, los empleados no pueden modificar sus credenciales de manera externa.
                         <br /><br />

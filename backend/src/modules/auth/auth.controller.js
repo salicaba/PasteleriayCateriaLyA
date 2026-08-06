@@ -3,13 +3,29 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import User from '../users/User.model.js';
+import DeviceSecurityService from './deviceSecurity.service.js';
 
 // POST: Iniciar sesión
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
+    const deviceId = req.headers['x-device-id'];
 
     console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}"`);
+
+    // 🔥 BLINDAJE: Verificar si el dispositivo envió su huella
+    if (!deviceId) {
+      return res.status(400).json({ message: 'Device ID es requerido para autenticación.' });
+    }
+
+    // 🔥 BLINDAJE: Verificar si el dispositivo ya está bloqueado antes de tocar la BD
+    const blockStatus = DeviceSecurityService.checkBlock(deviceId);
+    if (blockStatus.isBlocked) {
+      return res.status(429).json({
+        message: 'Demasiados intentos. Equipo bloqueado temporalmente.',
+        blockedUntil: blockStatus.blockedUntil
+      });
+    }
 
     // 1. Buscar al usuario en la base de datos (por Usuario O por Correo)
     const user = await User.findOne({ 
@@ -21,20 +37,32 @@ export const login = async (req, res) => {
       } 
     });
     
-    // Si no existe o está inactivo, devolvemos error genérico
-    if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
+    // Resolvemos la contraseña de manera segura para evitar ataques de timing
+    const isMatch = user ? await bcrypt.compare(password, user.password) : false;
+
+    // Si no existe, está inactivo, o la contraseña no coincide
+    if (!user || !user.isActive || !isMatch) {
+      // 🔥 BLINDAJE: Registrar el fallo en el dispositivo
+      const secStatus = DeviceSecurityService.registerFailure(deviceId);
+
+      if (secStatus.blockedUntil) {
+        return res.status(429).json({
+          message: 'Límite de intentos excedido. Equipo bloqueado por seguridad.',
+          blockedUntil: secStatus.blockedUntil
+        });
+      }
+
+      // Devolvemos error genérico pero avisamos cuántos intentos le quedan
+      return res.status(401).json({ 
+        message: `Usuario o contraseña incorrectos. Intentos restantes: ${5 - secStatus.attempts}` 
+      });
     }
 
-    // 2. Comparar la contraseña enviada con el hash de la BD
-    const isMatch = await bcrypt.compare(password, user.password);
-    
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
-    }
+    // 🔥 BLINDAJE: Si el login es exitoso, reseteamos el contador de ese dispositivo
+    DeviceSecurityService.resetDevice(deviceId);
 
     // 3. Generar el Token (JWT)
-    // 🔥 FIX: Vida útil estática de 24h. El frontend se encarga del cierre exacto a medianoche.
+    // FIX: Vida útil estática de 24h. El frontend se encarga del cierre exacto a medianoche.
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
       process.env.JWT_SECRET,
