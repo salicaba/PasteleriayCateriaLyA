@@ -1,20 +1,33 @@
+// backend/src/modules/auth/auth.controller.js
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import User from '../users/User.model.js';
 import IpSecurityService from './ipSecurity.service.js';
 
+// 🔥 UTILIDAD: Limpiador estricto de IP para evitar fluctuaciones locales (IPv4/IPv6)
+const getCleanIp = (req) => {
+  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+  if (ip) {
+    ip = ip.split(',')[0].trim();
+    if (ip.startsWith('::ffff:')) {
+      ip = ip.substring(7); // Extrae la IPv4 pura
+    }
+  }
+  return ip || 'unknown-ip';
+};
+
 // POST: Iniciar sesión
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // 🔥 Capturamos la IP del cliente automáticamente
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    // 🔥 Capturamos la IP limpia y normalizada
+    const clientIp = getCleanIp(req);
 
     console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | IP: ${clientIp}`);
 
-    // 🔥 Verificar si la IP ya está bloqueada antes de tocar la BD
+    // Verificar si la IP ya está bloqueada ANTES de consultar la Base de Datos
     const blockStatus = IpSecurityService.checkBlock(clientIp);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
@@ -23,7 +36,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // 1. Buscar al usuario en la base de datos (por Usuario O por Correo)
+    // 1. Buscar al usuario
     const user = await User.findOne({ 
       where: { 
         [Op.or]: [
@@ -33,12 +46,11 @@ export const login = async (req, res) => {
       } 
     });
     
-    // Resolvemos la contraseña de manera segura
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
     // Si no existe, está inactivo, o la contraseña no coincide
     if (!user || !user.isActive || !isMatch) {
-      // 🔥 Registrar el fallo a esa IP específica
+      // Registrar el fallo en esta IP exacta
       const secStatus = IpSecurityService.registerFailure(clientIp);
 
       if (secStatus.blockedUntil) {
@@ -48,23 +60,21 @@ export const login = async (req, res) => {
         });
       }
 
-      // Devolvemos error genérico pero avisamos cuántos intentos le quedan
+      // Conteo perfecto y estricto
       return res.status(401).json({ 
         message: `Usuario o contraseña incorrectos. Intentos restantes: ${5 - secStatus.attempts}` 
       });
     }
 
-    // 🔥 Si el login es exitoso, reseteamos el contador de esa IP
+    // Login exitoso, limpiamos el historial de fallos de la IP
     IpSecurityService.resetIp(clientIp);
 
-    // 3. Generar el Token (JWT)
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
       process.env.JWT_SECRET,
       { expiresIn: '24h' } 
     );
 
-    // Devolvemos la info al frontend
     res.json({
       message: 'Login exitoso',
       token,
@@ -82,7 +92,6 @@ export const login = async (req, res) => {
   }
 };
 
-// POST: Registro de prueba (Oculto/Temporal)
 export const registerTestUser = async (req, res) => {
   try {
     const { fullName, username, password, role } = req.body;

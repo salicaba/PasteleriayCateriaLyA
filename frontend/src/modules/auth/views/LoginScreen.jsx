@@ -1,3 +1,4 @@
+// src/modules/auth/views/LoginScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
@@ -48,11 +49,19 @@ export const LoginScreen = ({ onLogin }) => {
   const [bootState, setBootState] = useState('booting'); 
   const [phrase, setPhrase] = useState('');
   
-  // Cápsulas Neo-Bento de notificación local
   const [notification, setNotification] = useState(null);
 
-  // Estados para el Bloqueo de Seguridad (Fuerza Bruta)
-  const [blockedUntil, setBlockedUntil] = useState(null);
+  // 🔥 SOLUCIÓN: Leer de LocalStorage al iniciar. Sobrevive a los refrescos (F5)
+  const [blockedUntil, setBlockedUntil] = useState(() => {
+    const savedBlock = localStorage.getItem('lya_blockedUntil');
+    if (savedBlock && parseInt(savedBlock, 10) > Date.now()) {
+      return parseInt(savedBlock, 10);
+    }
+    // Si ya expiró, lo borramos
+    localStorage.removeItem('lya_blockedUntil');
+    return null;
+  });
+  
   const [timeLeft, setTimeLeft] = useState('');
 
   const triggerNotification = (msg, type = 'success') => {
@@ -71,6 +80,7 @@ export const LoginScreen = ({ onLogin }) => {
       if (difference <= 0) {
         setBlockedUntil(null);
         setTimeLeft('');
+        localStorage.removeItem('lya_blockedUntil'); // Limpiamos al terminar
         clearInterval(interval);
         return;
       }
@@ -137,7 +147,6 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // 🔥 Petición limpia (El backend captura la IP automáticamente)
       const response = await client.post('/auth/login', { username, password });
       
       if (response.data && response.data.user) {
@@ -157,10 +166,12 @@ export const LoginScreen = ({ onLogin }) => {
     } catch (error) {
       console.error("Error en inicio de sesión:", error);
       
-      // 🔥 Interceptar error de Bloqueo 429
       if (error.response?.status === 429 && error.response?.data?.blockedUntil) {
-        setBlockedUntil(error.response.data.blockedUntil);
-        triggerNotification("Límite de intentos excedido. IP bloqueada.", 'error');
+        // 🔥 Guardamos en LocalStorage para sobrevivir al refresh
+        const blockTimestamp = error.response.data.blockedUntil;
+        setBlockedUntil(blockTimestamp);
+        localStorage.setItem('lya_blockedUntil', blockTimestamp.toString());
+        triggerNotification("Límite de intentos excedido. Red bloqueada.", 'error');
       } else {
         const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
         triggerNotification(errorMsg, 'error');
@@ -173,7 +184,6 @@ export const LoginScreen = ({ onLogin }) => {
   return (
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-gray-100 dark:bg-gray-900 lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-300">
       
-      {/* NOTIFICACIONES CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -273,7 +283,6 @@ export const LoginScreen = ({ onLogin }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-gray-700/50 lya:border-lya-border/40 overflow-hidden relative z-10 my-auto shrink-0"
           >
-            {/* 🔥 Overlay de Bloqueo Visual por IP */}
             <AnimatePresence>
               {blockedUntil && (
                 <motion.div 
@@ -287,7 +296,7 @@ export const LoginScreen = ({ onLogin }) => {
                     Acceso Suspendido
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 text-center">
-                    Se han detectado múltiples intentos fallidos desde esta red. Por seguridad, el acceso ha sido bloqueado.
+                    Múltiples intentos fallidos detectados. Por seguridad, el acceso desde esta red ha sido bloqueado.
                   </p>
                   <div className="bg-red-100 dark:bg-red-900/30 lya:bg-red-500/20 text-red-600 dark:text-red-400 lya:text-red-400 px-6 py-3 rounded-2xl font-mono text-2xl font-bold tracking-widest shadow-inner">
                     {timeLeft}
