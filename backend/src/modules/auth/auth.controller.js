@@ -3,31 +3,24 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import User from '../users/User.model.js';
-import IpSecurityService from './ipSecurity.service.js';
-
-const getCleanIp = (req) => {
-  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
-  if (ip) {
-    ip = ip.split(',')[0].trim();
-    if (ip.startsWith('::ffff:')) {
-      ip = ip.substring(7);
-    }
-  }
-  return ip || 'unknown-ip';
-};
+import DeviceSecurityService from './deviceSecurity.service.js';
 
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
-    const clientIp = getCleanIp(req);
+    const deviceId = req.headers['x-device-id']; // 🔥 Leemos la huella del equipo
 
-    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | IP: ${clientIp}`);
+    console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | Dispositivo: ${deviceId || 'Desconocido'}`);
 
-    const blockStatus = IpSecurityService.checkBlock(clientIp);
+    if (!deviceId) {
+      return res.status(400).json({ message: 'Device ID es requerido para seguridad.' });
+    }
+
+    const blockStatus = DeviceSecurityService.checkBlock(deviceId);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
-        message: 'Demasiados intentos. Red bloqueada temporalmente.',
-        remainingMs: blockStatus.remainingMs // 🔥 Enviamos milisegundos relativos
+        message: 'Demasiados intentos. Equipo bloqueado temporalmente.',
+        remainingMs: blockStatus.remainingMs
       });
     }
 
@@ -43,12 +36,12 @@ export const login = async (req, res) => {
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
     if (!user || !user.isActive || !isMatch) {
-      const secStatus = IpSecurityService.registerFailure(clientIp);
+      const secStatus = DeviceSecurityService.registerFailure(deviceId);
 
       if (secStatus.blockedUntil) {
         return res.status(429).json({
-          message: 'Límite de intentos excedido. IP bloqueada por seguridad.',
-          remainingMs: secStatus.blockedUntil - Date.now() // 🔥 Calculamos lo que falta
+          message: 'Límite de intentos excedido. Equipo bloqueado por seguridad.',
+          remainingMs: secStatus.blockedUntil - Date.now()
         });
       }
 
@@ -57,7 +50,7 @@ export const login = async (req, res) => {
       });
     }
 
-    IpSecurityService.resetIp(clientIp);
+    DeviceSecurityService.resetDevice(deviceId);
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
@@ -83,33 +76,14 @@ export const login = async (req, res) => {
 };
 
 export const registerTestUser = async (req, res) => {
-  // ... tu código exacto de registro (no se modificó nada aquí)
+  // Código de registro sin cambios
   try {
     const { fullName, username, password, role } = req.body;
-
-    if (!fullName) {
-      return res.status(400).json({ message: 'El nombre completo es requerido.' });
-    }
-
+    if (!fullName) return res.status(400).json({ message: 'El nombre completo es requerido.' });
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = await User.create({
-      fullName,
-      username,
-      password: hashedPassword,
-      role: role || 'Empleado'
-    });
-
-    res.status(201).json({
-      message: 'Usuario maestro/prueba creado con éxito',
-      user: {
-        id: newUser.id,
-        fullName: newUser.fullName,
-        username: newUser.username,
-        role: newUser.role
-      }
-    });
+    const newUser = await User.create({ fullName, username, password: hashedPassword, role: role || 'Empleado' });
+    res.status(201).json({ message: 'Usuario creado', user: { id: newUser.id, fullName: newUser.fullName, username: newUser.username, role: newUser.role } });
   } catch (error) {
     res.status(400).json({ message: 'Error al crear usuario', error: error.message });
   }

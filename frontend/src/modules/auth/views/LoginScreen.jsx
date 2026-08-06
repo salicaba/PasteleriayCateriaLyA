@@ -39,6 +39,16 @@ export const LoginScreen = ({ onLogin }) => {
   
   const [timeLeft, setTimeLeft] = useState('');
 
+  // 🔥 Generador de Huella de Dispositivo (API Nativa)
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('lyA_deviceId');
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem('lyA_deviceId', deviceId);
+    }
+    return deviceId;
+  };
+
   const triggerNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3500);
@@ -98,7 +108,6 @@ export const LoginScreen = ({ onLogin }) => {
     runSystemCheck();
   }, []);
 
-  // 🔥 FUNCIÓN TÁCTIL PROTEGIDA: Levanta la vista al abrir el teclado en móviles
   const handleFocus = (e) => {
     const target = e.target;
     setTimeout(() => {
@@ -120,7 +129,11 @@ export const LoginScreen = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      const response = await client.post('/auth/login', { username, password });
+      // 🔥 Enviamos la huella en los headers
+      const response = await client.post('/auth/login', 
+        { username, password },
+        { headers: { 'x-device-id': getDeviceId() } }
+      );
       
       if (response.data && response.data.user) {
         localStorage.setItem('lya_token', response.data.token);
@@ -143,7 +156,7 @@ export const LoginScreen = ({ onLogin }) => {
         const localBlockTimestamp = Date.now() + error.response.data.remainingMs;
         setBlockedUntil(localBlockTimestamp);
         localStorage.setItem('lya_blockedUntil', localBlockTimestamp.toString());
-        triggerNotification("Límite de intentos excedido. Red bloqueada.", 'error');
+        triggerNotification("Límite de intentos excedido. Equipo bloqueado.", 'error');
       } else {
         const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
         if (errorMsg.includes('Intentos restantes')) {
@@ -167,10 +180,8 @@ export const LoginScreen = ({ onLogin }) => {
   };
 
   return (
-    // 🔥 CONTENEDOR PRINCIPAL: min-h-[100dvh] y pb-32 para dar espacio al scroll del teclado móvil
     <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 py-8 pb-32 bg-[#FDFBF7] dark:bg-gray-950 lya:bg-lya-bg relative overflow-y-auto custom-scrollbar transition-colors duration-500">
       
-      {/* 🔥 SOLUCIÓN DEL FONDO: "fixed" en lugar de "absolute" para evitar que se corte al scrollear */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <motion.div 
           animate={{ scale: [1, 1.2, 1], x: [0, 50, 0], y: [0, 30, 0] }}
@@ -292,7 +303,7 @@ export const LoginScreen = ({ onLogin }) => {
                     Acceso Restringido
                   </h3>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                    Múltiples intentos fallidos detectados. Por seguridad, el acceso desde esta red ha sido bloqueado temporalmente.
+                    Múltiples intentos fallidos detectados. Por seguridad, el acceso a este dispositivo ha sido bloqueado temporalmente.
                   </p>
                   <div className="bg-gradient-to-r from-red-100 to-rose-50 dark:from-red-900/40 dark:to-rose-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 px-8 py-4 rounded-[1.5rem] shadow-inner flex items-center gap-3">
                     <Sparkles size={20} className="animate-spin-slow opacity-50" />
