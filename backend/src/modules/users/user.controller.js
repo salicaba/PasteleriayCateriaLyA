@@ -1,17 +1,45 @@
 import bcrypt from 'bcryptjs';
-import nodemailer from 'nodemailer';
 import User from './User.model.js';
 
-// Configuración de Nodemailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.MAIL_USER, 
-    pass: process.env.MAIL_PASS  
+// ============================================================================
+// HELPER: ENVÍO DE CORREOS VÍA API HTTP (Puerto 443 - Bypassea bloqueos de Render)
+// ============================================================================
+const sendEmailViaHTTP = async (targetEmail, subject, htmlContent) => {
+  if (!process.env.BREVO_API_KEY) {
+    console.warn("⚠️ No se encontró BREVO_API_KEY. Envío de correo omitido.");
+    return;
   }
-});
 
-// Helper de validación de seguridad (Política Estricta)
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: { name: "Punto de Venta 𝓛𝔂𝓪", email: "poscafpastlya@gmail.com" }, // Debe coincidir con el verificado en Brevo
+        to: [{ email: targetEmail }],
+        subject: subject,
+        htmlContent: htmlContent
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("🔴 Error de Brevo API:", errorData);
+    } else {
+      console.log(`✅ Correo HTTP enviado exitosamente a ${targetEmail}`);
+    }
+  } catch (error) {
+    console.error("🔴 Error de red enviando correo HTTP:", error.message);
+  }
+};
+
+// ============================================================================
+// HELPER: VALIDACIÓN DE SEGURIDAD (Política Estricta)
+// ============================================================================
 const isValidPassword = (password) => {
   // Min 8 chars, 1 mayúscula, 1 minúscula, 1 número, 1 símbolo especial
   const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
@@ -40,41 +68,10 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ message: 'El nombre de usuario ya está en uso.' });
     }
 
-    // VALIDACIÓN ESTRICTA DE CONTRASEÑA
     if (!isValidPassword(password)) {
       return res.status(400).json({ 
-        message: 'La contraseña no cumple con las políticas de seguridad requeridas (Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 símbolo).' 
+        message: 'La contraseña no cumple con las políticas de seguridad requeridas.' 
       });
-    }
-
-    // ENVIAR CORREO ANTES DE HASHEAR LA CONTRASEÑA
-    if (email && process.env.MAIL_USER) {
-      const mailOptions = {
-        from: `"Punto de Venta 𝓛𝔂𝓪" <${process.env.MAIL_USER}>`,
-        to: email,
-        subject: '¡Bienvenido al equipo de 𝓛𝔂𝓪! - Tus credenciales de acceso',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #ea580c; text-align: center;">¡Hola, ${fullName}!</h2>
-            <p style="font-size: 14px; color: #475569; line-height: 1.5; text-align: justify;">
-              Se ha creado tu cuenta en el Sistema de Punto de Venta de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Estas son tus credenciales de acceso:
-            </p>
-            <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 5px 0; font-size: 14px;"><b>Usuario:</b> ${username}</p>
-              <p style="margin: 5px 0; font-size: 14px;"><b>Contraseña:</b> <span style="font-family: monospace; font-size: 16px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${password}</span></p>
-              <p style="margin: 5px 0; font-size: 14px;"><b>Rol Asignado:</b> ${role || 'Empleado'}</p>
-            </div>
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px;">
-              * Conserve este correo en un lugar seguro.
-            </p>
-          </div>
-        `
-      };
-
-      // 🔥 FIRE AND FORGET: Quitamos el "await" para no congelar el frontend
-      transporter.sendMail(mailOptions)
-        .then(() => console.log(`Correo enviado exitosamente a ${targetEmail || email}`))
-        .catch((mailError) => console.error("Error en segundo plano (Nodemailer):", mailError.message));
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -87,6 +84,27 @@ export const createUser = async (req, res) => {
       password: hashedPassword,
       role: role || 'Empleado'
     });
+
+    // 🔥 FIRE AND FORGET: Disparamos el correo sin "await" para no congelar el Frontend
+    if (email) {
+      const htmlTemplate = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #ea580c; text-align: center;">¡Hola, ${fullName}!</h2>
+          <p style="font-size: 14px; color: #475569; line-height: 1.5; text-align: justify;">
+            Se ha creado tu cuenta en el Sistema de Punto de Venta de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Estas son tus credenciales de acceso:
+          </p>
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0; font-size: 14px;"><b>Usuario:</b> ${username}</p>
+            <p style="margin: 5px 0; font-size: 14px;"><b>Contraseña:</b> <span style="font-family: monospace; font-size: 16px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${password}</span></p>
+            <p style="margin: 5px 0; font-size: 14px;"><b>Rol Asignado:</b> ${role || 'Empleado'}</p>
+          </div>
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px;">
+            * Conserve este correo en un lugar seguro.
+          </p>
+        </div>
+      `;
+      sendEmailViaHTTP(email, '¡Bienvenido al equipo de 𝓛𝔂𝓪! - Tus credenciales de acceso', htmlTemplate);
+    }
 
     res.status(201).json({
       message: 'Usuario creado exitosamente. Se enviaron las credenciales por correo.',
@@ -127,7 +145,6 @@ export const updateUser = async (req, res) => {
     if (isActive !== undefined && isActive !== user.isActive) { user.isActive = isActive; changesMade = true; }
 
     if (password) {
-      // VALIDACIÓN ESTRICTA EN ACTUALIZACIÓN
       if (!isValidPassword(password)) {
         return res.status(400).json({ 
           message: 'La nueva contraseña no cumple con las políticas de seguridad requeridas.' 
@@ -150,36 +167,27 @@ export const updateUser = async (req, res) => {
     await user.save();
 
     const targetEmail = parsedEmail || user.email; 
-    if (changesMade && targetEmail && process.env.MAIL_USER) {
-      const mailOptions = {
-        from: `"Punto de Venta 𝓛𝔂𝓪" <${process.env.MAIL_USER}>`,
-        to: targetEmail,
-        subject: 'Actualización de tu cuenta en 𝓛𝔂𝓪',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #ea580c; text-align: center;">¡Hola, ${user.fullName}!</h2>
-            <p style="font-size: 14px; color: #475569; line-height: 1.5; text-align: justify;">
-              El administrador ha actualizado la información de tu cuenta en el Sistema de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Aquí están tus datos vigentes:
-            </p>
-            <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 5px 0; font-size: 14px;"><b>Usuario / Login:</b> ${user.username}</p>
-              ${passwordChanged ? `<p style="margin: 5px 0; font-size: 14px;"><b>Nueva Contraseña:</b> <span style="font-family: monospace; font-size: 16px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${password}</span></p>` : `<p style="margin: 5px 0; font-size: 14px; color: #64748b;"><i>La contraseña no fue modificada.</i></p>`}
-              <p style="margin: 5px 0; font-size: 14px;"><b>Rol Asignado:</b> ${user.role}</p>
-              <p style="margin: 5px 0; font-size: 14px;"><b>Estado de la Cuenta:</b> ${user.isActive ? '<span style="color: #10b981; font-weight: bold;">Activo</span>' : '<span style="color: #ef4444; font-weight: bold;">Suspendido</span>'}</p>
-            </div>
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px;">
-              * Si no reconoces estos cambios o tienes problemas para entrar a tu turno, acércate al administrador.
-            </p>
+    
+    // 🔥 FIRE AND FORGET: Disparamos la actualización sin "await"
+    if (changesMade && targetEmail) {
+      const htmlTemplate = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #ea580c; text-align: center;">¡Hola, ${user.fullName}!</h2>
+          <p style="font-size: 14px; color: #475569; line-height: 1.5; text-align: justify;">
+            El administrador ha actualizado la información de tu cuenta en el Sistema de <b>Pastelería y Cafetería <span style="font-family: serif; font-size: 16px;">𝓛𝔂𝓪</span></b>. Aquí están tus datos vigentes:
+          </p>
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0; font-size: 14px;"><b>Usuario / Login:</b> ${user.username}</p>
+            ${passwordChanged ? `<p style="margin: 5px 0; font-size: 14px;"><b>Nueva Contraseña:</b> <span style="font-family: monospace; font-size: 16px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${password}</span></p>` : `<p style="margin: 5px 0; font-size: 14px; color: #64748b;"><i>La contraseña no fue modificada.</i></p>`}
+            <p style="margin: 5px 0; font-size: 14px;"><b>Rol Asignado:</b> ${user.role}</p>
+            <p style="margin: 5px 0; font-size: 14px;"><b>Estado de la Cuenta:</b> ${user.isActive ? '<span style="color: #10b981; font-weight: bold;">Activo</span>' : '<span style="color: #ef4444; font-weight: bold;">Suspendido</span>'}</p>
           </div>
-        `
-      };
-
-      try {
-        await transporter.sendMail(mailOptions);
-        console.log(`Correo de actualización enviado a ${targetEmail}`);
-      } catch (mailError) {
-        console.error("Error al enviar el correo de actualización:", mailError);
-      }
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px;">
+            * Si no reconoces estos cambios o tienes problemas para entrar a tu turno, acércate al administrador.
+          </p>
+        </div>
+      `;
+      sendEmailViaHTTP(targetEmail, 'Actualización de tu cuenta en 𝓛𝔂𝓪', htmlTemplate);
     }
 
     res.json({
