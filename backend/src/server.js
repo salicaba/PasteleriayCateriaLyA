@@ -1,3 +1,4 @@
+import 'dotenv/config'; // 🔥 ESTA ES LA LLAVE MÁGICA
 import http from 'http';
 import app from './app.js';
 import sequelize from './config/database.js';
