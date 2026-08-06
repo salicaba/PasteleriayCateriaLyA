@@ -1,6 +1,5 @@
 /**
  * Servicio en memoria para prevención de fuerza bruta por IP.
- * Reglas: 5 intentos -> 30 min bloqueo -> +5 intentos -> 60 min -> 120 min, etc.
  */
 const ipStore = new Map();
 
@@ -23,11 +22,10 @@ export default class IpSecurityService {
       return {
         isBlocked: true,
         blockedUntil: status.blockedUntil,
-        remainingTimeMs: status.blockedUntil - Date.now()
+        remainingMs: status.blockedUntil - Date.now() // 🔥 Agregamos el tiempo restante
       };
     }
 
-    // Si el tiempo de bloqueo ya expiró, limpiamos el bloqueo pero MANTENEMOS el multiplicador
     if (status.blockedUntil && status.blockedUntil <= Date.now()) {
       status.blockedUntil = null;
       ipStore.set(ip, status);
@@ -41,11 +39,9 @@ export default class IpSecurityService {
     status.attempts += 1;
 
     if (status.attempts >= 5) {
-      // Aplicar bloqueo exponencial: 30 minutos * multiplicador
       const blockDurationMs = 30 * 60 * 1000 * status.multiplier;
       status.blockedUntil = Date.now() + blockDurationMs;
       
-      // Preparar el estado para el siguiente ciclo si vuelven a fallar
       status.attempts = 0; 
       status.multiplier *= 2; 
     }

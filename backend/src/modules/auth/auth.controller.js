@@ -5,38 +5,32 @@ import { Op } from 'sequelize';
 import User from '../users/User.model.js';
 import IpSecurityService from './ipSecurity.service.js';
 
-// 🔥 UTILIDAD: Limpiador estricto de IP para evitar fluctuaciones locales (IPv4/IPv6)
 const getCleanIp = (req) => {
   let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
   if (ip) {
     ip = ip.split(',')[0].trim();
     if (ip.startsWith('::ffff:')) {
-      ip = ip.substring(7); // Extrae la IPv4 pura
+      ip = ip.substring(7);
     }
   }
   return ip || 'unknown-ip';
 };
 
-// POST: Iniciar sesión
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    // 🔥 Capturamos la IP limpia y normalizada
     const clientIp = getCleanIp(req);
 
     console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | IP: ${clientIp}`);
 
-    // Verificar si la IP ya está bloqueada ANTES de consultar la Base de Datos
     const blockStatus = IpSecurityService.checkBlock(clientIp);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
         message: 'Demasiados intentos. Red bloqueada temporalmente.',
-        blockedUntil: blockStatus.blockedUntil
+        remainingMs: blockStatus.remainingMs // 🔥 Enviamos milisegundos relativos
       });
     }
 
-    // 1. Buscar al usuario
     const user = await User.findOne({ 
       where: { 
         [Op.or]: [
@@ -48,25 +42,21 @@ export const login = async (req, res) => {
     
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
-    // Si no existe, está inactivo, o la contraseña no coincide
     if (!user || !user.isActive || !isMatch) {
-      // Registrar el fallo en esta IP exacta
       const secStatus = IpSecurityService.registerFailure(clientIp);
 
       if (secStatus.blockedUntil) {
         return res.status(429).json({
           message: 'Límite de intentos excedido. IP bloqueada por seguridad.',
-          blockedUntil: secStatus.blockedUntil
+          remainingMs: secStatus.blockedUntil - Date.now() // 🔥 Calculamos lo que falta
         });
       }
 
-      // Conteo perfecto y estricto
       return res.status(401).json({ 
         message: `Usuario o contraseña incorrectos. Intentos restantes: ${5 - secStatus.attempts}` 
       });
     }
 
-    // Login exitoso, limpiamos el historial de fallos de la IP
     IpSecurityService.resetIp(clientIp);
 
     const token = jwt.sign(
@@ -93,6 +83,7 @@ export const login = async (req, res) => {
 };
 
 export const registerTestUser = async (req, res) => {
+  // ... tu código exacto de registro (no se modificó nada aquí)
   try {
     const { fullName, username, password, role } = req.body;
 

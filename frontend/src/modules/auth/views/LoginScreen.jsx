@@ -51,13 +51,11 @@ export const LoginScreen = ({ onLogin }) => {
   
   const [notification, setNotification] = useState(null);
 
-  // 🔥 SOLUCIÓN: Leer de LocalStorage al iniciar. Sobrevive a los refrescos (F5)
   const [blockedUntil, setBlockedUntil] = useState(() => {
     const savedBlock = localStorage.getItem('lya_blockedUntil');
     if (savedBlock && parseInt(savedBlock, 10) > Date.now()) {
       return parseInt(savedBlock, 10);
     }
-    // Si ya expiró, lo borramos
     localStorage.removeItem('lya_blockedUntil');
     return null;
   });
@@ -69,7 +67,6 @@ export const LoginScreen = ({ onLogin }) => {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // Efecto del temporizador de bloqueo
   useEffect(() => {
     if (!blockedUntil) return;
 
@@ -80,7 +77,7 @@ export const LoginScreen = ({ onLogin }) => {
       if (difference <= 0) {
         setBlockedUntil(null);
         setTimeLeft('');
-        localStorage.removeItem('lya_blockedUntil'); // Limpiamos al terminar
+        localStorage.removeItem('lya_blockedUntil');
         clearInterval(interval);
         return;
       }
@@ -166,15 +163,21 @@ export const LoginScreen = ({ onLogin }) => {
     } catch (error) {
       console.error("Error en inicio de sesión:", error);
       
-      if (error.response?.status === 429 && error.response?.data?.blockedUntil) {
-        // 🔥 Guardamos en LocalStorage para sobrevivir al refresh
-        const blockTimestamp = error.response.data.blockedUntil;
-        setBlockedUntil(blockTimestamp);
-        localStorage.setItem('lya_blockedUntil', blockTimestamp.toString());
+      // 🔥 Ahora reacciona al tiempo relativo (remainingMs) y lo suma al reloj local
+      if (error.response?.status === 429 && error.response?.data?.remainingMs) {
+        const localBlockTimestamp = Date.now() + error.response.data.remainingMs;
+        setBlockedUntil(localBlockTimestamp);
+        localStorage.setItem('lya_blockedUntil', localBlockTimestamp.toString());
         triggerNotification("Límite de intentos excedido. Red bloqueada.", 'error');
       } else {
         const errorMsg = error.response?.data?.message || "Usuario o contraseña incorrectos";
-        triggerNotification(errorMsg, 'error');
+        
+        // Efecto visual: Si la advertencia menciona los intentos, la mostramos amarilla
+        if (errorMsg.includes('Intentos restantes')) {
+          triggerNotification(errorMsg, 'warning');
+        } else {
+          triggerNotification(errorMsg, 'error');
+        }
       }
     } finally {
       setIsLoading(false);
