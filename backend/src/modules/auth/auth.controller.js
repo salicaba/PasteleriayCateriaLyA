@@ -7,8 +7,8 @@ import DeviceSecurityService from './deviceSecurity.service.js';
 
 export const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const deviceId = req.headers['x-device-id']; // 🔥 Leemos la huella del equipo
+    // 🔥 Ahora recibimos el deviceId directamente del body, evadiendo los bloqueos de headers en Vercel
+    const { username, password, deviceId } = req.body; 
 
     console.log(`Intento de acceso a 𝓛𝔂𝓪 -> Identificador: "${username}" | Dispositivo: ${deviceId || 'Desconocido'}`);
 
@@ -76,7 +76,6 @@ export const login = async (req, res) => {
 };
 
 export const registerTestUser = async (req, res) => {
-  // Código de registro sin cambios
   try {
     const { fullName, username, password, role } = req.body;
     if (!fullName) return res.status(400).json({ message: 'El nombre completo es requerido.' });
