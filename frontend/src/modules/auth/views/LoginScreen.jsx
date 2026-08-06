@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, User, Lock, ArrowLeft, ShieldAlert, WifiOff, RefreshCw, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { v4 as uuidv4 } from 'uuid'; // 🔥 IMPORTANTE: Necesitas instalar uuid (npm install uuid)
 import logoLyA from '../../../assets/logo.jpeg'; 
 import client from '../../../api/client'; 
 
@@ -56,11 +55,11 @@ export const LoginScreen = ({ onLogin }) => {
   const [blockedUntil, setBlockedUntil] = useState(null);
   const [timeLeft, setTimeLeft] = useState('');
 
-  // 1. Obtener o generar Device ID
+ // 1. Obtener o generar Device ID (Usando Web Crypto API nativa)
   const getDeviceId = () => {
     let deviceId = localStorage.getItem('lyA_deviceId');
     if (!deviceId) {
-      deviceId = uuidv4();
+      deviceId = crypto.randomUUID(); // <-- Cambiamos uuidv4() por la API nativa
       localStorage.setItem('lyA_deviceId', deviceId);
     }
     return deviceId;
