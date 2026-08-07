@@ -319,18 +319,26 @@ function App() {
   }, [activeTab, user]);
 
   // 🔥 VALIDACIÓN DE SEGURIDAD PARA OCULTAR GRUPOS
-  // Se ha removido 'sistema_group' para permitir que el empleado vea "Sistema"
   const visibleMenuConfig = menuConfig.filter(group => {
-    if (['finanzas_group', 'personal_group'].includes(group.id) && user?.role === 'Empleado') {
+    // Bloqueamos Finanzas, Personal, Inventario y Reportes para el Empleado
+    if (['finanzas_group', 'personal_group', 'inventario_group', 'reportes'].includes(group.id) && user?.role === 'Empleado') {
       return false;
     }
     return true;
   });
 
   // 🔥 VALIDACIÓN DE SEGURIDAD PARA REDIRECCIONAR RUTAS
-  // Se han removido 'interfaz' y 'hardware' para permitir el acceso al empleado
   useEffect(() => {
-    const adminOnlyTabs = ['usuarios', 'cuentas', 'egresos', 'dashboard'];
+    // Añadimos reportes, inventario y arqueo a la lista blindada
+    const adminOnlyTabs = [
+      'usuarios', 
+      'cuentas', 
+      'egresos', 
+      'dashboard', 
+      'reportes', 
+      'inventario', 
+      'arqueo'
+    ];
     
     if (user?.role === 'Empleado' && adminOnlyTabs.includes(activeTab)) {
       setActiveTab('mesas'); 
