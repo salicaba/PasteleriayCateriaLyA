@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useState, useEffect } from 'react';
 // 🔥 Agregamos Shield para el ícono de los accesos
 import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield } from 'lucide-react';
@@ -38,7 +37,6 @@ const getInitials = (name) => {
 };
 
 function App() {
-  // 🔥 Extraemos needRefresh y updateServiceWorker del hook
   const { isInstallable, promptInstall, isStandalone, needRefresh, updateServiceWorker } = usePWA();
   const navigate = useNavigate();
 
@@ -56,17 +54,16 @@ function App() {
       }
       const root = document.documentElement;
       if (root.classList.contains('dark')) {
-        metaThemeColor.content = '#111827'; // Gris oscuro para tema Dark
+        metaThemeColor.content = '#111827'; 
       } else if (root.classList.contains('theme-lya')) {
-        metaThemeColor.content = '#FAF6F0'; // Cremita para tema Lya
+        metaThemeColor.content = '#FAF6F0'; 
       } else {
-        metaThemeColor.content = '#F9FAFB'; // Gris clarito para tema Light
+        metaThemeColor.content = '#F9FAFB'; 
       }
     };
 
-    updateMetaColor(); // Ejecutamos la primera vez
+    updateMetaColor(); 
     
-    // El observador detecta cualquier cambio de tema en tiempo real
     const observer = new MutationObserver(updateMetaColor);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
@@ -227,7 +224,6 @@ function App() {
     year: 'numeric' 
   });
 
-  // 🔥 NUEVA ESTRUCTURA DEL MENÚ
   const menuConfig = [
     { id: 'caja', label: 'Caja', icon: Wallet },
     { id: 'reportes', label: 'Reportes', icon: PieChart },
@@ -323,16 +319,18 @@ function App() {
   }, [activeTab, user]);
 
   // 🔥 VALIDACIÓN DE SEGURIDAD PARA OCULTAR GRUPOS
+  // Se ha removido 'sistema_group' para permitir que el empleado vea "Sistema"
   const visibleMenuConfig = menuConfig.filter(group => {
-    if (['sistema_group', 'finanzas_group', 'personal_group'].includes(group.id) && user?.role === 'Empleado') {
+    if (['finanzas_group', 'personal_group'].includes(group.id) && user?.role === 'Empleado') {
       return false;
     }
     return true;
   });
 
   // 🔥 VALIDACIÓN DE SEGURIDAD PARA REDIRECCIONAR RUTAS
+  // Se han removido 'interfaz' y 'hardware' para permitir el acceso al empleado
   useEffect(() => {
-    const adminOnlyTabs = ['usuarios', 'interfaz', 'cuentas', 'hardware', 'egresos', 'dashboard'];
+    const adminOnlyTabs = ['usuarios', 'cuentas', 'egresos', 'dashboard'];
     
     if (user?.role === 'Empleado' && adminOnlyTabs.includes(activeTab)) {
       setActiveTab('mesas'); 
@@ -647,21 +645,14 @@ function App() {
                     <motion.button
                       whileTap={!isUpdating ? { scale: 0.95 } : {}}
                       onClick={async () => {
-                        if (isUpdating) return; // Bloqueo absoluto anti-doble clic
+                        if (isUpdating) return; 
                         setIsUpdating(true);
                         try {
-                          // 1. Pequeño delay visual para que el usuario note inmediatamente la reacción del sistema
                           await new Promise(resolve => setTimeout(resolve, 600));
-                          
-                          // 2. Disparamos la actualización (esto descargará el nuevo SW y recargará la app)
                           await updateServiceWorker(true);
-                          
-                          // 🔥 CRÍTICO: NO liberamos el estado aquí (no hay setIsUpdating(false)).
-                          // El botón se quedará congelado en "Actualizando sistema..." protegiendo 
-                          // la interfaz hasta que el navegador complete el refresh automáticamente.
                         } catch (error) {
                           console.error("Error al actualizar la PWA:", error);
-                          setIsUpdating(false); // Solo liberamos el botón si la actualización falla
+                          setIsUpdating(false); 
                           toast.error("Error al actualizar. Intenta recargar manualmente.");
                         }
                       }}
