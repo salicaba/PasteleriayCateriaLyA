@@ -1,11 +1,11 @@
-// src/modules/admin/views/settings-tabs/HardwareTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Printer, Wifi, Usb, RefreshCw, AlertCircle, Barcode, Keyboard, Save, Loader2 } from 'lucide-react';
+import { Printer, Wifi, Usb, RefreshCw, AlertCircle, Barcode, Keyboard, Save, Loader2, Power, PowerOff } from 'lucide-react';
 import client from '../../../../api/client';
 
 export const HardwareTab = ({ showNotification, globalScroll }) => {
-  const [printerConfig, setPrinterConfig] = useState({ type: 'usb', interface: '' });
+  // 🔥 Añadimos "enabled" por defecto en false
+  const [printerConfig, setPrinterConfig] = useState({ enabled: false, type: 'usb', interface: '' });
   const [barcodeConfig, setBarcodeConfig] = useState({ autoAdd: true }); 
   const [lastScanned, setLastScanned] = useState(''); 
 
@@ -26,7 +26,8 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
     try {
       const res = await client.get('/settings');
       if (res.data) {
-        if (res.data.printer_config) setPrinterConfig(res.data.printer_config);
+        // Combinamos la respuesta con los valores por defecto para no perder la estructura
+        if (res.data.printer_config) setPrinterConfig(prev => ({ ...prev, ...res.data.printer_config }));
         if (res.data.barcode_config) setBarcodeConfig(res.data.barcode_config);
       }
     } catch (err) {
@@ -136,6 +137,7 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
       <div className={`flex-1 w-full relative flex flex-col ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 flex-1">
           
+          {/* SECCIÓN IMPRESORA */}
           <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
               <div className="flex items-center gap-3">
@@ -145,17 +147,17 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
                 <h2 className="font-bold text-xl text-gray-900 dark:text-white lya:text-lya-text">Impresora Térmica</h2>
               </div>
               <div className="flex items-center shrink-0">
-                {printerStatus === 'online' && (
+                {printerConfig.enabled && printerStatus === 'online' && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 rounded-xl text-[10px] uppercase font-black tracking-wider border border-emerald-500/20">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Conectada
                   </div>
                 )}
-                {printerStatus === 'offline' && (
+                {printerConfig.enabled && printerStatus === 'offline' && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-600 rounded-xl text-[10px] uppercase font-black tracking-wider border border-red-500/20">
                     <div className="w-2 h-2 rounded-full bg-red-500"></div> Desconectada
                   </div>
                 )}
-                {printerStatus === 'unknown' && (
+                {printerConfig.enabled && printerStatus === 'unknown' && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-500/10 text-gray-500 rounded-xl text-[10px] uppercase font-black tracking-wider border border-gray-500/20">
                     <AlertCircle size={12} /> Sin verificar
                   </div>
@@ -163,88 +165,128 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
               </div>
             </div>
 
-            <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 flex-1 text-justify">
-              Ajusta el puerto de conexión (USB) o la dirección IP de red de la miniprinter encargada de emitir los tickets de mostrador y comandas.
-            </p>
-
-            <div className="space-y-6">
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-2">Medio de Conexión</label>
-                <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40">
-                  <button 
-                    onClick={() => { setPrinterConfig({...printerConfig, type: 'usb'}); setPrinterStatus('unknown'); }} 
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-[1rem] transition-all ${
-                      printerConfig.type === 'usb' 
-                        ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
-                  >
-                    <Usb size={18}/> Cable USB
-                  </button>
-                  <button 
-                    onClick={() => { setPrinterConfig({...printerConfig, type: 'network'}); setPrinterStatus('unknown'); }} 
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-[1rem] transition-all ${
-                      printerConfig.type === 'network' 
-                        ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
-                  >
-                    <Wifi size={18}/> Red / LAN
-                  </button>
+            {/* 🔥 TOGGLE NEO-BENTO PARA ENCENDER/APAGAR IMPRESORA */}
+            <motion.button 
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setPrinterConfig({...printerConfig, enabled: !printerConfig.enabled})} 
+              className={`w-full flex items-center justify-between px-6 py-5 rounded-3xl border transition-all duration-300 outline-none ${
+                printerConfig.enabled 
+                  ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-400 lya:bg-lya-primary/10 lya:border-lya-primary/30 lya:text-lya-primary shadow-sm' 
+                  : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 lya:bg-lya-bg lya:border-lya-border/40'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`p-2 rounded-full ${printerConfig.enabled ? 'bg-emerald-200/50 dark:bg-emerald-800/50 lya:bg-lya-primary/20' : 'bg-gray-200 dark:bg-gray-800'}`}>
+                  {printerConfig.enabled ? <Power size={20} /> : <PowerOff size={20} />}
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-base font-black">Activar Impresora</span>
+                  <span className="text-xs font-medium opacity-80">Habilita la impresión de tickets</span>
                 </div>
               </div>
-
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-2">
-                  {printerConfig.type === 'network' ? 'Dirección IP de la Impresora' : 'Puerto USB Detectado'}
-                </label>
-                <div className="flex gap-2">
-                  {printerConfig.type === 'usb' && detectedPorts.length > 0 ? (
-                    <select 
-                      value={printerConfig.interface} 
-                      onChange={e => { setPrinterConfig({...printerConfig, interface: e.target.value}); setPrinterStatus('unknown'); }} 
-                      className="flex-1 px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold"
-                    >
-                      {detectedPorts.map(port => <option key={port} value={port}>{port}</option>)}
-                    </select>
-                  ) : (
-                    <input 
-                      type="text" 
-                      value={printerConfig.interface} 
-                      onChange={e => { setPrinterConfig({...printerConfig, interface: e.target.value}); setPrinterStatus('unknown'); }} 
-                      placeholder={printerConfig.type === 'network' ? "Ej. 192.168.1.100" : "Ingresa puerto o escanea"} 
-                      className="flex-1 px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm font-mono" 
-                    />
-                  )}
-                  {printerConfig.type === 'usb' && (
-                    <button 
-                      onClick={scanPrinters} 
-                      disabled={isScanning} 
-                      title="Escanear Puertos"
-                      className="px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 lya:text-lya-primary rounded-2xl font-bold flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:hover:scale-100 border border-transparent lya:border-lya-primary/20"
-                    >
-                      {isScanning ? <Loader2 className="animate-spin text-gray-500 lya:text-lya-primary" size={24}/> : <RefreshCw size={24} className="text-gray-600 dark:text-gray-300 lya:text-lya-primary" />}
-                    </button>
-                  )}
-                </div>
+              <div className={`w-14 h-8 rounded-full flex items-center p-1 transition-colors duration-300 ${printerConfig.enabled ? 'bg-emerald-500 lya:bg-lya-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                <motion.div 
+                  layout
+                  className="w-6 h-6 rounded-full bg-white shadow-md"
+                  animate={{ x: printerConfig.enabled ? 24 : 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
               </div>
+            </motion.button>
 
-              <div className="pt-2">
-                <button 
-                  onClick={handleTestPrint} 
-                  disabled={isTestingPrint || !printerConfig.interface} 
-                  className="w-full py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:bg-gray-50"
+            {/* 🔥 CONTENEDOR ANIMADO: Solo se muestra si la impresora está activada */}
+            <AnimatePresence>
+              {printerConfig.enabled && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  className="space-y-6 overflow-hidden"
                 >
-                  {isTestingPrint ? (
-                    <><Loader2 className="animate-spin" size={18}/> Enviando impresión...</>
-                  ) : (
-                    <><Printer size={18}/> Realizar Prueba de Conexión</>
-                  )}
-                </button>
-              </div>
-            </div>
+                  <div>
+                    <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-2">Medio de Conexión</label>
+                    <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40">
+                      <motion.button 
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { setPrinterConfig({...printerConfig, type: 'usb'}); setPrinterStatus('unknown'); }} 
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-[1rem] transition-all outline-none ${
+                          printerConfig.type === 'usb' 
+                            ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
+                            : 'text-gray-500 dark:text-gray-400 md:hover:text-gray-700 dark:md:hover:text-gray-200'
+                        }`}
+                      >
+                        <Usb size={18}/> Cable USB
+                      </motion.button>
+                      <motion.button 
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { setPrinterConfig({...printerConfig, type: 'network'}); setPrinterStatus('unknown'); }} 
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-[1rem] transition-all outline-none ${
+                          printerConfig.type === 'network' 
+                            ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-primary shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' 
+                            : 'text-gray-500 dark:text-gray-400 md:hover:text-gray-700 dark:md:hover:text-gray-200'
+                        }`}
+                      >
+                        <Wifi size={18}/> Red / LAN
+                      </motion.button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-2">
+                      {printerConfig.type === 'network' ? 'Dirección IP de la Impresora' : 'Puerto USB Detectado'}
+                    </label>
+                    <div className="flex gap-2">
+                      {printerConfig.type === 'usb' && detectedPorts.length > 0 ? (
+                        <select 
+                          value={printerConfig.interface} 
+                          onChange={e => { setPrinterConfig({...printerConfig, interface: e.target.value}); setPrinterStatus('unknown'); }} 
+                          className="flex-1 px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm font-bold"
+                        >
+                          {detectedPorts.map(port => <option key={port} value={port}>{port}</option>)}
+                        </select>
+                      ) : (
+                        <input 
+                          type="text" 
+                          value={printerConfig.interface} 
+                          onChange={e => { setPrinterConfig({...printerConfig, interface: e.target.value}); setPrinterStatus('unknown'); }} 
+                          placeholder={printerConfig.type === 'network' ? "Ej. 192.168.1.100" : "Ingresa puerto o escanea"} 
+                          className="flex-1 px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm font-mono" 
+                        />
+                      )}
+                      {printerConfig.type === 'usb' && (
+                        <motion.button 
+                          whileTap={!isScanning ? { scale: 0.95 } : {}}
+                          onClick={scanPrinters} 
+                          disabled={isScanning} 
+                          title="Escanear Puertos"
+                          className="px-5 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-primary/10 lya:md:hover:bg-lya-primary/20 lya:text-lya-primary rounded-2xl font-bold flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-transparent lya:border-lya-primary/20 outline-none"
+                        >
+                          {isScanning ? <Loader2 className="animate-spin text-gray-500 lya:text-lya-primary" size={24}/> : <RefreshCw size={24} className="text-gray-600 dark:text-gray-300 lya:text-lya-primary" />}
+                        </motion.button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <motion.button 
+                      whileTap={!isTestingPrint && printerConfig.interface ? { scale: 0.95 } : {}}
+                      onClick={handleTestPrint} 
+                      disabled={isTestingPrint || !printerConfig.interface} 
+                      className="w-full py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-all flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 disabled:opacity-50 disabled:cursor-not-allowed outline-none"
+                    >
+                      {isTestingPrint ? (
+                        <><Loader2 className="animate-spin" size={18}/> Enviando impresión...</>
+                      ) : (
+                        <><Printer size={18}/> Realizar Prueba de Conexión</>
+                      )}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
 
+          {/* SECCIÓN LECTOR DE BARRAS */}
           <section className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50 dark:border-gray-700 lya:border-lya-border/20">
               <div className="flex items-center gap-3">
@@ -265,19 +307,25 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
             <div className="space-y-6">
               <div>
                 <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-2">Comportamiento en POS</label>
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setBarcodeConfig({...barcodeConfig, autoAdd: !barcodeConfig.autoAdd})} 
-                  className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl border transition-all active:scale-[0.98] ${
+                  className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl border transition-all outline-none ${
                     barcodeConfig.autoAdd 
                       ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 lya:bg-lya-primary/10 lya:border-lya-primary/30 lya:text-lya-primary' 
                       : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 lya:bg-lya-bg lya:border-lya-border/40'
                   }`}
                 >
                   <span className="text-sm font-bold">Añadir al carrito automáticamente</span>
-                  <div className={`w-12 h-7 rounded-full flex items-center p-1 transition-colors ${barcodeConfig.autoAdd ? 'bg-blue-500 lya:bg-lya-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${barcodeConfig.autoAdd ? 'translate-x-5' : 'translate-x-0'}`} />
+                  <div className={`w-12 h-7 rounded-full flex items-center p-1 transition-colors duration-300 ${barcodeConfig.autoAdd ? 'bg-blue-500 lya:bg-lya-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                    <motion.div 
+                      layout
+                      className="w-5 h-5 rounded-full bg-white shadow-sm"
+                      animate={{ x: barcodeConfig.autoAdd ? 20 : 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
                   </div>
-                </button>
+                </motion.button>
               </div>
 
               <div>
@@ -295,17 +343,18 @@ export const HardwareTab = ({ showNotification, globalScroll }) => {
         </div>
 
         <div className="flex justify-end mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 shrink-0">
-          <button 
+          <motion.button 
+            whileTap={!loading ? { scale: 0.95 } : {}}
             onClick={saveSettingsToDB} 
             disabled={loading} 
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-gray-900 hover:bg-black dark:bg-emerald-500 dark:hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl text-sm font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-gray-900 md:hover:bg-black dark:bg-emerald-500 dark:md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:opacity-90 text-white rounded-2xl text-sm font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none"
           >
             {loading ? (
               <><Loader2 className="animate-spin" size={20} /> Guardando...</>
             ) : (
               <><Save size={20} /> Guardar Configuración</>
             )}
-          </button>
+          </motion.button>
         </div>
       </div>
     </motion.div>

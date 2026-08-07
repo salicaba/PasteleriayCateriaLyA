@@ -1,23 +1,23 @@
 // backend/src/modules/settings/settings.controller.js
 import BusinessConfig from './BusinessConfig.model.js';
-import { getIO } from '../../config/socket.js'; // 🔥 IMPORTACIÓN CRÍTICA AÑADIDA
+import { getIO } from '../../config/socket.js';
 
 export const getConfig = async (req, res) => {
   try {
     const configs = await BusinessConfig.findAll();
     
-    // Objeto con valores predeterminados seguros (Añadimos la pastelería)
+    // 🔥 Objeto con valores predeterminados seguros blindado
     const result = { 
       bank_accounts: [], 
       whatsapp_number: '', 
-      printer_config: null, 
-      barcode_config: null,
+      // Agregamos 'enabled' al config base para la impresora
+      printer_config: { enabled: false, type: 'usb', interface: '' }, 
+      barcode_config: { autoAdd: true },
       disabled_qrs: [],
-      pasteleria_config: { categorias: [], tamanos: [], sabores: [] } // 🔥 Valor por defecto
+      pasteleria_config: { categorias: [], tamanos: [], sabores: [] } 
     };
     
     configs.forEach(config => {
-      // 🔥 Añadimos 'pasteleria_config' a la lista de parseo JSON
       if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs', 'pasteleria_config'].includes(config.key)) {
         try {
           result[config.key] = JSON.parse(config.value);
@@ -43,7 +43,6 @@ export const updateConfig = async (req, res) => {
     for (const [key, value] of Object.entries(updates)) {
       let valueToSave = value;
       
-      // 🔥 Añadimos 'pasteleria_config' a los objetos que deben hacerse string
       if (['bank_accounts', 'printer_config', 'barcode_config', 'disabled_qrs', 'pasteleria_config'].includes(key) || typeof value === 'object') {
         valueToSave = JSON.stringify(value);
       }
@@ -71,7 +70,6 @@ export const updateConfig = async (req, res) => {
 export const getQrStatus = async (req, res) => {
     try {
         const config = await BusinessConfig.findOne({ where: { key: 'qr_service_active' } });
-        // Si no existe, por defecto está activo (true)
         res.json({ active: config ? config.value === 'true' : true });
     } catch (error) {
         res.status(500).json({ message: "Error al obtener estado del QR" });
@@ -91,13 +89,11 @@ export const setQrStatus = async (req, res) => {
             await config.save();
         }
 
-        // 🚀 INYECCIÓN DE TIEMPO REAL CORREGIDA: Usamos el Singleton seguro
         const io = getIO();
         if (io) {
-            // Disparamos la actualización global instantánea
             io.emit('config:update', { qr_service_active: String(active) });
             io.emit('qr:status_changed', active);
-            io.emit('pos:update'); // 🔥 Refresca las interfaces instantáneamente
+            io.emit('pos:update'); 
         }
 
         res.json({ active: config.value === 'true' });
