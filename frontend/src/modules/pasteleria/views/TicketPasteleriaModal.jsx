@@ -1,7 +1,7 @@
 // frontend/src/modules/pasteleria/views/TicketPasteleriaModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Printer, Cake, Landmark, MessageCircle } from 'lucide-react';
+import { X, Printer, Cake, Landmark, MessageCircle, Loader2 } from 'lucide-react';
 import client from '../../../api/client'; 
 import toast from 'react-hot-toast';
 import { SuccessScreen } from '../../cafeteria/views/SuccessScreen'; 
@@ -11,6 +11,9 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   const [transferInfo, setTransferInfo] = useState(null); 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+
+  // 🔥 ESTADO DE LA IMPRESORA TÉRMICA
+  const [isPrinterEnabled, setIsPrinterEnabled] = useState(false);
 
   const getLoggedUserName = () => {
     try {
@@ -34,8 +37,16 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   useEffect(() => {
     if (isOpen) {
       client.get('/settings')
-        .then(res => { if (res.data) setTransferInfo(res.data); })
-        .catch(err => console.error("Error al cargar datos bancarios:", err));
+        .then(res => { 
+          if (res.data) {
+            setTransferInfo(res.data); 
+            // Validamos si la impresora está habilitada
+            if (res.data.printer_config) {
+              setIsPrinterEnabled(res.data.printer_config.enabled === true || res.data.printer_config.enabled === 'true');
+            }
+          }
+        })
+        .catch(err => console.error("Error al cargar datos bancarios y hardware:", err));
     }
   }, [isOpen]);
 
@@ -54,7 +65,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
   const finanzas = calcularFinanzas(pedido);
 
-  // 🔥 Formateo exacto de la fecha de Entrega
   const dEnt = new Date(pedido.fechaEntrega);
   const diaEnt = dEnt.toLocaleDateString('es-MX', { weekday: 'long' });
   const diaEntCap = diaEnt.charAt(0).toUpperCase() + diaEnt.slice(1);
@@ -62,7 +72,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
   const horaEntFormateada = dEnt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
   const fechaEntregaStr = `${diaEntCap}, ${fechaEntFormateada} ${horaEntFormateada}`;
 
-  // 🔥 Formateo exacto de la fecha de Expedición
   const dExp = new Date(pedido.createdAt || new Date());
   const diaExp = dExp.toLocaleDateString('es-MX', { weekday: 'long' });
   const diaExpCap = diaExp.charAt(0).toUpperCase() + diaExp.slice(1);
@@ -91,7 +100,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       transferInfo.bank_accounts.forEach(acc => {
         cuentasTexto += `\n🏦 *${acc.bank_name}*\nTitular: ${acc.account_holder}\nCuenta: ${acc.account_number}\n${acc.clabe ? `CLABE: ${acc.clabe}\n` : ''}`;
       });
-      // AQUI AGREGAMOS EL WHATSAPP GLOBAL
       if (transferInfo.whatsapp_number) {
         cuentasTexto += `\n📲 *Mandar comprobante al:* ${transferInfo.whatsapp_number}\n`;
       }
@@ -157,7 +165,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                 >
                   <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shrink-0">
                     <h3 className="font-bold text-gray-700 dark:text-gray-200">Comprobante Digital</h3>
-                    <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-gray-100 dark:bg-gray-700 rounded-full transition-colors"><X size={18} /></button>
+                    <button onClick={onClose} className="p-2 text-gray-400 md:hover:text-gray-600 dark:md:hover:text-white bg-gray-100 dark:bg-gray-700 rounded-full transition-colors outline-none"><X size={18} /></button>
                   </div>
 
                   <div className="overflow-y-auto p-6 custom-scrollbar flex-1">
@@ -166,7 +174,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       
                       <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                         <Cake size={32} className="mx-auto mb-2 text-gray-800" />
-                        {/* Agregamos block, h-8, flex, leading-none y overflow-hidden para encerrar la tipografía rebelde */}
                         <div className="h-8 flex items-center justify-center overflow-hidden mb-1">
                           <h2 className="text-xl font-black uppercase tracking-widest leading-none" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
                         </div>
@@ -214,7 +221,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                             ))}
                           </div>
                           
-                          {/* AQUI MOSTRAMOS EL WHATSAPP GLOBAL (Si existe) */}
                           {transferInfo?.whatsapp_number && (
                             <div className="mt-3 bg-gray-50 p-2 rounded-lg border border-gray-200 text-center">
                               <span className="text-[10px] font-bold text-gray-500 block mb-0.5">Mandar comprobante (WhatsApp) al:</span>
@@ -224,7 +230,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                         </div>
                       )}
 
-                      {/* PIE DE PÁGINA HOMOLOGADO */}
                       <div className="text-center mt-6 text-xs text-gray-800 font-bold">
                         <p>¡Gracias por celebrar con nosotros!</p>
                         {finanzas.deuda > 0 ? (
@@ -249,18 +254,21 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
                       <button 
                         onClick={handleWhatsAppClick}
                         disabled={phoneNumber.length < 10}
-                        className="absolute right-1.5 p-2 bg-[#25D366] text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-green-500/20"
+                        className="absolute right-1.5 p-2 bg-[#25D366] text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 md:hover:scale-105 active:scale-95 transition-all shadow-lg shadow-green-500/20 outline-none"
                       >
                         <MessageCircle size={18} strokeWidth={2.5} />
                       </button>
                     </div>
 
-                    <button 
-                      onClick={handlePrint}
-                      className="py-3.5 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:scale-105 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2"
-                    >
-                      <Printer size={20} />
-                    </button>
+                    {/* 🔥 BOTÓN IMPRIMIR CONDICIONAL (Neo-Bento Lock) */}
+                    {isPrinterEnabled && (
+                      <button 
+                        onClick={handlePrint}
+                        className="py-3.5 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white text-white dark:text-gray-900 md:hover:scale-105 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 outline-none"
+                      >
+                        <Printer size={20} />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}

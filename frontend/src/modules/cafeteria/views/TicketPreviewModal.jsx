@@ -5,6 +5,9 @@ import { Printer, X, MessageCircle, Coffee, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
+// 🔥 IMPORTACIÓN DEL CLIENTE AÑADIDA
+import client from '../../../api/client'; 
+
 // 🔥 CEREBRO EXTRACTOR: Separa quirúrgicamente el nombre del teléfono
 const parseAccountData = (str) => {
   if (!str) return { name: 'General', phone: '' };
@@ -47,13 +50,27 @@ export const TicketPreviewModal = ({
   
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  // 🔥 ESTADO DE LA IMPRESORA TÉRMICA
+  const [isPrinterEnabled, setIsPrinterEnabled] = useState(false);
   
   const validCart = useMemo(() => cart.filter(item => cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED'), [cart, cuentasPagadasReales]);
   const uniqueAccounts = useMemo(() => Array.from(new Set(validCart.map(item => item.cuenta || 'General'))), [validCart]);
   
-  // 🔥 LÓGICA DE MONTAJE: Auto-Completado Inteligente de WhatsApp
+  // 🔥 LÓGICA DE MONTAJE: Auto-Completado Inteligente y Validación de Impresora
   useEffect(() => {
     if (isOpen) {
+      // 1. Validar estado de la impresora desde el servidor
+      client.get('/settings')
+        .then(res => {
+          if (res.data && res.data.printer_config) {
+            // El valor puede venir como boolean o string, validamos ambos
+            setIsPrinterEnabled(res.data.printer_config.enabled === true || res.data.printer_config.enabled === 'true');
+          }
+        })
+        .catch(err => console.error("Error al validar impresora térmica:", err));
+
+      // 2. Lógica de WhatsApp y cuentas
       let initialMode = 'Todas';
       if (cuentaName && uniqueAccounts.includes(cuentaName)) {
         initialMode = cuentaName;
@@ -213,7 +230,6 @@ export const TicketPreviewModal = ({
               </button>
             </div>
 
-            {/* 🔥 CONTENEDOR DE PESTAÑAS (Con Nombres Limpios) */}
             {uniqueAccounts.length > 1 && (
               <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 lya:border-orange-100 bg-gray-50 dark:bg-gray-800/50 lya:bg-orange-50/30 shrink-0">
                 <p className="text-[10px] uppercase font-bold text-gray-500 lya:text-orange-600/70 mb-2 tracking-wider">
@@ -243,7 +259,6 @@ export const TicketPreviewModal = ({
                       )}
                     >
                       <span className="w-2 h-2 rounded-full bg-current opacity-70"></span>
-                      {/* 🔥 VISTA LIMPIA: Solo el nombre, sin el teléfono */}
                       {parseAccountData(acc).name}
                     </button>
                   ))}
@@ -258,14 +273,12 @@ export const TicketPreviewModal = ({
 
                 <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                   <Coffee size={32} className="mx-auto mb-2 text-gray-800" />
-                  {/* Agregamos block, h-8, flex, leading-none y overflow-hidden para encerrar la tipografía rebelde */}
-<div className="h-8 flex items-center justify-center overflow-hidden mb-1">
-  <h2 className="text-xl font-black uppercase tracking-widest leading-none" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
-</div>
+                  <div className="h-8 flex items-center justify-center overflow-hidden mb-1">
+                    <h2 className="text-xl font-black uppercase tracking-widest leading-none" style={{ fontFamily: 'serif' }}>𝓛𝔂𝓪</h2>
+                  </div>
                   <p className="text-xs font-bold text-gray-600 uppercase mt-1">Cafetería</p>
                   <p className="text-xs text-gray-500 mt-1">Comprobante de Venta</p>
                   
-                  {/* 🔥 AQUI ESTAN LOS FOLIOS APILADOS */}
                   <div className="mt-2 flex flex-col gap-1 items-center">
                     {foliosToRender.map(folio => (
                       <span key={folio} className="text-lg font-black text-black tracking-wider bg-gray-100 rounded-lg inline-block px-4 py-1">
@@ -288,14 +301,12 @@ export const TicketPreviewModal = ({
                   {!isVitrina && isLlevar && nombreCliente !== 'MOSTRADOR' && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Cliente:</span> 
-                      {/* 🔥 VISTA LIMPIA EN TICKET */}
                       <span className="font-bold text-right text-black uppercase">{parseAccountData(nombreCliente).name}</span>
                     </div>
                   )}
                   {viewMode !== 'Todas' && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Cuenta:</span> 
-                      {/* 🔥 VISTA LIMPIA EN TICKET */}
                       <span className="font-bold text-right text-black uppercase bg-gray-100 px-2 py-0.5 rounded-md">{parseAccountData(viewMode).name}</span>
                     </div>
                   )}
@@ -344,7 +355,6 @@ export const TicketPreviewModal = ({
                             {uniqueAccounts.length > 1 && viewMode === 'Todas' && (
                               <tr>
                                 <td colSpan="3" className="text-[10px] font-bold text-gray-500 uppercase pt-2 pb-1 bg-gray-50 px-2 rounded">
-                                  {/* 🔥 VISTA LIMPIA EN SEPARADOR DE CUENTAS */}
                                   ● Cuenta: {parseAccountData(accName).name}
                                 </td>
                               </tr>
@@ -354,7 +364,6 @@ export const TicketPreviewModal = ({
                               <React.Fragment key={`${accName}-${idx}`}>
                                 <tr>
                                   <td className="align-top pt-2 pr-2">
-                                    {/* flex-shrink-0 y medidas w-7 h-7 estrictas evitan que el canvas lo aplaste */}
                                     <div className="bg-gray-100 rounded-md w-7 h-7 flex-shrink-0 flex items-center justify-center font-bold text-black text-xs">
                                       {item.qty}x
                                     </div>
@@ -399,7 +408,6 @@ export const TicketPreviewModal = ({
                         const subTotalAcc = itemsToPrint.filter(item => (item.cuenta || 'General') === accName).reduce((sum, item) => sum + (item.precio * item.qty), 0);
                         return (
                           <div key={accName} className="flex justify-between">
-                            {/* 🔥 VISTA LIMPIA EN RESUMEN FINAL */}
                             <span className="uppercase">{parseAccountData(accName).name}:</span>
                             <span className="font-bold text-black">${subTotalAcc.toFixed(2)}</span>
                           </div>
@@ -435,21 +443,24 @@ export const TicketPreviewModal = ({
                   <button 
                     onClick={handleWhatsAppClick}
                     disabled={phoneNumber.length < 10 || isSending}
-                    className="absolute right-2 p-2.5 bg-green-500 text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 md:hover:bg-green-600 active:scale-95 transition-all shadow-md shadow-green-500/20 flex items-center justify-center min-w-[42px] outline-none"
+                    className="absolute right-2 p-2.5 bg-green-500 text-white rounded-xl disabled:opacity-50 disabled:bg-gray-300 hover:scale-105 active:scale-95 transition-all shadow-md shadow-green-500/20 flex items-center justify-center min-w-[42px] outline-none"
                     title="Enviar por WhatsApp"
                   >
                     {isSending ? <Loader2 size={18} strokeWidth={3} className="animate-spin" /> : <MessageCircle size={20} strokeWidth={2.5} />}
                   </button>
                 </div>
 
-                <button 
-                  onClick={handlePhysicalPrint}
-                  disabled={isPrinting}
-                  className="py-4 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white lya:bg-orange-600 text-white dark:text-gray-900 lya:text-white md:hover:bg-black dark:md:hover:bg-gray-100 lya:md:hover:bg-orange-700 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 shrink-0 disabled:opacity-70 disabled:active:scale-100 min-w-[64px] outline-none"
-                  title="Imprimir Ticket Físico"
-                >
-                  {isPrinting ? <Loader2 size={22} className="animate-spin" /> : <Printer size={22} />}
-                </button>
+                {/* 🔥 BOTÓN IMPRIMIR CONDICIONAL (Neo-Bento Lock) */}
+                {isPrinterEnabled && (
+                  <button 
+                    onClick={handlePhysicalPrint}
+                    disabled={isPrinting}
+                    className="py-4 px-6 rounded-2xl font-black text-sm uppercase bg-gray-900 dark:bg-white lya:bg-orange-600 text-white dark:text-gray-900 lya:text-white md:hover:bg-black dark:md:hover:bg-gray-100 lya:md:hover:bg-orange-700 shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2 shrink-0 disabled:opacity-70 disabled:active:scale-100 min-w-[64px] outline-none"
+                    title="Imprimir Ticket Físico"
+                  >
+                    {isPrinting ? <Loader2 size={22} className="animate-spin" /> : <Printer size={22} />}
+                  </button>
+                )}
               </div>
             </div>
 
