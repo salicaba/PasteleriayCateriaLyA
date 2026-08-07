@@ -7,6 +7,9 @@ import { useTheme } from './hooks/useTheme';
 import { usePWA } from './hooks/usePWA';
 import { useNavigate } from 'react-router-dom';
 
+// 🔥 IMPORTACIÓN DEL SOCKET PARA EL KILL-SWITCH
+import socket from './api/socket'; 
+
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
 import { KitchenPage } from './modules/kitchen/views/KitchenPage';
@@ -194,7 +197,7 @@ function App() {
     
     setUser(userData);
     
-    setActiveTab('caja'); // Aterrizaje forzoso en la Caja para todos
+    setActiveTab('caja'); 
     localStorage.setItem('lya_active_tab', 'caja');
   };
 
@@ -209,6 +212,32 @@ function App() {
     setExpandedGroups([]); 
     setShowLogoutModal(false); 
   };
+
+  // 🔥 ESCUDO ANTI-TOPOS (KILL-SWITCH): Escucha en tiempo real si el admin revoca el acceso
+  useEffect(() => {
+    if (!user) return; 
+
+    const handleKickout = (data) => {
+      if (data.userId === user.id) {
+        handleLogout();
+        toast.error("Tu acceso ha sido revocado por el Administrador.", {
+          icon: '🚨',
+          duration: 6000,
+          style: {
+            background: '#fee2e2',
+            color: '#991b1b',
+            border: '1px solid #f87171'
+          }
+        });
+      }
+    };
+
+    socket.on('auth:kickout', handleKickout);
+
+    return () => {
+      socket.off('auth:kickout', handleKickout);
+    };
+  }, [user]);
 
   const formattedTime = currentTime.toLocaleTimeString('es-MX', { 
     hour: '2-digit', 

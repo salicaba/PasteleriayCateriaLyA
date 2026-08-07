@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import User from './User.model.js';
+// 🔥 IMPORTACIÓN DEL SOCKET AÑADIDA
+import { getIO } from '../../config/socket.js';
 
 // ============================================================================
 // HELPER: ENVÍO DE CORREOS VÍA API HTTP (Puerto 443 - Bypassea bloqueos de Render)
@@ -19,7 +21,7 @@ const sendEmailViaHTTP = async (targetEmail, subject, htmlContent) => {
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        sender: { name: "Punto de Venta 𝓛𝔂𝓪", email: "poscafpastlya@gmail.com" }, // Debe coincidir con el verificado en Brevo
+        sender: { name: "Punto de Venta 𝓛𝔂𝓪", email: "poscafpastlya@gmail.com" }, 
         to: [{ email: targetEmail }],
         subject: subject,
         htmlContent: htmlContent
@@ -85,7 +87,6 @@ export const createUser = async (req, res) => {
       role: role || 'Empleado'
     });
 
-    // 🔥 FIRE AND FORGET: Disparamos el correo sin "await" para no congelar el Frontend
     if (email) {
       const htmlTemplate = `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
@@ -166,9 +167,16 @@ export const updateUser = async (req, res) => {
 
     await user.save();
 
+    // 🔥 KILL-SWITCH EN TIEMPO REAL: Si el usuario quedó inactivo, lo sacamos del sistema
+    if (!user.isActive) {
+      const io = getIO();
+      if (io) {
+        io.emit('auth:kickout', { userId: user.id });
+      }
+    }
+
     const targetEmail = parsedEmail || user.email; 
     
-    // 🔥 FIRE AND FORGET: Disparamos la actualización sin "await"
     if (changesMade && targetEmail) {
       const htmlTemplate = `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
@@ -211,6 +219,12 @@ export const deleteUser = async (req, res) => {
 
     user.isActive = false;
     await user.save();
+
+    // 🔥 KILL-SWITCH EN TIEMPO REAL: Expulsión inmediata al eliminar (suspender)
+    const io = getIO();
+    if (io) {
+      io.emit('auth:kickout', { userId: user.id });
+    }
 
     res.json({ message: 'Usuario desactivado correctamente', user: { id: user.id, isActive: user.isActive } });
   } catch (error) {
