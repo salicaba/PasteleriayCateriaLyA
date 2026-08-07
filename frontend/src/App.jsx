@@ -101,7 +101,7 @@ function App() {
     if (savedSession) {
       try {
         const { userData } = JSON.parse(savedSession);
-        return userData?.role === 'Empleado' ? 'mesas' : 'caja';
+        return 'caja';
       } catch (e) {}
     }
     return 'caja'; 
@@ -194,9 +194,8 @@ function App() {
     
     setUser(userData);
     
-    const initialTab = userData.role === 'Empleado' ? 'mesas' : 'caja';
-    setActiveTab(initialTab);
-    localStorage.setItem('lya_active_tab', initialTab);
+    setActiveTab('caja'); // Aterrizaje forzoso en la Caja para todos
+    localStorage.setItem('lya_active_tab', 'caja');
   };
 
   const handleLogout = () => {

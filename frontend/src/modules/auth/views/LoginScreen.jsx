@@ -414,7 +414,7 @@ export const LoginScreen = ({ onLogin }) => {
                   >
                     <div className="space-y-4">
                       <motion.div variants={itemVariants} className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none transition-colors">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none transition-colors z-20">
                           <User size={18} className="text-gray-400 dark:text-gray-500 lya:text-lya-text/40 group-focus-within:text-blue-500 lya:group-focus-within:text-lya-primary transition-colors" />
                         </div>
                         <input 
