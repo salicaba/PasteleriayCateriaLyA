@@ -6,8 +6,8 @@ import {
   setQrStatus 
 } from './settings.controller.js'; 
 
-// 🔥 Inyectamos el middleware de control de roles (RBAC)
 import { authorizeRoles } from '../../middlewares/rbac.middleware.js';
+import { verifyToken } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -15,21 +15,21 @@ const router = Router();
 // CONFIGURACIÓN GENERAL DEL NEGOCIO
 // ==========================================
 
-// Obtener la configuración actual (Lectura autorizada para ambos roles)
-router.get('/', authorizeRoles('Administrador', 'Empleado'), getConfig);
+// 🟢 GET: PÚBLICO (Vital para que el frontend detecte conexión en el Login sin tener token)
+router.get('/', getConfig);
 
-// Actualizar o guardar la configuración (Escritura autorizada para que el empleado pueda prender/apagar su impresora local)
-router.put('/', authorizeRoles('Administrador', 'Empleado'), updateConfig);
+// 🔴 PUT: PROTEGIDO (Solo Admin y Empleado pueden guardar cambios)
+router.put('/', verifyToken, authorizeRoles('Administrador', 'Empleado'), updateConfig);
 
 
 // ==========================================
 // KILL-SWITCH: ESTADO DEL SERVICIO QR
 // ==========================================
 
-// Obtener el estado actual del servicio QR
-router.get('/qr-status', authorizeRoles('Administrador', 'Empleado'), getQrStatus);
+// 🟢 GET: PÚBLICO (El Kiosko cliente necesita leer esto para saber si mostrar el QR)
+router.get('/qr-status', getQrStatus);
 
-// Apagar o encender el servicio QR
-router.post('/qr-status', authorizeRoles('Administrador', 'Empleado'), setQrStatus);
+// 🔴 POST: PROTEGIDO
+router.post('/qr-status', verifyToken, authorizeRoles('Administrador', 'Empleado'), setQrStatus);
 
 export default router;
