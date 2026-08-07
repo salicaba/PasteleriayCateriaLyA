@@ -167,11 +167,13 @@ export const updateUser = async (req, res) => {
 
     await user.save();
 
-    // 🔥 KILL-SWITCH EN TIEMPO REAL: Si el usuario quedó inactivo, lo sacamos del sistema
+    // 🔥 KILL-SWITCH EN TIEMPO REAL: Apuntamos SOLO a la sala del usuario
     if (!user.isActive) {
-      const io = getIO();
-      if (io) {
-        io.emit('auth:kickout', { userId: user.id });
+      try {
+        const io = getIO();
+        io.to(`user_${user.id}`).emit('auth:kickout', { userId: user.id });
+      } catch (err) {
+        console.warn("⚠️ Socket.io no está listo para emitir el evento de kickout.");
       }
     }
 
@@ -220,10 +222,12 @@ export const deleteUser = async (req, res) => {
     user.isActive = false;
     await user.save();
 
-    // 🔥 KILL-SWITCH EN TIEMPO REAL: Expulsión inmediata al eliminar (suspender)
-    const io = getIO();
-    if (io) {
-      io.emit('auth:kickout', { userId: user.id });
+    // 🔥 KILL-SWITCH EN TIEMPO REAL: Apuntamos SOLO a la sala del usuario
+    try {
+      const io = getIO();
+      io.to(`user_${user.id}`).emit('auth:kickout', { userId: user.id });
+    } catch (err) {
+      console.warn("⚠️ Socket.io no está listo para emitir el evento de kickout.");
     }
 
     res.json({ message: 'Usuario desactivado correctamente', user: { id: user.id, isActive: user.isActive } });

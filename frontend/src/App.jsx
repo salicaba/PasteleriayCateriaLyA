@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-// 🔥 Agregamos Shield para el ícono de los accesos
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield } from 'lucide-react';
+// 🔥 Agregamos Shield, AlertTriangle y AlertCircle para notificaciones Premium Neo-Bento
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield, AlertTriangle, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -155,37 +155,6 @@ function App() {
     if (uiSize === 'small') root.style.fontSize = '12px';  
   }, [uiSize]);
 
-  useEffect(() => {
-    if (!user) return;
-    const interval = setInterval(() => {
-      const savedSession = localStorage.getItem('lya_pos_session');
-      if (savedSession) {
-        const { expiresAt } = JSON.parse(savedSession);
-        if (new Date().getTime() >= expiresAt) {
-          handleLogout();
-          toast("El turno ha finalizado (12:00 AM). Inicia sesión para el nuevo día.", {
-            icon: '🌙',
-            duration: 6000
-          });
-        }
-      } else {
-        handleLogout(); 
-      }
-    }, 10000); 
-    return () => clearInterval(interval);
-  }, [user]);
-
-  useEffect(() => {
-    const handleAuthError = () => {
-      if (user) {
-        handleLogout();
-        toast.error("Tu sesión ha expirado por seguridad. Vuelve a ingresar.");
-      }
-    };
-    window.addEventListener('auth_error', handleAuthError);
-    return () => window.removeEventListener('auth_error', handleAuthError);
-  }, [user]);
-
   const handleLogin = (userData) => {
     const now = new Date();
     const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
@@ -201,7 +170,11 @@ function App() {
     localStorage.setItem('lya_active_tab', 'caja');
   };
 
-  const handleLogout = () => {
+  // 🔥 CLEAN DISCONNECT: Centralizamos la lógica de expulsión y evitamos doble notificación
+  const performCleanLogout = (message, isKickout = false) => {
+    const hasToken = localStorage.getItem('lya_token');
+    if (!hasToken) return; // Si ya no hay token, alguien más ya disparó el evento (Evita doble toast)
+
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
     localStorage.removeItem('lya_user'); 
@@ -211,24 +184,73 @@ function App() {
     setActiveTab('caja'); 
     setExpandedGroups([]); 
     setShowLogoutModal(false); 
+
+    // Notificación Pilar 5 Estricto
+    if (isKickout) {
+      toast(message || "Tu acceso ha sido revocado por el Administrador.", {
+        icon: <div className="bg-red-100 dark:bg-red-900/30 p-1 rounded-full"><AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" /></div>,
+        style: { background: '#fee2e2', color: '#991b1b', border: '1px solid #f87171' }
+      });
+    } else {
+      toast(message || "Tu sesión ha expirado por seguridad. Vuelve a ingresar.", {
+        icon: <div className="bg-amber-100 dark:bg-amber-900/30 p-1 rounded-full"><AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>,
+      });
+    }
   };
+
+  const handleLogout = () => {
+    performCleanLogout("Cierre de sesión manual", false);
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      const savedSession = localStorage.getItem('lya_pos_session');
+      if (savedSession) {
+        const { expiresAt } = JSON.parse(savedSession);
+        if (new Date().getTime() >= expiresAt) {
+          performCleanLogout("El turno ha finalizado (12:00 AM). Inicia sesión para el nuevo día.", false);
+        }
+      } else {
+        performCleanLogout("Sesión no encontrada", false);
+      }
+    }, 10000); 
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // 🔥 INTERCEPTOR EVENT: Maneja 401s y Kickouts (403 + flag) de Axios
+  useEffect(() => {
+    const handleAuthError = (e) => {
+      const detail = e.detail || {};
+      performCleanLogout(detail.message, detail.isKickout);
+    };
+    
+    // RBAC: Solo mostramos advertencia si intenta entrar a algo prohibido pero no lo botamos
+    const handleRbacError = (e) => {
+      toast(e.detail?.message || "Acción denegada por seguridad", {
+        icon: <div className="bg-amber-100 dark:bg-amber-900/30 p-1 rounded-full"><Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>,
+      });
+    };
+
+    window.addEventListener('auth_error', handleAuthError);
+    window.addEventListener('rbac_error', handleRbacError);
+    
+    return () => {
+      window.removeEventListener('auth_error', handleAuthError);
+      window.removeEventListener('rbac_error', handleRbacError);
+    };
+  }, []);
 
   // 🔥 ESCUDO ANTI-TOPOS (KILL-SWITCH): Escucha en tiempo real si el admin revoca el acceso
   useEffect(() => {
     if (!user) return; 
 
+    // Unimos al usuario a su sala privada
+    socket.emit('join_user_room', user.id);
+
     const handleKickout = (data) => {
       if (data.userId === user.id) {
-        handleLogout();
-        toast.error("Tu acceso ha sido revocado por el Administrador.", {
-          icon: '🚨',
-          duration: 6000,
-          style: {
-            background: '#fee2e2',
-            color: '#991b1b',
-            border: '1px solid #f87171'
-          }
-        });
+        performCleanLogout("Tu acceso ha sido revocado por el Administrador.", true);
       }
     };
 
@@ -430,6 +452,9 @@ function App() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             padding: '12px 24px',
             textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           },
           success: {
             style: {
