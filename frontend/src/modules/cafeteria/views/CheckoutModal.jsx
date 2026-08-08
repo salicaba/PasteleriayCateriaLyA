@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/CheckoutModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle, Lock, Clock } from 'lucide-react';
 import client from '../../../api/client'; 
@@ -30,7 +30,7 @@ export const CheckoutModal = ({
   cuentasResumen = [], 
   onConfirmPayment,
   orderType = 'salon',
-  validateAllDelivered // 🔥 INYECCIÓN: Recibimos el cerebro validador del padre
+  validateAllDelivered 
 }) => {
   const [method, setMethod] = useState('efectivo');
   const [amountReceived, setAmountReceived] = useState('');
@@ -41,6 +41,9 @@ export const CheckoutModal = ({
   const [splitCount, setSplitCount] = useState(1);
   const [selectedCuentas, setSelectedCuentas] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // 🔥 PILAR 3: Candado asíncrono estricto
+  const lockRef = useRef(false);
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
 
@@ -49,7 +52,6 @@ export const CheckoutModal = ({
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
   };
 
-  // 🔥 EVALUACIÓN GENERAL DE LA MESA
   const isTableFullyDelivered = validateAllDelivered ? validateAllDelivered() : true;
 
   useEffect(() => {
@@ -60,9 +62,9 @@ export const CheckoutModal = ({
       setSplitCount(1);
       setTransferInfo(null);
       setIsProcessing(false); 
+      lockRef.current = false; // Reiniciamos el candado al abrir
       setToast({ show: false, message: '', type: 'error' }); 
 
-      // 🔥 LÓGICA DE CADENERO: Redirige forzosamente a "Por Cuentas" si hay pendientes
       if (orderType === 'salon' && !isTableFullyDelivered) {
         setCobroMode('nominal');
         const isInitialDelivered = initialTarget?.cuentaName && validateAllDelivered ? validateAllDelivered(initialTarget.cuentaName) : true;
@@ -106,15 +108,14 @@ export const CheckoutModal = ({
   }, [amountReceived, amountToPay, method]);
 
   const toggleCuentaSelection = (nombreCuenta) => {
-    if (isProcessing) return;
+    if (isProcessing || lockRef.current) return;
     setSelectedCuentas(prev => 
       prev.includes(nombreCuenta) ? prev.filter(c => c !== nombreCuenta) : [...prev, nombreCuenta]
     );
   };
 
   const selectAllCuentas = () => {
-    if (isProcessing) return;
-    // 🔥 SOLO SELECCIONA LAS QUE YA ESTÁN ENTREGADAS Y CON SALDO > 0
+    if (isProcessing || lockRef.current) return;
     const todasListas = cuentasResumen
       .filter(c => c.subtotal > 0 && (validateAllDelivered ? validateAllDelivered(c.nombre) : true))
       .map(c => c.nombre);
@@ -126,6 +127,9 @@ export const CheckoutModal = ({
     if (method === 'efectivo' && (parseFloat(amountReceived) || 0) < amountToPay) return showToast("El monto recibido es insuficiente.", "error");
     if (cobroMode === 'nominal' && selectedCuentas.length === 0) return showToast("Debes seleccionar al menos una cuenta.", "error");
     
+    // 🔥 BLOQUEO DE DOBLE CLIC INMEDIATO
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true); 
     setToast({ show: false, message: '', type: 'error' }); 
     
@@ -162,8 +166,11 @@ export const CheckoutModal = ({
             cuentaName: null, isLastInBatch: true
           });
       }
+      // Nota: No liberamos el candado aquí porque si el cobro es exitoso, el modal se desmontará.
     } catch(e) {
       showToast(e?.response?.data?.message || e.message || "Ocurrió un error al procesar el pago.", "error");
+      // 🔥 Solo liberamos el candado si la petición falla
+      lockRef.current = false;
       setIsProcessing(false); 
     }
   };
@@ -205,7 +212,7 @@ export const CheckoutModal = ({
         )}
       </AnimatePresence>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-gray-900/40 dark:bg-black/70 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isProcessing && onClose()} className="absolute inset-0 bg-gray-900/40 dark:bg-black/70 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
 
       <motion.div 
         variants={modalVariants} 
@@ -219,7 +226,7 @@ export const CheckoutModal = ({
             <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Selecciona qué vas a cobrar</p>
           </div>
           <motion.button 
-            whileTap={{ scale: 0.9 }}
+            whileTap={!isProcessing ? { scale: 0.9 } : {}}
             onClick={onClose} 
             disabled={isProcessing}
             className="p-2 sm:p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface md:hover:bg-gray-100 dark:md:hover:bg-gray-600 lya:md:hover:bg-lya-border/50 border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-full transition-colors disabled:opacity-50 shadow-sm outline-none"
@@ -230,7 +237,6 @@ export const CheckoutModal = ({
 
         <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-5">
           
-          {/* 🔥 PESTAÑAS DE COBRO BLINDADAS */}
           <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-gray-800/80 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-inner">
             <motion.button 
               whileTap={(!isProcessing && (isTableFullyDelivered || orderType !== 'salon')) ? { scale: 0.95 } : {}}
@@ -289,7 +295,6 @@ export const CheckoutModal = ({
                 </motion.div>
               )}
               
-              {/* 🔥 LISTA DE CUENTAS BLINDADA */}
               {cobroMode === 'nominal' && orderType === 'salon' && (
                 <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-col gap-2">
                   <div className="flex justify-between items-center px-1">
@@ -322,7 +327,6 @@ export const CheckoutModal = ({
                               {parseAccountName(cuenta.nombre)} 
                               <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'opacity-100' : 'opacity-60'}`}>${cuenta.subtotal.toFixed(2)}</span>
                               
-                              {/* AVISO DE PRODUCTOS PENDIENTES */}
                               {!isCuentaDelivered && (
                                 <span className="flex items-center gap-1 text-[9px] text-amber-500 mt-1 uppercase tracking-wider">
                                   <Clock size={10} /> En cocina

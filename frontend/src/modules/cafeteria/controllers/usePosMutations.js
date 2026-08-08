@@ -1,8 +1,7 @@
 // src/modules/cafeteria/controllers/usePosMutations.js
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import client from '../../../api/client.js';
 
-// 🔥 CEREBRO EXTRACTOR VISUAL
 const parseAccountName = (str) => {
   if (!str) return 'General';
   const s = String(str);
@@ -27,6 +26,9 @@ export const usePosMutations = ({
 }) => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
+  
+  // 🔥 PILAR 3: Candado asíncrono infalible a nivel de hook
+  const lockRef = useRef(false);
 
   const mapDBItemToLocal = (dbItem, itemsNuevos = []) => {
       let parsedPreps = [];
@@ -63,6 +65,9 @@ export const usePosMutations = ({
       return; 
     }
     
+    // 🔥 BLOQUEO DE DOBLE CLIC
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
     setIsSuccess(true);
     
@@ -118,17 +123,19 @@ export const usePosMutations = ({
         console.error("Error al enviar a cocina:", error);
         throw error;
     } finally {
+        lockRef.current = false;
         setIsProcessing(false);
     }
   };
 
   const moveItemToCuenta = async (item, target, qtyToMove = item.qty) => { 
     if (cuentasPagadasReales.includes(target)) {
-        // 🔥 APLICANDO FILTRO AQUÍ
         triggerNotification(`La cuenta "${parseAccountName(target)}" ya está cobrada. No puedes moverle más productos.`, 'error');
         return;
     }
 
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
     const itemsToProcess = item._groupedItems || [item];
     
@@ -207,6 +214,7 @@ export const usePosMutations = ({
       triggerNotification("Error al mover los ítems de cuenta.", "error");
       throw error;
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -220,7 +228,10 @@ export const usePosMutations = ({
     if (currentStatus !== 'READY' && currentStatus !== 'DELIVERED') return;
     const newStatus = currentStatus === 'DELIVERED' ? 'READY' : 'DELIVERED';
     
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
         await Promise.all(itemsToUpdate.map(async (subItem) => { 
           if (subItem.backendItemId) { 
@@ -240,12 +251,15 @@ export const usePosMutations = ({
       triggerNotification("No se pudo actualizar el estado de entrega.", "error");
       throw e;
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
 
   const deliverAllActiveItems = async () => {
     if (!activeOrderId) return;
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
     
     try {
@@ -257,6 +271,7 @@ export const usePosMutations = ({
 
         if (itemsListos.length === 0) {
             triggerNotification("No hay productos listos para entregar en cocina.", "warning");
+            lockRef.current = false;
             setIsProcessing(false);
             return;
         }
@@ -277,6 +292,7 @@ export const usePosMutations = ({
       console.error("Error en deliverAllActiveItems:", error);
       throw error; 
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -288,7 +304,10 @@ export const usePosMutations = ({
     }
     if (!activeOrderId || !item.backendItemId) return;
     
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
         const response = await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty });
         if (response.data.orderItems) {
@@ -307,6 +326,7 @@ export const usePosMutations = ({
       triggerNotification("Error al cancelar el ítem.", "error");
       throw error; 
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -315,26 +335,33 @@ export const usePosMutations = ({
     const itemsToCancel = cart.filter(item => item.cuenta === cuentaName && item.enviadoCocina && item.status !== 'CANCELLED');
     if (itemsToCancel.length === 0) return;
     
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
         for (const item of itemsToCancel) {
             await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty: item.qty });
         }
         setCart(prev => prev.map(item => itemsToCancel.some(i => String(i.backendItemId) === String(item.backendItemId)) ? { ...item, status: 'CANCELLED' } : item));
         
-        // 🔥 APLICANDO FILTRO AQUÍ
         triggerNotification(`Ítems de la cuenta ${parseAccountName(cuentaName)} cancelados.`, 'success');
     } catch (error) { 
       triggerNotification("Error al cancelar los ítems de la cuenta.", "error");
       throw error; 
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
 
   const cancelFullOrder = async (cancelReason = 'Cancelación de cuenta completa') => {
     if (!activeOrderId) return;
+
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
         const response = await client.put(`/pos/orders/${activeOrderId}/cancel`, { cancelReason });
         setOrderStatus('CANCELLED');
@@ -349,6 +376,7 @@ export const usePosMutations = ({
       triggerNotification("Error crítico al anular la orden.", "error");
       throw error; 
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -361,7 +389,10 @@ export const usePosMutations = ({
   };
 
   const payCuenta = async (nombreCuenta, paymentDetails, onComplete) => {
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
       const method = paymentDetails?.method || 'efectivo'; 
       if(activeOrderId) {
@@ -376,12 +407,16 @@ export const usePosMutations = ({
     } catch (error) { 
       throw error; 
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
 
   const handleCheckout = async (paymentDetails, onComplete) => {
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
       if (cart.some(p => !p.enviadoCocina)) {
         await new Promise((resolve, reject) => simulateKitchenSend(resolve).catch(reject));
@@ -402,12 +437,16 @@ export const usePosMutations = ({
     } catch (error) { 
       throw error; 
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };
 
   const handleCloseTable = async (onComplete) => {
+      if (lockRef.current) return;
+      lockRef.current = true;
       setIsProcessing(true);
+
       try {
         if(activeOrderId) { 
           await client.put(`/pos/orders/${activeOrderId}/close`); 
@@ -417,19 +456,25 @@ export const usePosMutations = ({
         setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
         if(onComplete) onComplete();
       } catch (error) { throw error; } 
-      finally { setIsProcessing(false); }
+      finally { 
+        lockRef.current = false;
+        setIsProcessing(false); 
+      }
   };
 
   const releaseAccount = async (cuentaName) => {
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsProcessing(true);
+
     try {
       if (activeOrderId) {
-        // 🔥 Le avisamos al backend que cierre ESTA cuenta en específico
         await client.put(`/pos/orders/${activeOrderId}/close-account`, { cuentaName });
       }
     } catch (error) {
       throw error;
     } finally {
+      lockRef.current = false;
       setIsProcessing(false);
     }
   };

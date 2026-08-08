@@ -1,5 +1,5 @@
 // src/modules/pasteleria/views/DetallePedidoModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, User, Phone, MapPin, Edit3, Layers, DollarSign, CameraOff, ShoppingBasket, Camera, Smartphone, Landmark, MessageCircle, Image as ImageIcon, Loader2 } from 'lucide-react'; 
 import client from '../../../api/client'; 
@@ -8,6 +8,9 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
   const [transferInfo, setTransferInfo] = useState(null);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0); 
   const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+  
+  // 🔥 PILAR 3: Candado asíncrono
+  const lockRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -16,25 +19,25 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
         .catch(err => console.error("Error al cargar datos bancarios:", err));
       setActivePhotoIdx(0); 
       setIsLoadingEdit(false); 
+      lockRef.current = false; // Liberar candado al abrir
     }
   }, [isOpen, pedido?.id]);
 
-  // 🔥 LÓGICA CORREGIDA: Espera real y desbloqueo del hilo principal
   const handleEditClick = async () => {
+    // 🔥 BLOQUEO DE DOBLE CLIC
+    if (lockRef.current) return;
+    lockRef.current = true;
     setIsLoadingEdit(true);
     
-    // 1. Forzamos a React a pausar 150ms para que SÍ alcance a dibujar el "Cargando..." en pantalla
     await new Promise(resolve => setTimeout(resolve, 150));
 
     try {
-      // 2. Esperamos a que el componente padre haga TODO su trabajo pesado (procesar imágenes, abrir modal)
       await Promise.resolve(onEdit(pedido));
-      
-      // 3. SOLO cuando termina de cargar la otra pantalla, cerramos esta
       onClose();
     } catch (error) {
       console.error("Error al preparar la edición:", error);
-      // Si algo falla, quitamos el cargando para que no se quede trabado
+    } finally {
+      lockRef.current = false;
       setIsLoadingEdit(false); 
     }
   };
@@ -52,7 +55,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isLoadingEdit && onClose()} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
           
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10"
@@ -74,13 +77,13 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   <button 
                     onClick={handleEditClick} 
                     disabled={isLoadingEdit}
-                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
                   >
                     {isLoadingEdit ? <Loader2 size={18} className="animate-spin" /> : <Edit3 size={18} />}
                     {isLoadingEdit ? 'Preparando...' : 'Editar'}
                   </button>
                 )}
-                <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors"><X size={24} /></button>
+                <button disabled={isLoadingEdit} onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors outline-none disabled:opacity-50"><X size={24} /></button>
               </div>
             </div>
 
@@ -119,7 +122,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                           <button
                             key={idx}
                             onClick={() => setActivePhotoIdx(idx)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all outline-none ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                           >
                             Foto {idx + 1}
                           </button>

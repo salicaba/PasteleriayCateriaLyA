@@ -1,5 +1,5 @@
 // src/modules/pasteleria/views/PasteleriaDashboard.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
@@ -61,7 +61,7 @@ const PasteleriaLoader = () => (
 
 export default function PasteleriaDashboard() {
   const { 
-    pedidos, // 🔥 1. AÑADIMOS ESTA VARIABLE AQUÍ
+    pedidos, 
     pedidosFiltrados, conteos, loading, 
     activeTab, setActiveTab, searchQuery, setSearchQuery,
     isModalOpen, abrirModalNuevoPedido, cerrarModalNuevoPedido, fechaPredefinida,
@@ -81,11 +81,17 @@ export default function PasteleriaDashboard() {
   const [modalInputValue, setModalInputValue] = useState('');
   const [restoringId, setRestoringId] = useState(null);
 
+  // 🔥 PILAR 3: Candado asíncrono para evitar múltiples submits accidentales
+  const lockRef = useRef(false);
+
   useEffect(() => {
-    if (abonoModal.isOpen && abonoForm.metodo === 'transferencia') {
-      client.get('/settings')
-        .then(res => { if (res.data) setTransferInfo(res.data); })
-        .catch(err => console.error("Error al cargar datos bancarios:", err));
+    if (abonoModal.isOpen) {
+      lockRef.current = false; // Liberar candado al abrir modal de abono
+      if (abonoForm.metodo === 'transferencia') {
+        client.get('/settings')
+          .then(res => { if (res.data) setTransferInfo(res.data); })
+          .catch(err => console.error("Error al cargar datos bancarios:", err));
+      }
     }
   }, [abonoModal.isOpen, abonoForm.metodo]);
 
@@ -134,10 +140,14 @@ export default function PasteleriaDashboard() {
   if (loading) return <PasteleriaLoader />; 
 
   const handleRestaurarDirecto = async (pedido) => {
+    // 🔥 BLOQUEO DE DOBLE CLIC
+    if (lockRef.current) return;
+    lockRef.current = true;
+    
     setRestoringId(pedido.id);
     try {
       if (restaurarPedido) {
-        await restaurarPedido(pedido.id);
+        await Promise.resolve(restaurarPedido(pedido.id));
       } else {
         pedirConfirmacion(pedido, 'restaurar');
         setTimeout(() => {
@@ -147,7 +157,10 @@ export default function PasteleriaDashboard() {
     } catch (error) {
       console.error("Error al restaurar:", error);
     } finally {
-      setTimeout(() => setRestoringId(null), 1500);
+      setTimeout(() => {
+        setRestoringId(null);
+        lockRef.current = false;
+      }, 1000); // 1 segundo de debounce
     }
   };
 
@@ -632,13 +645,21 @@ export default function PasteleriaDashboard() {
                 </motion.button>
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => {
+                  onClick={async () => {
+                    // 🔥 BLOQUEO DE DOBLE CLIC EN CONFIRMACIONES (Cancelar/Entregar)
+                    if (lockRef.current) return;
+                    lockRef.current = true;
+
                     let reason = undefined;
                     if (detallesModal.requireInput) {
                       reason = modalInputValue.trim() !== '' ? modalInputValue.trim() : 'Cancelado desde POS';
                     }
-                    ejecutarAccionConfirmada(reason);
-                    setModalInputValue('');
+                    try {
+                      await Promise.resolve(ejecutarAccionConfirmada(reason));
+                      setModalInputValue('');
+                    } finally {
+                      setTimeout(() => { lockRef.current = false; }, 1000);
+                    }
                   }} 
                   disabled={isSubmitting} 
                   className={`flex-1 text-white lya:text-lya-surface font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'md:hover:-translate-y-0.5'} ${detallesModal.color}`}
@@ -685,9 +706,17 @@ export default function PasteleriaDashboard() {
           const mostrarCambio = abonoForm.metodo === 'efectivo' && recibidoNum > 0;
           const cambio = Math.max(recibidoNum - montoIngresadoNum, 0);
 
-          const submitPago = (e) => {
+          // 🔥 SOLUCIÓN ESTRICTA: BLOQUEO DE DOBLE ABONO
+          const submitPago = async (e) => {
             e.preventDefault();
-            registrarAbono(p.id, abonoForm.monto, abonoForm.metodo);
+            if (lockRef.current) return;
+            lockRef.current = true;
+            try {
+              await Promise.resolve(registrarAbono(p.id, abonoForm.monto, abonoForm.metodo));
+            } finally {
+              // Liberamos el candado después de 1 segundo para anular el doble rebote del click
+              setTimeout(() => { lockRef.current = false; }, 1000); 
+            }
           };
 
           const isMontoAbonoInvalido = montoIngresadoNum <= 0 || montoIngresadoNum > fin.deuda;
