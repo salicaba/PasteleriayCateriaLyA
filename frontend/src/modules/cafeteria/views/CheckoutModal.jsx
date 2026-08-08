@@ -146,15 +146,8 @@ export const CheckoutModal = ({
               });
           }
       } else if (cobroMode === 'full' && orderType === 'salon') {
-          for (let i = 0; i < cuentasResumen.length; i++) {
-              const c = cuentasResumen[i];
-              if (c.subtotal > 0) {
-                  await onConfirmPayment({ 
-                      method, amountReceived: c.subtotal, change: 0, amountPaid: c.subtotal, 
-                      targetType: 'silent_partial', cuentaName: c.nombre, isLastInBatch: false 
-                  });
-              }
-          }
+          // 🔥 FIX DEFINITIVO: Eliminamos el bucle "silent_partial" que duplicaba los pagos.
+          // Solo enviamos una petición limpia para pagar la mesa completa.
           await onConfirmPayment({ 
             method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
             change, amountPaid: amountToPay, targetType: 'full', cuentaName: null, isLastInBatch: true
@@ -169,7 +162,6 @@ export const CheckoutModal = ({
       // Nota: No liberamos el candado aquí porque si el cobro es exitoso, el modal se desmontará.
     } catch(e) {
       showToast(e?.response?.data?.message || e.message || "Ocurrió un error al procesar el pago.", "error");
-      // 🔥 Solo liberamos el candado si la petición falla
       lockRef.current = false;
       setIsProcessing(false); 
     }
