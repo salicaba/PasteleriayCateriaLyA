@@ -57,6 +57,8 @@ export const TicketBottomBar = ({
     return !hasPending;
   });
 
+  // 🔥 CORRECCIÓN MATEMÁTICA: Este total calcula la suma exacta de todo lo que hay en el carrito 
+  // (sin importar si ya se mandó a cocina o no).
   const totalPendiente = activeCart
     .filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General'))
     .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
@@ -139,8 +141,9 @@ export const TicketBottomBar = ({
                
                <div className="flex justify-between items-end pt-1">
                  <span className="text-gray-900 dark:text-white lya:text-lya-text font-black text-xs uppercase tracking-tight">Total Activo</span>
+                 {/* 🔥 FIX: Removida la doble suma del unsentTotal */}
                  <span className="text-3xl sm:text-4xl font-black text-orange-500 dark:text-orange-400 lya:text-lya-primary tracking-tighter drop-shadow-sm leading-none">
-                   ${(totalPendiente + unsentTotal).toFixed(2)}
+                   ${totalPendiente.toFixed(2)}
                  </span>
                </div>
              </div>
@@ -181,7 +184,6 @@ export const TicketBottomBar = ({
         )}
       </AnimatePresence>
 
-      {/* 🔥 LIBERADO: Ya no requiere que hasCuentasActivas sea true */}
       {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
           <motion.button 
              whileTap={{ scale: 0.95 }}
