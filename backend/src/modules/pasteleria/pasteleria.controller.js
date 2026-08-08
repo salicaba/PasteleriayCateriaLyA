@@ -1,6 +1,6 @@
 // backend/src/modules/pasteleria/pasteleria.controller.js
 import { Op } from 'sequelize';
-import sequelize from '../../config/database.js'; // Necesario para transacciones seguras
+import sequelize from '../../config/database.js'; 
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
 import Transaction from '../cash/Transaction.model.js'; 
@@ -118,9 +118,9 @@ export const createPedido = async (req, res) => {
   }
 };
 
-// 🔥 Actualizar un pedido completo (Con Inteligencia de Reembolsos)
+// 🔥 Actualizar un pedido completo (Con Inteligencia de Reembolsos Blindada)
 export const updatePedido = async (req, res) => {
-  const t = await sequelize.transaction(); // Usamos transacción para seguridad financiera
+  const t = await sequelize.transaction(); 
   try {
     const { id } = req.params;
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
@@ -132,7 +132,6 @@ export const updatePedido = async (req, res) => {
     }
 
     // 🛡️ BLINDAJE 1: Limpieza del Payload
-    // Eliminamos anticipo y metodoPagoAnticipo para que Sequelize no intente guardarlos y colapse
     const { 
         id: reqId, 
         createdAt, 
@@ -153,7 +152,6 @@ export const updatePedido = async (req, res) => {
     const nuevoCosto = parseFloat(updateData.costoTotal);
     const costoAnterior = parseFloat(pedido.costoTotal);
     
-    // Verificamos si el usuario le bajó el precio al pedido
     if (!isNaN(nuevoCosto) && !isNaN(costoAnterior) && nuevoCosto < costoAnterior) {
       const abonosActuales = pedido.abonos || [];
       const totalPagado = abonosActuales.reduce((sum, ab) => sum + parseFloat(ab.monto), 0);
@@ -162,21 +160,21 @@ export const updatePedido = async (req, res) => {
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
-        // 1. Crear transacción de salida (100% compatible con tu modelo)
+        // 1. Crear transacción de SALIDA en la caja
         const tx = await Transaction.create({
           source: 'PASTELERIA',
-          paymentMethod: 'CASH',     // Se asume que le devuelves el billete en mano
-          amount: devolucion,
+          paymentMethod: 'CASH', // Se asume que le devuelves el billete en mano
+          amount: -Math.abs(devolucion), // 🔥 FIX FINANCIERO CRÍTICO: Debe ser estrictamente negativo para restar de Caja
           description: `Devolución de saldo a favor por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
           createdBy: userId
         }, { transaction: t });
 
-        // 2. Registrar el reembolso en el historial de abonos del pedido como número negativo
+        // 2. Registrar el reembolso en el historial de abonos del pedido
         const abonoReembolso = {
           id: tx.id,
           fecha: new Date().toISOString(),
-          monto: -devolucion, // Monto negativo para equilibrar el total pagado
+          monto: -Math.abs(devolucion), // Monto negativo para equilibrar el total pagado en el pedido
           metodo: 'efectivo',
           nota: 'Devolución automática'
         };
@@ -192,7 +190,6 @@ export const updatePedido = async (req, res) => {
     res.json({ data: pedido });
   } catch (error) {
     await t.rollback();
-    // Inyectamos el log detallado para que nos diga en consola exactamente por qué falla si vuelve a ocurrir
     console.error("🔥 Error al editar pedido:", error.message, error.sql);
     res.status(500).json({ message: "Error al actualizar el pedido", details: error.message });
   }
