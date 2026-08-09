@@ -45,7 +45,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const [isSyncLocked, setIsSyncLocked] = useState(false);
   const syncLockTimeout = useRef(null);
 
-  // 🔥 3. AHORA SÍ usamos el useEffect porque mutations ya existe
+  // 🔥 3. AHORA SÍ usamos el useEffect del candado
   useEffect(() => {
     if (mutations.isProcessing) {
       setIsSyncLocked(true);
@@ -77,10 +77,12 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const mesaOrderId = mesaActual?.orderId;
   const mesaOrderStatus = mesaActual?.orderStatus;
   
-  const dbItemsString = JSON.stringify(mesaActual?.items || []);
+  // 🔥 FIX BBDD UNIVERSAL PARA LLEVAR Y MOSTRADOR
+  const rawItems = mesaActual?.items || mesaActual?.orderItems || mesaActual?.OrderItems || [];
+  const dbItemsString = JSON.stringify(rawItems);
   const paidAccountsString = JSON.stringify(mesaActual?.paidAccounts || []);
 
-  // 🔥 EFECTO 1: EL BORRADOR INMORTAL (Auto-Save en tiempo real)
+  // 🔥 EFECTO 1: EL BORRADOR INMORTAL
   useEffect(() => {
     if (isOpen && mesaId) {
       const unsentDraft = cartLogic.cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED');
@@ -94,9 +96,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   // 🔥 EFECTO 2: ORQUESTADOR PRINCIPAL (Fusión de BD + Borrador)
   useEffect(() => {
-    // 🛡️ ESCUDO ANTI-CARRERAS Y ANTI-ZOMBIES
-    // Si estamos procesando o en tiempo de enfriamiento, IGNORAMOS la base de datos
-    // porque nuestra memoria local ya fue perfectamente actualizada por el mutador.
     if (mutations.isProcessing || isSyncLocked) return;
 
     if (!isOpen) {
@@ -116,9 +115,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       if (draftStr) recoveredDraft = JSON.parse(draftStr);
     } catch (e) {}
 
-    if (mesaEstado === 'ocupada') {
-        setActiveOrderId(mesaOrderId);
-        setOrderStatus(mesaOrderStatus || 'OPEN');
+    const isMesaActiva = mesaEstado === 'ocupada' || mesaOrderId != null || activeOrderId != null || rawItems.length > 0;
+
+    if (isMesaActiva) {
+        setActiveOrderId(mesaOrderId || activeOrderId);
+        setOrderStatus(mesaOrderStatus || orderStatus || 'OPEN');
         
         let loadedPaidAccounts = [];
         try { loadedPaidAccounts = JSON.parse(paidAccountsString); } catch(e) {}
@@ -149,6 +150,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             }
             if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
 
+            // 🛡️ ESCUDO ANTI-ZOMBIES
+            const prevLocal = cartLogic.cart.find(p => String(p.backendItemId) === String(item.id));
+            const safeStatus = (prevLocal && prevLocal.status === 'CANCELLED') ? 'CANCELLED' : (item.status || 'ACTIVE');
+
             return {
                 id: item.productId,
                 nombre: item.product?.name || item.product?.nombre || 'Producto',
@@ -158,7 +163,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 preparaciones: parsedPreps,
                 enviadoCocina: true,
                 kitchenStatus: item.kitchenStatus,
-                status: item.status || 'ACTIVE', // Mapeo puro y limpio
+                status: safeStatus, 
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway || false,
                 backendItemId: String(item.id),
@@ -169,6 +174,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             };
         });
 
+        // 🛡️ SEGURO ANTI-DESAPARICIÓN PARA "LLEVAR" Y "MOSTRADOR"
+        const isSafeToPurge = mesaOrderId === activeOrderId || mesaEstado === 'ocupada' || rawItems.length > 0;
+
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
@@ -176,15 +184,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             const sentButNotLoaded = prev.filter(p => {
                 if (!p.enviadoCocina) return false;
                 
-                // 🔥 PURGA FÍSICA ESTRICTA:
-                // Si el producto ya tenía un ID asignado, el servidor es su único dueño.
-                // Si el servidor lo manda en 'loadedCart', se renderiza con normalidad.
-                // Si el servidor NO lo manda, es porque se eliminó. ¡Lo destruimos sin dudar!
                 if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
+                     const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
+                     if (exactMatch) return false; 
+                     
+                     if (!isSafeToPurge) return true;
+                     
                      return false; 
                 }
                 
-                // (Solo retenemos los productos recién creados que aún no tienen ID)
                 const contentMatch = loadedCart.some(loaded => 
                      String(loaded.id) === String(p.id) && 
                      loaded.cuenta === (p.cuenta || 'General') &&
@@ -233,7 +241,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString, mutations.isProcessing, isSyncLocked]); // 🔥 Añadimos isSyncLocked a las dependencias
+  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString, mutations.isProcessing, isSyncLocked]);
 
   // 🔥 WRAPPERS ANTI-ZOMBIES
   const wrappedCancelFullOrder = async (motivo) => {
