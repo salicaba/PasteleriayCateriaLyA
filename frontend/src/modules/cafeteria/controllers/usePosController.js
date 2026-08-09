@@ -50,7 +50,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     sincronizarCuentas 
   } = accounts;
 
-  // Variables Primitivas para useEffect (Previene re-renders innecesarios)
+  // Variables Primitivas para useEffect
   const mesaId = mesaActual?.id;
   const mesaEstado = mesaActual?.estado;
   const mesaOrderId = mesaActual?.orderId;
@@ -62,7 +62,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   // 🔥 EFECTO 1: EL BORRADOR INMORTAL (Auto-Save en tiempo real)
   useEffect(() => {
     if (isOpen && mesaId) {
-      // Filtramos solo lo que el empleado ha tecleado pero NO ha enviado a cocina
       const unsentDraft = cartLogic.cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED');
       if (unsentDraft.length > 0) {
         localStorage.setItem(`lya_draft_${mesaId}`, JSON.stringify(unsentDraft));
@@ -74,6 +73,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   // 🔥 EFECTO 2: ORQUESTADOR PRINCIPAL (Fusión de BD + Borrador)
   useEffect(() => {
+    // 🛡️ ESCUDO ANTI-CARRERAS (RACE CONDITION SHIELD)
+    // Si el sistema está enviando a cocina o procesando un cobro, PAUSAMOS la lectura 
+    // de los WebSockets. Esto evita que los datos locales choquen con la BD y formen clones.
+    if (mutations.isProcessing) return;
+
     if (!isOpen) {
         setCart([]); 
         setActiveOrderId(null); 
@@ -128,7 +132,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 id: item.productId,
                 nombre: item.product?.name || item.product?.nombre || 'Producto',
                 imagen: item.product?.imageUrl || null,
-                precio: parseFloat(item.subtotal) / (item.quantity || 1), // Blindaje contra NaN
+                precio: parseFloat(item.subtotal) / (item.quantity || 1),
                 qty: item.quantity,
                 preparaciones: parsedPreps,
                 enviadoCocina: true,
@@ -136,9 +140,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 status: item.status || 'ACTIVE',
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway || false,
-                backendItemId: String(item.id), // 🔥 FIX: Casteo explícito a String para evitar coerción fallida
+                backendItemId: String(item.id),
                 requiereCocina: item.product?.requiereCocina !== false,
-                isAutoPromo: item.isAutoPromo || false, // Sincronizado con mutations
+                isAutoPromo: item.isAutoPromo || false,
                 promoLabel: item.promoLabel || null,
                 precioOriginal: item.precioOriginal || null
             };
@@ -148,19 +152,25 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             const localItems = prev.filter(p => !p.enviadoCocina);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
 
-            // 🔥 FIX CLONAJE: Filtro blindado con comparación estricta de Strings
+            // 🔥 BOMBARDERO ANTI-FANTASMAS DEFINITIVO
             const sentButNotLoaded = prev.filter(p => {
                 if (!p.enviadoCocina) return false;
                 
-                if (p.backendItemId) {
-                     return !loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
+                // 1. Coincidencia estricta por ID
+                if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
+                     const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
+                     if (exactMatch) return false; // Existe en la BD, destruimos la copia local fantasma
                 }
                 
-                const yaLlegoDeLaBD = loadedCart.some(loaded => 
-                     String(loaded.id) === String(p.id) && loaded.cuenta === (p.cuenta || 'General')
+                // 2. Coincidencia por Huella Digital (Fallback)
+                // Si la BD no nos regresó el ID a tiempo en el POST, comparamos "el alma" del producto
+                const contentMatch = loadedCart.some(loaded => 
+                     String(loaded.id) === String(p.id) && 
+                     loaded.cuenta === (p.cuenta || 'General') &&
+                     Number(loaded.precio).toFixed(2) === Number(p.precio).toFixed(2)
                 );
                 
-                return !yaLlegoDeLaBD; 
+                return !contentMatch; 
             });
 
             const finalCart = [...loadedCart, ...sentButNotLoaded, ...activeLocals];
@@ -183,7 +193,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
         
     } else {
-        // 🔥 FIX 400: MESA LIBRE -> Purgamos el ID de la orden para evitar Zombie Orders
+        // 🔥 MESA LIBRE
         setActiveOrderId(null);
         setOrderStatus('OPEN');
         setPaidAccounts([]);
@@ -203,7 +213,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString]);
+  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString, mutations.isProcessing]); 
+  // 👆 LA CLAVE ESTÁ AQUÍ: mutations.isProcessing en las dependencias obliga a recalcular 
+  // cuando el POST termina de forma segura, reconciliando los datos sin chocar.
 
   // 🔥 WRAPPERS ANTI-ZOMBIES
   const wrappedCancelFullOrder = async (motivo) => {
@@ -211,7 +223,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       if (clearEntireCart) clearEntireCart();
       localStorage.removeItem(`lya_draft_${mesaId}`);
       
-      setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER
+      setActiveOrderId(null); 
       setOrderStatus('OPEN');
   };
 
@@ -226,19 +238,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
       const remainingActive = cartLogic.cart.filter(p => p.cuenta !== cuenta && p.status !== 'CANCELLED');
       if (remainingActive.length === 0) {
-          setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER
+          setActiveOrderId(null); 
           setOrderStatus('OPEN');
       }
   };
 
-  // 5. Cálculos Derivados (Orquestados)
   const cuentasDisponibles = useMemo(() => 
     Array.from(new Set([...accounts.nombresCuentas, ...cartLogic.cart.map(i => i.cuenta || 'General')])), 
   [cartLogic.cart, accounts.nombresCuentas]);
 
-  // 🔥 NUEVO: Filtro estricto para el Modal de Cancelación
-  // Solo devuelve las cuentas que tienen productos físicos, activos y visibles en la mesa.
-  // Ignora por completo las cuentas vacías o ya liberadas.
   const cuentasCancelables = useMemo(() => {
     const cuentasVivas = cartLogic.cart
       .filter(item => item.status !== 'CANCELLED')
@@ -272,8 +280,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     cuentaActiva: accounts.cuentaActiva, 
     setCuentaActiva: accounts.setCuentaActiva, 
     cuentasDisponibles, 
-    cuentasCancelables, // 🔥 Agregamos la nueva variable exportada
-    addNewCuenta: (n, t) => accounts.addNewCuenta(n, t, activeOrderId),
+    cuentasCancelables,
+    addNewCuenta: (n, t) => accounts.addNewCuenta(n, t, activeOrderId), 
     paidAccounts: accounts.paidAccounts,
     cuentasTelefonos: accounts.cuentasTelefonos,
     
