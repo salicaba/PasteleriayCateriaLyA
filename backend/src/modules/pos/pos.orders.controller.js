@@ -104,12 +104,24 @@ export const createOrder = async (req, res) => {
 // ==========================================
 export const addItemsToOrder = async (req, res) => {
   try {
-    const { orderId } = req.params;
+    let { orderId } = req.params;
     const { items } = req.body; 
-    const order = await Order.findByPk(orderId);
+    let order = await Order.findByPk(orderId);
     
-    if (!order || !['OPEN', 'PAID'].includes(order.status)) {
-      return res.status(400).json({ message: 'La orden no está abierta para recibir productos.' });
+    // 🔥 FIX AUTO-HEAL: Si la orden ya estaba cancelada o cerrada, creamos un ticket/folio NUEVO.
+    // Esto aísla los productos nuevos y evita que se mezclen con los zombies del pasado en la cocina.
+    if (order && !['OPEN', 'PAID'].includes(order.status)) {
+        order = await Order.create({
+            orderType: order.orderType,
+            tableId: order.tableId,
+            ticketId: order.ticketId,
+            createdBy: req.user?.id || null,
+            status: 'OPEN',
+            totalAmount: 0
+        });
+        orderId = order.id; // Actualizamos al nuevo ID limpio
+    } else if (!order) {
+        return res.status(400).json({ message: 'La orden no existe.' });
     }
 
     const itemsToInsert = items.map(item => {
@@ -130,7 +142,7 @@ export const addItemsToOrder = async (req, res) => {
 
       return { 
         ...item, 
-        orderId, 
+        orderId, // Usará el ID curado
         cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
         kitchenStatus: 'PENDING',
         isTakeaway: item.isTakeaway || false,
@@ -177,7 +189,9 @@ export const addItemsToOrder = async (req, res) => {
     getIO().emit('kitchen:update'); 
     
     const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
-    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: cleanItems });
+    
+    // 🔥 Devolvemos el newOrderId para que el Frontend actualice su memoria
+    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: cleanItems, newOrderId: orderId });
   } catch (error) { 
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
   }

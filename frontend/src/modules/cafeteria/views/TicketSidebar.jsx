@@ -88,10 +88,26 @@ export const TicketSidebar = ({
   const handleAddCuenta = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     const name = newCuentaName.trim();
+    
     if (name && addNewCuenta) {
+      // 🔥 ESCUDO ANTI-NOMBRES REPETIDOS
+      const nameLower = name.toLowerCase();
+      // Revisamos si el nombre que escribió el cajero ya existe en la mesa
+      const yaExiste = availableAccs.some(acc => {
+          const accName = parseAccountName(acc).toLowerCase();
+          return accName === nameLower;
+      });
+
+      if (yaExiste) {
+          toast(`Ya hay una cuenta llamada "${name}". Agrégale una inicial o número (Ej. ${name} 2).`, 'warning');
+          return; // Detenemos la función aquí, no creamos la cuenta
+      }
+
+      // Si no existe, la creamos normalmente
       addNewCuenta(name, newCuentaPhone);
       toast(`Cuenta "${parseAccountName(name)}" creada exitosamente`, 'success');
     }
+    
     setNewCuentaName('');
     setNewCuentaPhone('');
   };

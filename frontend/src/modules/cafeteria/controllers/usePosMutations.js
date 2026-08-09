@@ -104,6 +104,12 @@ export const usePosMutations = ({
       }));
 
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
+      
+      // 🔥 ATRAPAMOS LA CURA: Si el backend nos generó un ID nuevo, lo actualizamos
+      if (response.data.newOrderId && response.data.newOrderId !== orderId) {
+          setActiveOrderId(response.data.newOrderId);
+      }
+
       let allItemsFromDB = response.data.orderItems || [];
       
       const updatedCart = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
@@ -344,7 +350,8 @@ export const usePosMutations = ({
   };
 
   const cancelAccountItems = async (cuentaName, cancelReason = 'Cancelación de cuenta') => {
-    const itemsToCancel = cart.filter(item => item.cuenta === cuentaName && item.enviadoCocina && item.status !== 'CANCELLED');
+    // 🔥 Aseguramos que atrape la cuenta General correctamente aunque sea undefined
+    const itemsToCancel = cart.filter(item => (item.cuenta || 'General') === cuentaName && item.enviadoCocina && item.status !== 'CANCELLED');
     if (itemsToCancel.length === 0) return;
     
     if (lockRef.current) return;
