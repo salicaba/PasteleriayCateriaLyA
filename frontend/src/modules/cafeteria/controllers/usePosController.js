@@ -1,3 +1,4 @@
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useState, useMemo, useEffect } from 'react';
 
 // Hooks de Dominio
@@ -24,6 +25,27 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const { notification, triggerNotification } = usePosNotifications();
   const menu = usePosMenu(isVitrina);
   const accounts = usePosAccounts();
+
+  // 🔥 NUEVO: Candado de Sincronización (Cooldown Lock)
+  const [isSyncLocked, setIsSyncLocked] = useState(false);
+  const syncLockTimeout = useRef(null);
+
+  // Efecto para activar el candado durante y después de una mutación
+  useEffect(() => {
+    if (mutations.isProcessing) {
+      setIsSyncLocked(true);
+      if (syncLockTimeout.current) clearTimeout(syncLockTimeout.current);
+      return;
+    }
+
+    // Cuando termina la mutación, mantenemos el escudo activo por 1.5 segundos
+    // para ignorar los datos viejos que vienen rezagados en el WebSocket.
+    syncLockTimeout.current = setTimeout(() => {
+      setIsSyncLocked(false);
+    }, 1500);
+
+    return () => clearTimeout(syncLockTimeout.current);
+  }, [mutations.isProcessing]);
   
   const cartLogic = usePosCart(accounts.cuentaActiva, accounts.cuentasPagadasReales, showToast || triggerNotification);
 
@@ -73,10 +95,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   // 🔥 EFECTO 2: ORQUESTADOR PRINCIPAL (Fusión de BD + Borrador)
   useEffect(() => {
-    // 🛡️ ESCUDO ANTI-CARRERAS (RACE CONDITION SHIELD)
-    // Si el sistema está enviando a cocina o procesando un cobro, PAUSAMOS la lectura 
-    // de los WebSockets. Esto evita que los datos locales choquen con la BD y formen clones.
-    if (mutations.isProcessing) return;
+    // 🛡️ ESCUDO ANTI-CARRERAS Y ANTI-ZOMBIES
+    // Si estamos procesando o en tiempo de enfriamiento, IGNORAMOS la base de datos
+    // porque nuestra memoria local ya fue perfectamente actualizada por el mutador.
+    if (mutations.isProcessing || isSyncLocked) return;
 
     if (!isOpen) {
         setCart([]); 
@@ -128,12 +150,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             }
             if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
 
-            // 🔥 1. ESCUDO ANTI-ZOMBIE DE ESTADOS (Prioridad Local)
-            // Si cancelamos localmente un producto, la BD puede tardar unos ms en enviar el WebSocket.
-            // Para que la vista "vieja" no lo reviva en la pantalla, forzamos el estado 'CANCELLED' si nosotros ya lo habíamos matado.
-            const prevLocal = cartLogic.cart.find(p => String(p.backendItemId) === String(item.id));
-            const safeStatus = (prevLocal && prevLocal.status === 'CANCELLED') ? 'CANCELLED' : (item.status || 'ACTIVE');
-
             return {
                 id: item.productId,
                 nombre: item.product?.name || item.product?.nombre || 'Producto',
@@ -143,7 +159,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 preparaciones: parsedPreps,
                 enviadoCocina: true,
                 kitchenStatus: item.kitchenStatus,
-                status: safeStatus, // 🔥 Estado blindado (No revive)
+                status: item.status || 'ACTIVE', // Mapeo puro y limpio
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway || false,
                 backendItemId: String(item.id),
@@ -162,16 +178,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 if (!p.enviadoCocina) return false;
                 
                 if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
-                     const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
-                     if (exactMatch) return false; // Existe en la BD, nos quedamos con la copia de la BD
-                     
-                     // 🔥 2. EL GOLPE DE GRACIA AL BUG DE CANCELACIÓN:
-                     // Si el producto tenía ID (ya había subido a la BD) pero YA NO ESTÁ en loadedCart,
-                     // significa que el backend lo ELIMINÓ FÍSICAMENTE. ¡No lo mantengas como fantasma en la pantalla!
-                     return false; 
+                     return !loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
                 }
                 
-                // Coincidencia para items recién enviados que aún no tienen ID confirmado
                 const contentMatch = loadedCart.some(loaded => 
                      String(loaded.id) === String(p.id) && 
                      loaded.cuenta === (p.cuenta || 'General') &&
@@ -201,7 +210,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
         
     } else {
-        // 🔥 MESA LIBRE
         setActiveOrderId(null);
         setOrderStatus('OPEN');
         setPaidAccounts([]);
@@ -221,9 +229,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString, mutations.isProcessing]); 
-  // 👆 LA CLAVE ESTÁ AQUÍ: mutations.isProcessing en las dependencias obliga a recalcular 
-  // cuando el POST termina de forma segura, reconciliando los datos sin chocar.
+  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString, mutations.isProcessing, isSyncLocked]); // 🔥 Añadimos isSyncLocked a las dependencias
 
   // 🔥 WRAPPERS ANTI-ZOMBIES
   const wrappedCancelFullOrder = async (motivo) => {
