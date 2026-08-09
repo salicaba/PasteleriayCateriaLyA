@@ -8,10 +8,11 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
   // 🔥 SINCRONIZACIÓN EN TIEMPO REAL CON CAJA
-  const [liveCart, setLiveCart] = useState(cart || []);
+  const [liveCart, setLiveCart] = useState([]);
   
   useEffect(() => {
-    setLiveCart(cart || []);
+    // 🔥 FILTRO ANTI-FANTASMAS: Limpiamos lo que venga del caché si ya estaba cancelado
+    setLiveCart((cart || []).filter(item => item.status !== 'CANCELLED'));
   }, [cart]);
 
   useEffect(() => {

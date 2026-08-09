@@ -121,8 +121,7 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa.
-    // Si es una promoción de $0, el refundAmount será 0 automáticamente y no tocará la caja.
+    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa, sin magia.
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
 
@@ -132,11 +131,9 @@ export const cancelOrderItem = async (req, res) => {
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      // Pasamos la cuenta específica para el descuento exacto
       await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
     }
 
-    const previousKitchenStatus = item.kitchenStatus;
     let notesArray = [];
     try { notesArray = JSON.parse(item.notes || '[]'); } catch(e) {}
     if (!Array.isArray(notesArray)) notesArray = [notesArray];
@@ -174,10 +171,8 @@ export const cancelOrderItem = async (req, res) => {
         });
     }
 
-    // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) para que se borre de su vista en vivo
-    if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
-      getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
-    }
+    // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) SIEMPRE, para que se borre de su vista en tiempo real
+    getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
@@ -262,8 +257,6 @@ export const cancelOrder = async (req, res) => {
 
     for (const item of order.items) {
       if (item.status === 'ACTIVE') {
-        const previousKitchenStatus = item.kitchenStatus;
-        
         let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) {
            totalRefundByAccount[item.cuenta] = (totalRefundByAccount[item.cuenta] || 0) + Number(item.subtotal);
@@ -276,9 +269,8 @@ export const cancelOrder = async (req, res) => {
           cancelledBy: userId
         });
 
-        if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
-          getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
-        }
+        // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) SIEMPRE
+        getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
       }
     }
 
