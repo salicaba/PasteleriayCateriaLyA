@@ -131,6 +131,7 @@ export const cancelOrderItem = async (req, res) => {
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
+      // Pasamos la cuenta específica para el descuento exacto
       await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
     }
 
@@ -171,12 +172,18 @@ export const cancelOrderItem = async (req, res) => {
         });
     }
 
-    // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) SIEMPRE, para que se borre de su vista en tiempo real
-    getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
+    // 🔥 FIX: AHORA SIEMPRE AVISA AL CLIENTE SIN IMPORTAR EL ESTADO EN COCINA
+    getIO().emit('orderItemCancelled', { 
+        orderId: id, 
+        itemId: item.id, 
+        productId: item.productId, 
+        cancelQty: qtyToCancel 
+    });
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
     
+    // Si se vacía el ticket por completo, se cancela global
     if (activeItems === 0 && order.status !== 'CLOSED') {
       const numeroMesa = order.table ? order.table.numero || order.table.number : 'Sin Mesa/Llevar';
       const nombreCuenta = item.cuenta || 'Cuenta General'; 
@@ -195,6 +202,9 @@ export const cancelOrderItem = async (req, res) => {
         cancelledBy: userId 
       });
       
+      // 🔥 FIX: Avisamos al cliente que TODA la orden murió
+      getIO().emit('orderCancelled', { orderId: id, tableId: order.tableId });
+
       if (order.tableId) {
         const remainingOrders = await Order.count({ where: { tableId: order.tableId, status: ['OPEN', 'PAID'] } });
         if (remainingOrders === 0) {
@@ -268,11 +278,11 @@ export const cancelOrder = async (req, res) => {
           cancelReason: motivoFinal, 
           cancelledBy: userId
         });
-
-        // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) SIEMPRE
-        getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
       }
     }
+
+    // 🔥 FIX: Avisamos al cliente que TODA la orden murió
+    getIO().emit('orderCancelled', { orderId: id, tableId: order.tableId });
 
     for (const [cuentaName, amount] of Object.entries(totalRefundByAccount)) {
        if (amount > 0) {

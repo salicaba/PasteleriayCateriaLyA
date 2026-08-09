@@ -1,4 +1,4 @@
-// src/modules/client/views/ClientOrderSuccess.jsx
+// frontend/src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag } from 'lucide-react';
@@ -11,20 +11,71 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   const [liveCart, setLiveCart] = useState([]);
   
   useEffect(() => {
-    // 🔥 FILTRO ANTI-FANTASMAS: Limpiamos lo que venga del caché si ya estaba cancelado
+    // Limpiamos lo que venga del caché si ya estaba cancelado por backend
     setLiveCart((cart || []).filter(item => item.status !== 'CANCELLED'));
   }, [cart]);
 
   useEffect(() => {
-    const handleItemCancelled = ({ orderId, itemId }) => {
-        setLiveCart(prev => prev.filter(item => 
-            String(item.backendItemId || item.id) !== String(itemId)
-        ));
+    // 1. Escuchar cancelación individual
+    const handleItemCancelled = ({ orderId, itemId, productId, cancelQty }) => {
+        setLiveCart(prev => {
+            let found = false;
+            const newCart = prev.map(item => {
+                if (!found && (String(item.backendItemId || item.id) === String(itemId) || String(item.id) === String(productId))) {
+                    found = true;
+                    const newQty = item.qty - (cancelQty || 1);
+                    return { ...item, qty: newQty };
+                }
+                return item;
+            }).filter(item => item.qty > 0);
+            return newCart;
+        });
+    };
+
+    // 2. Escuchar cancelación de la mesa completa
+    const handleOrderCancelled = (data) => {
+        if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('lya_') || key.includes('snapshot'))) localStorage.removeItem(key);
+                }
+            } catch(e) {}
+            onReset(); // Expulsamos al cliente de la pantalla de éxito
+        }
     };
     
     socket.on('orderItemCancelled', handleItemCancelled);
-    return () => socket.off('orderItemCancelled', handleItemCancelled);
-  }, []);
+    socket.on('orderCancelled', handleOrderCancelled);
+    return () => {
+       socket.off('orderItemCancelled', handleItemCancelled);
+       socket.off('orderCancelled', handleOrderCancelled);
+    };
+  }, [tableId, onReset]);
+
+  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh): Sobrescribe la memoria del navegador
+  useEffect(() => {
+    if (liveCart.length === 0 && cart.length > 0) {
+       onReset(); // Todo fue anulado 1 por 1
+    } else if (liveCart.length > 0 && (liveCart.length !== cart.length || liveCart.some((l, i) => cart[i] && l.qty !== cart[i].qty))) {
+       try {
+           for (let i = 0; i < localStorage.length; i++) {
+               const key = localStorage.key(i);
+               if (key && (key.toLowerCase().includes('client') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('cart'))) {
+                   const val = localStorage.getItem(key);
+                   if (val && val.includes('precioUnitario')) {
+                       const parsed = JSON.parse(val);
+                       if (parsed.items) {
+                           parsed.items = liveCart;
+                           parsed.total = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
+                           localStorage.setItem(key, JSON.stringify(parsed)); // ¡Memoria actualizada!
+                       }
+                   }
+               }
+           }
+       } catch(e) {}
+    }
+  }, [liveCart, cart, onReset]);
 
   const liveTotal = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
 
@@ -42,7 +93,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // Obtenemos solo el primer nombre para un trato más cercano
   const primerNombre = displayName.split(' ')[0] || 'Cliente';
 
   // --- VISTA: Menú Solo Lectura ---
@@ -170,7 +220,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           </p>
         </div>
 
-        {/* Tarjeta Minimalista tipo Apple Pay / Fintech */}
         <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-[#EADCC9] relative overflow-hidden shrink-0">
           
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
