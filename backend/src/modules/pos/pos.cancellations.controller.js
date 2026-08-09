@@ -7,56 +7,71 @@ import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
 
 // =====================================================================
-// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN ORIGINAL (ANULACIONES) 🔥
+// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Ahora Inteligente por Cuentas)
 // =====================================================================
-const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null) => {
-  const tx = await Transaction.findOne({
-    where: { referenceId: orderId, type: 'INCOME' },
-    order: [['createdAt', 'DESC']]
+const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null) => {
+  let whereClause = { referenceId: orderId, type: 'INCOME' };
+  
+  // Obtenemos todas las transacciones de esta mesa
+  let txs = await Transaction.findAll({
+      where: whereClause,
+      order: [['createdAt', 'DESC']]
   });
 
-  if (tx && monto > 0) {
-    let nuevoMonto = Number(tx.amount);
-    let nuevaDescripcion = tx.description || '';
+  // 🔥 FIX FRANCOTIRADOR CIEGO: Buscamos exactamente el ticket de la cuenta afectada
+  let targetTxs = cuentaName 
+    ? txs.filter(tx => tx.description && tx.description.includes(`Cuenta: ${cuentaName}`)) 
+    : txs;
+  
+  // Si por alguna razón no encuentra la cuenta exacta (ej. Cobro de Mesa Completa), usamos el historial general
+  if (targetTxs.length === 0) targetTxs = txs; 
 
-    if (tipoOperacion === 'restar') {
-      nuevoMonto -= monto;
-      nuevaDescripcion += ` | 📉 -$${monto.toFixed(2)} (Anulado: ${detalle})`;
-    } else if (tipoOperacion === 'sumar') {
-      nuevoMonto += monto;
-      nuevaDescripcion += ` | 📈 +$${monto.toFixed(2)} (Restaurado: ${detalle})`;
-    }
+  let remainingMonto = monto;
 
-    // Evitamos decimales residuales
-    if (nuevoMonto <= 0.01) nuevoMonto = 0;
+  for (let tx of targetTxs) {
+      if (remainingMonto <= 0) break;
 
-    let newStatus = tx.status;
-    let cancelledAt = tx.cancelledAt;
-    let cancelledBy = tx.cancelledBy;
+      let nuevoMonto = Number(tx.amount);
+      let appliedAmount = 0;
 
-    // 🔥 LA MAGIA: Si llega a 0, la pasamos a ANULADO automáticamente.
-    if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
-      newStatus = 'CANCELLED';
-      cancelledAt = new Date();
-      cancelledBy = userId;
-    } 
-    // 🔥 Si estaba anulada y le regresamos dinero (Restaurar), la revivimos.
-    else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
-      newStatus = 'ACTIVE';
-      cancelledAt = null;
-      cancelledBy = null;
-    }
+      if (tipoOperacion === 'restar') {
+          appliedAmount = Math.min(nuevoMonto, remainingMonto);
+          nuevoMonto -= appliedAmount;
+          remainingMonto -= appliedAmount;
+          tx.description += ` | 📉 -$${appliedAmount.toFixed(2)} (Anulado: ${detalle})`;
+      } else if (tipoOperacion === 'sumar') {
+          appliedAmount = remainingMonto;
+          nuevoMonto += appliedAmount;
+          remainingMonto -= appliedAmount;
+          tx.description += ` | 📈 +$${appliedAmount.toFixed(2)} (Restaurado: ${detalle})`;
+      }
 
-    await tx.update({
-      amount: nuevoMonto,
-      description: nuevaDescripcion,
-      status: newStatus,
-      cancelledAt,
-      cancelledBy
-    });
-    return true;
+      // Evitamos decimales residuales
+      if (nuevoMonto <= 0.01) nuevoMonto = 0;
+
+      let newStatus = tx.status;
+      let cancelledAt = tx.cancelledAt;
+      let cancelledBy = tx.cancelledBy;
+
+      if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
+          newStatus = 'CANCELLED';
+          cancelledAt = new Date();
+          cancelledBy = userId;
+      } else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
+          newStatus = 'ACTIVE';
+          cancelledAt = null;
+          cancelledBy = null;
+      }
+
+      await tx.update({
+          amount: nuevoMonto,
+          description: tx.description,
+          status: newStatus,
+          cancelledAt,
+          cancelledBy
+      });
   }
-  return false;
+  return true;
 };
 
 // ==========================================
@@ -68,11 +83,7 @@ export const cancelOrderItem = async (req, res) => {
     const { cancelReason, cancelQty } = req.body; 
     const userId = req.user?.id; 
 
-    const item = await OrderItem.findOne({ 
-      where: { id: itemId, orderId: id }, 
-      include: [{ model: Product, as: 'product' }] 
-    });
-    
+    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id }, include: [{ model: Product, as: 'product' }] });
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
 
     const order = await Order.findByPk(id, {
@@ -82,47 +93,97 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // 🔥 FIX PROMOCIONES: Calculamos el reembolso real basado en si es Promo Automática
+    // 🔥 FIX PROMOCIONES: Detectamos si el ítem cancelado era una promoción
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
-    
-    // Verificamos si era una promo
     let isPromoItem = false;
-    let originalPriceForPromo = 0;
+    
     try {
         const notesArray = JSON.parse(item.notes || '[]');
         if (Array.isArray(notesArray)) {
             const promoMeta = notesArray.find(n => n && n._isPromoMeta);
-            if (promoMeta && promoMeta.isAutoPromo) {
-                isPromoItem = true;
-                originalPriceForPromo = Number(promoMeta.precioOriginal || 0);
-            }
+            if (promoMeta && promoMeta.isAutoPromo) isPromoItem = true;
         }
     } catch(e) {}
 
-    // Si es promo, el reembolso no puede ser 0 o menor al precio base, debe reflejar la pérdida real del combo.
-    if (isPromoItem && unitPrice === 0) {
-        // Buscamos si hay productos "Normales" en la misma cuenta para recalcular
-        const normalPartner = await OrderItem.findOne({
-            where: { 
-                orderId: id, 
-                productId: item.productId, 
-                cuenta: item.cuenta,
-                status: 'ACTIVE'
-            }
+    // 🔥 RECÁLCULO INTELIGENTE: Si se cancela un producto NORMAL, revertimos la promo de otro ítem
+    if (!isPromoItem && unitPrice > 0) {
+        const promoPartners = await OrderItem.findAll({
+            where: { orderId: id, productId: item.productId, cuenta: item.cuenta, status: 'ACTIVE', id: { [Op.ne]: item.id } }
         });
-        if (normalPartner && Number(normalPartner.subtotal) > 0) {
-            refundAmount = (Number(normalPartner.subtotal) / normalPartner.quantity) * qtyToCancel;
-        } else {
-            refundAmount = originalPriceForPromo * qtyToCancel;
+
+        let promosToRevert = qtyToCancel;
+        for (const partner of promoPartners) {
+            if (promosToRevert <= 0) break;
+
+            let isPartnerPromo = false;
+            let pOriginalPrice = 0;
+            let partnerNotes = [];
+            
+            try {
+                partnerNotes = JSON.parse(partner.notes || '[]');
+                if (Array.isArray(partnerNotes)) {
+                    const pMeta = partnerNotes.find(n => n && n._isPromoMeta);
+                    if (pMeta && pMeta.isAutoPromo) {
+                        isPartnerPromo = true;
+                        pOriginalPrice = Number(pMeta.precioOriginal || 0);
+                    }
+                }
+            } catch(e){}
+
+            if (isPartnerPromo) {
+                let partnerUnitPromoPrice = Number(partner.subtotal) / partner.quantity;
+                let qtyToRevert = Math.min(promosToRevert, partner.quantity);
+                let priceDiffPerUnit = pOriginalPrice - partnerUnitPromoPrice;
+
+                if (priceDiffPerUnit > 0) {
+                    // Restamos la penalización por romper la promo del reembolso total
+                    refundAmount -= (priceDiffPerUnit * qtyToRevert);
+
+                    if (qtyToRevert === partner.quantity) {
+                        // Quitamos el tag de promo y lo regresamos a precio normal
+                        const cleanedNotes = partnerNotes.filter(n => !(n && n._isPromoMeta));
+                        await partner.update({
+                            subtotal: pOriginalPrice * partner.quantity,
+                            notes: JSON.stringify(cleanedNotes)
+                        });
+                    } else {
+                        // Si era un grupo de promos, dividimos el ítem
+                        const remainingQty = partner.quantity - qtyToRevert;
+                        const cleanedNotes = partnerNotes.filter(n => !(n && n._isPromoMeta));
+                        
+                        await partner.update({
+                            quantity: remainingQty,
+                            subtotal: partnerUnitPromoPrice * remainingQty
+                        });
+
+                        await OrderItem.create({
+                            orderId: partner.orderId,
+                            productId: partner.productId,
+                            quantity: qtyToRevert,
+                            subtotal: pOriginalPrice * qtyToRevert,
+                            cuenta: partner.cuenta,
+                            isTakeaway: partner.isTakeaway,
+                            notes: JSON.stringify(cleanedNotes),
+                            kitchenStatus: partner.kitchenStatus,
+                            status: 'ACTIVE'
+                        });
+                    }
+                }
+                promosToRevert -= qtyToRevert;
+            }
         }
     }
+
+    // Evitamos reembolsos negativos por errores de cálculo
+    if (refundAmount < 0) refundAmount = 0;
 
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto} (${item.cuenta})`, userId);
+      // 🔥 PASAMOS LA CUENTA ESPECÍFICA PARA QUE DESCUENTE DEL LUGAR CORRECTO
+      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
     }
 
     const previousKitchenStatus = item.kitchenStatus;
@@ -138,28 +199,27 @@ export const cancelOrderItem = async (req, res) => {
             orderId: item.orderId,
             productId: item.productId,
             quantity: qtyToCancel,
-            subtotal: refundAmount, // El subtotal de la línea cancelada
+            subtotal: refundAmount, // Guardamos el valor matemáticamente correcto
             cuenta: item.cuenta,
             isTakeaway: item.isTakeaway,
             notes: JSON.stringify(cancelledNotes),
             kitchenStatus: item.kitchenStatus,
             status: 'CANCELLED',
             cancelledAt: new Date(),
-            cancelReason: cancelReason || `Cancelación parcial desde POS (${item.cuenta})`,
+            cancelReason: cancelReason || `Cancelación parcial desde POS`,
             cancelledBy: userId
         });
 
-        // Actualizamos el original restando el reembolso real
         await item.update({
             quantity: item.quantity - qtyToCancel,
-            subtotal: Math.max(0, Number(item.subtotal) - refundAmount), 
+            subtotal: Math.max(0, Number(item.subtotal) - (unitPrice * qtyToCancel)), 
             notes: JSON.stringify(remainingNotes)
         });
     } else {
         await item.update({
           status: 'CANCELLED',
           cancelledAt: new Date(),
-          cancelReason: cancelReason || `Cancelado desde POS (${item.cuenta})`,
+          cancelReason: cancelReason || `Cancelado desde POS`,
           cancelledBy: userId
         });
     }
@@ -247,14 +307,17 @@ export const cancelOrder = async (req, res) => {
     
     const motivoFinal = cancelReason ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` : `Cancelación de ${textoPapelera}`;
 
-    let totalRefund = 0;
+    // 🔥 FIX: Agrupamos el reembolso por Cuentas para no cruzar los recibos de la Caja
+    let totalRefundByAccount = {};
 
     for (const item of order.items) {
       if (item.status === 'ACTIVE') {
         const previousKitchenStatus = item.kitchenStatus;
         
         let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
-        if (wasPaid) totalRefund += Number(item.subtotal);
+        if (wasPaid) {
+           totalRefundByAccount[item.cuenta] = (totalRefundByAccount[item.cuenta] || 0) + Number(item.subtotal);
+        }
 
         await item.update({
           status: 'CANCELLED',
@@ -269,8 +332,11 @@ export const cancelOrder = async (req, res) => {
       }
     }
 
-    if (totalRefund > 0) {
-      await modificarTransaccionOriginal(order.id, totalRefund, 'restar', 'Todos los productos/Cuentas', userId);
+    // Procesamos la devolución a cada recibo de forma individual
+    for (const [cuentaName, amount] of Object.entries(totalRefundByAccount)) {
+       if (amount > 0) {
+          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa completa (${cuentaName})`, userId, cuentaName);
+       }
     }
 
     await order.update({
@@ -291,7 +357,7 @@ export const cancelOrder = async (req, res) => {
     }
 
     getIO().emit('pos:update'); 
-    res.json({ message: `La cuenta fue cancelada correctamente`, refundedAmount: totalRefund });
+    res.json({ message: `La cuenta fue cancelada correctamente` });
   } catch (error) {
     console.error('Error en cancelOrder:', error);
     res.status(500).json({ message: 'Error al cancelar la cuenta' });
@@ -381,22 +447,12 @@ export const restoreOrderItem = async (req, res) => {
     let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
     if (wasPaid) {
-      // 🔥 FIX RESTAURAR PROMOCIONES
-      let unitPrice = Number(item.subtotal) / item.quantity;
-      let amountToRestore = unitPrice * item.quantity;
-
-      try {
-          const notesArray = JSON.parse(item.notes || '[]');
-          if (Array.isArray(notesArray)) {
-              const promoMeta = notesArray.find(n => n && n._isPromoMeta);
-              if (promoMeta && promoMeta.isAutoPromo && unitPrice === 0) {
-                  amountToRestore = Number(promoMeta.precioOriginal || 0) * item.quantity;
-              }
-          }
-      } catch(e) {}
-
+      const unitPrice = Number(item.subtotal) / item.quantity;
+      const amountToRestore = unitPrice * item.quantity;
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto} (${item.cuenta})`, userId);
+      
+      // 🔥 FIX RESTAURAR: Lo inyectamos de vuelta a la cuenta específica
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta);
     }
 
     await item.update({
@@ -471,25 +527,29 @@ export const restoreOrder = async (req, res) => {
     const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
     const wasGloballyPaid = !!tx;
 
-    let totalRestoredAmount = 0;
+    let totalRestoredByAccount = {};
 
     for (const item of order.items) {
       if (item.status === 'CANCELLED') {
         let wasPaid = wasGloballyPaid || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
-        if (wasPaid) totalRestoredAmount += Number(item.subtotal);
+        if (wasPaid) {
+            totalRestoredByAccount[item.cuenta] = (totalRestoredByAccount[item.cuenta] || 0) + Number(item.subtotal);
+        }
 
         await item.update({ status: 'ACTIVE', cancelledAt: null, cancelReason: null, cancelledBy: null });
         getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
       }
     }
 
-    if (totalRestoredAmount > 0) {
-      await modificarTransaccionOriginal(order.id, totalRestoredAmount, 'sumar', 'Todos los productos/Cuentas', userId);
+    for (const [cuentaName, amount] of Object.entries(totalRestoredByAccount)) {
+        if (amount > 0) {
+           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Todos los productos (${cuentaName})`, userId, cuentaName);
+        }
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     
-    const finalStatus = (wasGloballyPaid || totalRestoredAmount >= newTotal) && newTotal > 0 ? 'PAID' : 'OPEN';
+    const finalStatus = (wasGloballyPaid || (Object.values(totalRestoredByAccount).reduce((a,b)=>a+b,0) >= newTotal)) && newTotal > 0 ? 'PAID' : 'OPEN';
 
     await order.update({
       status: finalStatus,
