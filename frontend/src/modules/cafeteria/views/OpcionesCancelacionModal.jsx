@@ -16,9 +16,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
 
   useEffect(() => {
     if (isOpen) {
-      // 🔥 FIX 1: Si solo queda una cuenta visible, forzamos el modo 'cuenta'
-      // para evitar que mande el comando de anular la mesa completa por accidente.
-      setTipoCancelacion(cuentas?.length === 1 ? 'cuenta' : 'mesa'); 
+      setTipoCancelacion('mesa'); 
       setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
       setMotivo(''); 
       setIsProcessing(false);
@@ -27,7 +25,6 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   }, [isOpen, cuentas]); 
 
   useEffect(() => {
-    // Si la cuenta seleccionada ya no existe en el array purgado, la reiniciamos
     if (isOpen && cuentas?.length > 0 && (!cuentaSeleccionada || !cuentas.includes(cuentaSeleccionada))) {
       setCuentaSeleccionada(cuentas[0]);
     }
@@ -39,27 +36,18 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   };
 
   const handleConfirmar = async () => {
-    if (isProcessing) return; // PILAR 3: Bloqueo extra por seguridad anti doble-clic
+    if (isProcessing) return; 
     setIsProcessing(true);
     setErrorMessage('');
     
     try {
       const finalMotivo = motivo.trim() || 'Cancelación desde POS';
-      
-      // 🔥 FIX 2: BOMBARDERO QUIRÚRGICO (Anti-Nuclear)
-      // Si eligen cancelar "Toda la Orden", en lugar de enviar 'mesa' al backend 
-      // (lo cual destruiría todas las cuentas, incluidas las ya pagadas/liberadas),
-      // iteramos y cancelamos UNA POR UNA solo las cuentas que están visibles en el modal.
-      if (tipoCancelacion === 'mesa' && cuentas?.length > 1) {
-        for (const acc of cuentas) {
-           await onConfirmar('cuenta', acc, finalMotivo);
-        }
+      // 🔥 REVERTIDO AL COMPORTAMIENTO NATIVO: El backend ya sabe proteger cuentas liberadas
+      if (tipoCancelacion === 'mesa') {
+        await onConfirmar('mesa', null, finalMotivo);
       } else {
-        // Si eligió 'cuenta' o si el sistema forzó 'cuenta' porque solo había 1
         await onConfirmar('cuenta', cuentaSeleccionada || cuentas[0], finalMotivo);
       }
-      
-      // Cerramos el modal tras éxito síncrono
       onClose();
     } catch (error) {
       console.error("Error al cancelar:", error);
@@ -74,7 +62,6 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
       {isOpen && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors">
           
-          {/* PILAR 5: Notificación Flotante "Cápsula Neo-Bento" para Errores */}
           <AnimatePresence>
             {errorMessage && (
               <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -93,7 +80,6 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
             )}
           </AnimatePresence>
 
-          {/* PILAR 4: Geometría Premium y Entrada Animada */}
           <motion.div 
             initial={{ scale: 0.95, y: 20, opacity: 0 }} 
             animate={{ scale: 1, y: 0, opacity: 1 }} 
@@ -109,13 +95,12 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
               {isTakeawayGeneral ? 'Cancelar Pedido' : (hasMultipleAccounts ? 'Opciones de Cancelación' : 'Cancelar Orden')}
             </h3>
             
-            {/* PILAR 4: Textos de confirmación centrados */}
             <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 leading-relaxed font-medium text-center px-2">
               {isTakeawayGeneral 
                 ? 'Ingresa un motivo para cancelar este pedido para llevar.' 
                 : (hasMultipleAccounts 
                     ? 'Selecciona si deseas cancelar toda la orden o solo una cuenta específica.' 
-                    : 'Ingresa un motivo para cancelar esta cuenta.')}
+                    : 'Ingresa un motivo para cancelar esta orden.')}
             </p>
 
             <div className="w-full mb-8 text-left space-y-4">
@@ -123,7 +108,6 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
               {hasMultipleAccounts && (
                 <>
                   <div className="flex flex-col gap-3 mb-4">
-                    {/* PILAR 2: Blindaje Táctil md:hover */}
                     <label className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                       isProcessing ? 'opacity-50 pointer-events-none' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/50 lya:md:hover:bg-lya-bg/50'
                     } ${
