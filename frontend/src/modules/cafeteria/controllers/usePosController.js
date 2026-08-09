@@ -231,9 +231,20 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       }
   };
 
+  // 5. Cálculos Derivados (Orquestados)
   const cuentasDisponibles = useMemo(() => 
     Array.from(new Set([...accounts.nombresCuentas, ...cartLogic.cart.map(i => i.cuenta || 'General')])), 
   [cartLogic.cart, accounts.nombresCuentas]);
+
+  // 🔥 NUEVO: Filtro estricto para el Modal de Cancelación
+  // Solo devuelve las cuentas que tienen productos físicos, activos y visibles en la mesa.
+  // Ignora por completo las cuentas vacías o ya liberadas.
+  const cuentasCancelables = useMemo(() => {
+    const cuentasVivas = cartLogic.cart
+      .filter(item => item.status !== 'CANCELLED')
+      .map(item => item.cuenta || 'General');
+    return Array.from(new Set(cuentasVivas));
+  }, [cartLogic.cart]);
 
   return { 
     cart: cartLogic.cart, 
@@ -261,7 +272,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     cuentaActiva: accounts.cuentaActiva, 
     setCuentaActiva: accounts.setCuentaActiva, 
     cuentasDisponibles, 
-    addNewCuenta: (n, t) => accounts.addNewCuenta(n, t, activeOrderId), 
+    cuentasCancelables, // 🔥 Agregamos la nueva variable exportada
+    addNewCuenta: (n, t) => accounts.addNewCuenta(n, t, activeOrderId),
     paidAccounts: accounts.paidAccounts,
     cuentasTelefonos: accounts.cuentasTelefonos,
     

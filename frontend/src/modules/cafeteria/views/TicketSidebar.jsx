@@ -446,7 +446,10 @@ export const TicketSidebar = ({
     }
   }
 
-  const cuentasCancelables = Array.from(new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General')));
+// 🔥 FIX: Filtramos las cuentas cancelables para excluir las que ya fueron liberadas/ocultas
+  const cuentasCancelables = Array.from(
+    new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General'))
+  ).filter(cuenta => !cuentasOcultasEfectivas.includes(cuenta));
   
   const sentItems = activeCart.filter(i => i.enviadoCocina);
   const itemsNeedingDelivery = sentItems.filter(i => ['PENDING', 'PREPARING', 'READY'].includes(i.kitchenStatus));
