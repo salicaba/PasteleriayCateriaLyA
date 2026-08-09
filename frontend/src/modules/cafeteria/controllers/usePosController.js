@@ -117,7 +117,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
     // 🔥 FIX: Seguro de Vida para Mesas Virtuales
     const isLlevarVirtual = mesaActual?.zona === 'llevar' || mesaActual?.orderType === 'LLEVAR';
-    // Si es Mostrador o Llevar, la consideramos SIEMPRE activa mientras la pantalla esté abierta. ¡Jamás la borrará por error!
     const isMesaActiva = isVitrina || isLlevarVirtual || mesaEstado === 'ocupada' || mesaOrderId != null || activeOrderId != null || rawItems.length > 0;
 
     if (isMesaActiva) {
@@ -177,9 +176,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             };
         });
 
-        // 🛡️ SEGURO ANTI-DESAPARICIÓN PARA "LLEVAR" Y "MOSTRADOR"
-        const isSafeToPurge = mesaOrderId === activeOrderId || mesaEstado === 'ocupada' || rawItems.length > 0;
-
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
@@ -190,10 +186,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
                      const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
                      if (exactMatch) return false; 
-                     
-                     if (!isSafeToPurge) return true;
-                     
-                     return false; 
+                     return true; 
                 }
                 
                 const contentMatch = loadedCart.some(loaded => 
@@ -243,8 +236,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
     }
 
+  // 🔥 FIX MAESTRO: Removemos isSyncLocked y mutations.isProcessing del array de dependencias 
+  // para evitar que el efecto se dispare de forma prematura y sobrescriba los cambios visuales de entrega.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString, mutations.isProcessing, isSyncLocked]);
+  }, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId]);
 
   // 🔥 WRAPPERS ANTI-ZOMBIES
   const wrappedCancelFullOrder = async (motivo) => {

@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/MesasPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2, AlertTriangle, PowerOff } from 'lucide-react';
+import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket'; 
@@ -21,7 +21,9 @@ export const MesasPage = () => {
     mesasSalon, mesasLlevar, isLoading, 
     handleLiberarMesa, handleUpdateTotal, handleUnirMesas, handlePagoParcial,
     nuevoPedidoVitrina, nuevoPedidoLlevar, handleRestoreOrder, handleRestoreItem,
-    handleCancelOrder
+    handleCancelOrder,
+    dailySummary,     // 👈 Resumen diario unificado desde el hook
+    fetchSummary      // 👈 Función de recarga sincronizada
   } = useMesasController();
 
   const [selectedMesa, setSelectedMesa] = useState(null);
@@ -49,22 +51,10 @@ export const MesasPage = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const [dailySummary, setDailySummary] = useState({
-    vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
-  });
   const [showPapelera, setShowPapelera] = useState(false);
   const [showVendidos, setShowVendidos] = useState(false);
 
   const wasActiveRef = useRef(false);
-
-  const fetchSummary = async () => {
-    try {
-      const res = await client.get('/pos/orders/daily-summary');
-      setDailySummary(res.data);
-    } catch (error) {
-      console.error("Error cargando el resumen del día:", error);
-    }
-  };
 
   // 🚀 CEREBRO DE ESTADO GRANULAR PARA EL MESERO
   useEffect(() => {
@@ -106,18 +96,11 @@ export const MesasPage = () => {
     };
   }, []);
 
-  useEffect(() => {
-    fetchSummary();
-    socket.on('pos:update', fetchSummary);
-    return () => { socket.off('pos:update', fetchSummary); };
-  }, []);
-
   // 🔥 AUTO-ACTUALIZADOR DE MESA (Escudo contra cierres forzosos)
   useEffect(() => {
     if (selectedMesa && !isLoading) {
       const todasLasMesas = [...mesasSalon, ...mesasLlevar];
       
-      // Buscamos la versión más reciente de la mesa que estamos viendo
       const mesaActualizada = todasLasMesas.find(m => 
         m.id === selectedMesa.id || 
         (m.orderId && selectedMesa.orderId && m.orderId === selectedMesa.orderId)
@@ -125,14 +108,10 @@ export const MesasPage = () => {
 
       if (mesaActualizada) {
         wasActiveRef.current = true;
-        // Si la mesa cambió de estado (ej. de libre a ocupada porque un cliente pidió),
-        // inyectamos los nuevos datos silenciosamente SIN cerrar el modal
         if (mesaActualizada.orderId !== selectedMesa.orderId || mesaActualizada.estado !== selectedMesa.estado) {
           setSelectedMesa(mesaActualizada);
         }
       } else if (wasActiveRef.current) {
-        // Si la mesa YA NO EXISTE en la lista (ej. una cuenta "Llevar" que se cobró y desapareció)
-        // ENTONCES sí cerramos el modal automáticamente por seguridad.
         setSelectedMesa(null);
         wasActiveRef.current = false;
       }
@@ -147,10 +126,6 @@ export const MesasPage = () => {
     setRestoringOrderId(orderId);
     try {
       await handleRestoreOrder(orderId);
-      setDailySummary(prev => ({
-        ...prev,
-        cancelledOrders: prev.cancelledOrders.filter(o => o.id !== orderId)
-      }));
       showToast('Cuenta restaurada con éxito', 'success'); 
       fetchSummary(); 
     } catch (error) {
@@ -164,10 +139,6 @@ export const MesasPage = () => {
     setRestoringItemId(itemId);
     try {
       await handleRestoreItem(orderId, itemId);
-      setDailySummary(prev => ({
-        ...prev,
-        cancelledItems: prev.cancelledItems.filter(i => i.id !== itemId)
-      }));
       showToast('Producto restaurado con éxito', 'success'); 
       fetchSummary(); 
     } catch (error) {
@@ -225,7 +196,6 @@ export const MesasPage = () => {
   }
 
   const mesasOcupadas = mesasSalon.filter(m => m.estado === 'ocupada').length;
-  // Solo visual para el empleado
   const isLlevarPaused = !globalQrActive || disabledQrs.includes('llevar');
 
   return (
@@ -297,7 +267,6 @@ export const MesasPage = () => {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {mesasSalon.map(mesa => {
-                    // 🔥 SELLO VISUAL: Calculamos el estado apagado y lo inyectamos a la tarjeta
                     const isQrPaused = !globalQrActive || disabledQrs.includes(`mesa-${mesa.numero}`);
 
                     return (
@@ -320,7 +289,6 @@ export const MesasPage = () => {
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="text-gray-400" size={20} />
                   <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Cuentas Para Llevar</h3>
-                  {/* 🔥 SELLO VISUAL PARA LLEVAR (Global) */}
                   {isLlevarPaused && (
                     <span className="bg-amber-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm ml-2 pointer-events-none">
                       QR Pausado
@@ -328,7 +296,6 @@ export const MesasPage = () => {
                   )}
                 </div>
                 
-                {/* 🚀 BOTÓN NUEVA CUENTA (LLEVAR) - SIEMPRE ACTIVO PARA EL EMPLEADO */}
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowLlevarModal(true)}
@@ -352,7 +319,7 @@ export const MesasPage = () => {
                       mesa={pedido} 
                       onClick={() => setSelectedMesa(pedido)} 
                       onCancel={() => setOrderToCancel(pedido)} 
-                      isQrPaused={isLlevarPaused} // Propagamos el estado a la tarjeta
+                      isQrPaused={isLlevarPaused}
                     />
                   ))}
                 </div>

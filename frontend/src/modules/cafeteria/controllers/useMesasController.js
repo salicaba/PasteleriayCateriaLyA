@@ -8,6 +8,11 @@ export const useMesasController = () => {
   const [zonaActiva, setZonaActiva] = useState('salon');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Estado unificado del resumen diario para que la pantalla de carga espere todo
+  const [dailySummary, setDailySummary] = useState({
+    vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
+  });
+
   const zonas = [ 
     { id: 'salon', label: 'Salón' }, 
     { id: 'llevar', label: 'Para Llevar' },
@@ -16,13 +21,19 @@ export const useMesasController = () => {
 
   const loadMesas = useCallback(async () => {
     try {
-      const [tablesRes, activeOrdersRes] = await Promise.all([
+      // 🔥 CARGA CONCURRENTE ATÓMICA: Mesas, Órdenes activas y Resumen Diario juntos
+      const [tablesRes, activeOrdersRes, summaryRes] = await Promise.all([
         client.get('/pos/tables'), 
-        client.get('/pos/orders/active')
+        client.get('/pos/orders/active'),
+        client.get('/pos/orders/daily-summary').catch(() => ({ data: {} }))
       ]);
       
       const catalog = tablesRes.data || [];
       const orders = (activeOrdersRes.data || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      
+      if (summaryRes.data) {
+        setDailySummary(summaryRes.data);
+      }
 
       const mergedMesas = catalog.map(table => {
         const order = orders.find(o => o.tableId === table.id);
@@ -32,7 +43,6 @@ export const useMesasController = () => {
           const cuentasSet = new Set();
           if (order.items) order.items.forEach(item => cuentasSet.add(item.cuenta || 'General'));
           if (order.paidAccounts) order.paidAccounts.forEach(acc => cuentasSet.add(acc));
-          // Si el set está vacío, significa que es una mesa nueva, mostramos 1. Si no, el tamaño real.
           cuentasActivas = cuentasSet.size > 0 ? cuentasSet.size : 1;
         }
 
@@ -59,14 +69,13 @@ export const useMesasController = () => {
           const cuentasActivasFinal = cuentasSet.size > 0 ? cuentasSet.size : 1;
           
           const rawTicketId = o.ticketId || 'Sin Nombre';
-          
           const isVitrina = rawTicketId.startsWith('MOSTRADOR') || rawTicketId.startsWith('VITRINA') || rawTicketId.startsWith('MOS-');
           
           let numeroFinal = rawTicketId;
           if (!isVitrina) {
             numeroFinal = rawTicketId.toLowerCase().includes('llevar') 
-                 ? rawTicketId 
-                 : `Llevar #${indexLlevar} - ${rawTicketId}`;
+               ? rawTicketId 
+               : `Llevar #${indexLlevar} - ${rawTicketId}`;
             indexLlevar++;
           }
           
@@ -91,11 +100,11 @@ export const useMesasController = () => {
     } catch (error) { 
       console.error("Error al sincronizar mesas:", error); 
     } finally { 
+      // 🚀 El loader principal SÓLO se apaga cuando TODO está descargado en memoria
       setIsLoading(false); 
     }
   }, []);
 
-  // 🔥 CORRECCIÓN: Ahora el socket.off solo apaga ESTA función, no todo el sistema
   useEffect(() => { 
     loadMesas(); 
     const onUpdate = () => loadMesas();
@@ -218,6 +227,8 @@ export const useMesasController = () => {
     actualizarEstadoMesa: loadMesas, pagoParcialMesa: loadMesas, unirMesas: loadMesas, 
     nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading,
     mesasSalon, mesasLlevar,
+    dailySummary,            // 👈 Exportamos el resumen unificado
+    fetchSummary: loadMesas, // 👈 Vinculamos el refresco al loadMesas general
     handleLiberarMesa: loadMesas,
     handleUpdateTotal: loadMesas,
     handleUnirMesas: loadMesas,

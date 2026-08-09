@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
+import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -128,7 +128,6 @@ export const PosModal = ({
     if (!isAPaid && isBPaid) return -1;
 
     // 2. Regla de estabilidad: Conservar el orden cronológico original.
-    // Ignoramos el estado del producto (Entregado/Preparando). Solo usamos el índice original de creación.
     const originalIndexA = cuentasDisponibles.indexOf(a);
     const originalIndexB = cuentasDisponibles.indexOf(b);
 
@@ -389,7 +388,8 @@ export const PosModal = ({
     onCancelAccount: cancelAccountItems,
     nombreCliente: isLlevar ? nombreParaSidebar : null,
     onReleaseAccount: releaseAccount,
-    showToast 
+    showToast,
+    isProcessing: isProcessingAction // <- Delegando el estado asíncrono para su prevención de doble click
   };
 
   const totalItemsInCart = activeCart.reduce((acc, curr) => acc + curr.qty, 0);
@@ -425,12 +425,13 @@ export const PosModal = ({
               />
             </div>
             {!inline && (
-              <button 
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
                 onClick={onClose} 
-                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors active:scale-95 shadow-sm shrink-0 outline-none"
+                className="p-3 bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/50 rounded-[1.25rem] text-gray-500 dark:text-gray-400 transition-colors shadow-sm shrink-0 outline-none"
               >
                 <X size={20} />
-              </button>
+              </motion.button>
             )}
           </div>
           <CategoryBar categories={dbCategories} active={categoriaActiva} onSelect={setCategoriaActiva} />
@@ -492,9 +493,10 @@ export const PosModal = ({
       </div>
 
       <div className="md:hidden absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none px-4">
-        <button
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={() => setIsMobileCartOpen(true)}
-          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 active:bg-black dark:bg-white dark:active:bg-gray-100 lya:bg-lya-primary lya:active:bg-lya-primary/90 text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black active:scale-95 transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary outline-none touch-manipulation"
+          className="pointer-events-auto w-full max-w-[320px] bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-white px-6 py-4 rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.3)] flex items-center justify-between font-black transition-all border border-gray-800 dark:border-gray-200 lya:border-lya-primary outline-none touch-manipulation"
         >
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -508,7 +510,7 @@ export const PosModal = ({
             <span className="text-sm uppercase tracking-wider">Comanda</span>
           </div>
           <span className="text-lg bg-white/10 dark:bg-black/10 px-3 py-1 rounded-xl">${(total).toFixed(2)}</span>
-        </button>
+        </motion.button>
       </div>
 
       <AnimatePresence>
@@ -527,12 +529,13 @@ export const PosModal = ({
                   {isVitrina ? 'Cobro Inmediato' : (isLlevar ? 'Venta para Llevar' : 'Consumo en Salón')}
                 </p>
               </div>
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setIsMobileCartOpen(false)}
-                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 active:scale-95 transition-transform shrink-0 outline-none"
+                className="p-2.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-full shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 text-gray-500 transition-transform shrink-0 outline-none md:hover:bg-gray-50 dark:md:hover:bg-gray-600"
               >
                 <ChevronDown size={20} className="text-gray-900 dark:text-white lya:text-lya-text" />
-              </button>
+              </motion.button>
             </div>
             <div className="flex-1 overflow-hidden h-full flex flex-col">
               <TicketSidebar {...sidebarProps} />
@@ -575,7 +578,8 @@ export const PosModal = ({
                         <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text text-center mb-2 line-clamp-2">
                           Ruptura de Promoción
                         </h3>
-                        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-center mb-8 leading-relaxed">
+                        {/* Pilar 4 Tipografía: text-justify para textos descriptivos */}
+                        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify mb-8 leading-relaxed">
                           {promoWarning.message}
                         </p>
                         <div className="flex w-full gap-3">
@@ -634,7 +638,7 @@ export const PosModal = ({
                         }`}>
                           {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
                         </div>
-                        <span className="text-sm">{localToast.msg}</span>
+                        <span className="text-sm text-center">{localToast.msg}</span>
                       </motion.div>
                     </div>
                   )}
