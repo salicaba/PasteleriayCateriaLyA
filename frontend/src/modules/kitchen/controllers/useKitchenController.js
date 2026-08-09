@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import client from '../../../api/client.js';
+import { socket } from '../../../api/socket.js'; // 🔥 IMPORTAMOS EL SOCKET
 
 export const useKitchenController = () => {
   const [orders, setOrders] = useState([]);
@@ -87,6 +88,23 @@ export const useKitchenController = () => {
     fetchKitchenOrders(false);
     const interval = setInterval(() => fetchKitchenOrders(true), 5000);
     return () => clearInterval(interval);
+  }, [fetchKitchenOrders]);
+
+  // 🔥 MAGIA DE LIMPIEZA EN COCINA: Escuchamos las cancelaciones del cajero
+  useEffect(() => {
+    const recargarCocina = () => fetchKitchenOrders(true);
+
+    socket.on('orderItemCancelled', recargarCocina);
+    socket.on('orderCancelled', recargarCocina);
+    socket.on('orderItemRestored', recargarCocina);
+    socket.on('orderRestored', recargarCocina);
+
+    return () => {
+      socket.off('orderItemCancelled', recargarCocina);
+      socket.off('orderCancelled', recargarCocina);
+      socket.off('orderItemRestored', recargarCocina);
+      socket.off('orderRestored', recargarCocina);
+    };
   }, [fetchKitchenOrders]);
 
   return {

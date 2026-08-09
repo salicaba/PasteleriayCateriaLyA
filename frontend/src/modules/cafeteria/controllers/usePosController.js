@@ -149,7 +149,24 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             // 🔥 FUSIÓN BINDADA: Si el estado local se borró (porque te sacó el sistema), usamos el borrador rescatado
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
 
-            const sentButNotLoaded = prev.filter(p => p.enviadoCocina && !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId));
+            // 🔥 FIX CLONAJE: Evita que 2 productos se vuelvan 4 al enviar a cocina
+            const sentButNotLoaded = prev.filter(p => {
+                if (!p.enviadoCocina) return false;
+                
+                // Si el item ya tenía ID de base de datos, verificamos si desapareció
+                if (p.backendItemId) {
+                     return !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId);
+                }
+                
+                // Si es un producto local RECIÉN enviado (no tiene backendItemId aún),
+                // comprobamos si el loadedCart ya nos devolvió ese mismo producto para esa cuenta
+                const yaLlegoDeLaBD = loadedCart.some(loaded => 
+                     loaded.id === p.id && loaded.cuenta === p.cuenta
+                );
+                
+                // Si ya llegó de la BD, destruimos el clon local para no duplicar.
+                return !yaLlegoDeLaBD; 
+            });
             const finalCart = [...loadedCart, ...sentButNotLoaded, ...activeLocals];
             
             if (sincronizarCuentas) {
@@ -194,22 +211,31 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString]);
 
-  // 🔥 WRAPPERS ANTI-ZOMBIES: Limpiamos la memoria local y el localStorage al cancelar
+  // 🔥 WRAPPERS ANTI-ZOMBIES: Limpiamos la memoria y matamos el Error 400
   const wrappedCancelFullOrder = async (motivo) => {
-    await mutations.cancelFullOrder(motivo);
-    if (clearEntireCart) clearEntireCart();
-    localStorage.removeItem(`lya_draft_${mesaId}`);
+      await mutations.cancelFullOrder(motivo);
+      if (clearEntireCart) clearEntireCart();
+      localStorage.removeItem(`lya_draft_${mesaId}`);
+      
+      setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER (Previene Error 400)
+      setOrderStatus('OPEN');
   };
 
   const wrappedCancelAccountItems = async (cuenta, motivo) => {
-    await mutations.cancelAccountItems(cuenta, motivo);
-    if (clearCartByAccount) clearCartByAccount(cuenta);
-    
-    // Si la cuenta que acabamos de matar era la única con productos nuevos, destruimos el borrador
-    const remainingUnsent = cartLogic.cart.filter(p => p.cuenta !== cuenta && !p.enviadoCocina && p.status !== 'CANCELLED');
-    if (remainingUnsent.length === 0) {
-      localStorage.removeItem(`lya_draft_${mesaId}`);
-    }
+      await mutations.cancelAccountItems(cuenta, motivo);
+      if (clearCartByAccount) clearCartByAccount(cuenta);
+      
+      const remainingUnsent = cartLogic.cart.filter(p => p.cuenta !== cuenta && !p.enviadoCocina && p.status !== 'CANCELLED');
+      if (remainingUnsent.length === 0) {
+          localStorage.removeItem(`lya_draft_${mesaId}`);
+      }
+
+      // Si ya no queda NADA vivo en el carrito, matamos el ID de la orden
+      const remainingActive = cartLogic.cart.filter(p => p.cuenta !== cuenta && p.status !== 'CANCELLED');
+      if (remainingActive.length === 0) {
+          setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER
+          setOrderStatus('OPEN');
+      }
   };
 
   // 5. Cálculos Derivados (Orquestados)
