@@ -16,8 +16,9 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
 
   useEffect(() => {
     if (isOpen) {
-      setTipoCancelacion('mesa'); 
-      // Nos aseguramos de seleccionar la primera cuenta válida por defecto
+      // 🔥 FIX 1: Si solo queda una cuenta visible, forzamos el modo 'cuenta'
+      // para evitar que mande el comando de anular la mesa completa por accidente.
+      setTipoCancelacion(cuentas?.length === 1 ? 'cuenta' : 'mesa'); 
       setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
       setMotivo(''); 
       setIsProcessing(false);
@@ -44,7 +45,20 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
     
     try {
       const finalMotivo = motivo.trim() || 'Cancelación desde POS';
-      await onConfirmar(tipoCancelacion, cuentaSeleccionada, finalMotivo);
+      
+      // 🔥 FIX 2: BOMBARDERO QUIRÚRGICO (Anti-Nuclear)
+      // Si eligen cancelar "Toda la Orden", en lugar de enviar 'mesa' al backend 
+      // (lo cual destruiría todas las cuentas, incluidas las ya pagadas/liberadas),
+      // iteramos y cancelamos UNA POR UNA solo las cuentas que están visibles en el modal.
+      if (tipoCancelacion === 'mesa' && cuentas?.length > 1) {
+        for (const acc of cuentas) {
+           await onConfirmar('cuenta', acc, finalMotivo);
+        }
+      } else {
+        // Si eligió 'cuenta' o si el sistema forzó 'cuenta' porque solo había 1
+        await onConfirmar('cuenta', cuentaSeleccionada || cuentas[0], finalMotivo);
+      }
+      
       // Cerramos el modal tras éxito síncrono
       onClose();
     } catch (error) {
@@ -101,7 +115,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                 ? 'Ingresa un motivo para cancelar este pedido para llevar.' 
                 : (hasMultipleAccounts 
                     ? 'Selecciona si deseas cancelar toda la orden o solo una cuenta específica.' 
-                    : 'Ingresa un motivo para cancelar esta orden.')}
+                    : 'Ingresa un motivo para cancelar esta cuenta.')}
             </p>
 
             <div className="w-full mb-8 text-left space-y-4">

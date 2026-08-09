@@ -135,7 +135,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     }
   }, []);
 
-  // 🔥 SOLUCIÓN TEMPORIZADOR DE INACTIVIDAD
+  // 🔥 TEMPORIZADOR DE INACTIVIDAD
   useEffect(() => {
     const updateActivity = () => {
       if (sessionExpired || isConfirmed || finalizedStatus) return;
@@ -171,7 +171,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     };
   }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
 
-  // 🔥 EL FIX DEFINITIVO DE LA APP DEL CLIENTE (Sincronización de Carrito y Espejo)
+  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -206,6 +206,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
                     const note = parsedNotes[i] || {};
                     const newItem = {
                         id: serverItem.productId,
+                        backendItemId: serverItem.id, // 🔥 FIX: Guardamos el ID real para que la cancelación funcione
                         nombre: serverItem.product?.name || 'Producto',
                         imagen: serverItem.product?.imageUrl || null,
                         precioUnitario: precioUnitario,
@@ -303,11 +304,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
 
   const handleDownloadTicket = async () => {
     if (!activeOrderId) return;
-    
-    // 1. Feedback visual inmediato en la UI
     triggerNotification('Generando comprobante digital...', 'success');
-    
-    // 2. Pausa táctica de 800ms para que el botón muestre el loader y el usuario lea el mensaje
     await new Promise(resolve => setTimeout(resolve, 800));
 
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
@@ -316,12 +313,10 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     }
     const shortId = activeOrderId.split('-')[0];
     const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(clientData?.name || '')}`;
-    
-    // 3. El navegador abre la pestaña (la pantalla negra ahora tendrá contexto para el usuario)
     window.open(url, '_blank');
   };
 
-  // 🔥 NUEVA CARGA DE MENÚ
+  // 🔥 CARGA DE MENÚ
   const loadMenuData = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setIsLoading(true);
@@ -523,7 +518,6 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
   };
 
   return {
-    // Variables de Estado y Renderizado
     categories, products, isLoading, activeCategory, setActiveCategory,
     showCheckout, setShowCheckout, selectedProduct, setSelectedProduct,
     showSettings, setShowSettings, showLogoutConfirm, setShowLogoutConfirm,
@@ -531,10 +525,8 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     sessionExpired, finalizedStatus, isOrderPaid, showFinalizedOverlay,
     isServiceActive, isConfirmed, setIsConfirmed, isReadOnly, confirmedSnapshot,
     isLoggingOut, displayName, displayPhone, visibleProducts,
-    // Funciones
     triggerNotification, handleLogout, handleDownloadTicket, cycleTheme, 
     cycleSize, handleAddDirectly, handleConfirmOrder, getCategoryName,
-    // Utils del carrito
     cartUtils
   };
 }

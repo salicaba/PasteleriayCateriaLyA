@@ -36,11 +36,9 @@ export default function ClientApp({ type }) {
   
   const [isAppReady, setIsAppReady] = useState(false);
   
-  // 🔥 ESTADOS DEL GUARDIA DE ENRUTAMIENTO (Active Session Recovery)
   const [isGuarding, setIsGuarding] = useState(false);
   const [guardMessage, setGuardMessage] = useState(null);
 
-  // SINCRONIZADOR DEL COLOR DE LA STATUS BAR PARA ANDROID/SAMSUNG
   useEffect(() => {
     const updateMetaColor = () => {
       let metaThemeColor = document.querySelector("meta[name='theme-color']");
@@ -67,7 +65,6 @@ export default function ClientApp({ type }) {
     return () => observer.disconnect();
   }, []);
 
-  // 1. BLINDAJE DEL ATRAPA-ERRORES
   useEffect(() => {
     const handleError = (event) => {
       if (event.message?.includes('Failed to update a ServiceWorker')) return;
@@ -90,7 +87,6 @@ export default function ClientApp({ type }) {
     };
   }, []);
 
-  // 2. RADAR DE CONEXIÓN PARA EL ACTUALIZADOR
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -203,7 +199,7 @@ export default function ClientApp({ type }) {
     setStandaloneSelection(null); 
   }, []);
 
-  // 🔥 3. EL GUARDIA DE ENRUTAMIENTO UNIFICADO (Active Session Recovery)
+  // 🔥 3. FIX: EL GUARDIA COMPASIVO (Session Recovery)
   useEffect(() => {
     const validateAndRouteSession = async () => {
       if (!clientData) return;
@@ -212,7 +208,6 @@ export default function ClientApp({ type }) {
       let isCollision = false;
       let recoveryPath = '';
 
-      // Detección inteligente de colisión usando 'effectiveTableId' para soportar el Mapeo
       if (sessionType && sessionType !== effectiveType) {
         isCollision = true;
         recoveryPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
@@ -227,23 +222,26 @@ export default function ClientApp({ type }) {
         
         if (activeOrderId) {
           try {
-            // Consulta directa a la fuente de la verdad (Backend)
             const res = await api.get(`/pos/orders/${activeOrderId}/status`, {
               params: { cuenta: clientData?.name }
             });
             const { status, accountStatus } = res.data || {};
             
-            // Si la orden sigue viva, bloqueamos el acceso y redirigimos
-            if (status === 'OPEN' || accountStatus === 'PAID') {
+            // 🔥 LA SOLUCIÓN: Si está abierta o pagada, o si CUALQUIERA de las banderas locales dice
+            // que la persona seguía interactuando con su nota... NO lo echamos al login, lo redirigimos a su mesa.
+            const hasLocalConfirm = localStorage.getItem('lya_client_is_confirmed') === 'true';
+            const hasLocalPaid = localStorage.getItem('lya_client_order_paid') === 'true';
+            const hasFinalized = localStorage.getItem('lya_client_finalized_status');
+
+            if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
               const locationName = sessionType === 'mesa' ? `Mesa ${sessionTableId}` : 'Para Llevar';
-              setGuardMessage(`Tienes una sesión activa en ${locationName}. Redirigiendo...`);
+              setGuardMessage(`Reconectando con tu cuenta en ${locationName}...`);
               
-              // Lock visual (Neo-Bento) por 2.5s antes del redirect
               setTimeout(() => {
                 navigate(recoveryPath, { replace: true });
                 setIsGuarding(false);
                 setGuardMessage(null);
-              }, 2500);
+              }, 2000);
               return; 
             }
           } catch (error) {
@@ -251,13 +249,11 @@ export default function ClientApp({ type }) {
           }
         }
         
-        // Si no hay orden o el backend dice que está muerta, purgamos silenciosamente
         handleClientLogout();
         setIsGuarding(false);
-        return; // Salimos para no ejecutar la redirección normal
+        return; 
       }
 
-      // 🚦 Si NO hay colisión, alineamos la URL limpiamente (Migración de Mapeo a URL correcta)
       if (!isCollision && sessionType === 'mesa' && urlTableId !== sessionTableId) {
         navigate(`/m/${sessionTableId}`, { replace: true });
       } else if (!isCollision && sessionType === 'llevar' && window.location.pathname !== '/llevar') {
@@ -346,7 +342,6 @@ export default function ClientApp({ type }) {
 
   return (
     <>
-      {/* CÁPSULA NEO-BENTO DE REDIRECCIÓN */}
       <AnimatePresence>
         {guardMessage && (
           <motion.div
@@ -449,7 +444,6 @@ export default function ClientApp({ type }) {
           
           <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10 overflow-hidden">
             <AnimatePresence mode="wait">
-              {/* BLOQUEO TOTAL SI ESTAMOS VALIDANDO LA SESIÓN (Evita renderizar componentes hijos) */}
               {isGuarding ? (
                 <motion.div
                   key="guarding"
