@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useState, useMemo, useEffect } from 'react';
 
 // Hooks de Dominio
 import { usePosNotifications } from './usePosNotifications.js';
@@ -177,10 +176,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
             const sentButNotLoaded = prev.filter(p => {
                 if (!p.enviadoCocina) return false;
                 
+                // 🔥 PURGA FÍSICA ESTRICTA:
+                // Si el producto ya tenía un ID asignado, el servidor es su único dueño.
+                // Si el servidor lo manda en 'loadedCart', se renderiza con normalidad.
+                // Si el servidor NO lo manda, es porque se eliminó. ¡Lo destruimos sin dudar!
                 if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
-                     return !loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
+                     return false; 
                 }
                 
+                // (Solo retenemos los productos recién creados que aún no tienen ID)
                 const contentMatch = loadedCart.some(loaded => 
                      String(loaded.id) === String(p.id) && 
                      loaded.cuenta === (p.cuenta || 'General') &&
