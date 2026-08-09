@@ -19,7 +19,7 @@ const getCleanAccountName = (str) => {
       clean = parts.slice(0, -1).join(' ');
   }
   
-  // Eliminamos cualquier número de teléfono pegado al texto
+  // Eliminamos cualquier número de teléfono pegado al texto para que haga match exacto en Caja
   clean = clean.replace(/\d+/g, '').trim();
   
   return clean || 'General';
@@ -68,12 +68,14 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
           tx.description += ` | 📈 +$${appliedAmount.toFixed(2)} (Restaurado: ${detalle})`;
       }
 
+      // Evitamos decimales residuales
       if (nuevoMonto <= 0.01) nuevoMonto = 0;
 
       let newStatus = tx.status;
       let cancelledAt = tx.cancelledAt;
       let cancelledBy = tx.cancelledBy;
 
+      // LA MAGIA: Si llega a 0, la pasamos a ANULADO automáticamente.
       if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
           newStatus = 'CANCELLED';
           cancelledAt = new Date();
@@ -96,7 +98,7 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 };
 
 // ==========================================
-// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL (Con Suspensión de Promos)
+// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL (Transparencia Total 1 a 1)
 // ==========================================
 export const cancelOrderItem = async (req, res) => {
   try {
@@ -118,104 +120,9 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
+    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa, sin magia.
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
-    let isPromoItem = false;
-    let originalPriceForPromo = 0;
-    
-    try {
-        const notesArray = JSON.parse(item.notes || '[]');
-        if (Array.isArray(notesArray)) {
-            const promoMeta = notesArray.find(n => n && n._isPromoMeta);
-            if (promoMeta && promoMeta.isAutoPromo) {
-                isPromoItem = true;
-                originalPriceForPromo = Number(promoMeta.precioOriginal || 0);
-            }
-        }
-    } catch(e) {}
-
-    // Si cancelan la Promo Directamente
-    if (isPromoItem && unitPrice === 0) {
-        const normalPartner = await OrderItem.findOne({
-            where: { orderId: id, productId: item.productId, cuenta: item.cuenta, status: 'ACTIVE' }
-        });
-        if (normalPartner && Number(normalPartner.subtotal) > 0) {
-            refundAmount = (Number(normalPartner.subtotal) / normalPartner.quantity) * qtyToCancel;
-        } else {
-            refundAmount = originalPriceForPromo * qtyToCancel;
-        }
-    }
-
-    // 🔥 SUSPENSIÓN DE PROMOS: Si cancelan un Normal, dormimos a la promo en lugar de matarla
-    if (!isPromoItem && unitPrice > 0) {
-        const promoPartners = await OrderItem.findAll({
-            where: { orderId: id, productId: item.productId, cuenta: item.cuenta, status: 'ACTIVE', id: { [Op.ne]: item.id } }
-        });
-
-        let promosToRevert = qtyToCancel;
-        for (const partner of promoPartners) {
-            if (promosToRevert <= 0) break;
-
-            let isPartnerPromo = false;
-            let pOriginalPrice = 0;
-            let partnerNotes = [];
-            
-            try {
-                partnerNotes = JSON.parse(partner.notes || '[]');
-                if (Array.isArray(partnerNotes)) {
-                    const pMeta = partnerNotes.find(n => n && n._isPromoMeta);
-                    if (pMeta && pMeta.isAutoPromo) {
-                        isPartnerPromo = true;
-                        pOriginalPrice = Number(pMeta.precioOriginal || 0);
-                    }
-                }
-            } catch(e){}
-
-            if (isPartnerPromo) {
-                let partnerUnitPromoPrice = Number(partner.subtotal) / partner.quantity;
-                let qtyToRevert = Math.min(promosToRevert, partner.quantity);
-                let priceDiffPerUnit = pOriginalPrice - partnerUnitPromoPrice;
-
-                if (priceDiffPerUnit > 0) {
-                    refundAmount -= (priceDiffPerUnit * qtyToRevert);
-
-                    // 🔥 LA MAGIA: Ponemos a dormir la promo, guardando su precio de oferta en memoria
-                    const suspendedNotes = partnerNotes.map(n => 
-                        (n && n._isPromoMeta) ? { ...n, isAutoPromo: false, _promoSuspended: true, _suspendedPromoPrice: partnerUnitPromoPrice } : n
-                    );
-
-                    if (qtyToRevert === partner.quantity) {
-                        await partner.update({
-                            subtotal: pOriginalPrice * partner.quantity,
-                            notes: JSON.stringify(suspendedNotes)
-                        });
-                    } else {
-                        const remainingQty = partner.quantity - qtyToRevert;
-                        
-                        // La parte que se queda intacta como promo
-                        await partner.update({
-                            quantity: remainingQty,
-                            subtotal: partnerUnitPromoPrice * remainingQty
-                        });
-
-                        // La parte a la que le rompimos la promo se va a dormir
-                        await OrderItem.create({
-                            orderId: partner.orderId,
-                            productId: partner.productId,
-                            quantity: qtyToRevert,
-                            subtotal: pOriginalPrice * qtyToRevert,
-                            cuenta: partner.cuenta,
-                            isTakeaway: partner.isTakeaway,
-                            notes: JSON.stringify(suspendedNotes),
-                            kitchenStatus: partner.kitchenStatus,
-                            status: 'ACTIVE'
-                        });
-                    }
-                }
-                promosToRevert -= qtyToRevert;
-            }
-        }
-    }
 
     if (refundAmount < 0) refundAmount = 0;
 
@@ -223,6 +130,7 @@ export const cancelOrderItem = async (req, res) => {
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
+      // Pasamos la cuenta específica para el descuento exacto
       await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
     }
 
@@ -252,7 +160,7 @@ export const cancelOrderItem = async (req, res) => {
 
         await item.update({
             quantity: item.quantity - qtyToCancel,
-            subtotal: Math.max(0, Number(item.subtotal) - (unitPrice * qtyToCancel)), 
+            subtotal: Math.max(0, Number(item.subtotal) - refundAmount), 
             notes: JSON.stringify(remainingNotes)
         });
     } else {
@@ -465,7 +373,7 @@ export const getDailySummary = async (req, res) => {
 };
 
 // ==========================================
-// ♻️ RESTAURAR PRODUCTO CANCELADO (Reviviendo Promos)
+// ♻️ RESTAURAR PRODUCTO CANCELADO (Transparencia Total 1 a 1)
 // ==========================================
 export const restoreOrderItem = async (req, res) => {
   try {
@@ -484,20 +392,10 @@ export const restoreOrderItem = async (req, res) => {
     const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
     let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
+    // 🔥 CÁLCULO 1 A 1: Restauramos exactamente el valor que el producto tiene guardado
     let unitPrice = Number(item.subtotal) / item.quantity;
     let amountToRestore = unitPrice * item.quantity;
 
-    try {
-        const notesArray = JSON.parse(item.notes || '[]');
-        if (Array.isArray(notesArray)) {
-            const promoMeta = notesArray.find(n => n && n._isPromoMeta);
-            if (promoMeta && promoMeta.isAutoPromo && unitPrice === 0) {
-                amountToRestore = Number(promoMeta.precioOriginal || 0) * item.quantity;
-            }
-        }
-    } catch(e) {}
-
-    // Revivimos el item en la base de datos primero
     await item.update({
       status: 'ACTIVE',
       cancelledAt: null,
@@ -505,77 +403,9 @@ export const restoreOrderItem = async (req, res) => {
       cancelledBy: null
     });
 
-    // 🔥 FIX RESTAURAR PROMOCIONES: Buscamos si hay promos "dormidas" para despertarlas
-    let promoDiscountToApply = 0;
-    
-    const suspendedPartners = await OrderItem.findAll({
-        where: { orderId: id, productId: item.productId, cuenta: item.cuenta, status: 'ACTIVE', id: { [Op.ne]: item.id } }
-    });
-    
-    let reactivationsAvailable = item.quantity;
-    
-    for (const partner of suspendedPartners) {
-        if (reactivationsAvailable <= 0) break;
-        
-        let pNotes = [];
-        try { pNotes = JSON.parse(partner.notes || '[]'); } catch(e){}
-        const pMeta = pNotes.find(n => n && n._promoSuspended);
-        
-        if (pMeta) {
-            let qtyToReactivate = Math.min(reactivationsAvailable, partner.quantity);
-            let pOriginalPrice = Number(pMeta.precioOriginal || 0);
-            let pPromoPrice = Number(pMeta._suspendedPromoPrice || 0);
-            
-            let priceDiffPerUnit = pOriginalPrice - pPromoPrice;
-            
-            if (priceDiffPerUnit > 0) {
-                promoDiscountToApply += (priceDiffPerUnit * qtyToReactivate);
-                
-                // Le quitamos el estado de "suspendido" y le devolvemos su insignia de Promo
-                const reactivatedNotes = pNotes.map(n => 
-                    (n && n._promoSuspended) ? { ...n, isAutoPromo: true, _promoSuspended: false } : n
-                );
-                
-                if (qtyToReactivate === partner.quantity) {
-                    await partner.update({
-                        subtotal: pPromoPrice * partner.quantity,
-                        notes: JSON.stringify(reactivatedNotes)
-                    });
-                } else {
-                    const remainingQty = partner.quantity - qtyToReactivate;
-                    
-                    await partner.update({
-                        quantity: remainingQty,
-                        subtotal: pOriginalPrice * remainingQty 
-                    });
-                    
-                    await OrderItem.create({
-                        orderId: partner.orderId,
-                        productId: partner.productId,
-                        quantity: qtyToReactivate,
-                        subtotal: pPromoPrice * qtyToReactivate, 
-                        cuenta: partner.cuenta,
-                        isTakeaway: partner.isTakeaway,
-                        notes: JSON.stringify(reactivatedNotes),
-                        kitchenStatus: partner.kitchenStatus,
-                        status: 'ACTIVE'
-                    });
-                }
-            }
-            reactivationsAvailable -= qtyToReactivate;
-        }
-    }
-
-    // Ajustamos la caja (Sumamos el producto restaurado, y restamos el descuento de la promo que revivió)
-    if (wasPaid) {
-      let finalAmountToAddToTx = amountToRestore - promoDiscountToApply;
+    if (wasPaid && amountToRestore > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      
-      if (finalAmountToAddToTx > 0) {
-          await modificarTransaccionOriginal(order.id, finalAmountToAddToTx, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta);
-      } else if (finalAmountToAddToTx < 0) {
-          await modificarTransaccionOriginal(order.id, Math.abs(finalAmountToAddToTx), 'restar', `Ajuste Promo ${nombreProducto}`, userId, item.cuenta);
-      }
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta);
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
