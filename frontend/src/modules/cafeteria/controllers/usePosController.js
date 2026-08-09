@@ -25,29 +25,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const menu = usePosMenu(isVitrina);
   const accounts = usePosAccounts();
 
-  // 🔥 NUEVO: Candado de Sincronización (Cooldown Lock)
-  const [isSyncLocked, setIsSyncLocked] = useState(false);
-  const syncLockTimeout = useRef(null);
-
-  // Efecto para activar el candado durante y después de una mutación
-  useEffect(() => {
-    if (mutations.isProcessing) {
-      setIsSyncLocked(true);
-      if (syncLockTimeout.current) clearTimeout(syncLockTimeout.current);
-      return;
-    }
-
-    // Cuando termina la mutación, mantenemos el escudo activo por 1.5 segundos
-    // para ignorar los datos viejos que vienen rezagados en el WebSocket.
-    syncLockTimeout.current = setTimeout(() => {
-      setIsSyncLocked(false);
-    }, 1500);
-
-    return () => clearTimeout(syncLockTimeout.current);
-  }, [mutations.isProcessing]);
-  
   const cartLogic = usePosCart(accounts.cuentaActiva, accounts.cuentasPagadasReales, showToast || triggerNotification);
 
+  // 🔥 1. PRIMERO declaramos mutations
   const mutations = usePosMutations({
     cart: cartLogic.cart,
     setCart: cartLogic.setCart,
@@ -60,6 +40,26 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     cuentasPagadasReales: accounts.cuentasPagadasReales,
     triggerNotification: showToast || triggerNotification 
   });
+
+  // 🔥 2. LUEGO declaramos el candado (Cooldown Lock)
+  const [isSyncLocked, setIsSyncLocked] = useState(false);
+  const syncLockTimeout = useRef(null);
+
+  // 🔥 3. AHORA SÍ usamos el useEffect porque mutations ya existe
+  useEffect(() => {
+    if (mutations.isProcessing) {
+      setIsSyncLocked(true);
+      if (syncLockTimeout.current) clearTimeout(syncLockTimeout.current);
+      return;
+    }
+
+    syncLockTimeout.current = setTimeout(() => {
+      setIsSyncLocked(false);
+    }, 1500);
+
+    return () => clearTimeout(syncLockTimeout.current);
+  }, [mutations.isProcessing]);
+
 
   // 4. EL ORQUESTADOR DE SINCRONIZACIÓN (Base de Datos a UI)
   const { setCart, clearEntireCart, clearCartByAccount } = cartLogic;
