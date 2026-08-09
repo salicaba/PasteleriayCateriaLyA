@@ -7,24 +7,51 @@ import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
 
 // =====================================================================
-// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Ahora Inteligente por Cuentas)
+// 🧠 HELPER: LIMPIEZA EXTREMA DE NOMBRES DE CUENTA (Fix Teléfonos)
+// =====================================================================
+const getCleanAccountName = (str) => {
+  if (!str) return 'General';
+  let clean = String(str);
+  
+  // Limpiamos los formatos conocidos del frontend ("Nombre | Tel" o "Nombre - Tel")
+  if (clean.includes(' | ')) clean = clean.split(' | ')[0];
+  if (clean.includes(' - ')) {
+      const parts = clean.split(' - ');
+      clean = parts.slice(0, -1).join(' ');
+  }
+  
+  // 🔥 FIX CRÍTICO: Eliminamos cualquier número de teléfono pegado al texto (ej. Salinas9611191492 -> Salinas)
+  clean = clean.replace(/\d+/g, '').trim();
+  
+  return clean || 'General';
+};
+
+// =====================================================================
+// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Precisión Láser por Cuenta)
 // =====================================================================
 const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null) => {
   let whereClause = { referenceId: orderId, type: 'INCOME' };
   
-  // Obtenemos todas las transacciones de esta mesa
   let txs = await Transaction.findAll({
       where: whereClause,
       order: [['createdAt', 'DESC']]
   });
 
-  // 🔥 FIX FRANCOTIRADOR CIEGO: Buscamos exactamente el ticket de la cuenta afectada
-  let targetTxs = cuentaName 
-    ? txs.filter(tx => tx.description && tx.description.includes(`Cuenta: ${cuentaName}`)) 
-    : txs;
+  let targetTxs = txs;
   
-  // Si por alguna razón no encuentra la cuenta exacta (ej. Cobro de Mesa Completa), usamos el historial general
-  if (targetTxs.length === 0) targetTxs = txs; 
+  if (cuentaName) {
+    const cleanTarget = getCleanAccountName(cuentaName);
+    
+    // Buscamos transacciones cuya descripción contenga exactamente el nombre limpio
+    const filteredTxs = txs.filter(tx => 
+      tx.description && tx.description.includes(`Cuenta: ${cleanTarget}`)
+    );
+    
+    // 🎯 Si lo encuentra, fijamos el objetivo exclusivamente a esta cuenta
+    if (filteredTxs.length > 0) {
+       targetTxs = filteredTxs; 
+    }
+  }
 
   let remainingMonto = monto;
 
@@ -53,11 +80,14 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
       let cancelledAt = tx.cancelledAt;
       let cancelledBy = tx.cancelledBy;
 
+      // LA MAGIA: Si llega a 0, la pasamos a ANULADO automáticamente.
       if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
           newStatus = 'CANCELLED';
           cancelledAt = new Date();
           cancelledBy = userId;
-      } else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
+      } 
+      // Si estaba anulada y le regresamos dinero, la revivimos.
+      else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
           newStatus = 'ACTIVE';
           cancelledAt = null;
           cancelledBy = null;
@@ -75,7 +105,7 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 };
 
 // ==========================================
-// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL (Blindado anti-errores)
+// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL
 // ==========================================
 export const cancelOrderItem = async (req, res) => {
   try {
@@ -83,7 +113,11 @@ export const cancelOrderItem = async (req, res) => {
     const { cancelReason, cancelQty } = req.body; 
     const userId = req.user?.id; 
 
-    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id }, include: [{ model: Product, as: 'product' }] });
+    const item = await OrderItem.findOne({ 
+      where: { id: itemId, orderId: id }, 
+      include: [{ model: Product, as: 'product' }] 
+    });
+    
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
 
     const order = await Order.findByPk(id, {
@@ -93,20 +127,33 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // 🔥 FIX PROMOCIONES: Detectamos si el ítem cancelado era una promoción
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
     let isPromoItem = false;
+    let originalPriceForPromo = 0;
     
     try {
         const notesArray = JSON.parse(item.notes || '[]');
         if (Array.isArray(notesArray)) {
             const promoMeta = notesArray.find(n => n && n._isPromoMeta);
-            if (promoMeta && promoMeta.isAutoPromo) isPromoItem = true;
+            if (promoMeta && promoMeta.isAutoPromo) {
+                isPromoItem = true;
+                originalPriceForPromo = Number(promoMeta.precioOriginal || 0);
+            }
         }
     } catch(e) {}
 
-    // 🔥 RECÁLCULO INTELIGENTE: Si se cancela un producto NORMAL, revertimos la promo de otro ítem
+    if (isPromoItem && unitPrice === 0) {
+        const normalPartner = await OrderItem.findOne({
+            where: { orderId: id, productId: item.productId, cuenta: item.cuenta, status: 'ACTIVE' }
+        });
+        if (normalPartner && Number(normalPartner.subtotal) > 0) {
+            refundAmount = (Number(normalPartner.subtotal) / normalPartner.quantity) * qtyToCancel;
+        } else {
+            refundAmount = originalPriceForPromo * qtyToCancel;
+        }
+    }
+
     if (!isPromoItem && unitPrice > 0) {
         const promoPartners = await OrderItem.findAll({
             where: { orderId: id, productId: item.productId, cuenta: item.cuenta, status: 'ACTIVE', id: { [Op.ne]: item.id } }
@@ -137,18 +184,15 @@ export const cancelOrderItem = async (req, res) => {
                 let priceDiffPerUnit = pOriginalPrice - partnerUnitPromoPrice;
 
                 if (priceDiffPerUnit > 0) {
-                    // Restamos la penalización por romper la promo del reembolso total
                     refundAmount -= (priceDiffPerUnit * qtyToRevert);
 
                     if (qtyToRevert === partner.quantity) {
-                        // Quitamos el tag de promo y lo regresamos a precio normal
                         const cleanedNotes = partnerNotes.filter(n => !(n && n._isPromoMeta));
                         await partner.update({
                             subtotal: pOriginalPrice * partner.quantity,
                             notes: JSON.stringify(cleanedNotes)
                         });
                     } else {
-                        // Si era un grupo de promos, dividimos el ítem
                         const remainingQty = partner.quantity - qtyToRevert;
                         const cleanedNotes = partnerNotes.filter(n => !(n && n._isPromoMeta));
                         
@@ -175,14 +219,13 @@ export const cancelOrderItem = async (req, res) => {
         }
     }
 
-    // Evitamos reembolsos negativos por errores de cálculo
     if (refundAmount < 0) refundAmount = 0;
 
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      // 🔥 PASAMOS LA CUENTA ESPECÍFICA PARA QUE DESCUENTE DEL LUGAR CORRECTO
+      // 🔥 Mandamos 'item.cuenta' a la función maestra
       await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
     }
 
@@ -199,7 +242,7 @@ export const cancelOrderItem = async (req, res) => {
             orderId: item.orderId,
             productId: item.productId,
             quantity: qtyToCancel,
-            subtotal: refundAmount, // Guardamos el valor matemáticamente correcto
+            subtotal: refundAmount,
             cuenta: item.cuenta,
             isTakeaway: item.isTakeaway,
             notes: JSON.stringify(cancelledNotes),
@@ -212,7 +255,7 @@ export const cancelOrderItem = async (req, res) => {
 
         await item.update({
             quantity: item.quantity - qtyToCancel,
-            subtotal: Math.max(0, Number(item.subtotal) - (unitPrice * qtyToCancel)), 
+            subtotal: Math.max(0, Number(item.subtotal) - refundAmount), 
             notes: JSON.stringify(remainingNotes)
         });
     } else {
@@ -307,7 +350,6 @@ export const cancelOrder = async (req, res) => {
     
     const motivoFinal = cancelReason ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` : `Cancelación de ${textoPapelera}`;
 
-    // 🔥 FIX: Agrupamos el reembolso por Cuentas para no cruzar los recibos de la Caja
     let totalRefundByAccount = {};
 
     for (const item of order.items) {
@@ -332,10 +374,10 @@ export const cancelOrder = async (req, res) => {
       }
     }
 
-    // Procesamos la devolución a cada recibo de forma individual
     for (const [cuentaName, amount] of Object.entries(totalRefundByAccount)) {
        if (amount > 0) {
-          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa completa (${cuentaName})`, userId, cuentaName);
+          // 🔥 Aquí también mandamos la cuenta para que cancele con precisión láser
+          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName);
        }
     }
 
@@ -447,11 +489,21 @@ export const restoreOrderItem = async (req, res) => {
     let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
     if (wasPaid) {
-      const unitPrice = Number(item.subtotal) / item.quantity;
-      const amountToRestore = unitPrice * item.quantity;
+      let unitPrice = Number(item.subtotal) / item.quantity;
+      let amountToRestore = unitPrice * item.quantity;
+
+      try {
+          const notesArray = JSON.parse(item.notes || '[]');
+          if (Array.isArray(notesArray)) {
+              const promoMeta = notesArray.find(n => n && n._isPromoMeta);
+              if (promoMeta && promoMeta.isAutoPromo && unitPrice === 0) {
+                  amountToRestore = Number(promoMeta.precioOriginal || 0) * item.quantity;
+              }
+          }
+      } catch(e) {}
+
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      
-      // 🔥 FIX RESTAURAR: Lo inyectamos de vuelta a la cuenta específica
+      // 🔥 RESTAURACIÓN LÁSER POR CUENTA
       await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta);
     }
 
@@ -543,7 +595,7 @@ export const restoreOrder = async (req, res) => {
 
     for (const [cuentaName, amount] of Object.entries(totalRestoredByAccount)) {
         if (amount > 0) {
-           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Todos los productos (${cuentaName})`, userId, cuentaName);
+           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName);
         }
     }
 
