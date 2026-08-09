@@ -14,22 +14,37 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   const hasMultipleAccounts = cuentas?.length > 1;
   const isTakeawayGeneral = !hasMultipleAccounts && cuentas?.[0] === 'General';
 
-  // 🔥 FIX 1: Separamos el inicio del modal para que NO apague el loading (isProcessing) 
-  // cuando reciba actualizaciones por WebSocket a mitad del proceso.
+  // 🔥 FIX 1: INICIALIZACIÓN CONTROLADA
+  // Este efecto SOLO corre cuando el modal se abre. Evita el "Aggressive State Reset"
+  // que te forzaba a regresar a "Toda la Orden" cuando el componente padre se renderizaba.
   useEffect(() => {
     if (isOpen) {
       setErrorMessage('');
-      // Solo ajustamos los selects si NO estamos a mitad de una cancelación
+      setMotivo('');
       if (!isProcessing) {
-        setTipoCancelacion(cuentas?.length === 1 ? 'cuenta' : 'mesa'); 
-        if (!cuentaSeleccionada || !cuentas?.includes(cuentaSeleccionada)) {
-          setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
-        }
-        setMotivo(''); 
+        const cuentasArray = cuentas || [];
+        setTipoCancelacion(cuentasArray.length === 1 ? 'cuenta' : 'mesa'); 
+        setCuentaSeleccionada(cuentasArray.length > 0 ? cuentasArray[0] : '');
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, cuentas]); // Quitamos el setIsProcessing(false) que causaba el parpadeo
+  }, [isOpen]); // Dependencia exclusiva en isOpen
+
+  // 🔥 FIX 2: SINCRONIZACIÓN PASIVA (Manejo de cuentas liberadas en tiempo real)
+  // Si una cuenta es liberada desde otra pantalla y desaparece de 'cuentas',
+  // ajustamos el select, pero NO tocamos el radio button del usuario a menos que solo quede 1.
+  useEffect(() => {
+    if (isOpen && !isProcessing) {
+      const cuentasArray = cuentas || [];
+      if (cuentaSeleccionada && !cuentasArray.includes(cuentaSeleccionada)) {
+        setCuentaSeleccionada(cuentasArray.length > 0 ? cuentasArray[0] : '');
+        // Forzamos a 'cuenta' solo si el websocket nos redujo a una única cuenta viva
+        if (cuentasArray.length === 1) {
+          setTipoCancelacion('cuenta');
+        }
+      }
+    }
+  }, [cuentas, cuentaSeleccionada, isOpen, isProcessing]);
 
   const handleConfirmar = async () => {
     if (isProcessing) return; // PILAR 3: Bloqueo extra por seguridad anti doble-clic
@@ -39,24 +54,19 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
     try {
       const finalMotivo = motivo.trim() || 'Cancelación desde POS';
       
-      // 🔥 FIX 2: BOMBARDERO QUIRÚRGICO (Anti-Nuclear)
-      // Si eligen cancelar "Toda la Orden", en lugar de enviar 'mesa' al backend 
-      // (lo cual destruiría todas las cuentas, incluidas las ya pagadas/liberadas),
-      // iteramos y cancelamos UNA POR UNA solo las cuentas que están visibles en el modal.
+      // BOMBARDERO QUIRÚRGICO (Anti-Nuclear)
       if (tipoCancelacion === 'mesa' && cuentas?.length > 1) {
         for (const acc of cuentas) {
            await onConfirmar('cuenta', acc, finalMotivo);
         }
       } else {
-        // Si eligió 'cuenta' o si el sistema forzó 'cuenta' porque solo había 1
         await onConfirmar('cuenta', cuentaSeleccionada || cuentas[0], finalMotivo);
       }
       
-      // Cerramos el modal tras éxito síncrono
       onClose();
     } catch (error) {
       console.error("Error al cancelar:", error);
-      showError(error?.response?.data?.message || error.message || "Ocurrió un error al procesar la cancelación.");
+      setErrorMessage(error?.response?.data?.message || error.message || "Ocurrió un error al procesar la cancelación.");
     } finally {
       setIsProcessing(false);
     }
