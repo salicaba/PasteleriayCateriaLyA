@@ -344,8 +344,7 @@ export const usePosMutations = ({
   };
 
   const cancelAccountItems = async (cuentaName, cancelReason = 'Cancelación de cuenta') => {
-    // 🔥 FIX: Solo tomamos los items que están 'ACTIVE'. Los 'CLOSED' (Liberados) se ignoran.
-    const itemsToCancel = cart.filter(item => item.cuenta === cuentaName && item.enviadoCocina && item.status === 'ACTIVE');
+    const itemsToCancel = cart.filter(item => item.cuenta === cuentaName && item.enviadoCocina && item.status !== 'CANCELLED');
     if (itemsToCancel.length === 0) return;
     
     if (lockRef.current) return;
