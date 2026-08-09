@@ -42,7 +42,7 @@ export const usePosMutations = ({
         id: dbItem.productId, 
         nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
         imagen: dbItem.product?.imageUrl || null, 
-        precio: parseFloat(dbItem.subtotal) / dbItem.quantity, 
+        precio: parseFloat(dbItem.subtotal) / (dbItem.quantity || 1), // 🔥 Prevención NaN
         qty: dbItem.quantity, 
         preparaciones: parsedPreps, 
         enviadoCocina: true, 
@@ -50,8 +50,8 @@ export const usePosMutations = ({
         status: dbItem.status || 'ACTIVE', 
         cuenta: dbItem.cuenta || 'General', 
         isTakeaway: dbItem.isTakeaway || false, 
-        backendItemId: String(dbItem.id), 
-        requiereCocina: itemsNuevos.find(n => n.id === dbItem.productId)?.requiereCocina !== false,
+        backendItemId: String(dbItem.id), // 🛡️ Blindado como String
+        requiereCocina: itemsNuevos.find(n => String(n.id) === String(dbItem.productId))?.requiereCocina !== false,
         isAutoPromo: dbItem.isAutoPromo || false,
         promoLabel: dbItem.promoLabel || null,
         precioOriginal: dbItem.precioOriginal || null

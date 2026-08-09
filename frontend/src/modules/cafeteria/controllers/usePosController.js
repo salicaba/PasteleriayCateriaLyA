@@ -1,4 +1,3 @@
-// src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect } from 'react';
 
 // Hooks de Dominio
@@ -51,7 +50,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     sincronizarCuentas 
   } = accounts;
 
-  // Variables Primitivas para useEffect
+  // Variables Primitivas para useEffect (Previene re-renders innecesarios)
   const mesaId = mesaActual?.id;
   const mesaEstado = mesaActual?.estado;
   const mesaOrderId = mesaActual?.orderId;
@@ -68,7 +67,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       if (unsentDraft.length > 0) {
         localStorage.setItem(`lya_draft_${mesaId}`, JSON.stringify(unsentDraft));
       } else {
-        // Si el carrito está vacío o todo ya fue enviado, limpiamos el borrador
         localStorage.removeItem(`lya_draft_${mesaId}`);
       }
     }
@@ -87,7 +85,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         return;
     }
 
-    // RECUPERAR EL BORRADOR DE LOCALSTORAGE
     let recoveredDraft = [];
     try {
       const draftStr = localStorage.getItem(`lya_draft_${mesaId}`);
@@ -131,7 +128,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 id: item.productId,
                 nombre: item.product?.name || item.product?.nombre || 'Producto',
                 imagen: item.product?.imageUrl || null,
-                precio: parseFloat(item.subtotal) / item.quantity,
+                precio: parseFloat(item.subtotal) / (item.quantity || 1), // Blindaje contra NaN
                 qty: item.quantity,
                 preparaciones: parsedPreps,
                 enviadoCocina: true,
@@ -139,34 +136,33 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 status: item.status || 'ACTIVE',
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway || false,
-                backendItemId: item.id,
-                requiereCocina: item.product?.requiereCocina !== false 
+                backendItemId: String(item.id), // 🔥 FIX: Casteo explícito a String para evitar coerción fallida
+                requiereCocina: item.product?.requiereCocina !== false,
+                isAutoPromo: item.isAutoPromo || false, // Sincronizado con mutations
+                promoLabel: item.promoLabel || null,
+                precioOriginal: item.precioOriginal || null
             };
         });
 
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
-            // 🔥 FUSIÓN BINDADA: Si el estado local se borró (porque te sacó el sistema), usamos el borrador rescatado
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
 
-            // 🔥 FIX CLONAJE: Evita que 2 productos se vuelvan 4 al enviar a cocina
+            // 🔥 FIX CLONAJE: Filtro blindado con comparación estricta de Strings
             const sentButNotLoaded = prev.filter(p => {
                 if (!p.enviadoCocina) return false;
                 
-                // Si el item ya tenía ID de base de datos, verificamos si desapareció
                 if (p.backendItemId) {
-                     return !loadedCart.some(loaded => loaded.backendItemId === p.backendItemId);
+                     return !loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
                 }
                 
-                // Si es un producto local RECIÉN enviado (no tiene backendItemId aún),
-                // comprobamos si el loadedCart ya nos devolvió ese mismo producto para esa cuenta
                 const yaLlegoDeLaBD = loadedCart.some(loaded => 
-                     loaded.id === p.id && loaded.cuenta === p.cuenta
+                     String(loaded.id) === String(p.id) && loaded.cuenta === (p.cuenta || 'General')
                 );
                 
-                // Si ya llegó de la BD, destruimos el clon local para no duplicar.
                 return !yaLlegoDeLaBD; 
             });
+
             const finalCart = [...loadedCart, ...sentButNotLoaded, ...activeLocals];
             
             if (sincronizarCuentas) {
@@ -187,13 +183,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
         
     } else {
-        // 🔥 FIX 400: MESA LIBRE -> Debemos purgar el ID de la orden cancelada 
-        // para que no intente inyectar productos nuevos a un ticket muerto.
+        // 🔥 FIX 400: MESA LIBRE -> Purgamos el ID de la orden para evitar Zombie Orders
         setActiveOrderId(null);
         setOrderStatus('OPEN');
         setPaidAccounts([]);
 
-        // Solo usamos el carrito local o el borrador recuperado
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
@@ -211,13 +205,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString]);
 
-  // 🔥 WRAPPERS ANTI-ZOMBIES: Limpiamos la memoria y matamos el Error 400
+  // 🔥 WRAPPERS ANTI-ZOMBIES
   const wrappedCancelFullOrder = async (motivo) => {
       await mutations.cancelFullOrder(motivo);
       if (clearEntireCart) clearEntireCart();
       localStorage.removeItem(`lya_draft_${mesaId}`);
       
-      setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER (Previene Error 400)
+      setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER
       setOrderStatus('OPEN');
   };
 
@@ -230,7 +224,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
           localStorage.removeItem(`lya_draft_${mesaId}`);
       }
 
-      // Si ya no queda NADA vivo en el carrito, matamos el ID de la orden
       const remainingActive = cartLogic.cart.filter(p => p.cuenta !== cuenta && p.status !== 'CANCELLED');
       if (remainingActive.length === 0) {
           setActiveOrderId(null); // <-- DESTRUYE EL CADÁVER
@@ -238,12 +231,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       }
   };
 
-  // 5. Cálculos Derivados (Orquestados)
   const cuentasDisponibles = useMemo(() => 
     Array.from(new Set([...accounts.nombresCuentas, ...cartLogic.cart.map(i => i.cuenta || 'General')])), 
   [cartLogic.cart, accounts.nombresCuentas]);
 
-  // 6. RETORNO DE API PÚBLICA (Compatibilidad 100% garantizada)
   return { 
     cart: cartLogic.cart, 
     total: cartLogic.total, 
