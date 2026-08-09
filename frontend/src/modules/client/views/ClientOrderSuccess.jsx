@@ -1,5 +1,5 @@
 // frontend/src/modules/client/views/ClientOrderSuccess.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag } from 'lucide-react';
 import { socket } from '../../../api/socket.js';
@@ -7,11 +7,12 @@ import { socket } from '../../../api/socket.js';
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
-  // 🔥 SINCRONIZACIÓN EN TIEMPO REAL CON CAJA
-  const [liveCart, setLiveCart] = useState([]);
+  // 🔥 FIX: Inicializamos sincrónicamente para evitar el "falso vacío" que te expulsaba
+  const [liveCart, setLiveCart] = useState(() => (cart || []).filter(item => item.status !== 'CANCELLED'));
+  
+  const isFirstRender = useRef(true);
   
   useEffect(() => {
-    // Limpiamos lo que venga del caché si ya estaba cancelado por backend
     setLiveCart((cart || []).filter(item => item.status !== 'CANCELLED'));
   }, [cart]);
 
@@ -53,9 +54,14 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     };
   }, [tableId, onReset]);
 
-  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh): Sobrescribe la memoria del navegador
+  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh): Ahora respeta el primer render
   useEffect(() => {
-    if (liveCart.length === 0 && cart.length > 0) {
+    if (isFirstRender.current) {
+        isFirstRender.current = false;
+        return; 
+    }
+
+    if (liveCart.length === 0 && cart && cart.length > 0) {
        onReset(); // Todo fue anulado 1 por 1
     } else if (liveCart.length > 0 && (liveCart.length !== cart.length || liveCart.some((l, i) => cart[i] && l.qty !== cart[i].qty))) {
        try {
@@ -68,7 +74,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                        if (parsed.items) {
                            parsed.items = liveCart;
                            parsed.total = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
-                           localStorage.setItem(key, JSON.stringify(parsed)); // ¡Memoria actualizada!
+                           localStorage.setItem(key, JSON.stringify(parsed));
                        }
                    }
                }
@@ -93,6 +99,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
+  // Obtenemos solo el primer nombre para un trato más cercano
   const primerNombre = displayName.split(' ')[0] || 'Cliente';
 
   // --- VISTA: Menú Solo Lectura ---
@@ -220,6 +227,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           </p>
         </div>
 
+        {/* Tarjeta Minimalista tipo Apple Pay / Fintech */}
         <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-[#EADCC9] relative overflow-hidden shrink-0">
           
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
