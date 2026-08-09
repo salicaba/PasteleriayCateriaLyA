@@ -116,7 +116,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
   };
 
   // Blindaje para evitar crasheos si el router manda tableId como objeto
-  const displayTableId = typeof tableId === 'object' ? tableId?.id || tableId?.tableId || 'Desconocida' : tableId;
+  const displayTableId = typeof tableId === 'object' ? tableId?.numero || tableId?.id || tableId?.tableId || 'Desconocida' : tableId;
 
   // PILAR 1: Responsividad Estricta y Flexbox (Anti-Ghost Scroll)
   return (

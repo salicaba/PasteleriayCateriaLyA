@@ -606,10 +606,16 @@ export const TicketSidebar = ({
         cuentas={cuentasCancelables}
         onConfirmar={async (tipo, cuenta, motivo) => {
           try {
-            if (tipo === 'mesa') {
+            // 🔥 AUTO-DETECCIÓN: Verificamos si la cuenta seleccionada es la ÚLTIMA viva en la mesa
+            const cuentasActivas = Array.from(new Set(activeCart.map(i => i.cuenta || 'General')));
+            const esLaUltimaCuenta = cuentasActivas.length === 1 && cuentasActivas[0] === cuenta;
+
+            // Si eligen 'Toda la Mesa' O es la última cuenta disponible, destruimos toda la orden
+            if (tipo === 'mesa' || esLaUltimaCuenta) {
                 if (onCancelFullOrder) await onCancelFullOrder(motivo);
-                toast('Orden completa cancelada', 'success');
+                toast(esLaUltimaCuenta ? 'Última cuenta cancelada. Mesa liberada.' : 'Orden completa cancelada', 'success');
             } else {
+                // Solo cancelamos la cuenta parcialmente si aún quedan más cuentas vivas en la mesa
                 if (onCancelAccount) await onCancelAccount(cuenta, motivo);
                 toast(`Cuenta ${parseAccountName(cuenta)} cancelada exitosamente`, 'success');
             }

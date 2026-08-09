@@ -117,6 +117,13 @@ export default function ClientApp({ type }) {
     ? String(standaloneSelection.tableId) 
     : (urlTableId ? String(urlTableId) : undefined);
 
+  // 🔥 FIX BBDD: Mapeamos el ID crudo (Ej. 29) con el número visual (Ej. 1)
+  const mesaActivaObj = activeTables.find(t => String(t.id) === String(effectiveTableId));
+  const visualTableData = mesaActivaObj ? { 
+      id: mesaActivaObj.id, 
+      numero: mesaActivaObj.name || mesaActivaObj.number || mesaActivaObj.numero 
+  } : effectiveTableId;
+
   const [themeIndex] = useState(getInitialTheme);
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -576,12 +583,13 @@ export default function ClientApp({ type }) {
 
                     <ClientLogin 
                       onLogin={(data) => {
+                        // Guardamos estrictamente el ID de la Base de Datos en la sesión para no romper el backend
                         const sessionData = { ...data, type: effectiveType, tableId: effectiveTableId };
                         setClientData(sessionData);
                         localStorage.setItem('lya_client_session', JSON.stringify(sessionData));
                       }} 
                       type={effectiveType} 
-                      tableId={effectiveTableId} 
+                      tableId={visualTableData} // 🔥 Le pasamos el objeto visual al Login para arreglar la UI
                     />
 
                     {!isStandalone && isInstallable && (
