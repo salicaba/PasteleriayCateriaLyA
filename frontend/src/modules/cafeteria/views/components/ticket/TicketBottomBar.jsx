@@ -98,30 +98,39 @@ export const TicketBottomBar = ({
         )}
       </AnimatePresence>
 
-      {showDeliverAllBtn && (
-        <motion.button
-           whileTap={!isDeliveringAll && hasReadyItems ? { scale: 0.95 } : {}}
-           disabled={!hasReadyItems || isDeliveringAll}
-           onClick={() => openConfirmModal({
-               title: (isVitrina || isLlevar) ? 'Entregar Todo el Pedido' : 'Entregar Toda la Mesa',
-               message: hasCookingItems 
-                 ? ((isVitrina || isLlevar) ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos del pedido como entregados?' : 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?')
-                 : ((isVitrina || isLlevar) ? '¿Confirmas que ya entregaste los productos listos del pedido?' : '¿Confirmas que ya entregaste los productos listos a la mesa?'),
-               icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
-               onConfirm: async () => await handleDeliverAll()
-           })}
-           className={clsx(
-             "w-full py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all shadow-sm border outline-none",
-             isDeliveringAll ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 border-emerald-300 cursor-wait opacity-80" :
-             hasReadyItems
-               ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 md:hover:bg-emerald-100 dark:md:hover:bg-emerald-800/40 cursor-pointer lya:border-lya-primary lya:bg-lya-primary/10 lya:text-lya-primary"
-               : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed opacity-70 shadow-none"
-           )}
-        >
-           {isDeliveringAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
-           {isDeliveringAll ? 'Entregando...' : (hasReadyItems ? ((isVitrina || isLlevar) ? 'Entregar Todo El Pedido' : 'Entregar Toda La Mesa') : 'Esperando a Cocina...')}
-        </motion.button>
-      )}
+      <AnimatePresence>
+        {showDeliverAllBtn && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
+            <motion.button
+               whileTap={!isDeliveringAll && hasReadyItems ? { scale: 0.95 } : {}}
+               disabled={!hasReadyItems || isDeliveringAll}
+               onClick={() => openConfirmModal({
+                   title: (isVitrina || isLlevar) ? 'Entregar Todo el Pedido' : 'Entregar Toda la Mesa',
+                   message: hasCookingItems 
+                     ? ((isVitrina || isLlevar) ? 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos del pedido como entregados?' : 'Aún hay productos en preparación. ¿Seguro que deseas marcar TODOS los productos de la mesa como entregados?')
+                     : ((isVitrina || isLlevar) ? '¿Confirmas que ya entregaste los productos listos del pedido?' : '¿Confirmas que ya entregaste los productos listos a la mesa?'),
+                   icon: CheckCheck, color: 'green', confirmText: 'Sí, Entregar',
+                   onConfirm: async () => await handleDeliverAll()
+               })}
+               className={clsx(
+                 "w-full py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all shadow-sm border outline-none",
+                 isDeliveringAll ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 border-emerald-300 cursor-wait opacity-80" :
+                 hasReadyItems
+                   ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 md:hover:bg-emerald-100 dark:md:hover:bg-emerald-800/40 cursor-pointer lya:border-lya-primary lya:bg-lya-primary/10 lya:text-lya-primary"
+                   : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-transparent cursor-not-allowed opacity-70 shadow-none"
+               )}
+            >
+               {isDeliveringAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+               {isDeliveringAll ? 'Entregando...' : (hasReadyItems ? ((isVitrina || isLlevar) ? 'Entregar Todo El Pedido' : 'Entregar Toda La Mesa') : 'Esperando a Cocina...')}
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {hasCuentasActivas && (

@@ -262,7 +262,8 @@ export const TicketSidebar = ({
     try {
       if (onCheckout) await onCheckout();
     } finally {
-      setTimeout(() => setIsCheckingOut(false), 500);
+      // 🔥 FIX: Eliminamos el setTimeout de 500ms. Liberación instantánea.
+      setIsCheckingOut(false);
     }
   };
 
@@ -271,7 +272,8 @@ export const TicketSidebar = ({
     try {
       if (onSendToKitchen) await onSendToKitchen();
     } finally {
-      setTimeout(() => setIsSendingToKitchen(false), 500);
+      // 🔥 FIX: Eliminamos el retraso visual fantasma.
+      setIsSendingToKitchen(false);
     }
   };
 
