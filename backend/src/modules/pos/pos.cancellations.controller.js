@@ -121,7 +121,7 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa, sin magia.
+    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa.
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
 
@@ -131,7 +131,6 @@ export const cancelOrderItem = async (req, res) => {
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      // Pasamos la cuenta específica para el descuento exacto
       await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
     }
 
@@ -172,7 +171,7 @@ export const cancelOrderItem = async (req, res) => {
         });
     }
 
-    // 🔥 FIX: AHORA SIEMPRE AVISA AL CLIENTE SIN IMPORTAR EL ESTADO EN COCINA
+    // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) SIEMPRE
     getIO().emit('orderItemCancelled', { 
         orderId: id, 
         itemId: item.id, 
@@ -183,7 +182,6 @@ export const cancelOrderItem = async (req, res) => {
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     const activeItems = await OrderItem.count({ where: { orderId: id, status: 'ACTIVE' } });
     
-    // Si se vacía el ticket por completo, se cancela global
     if (activeItems === 0 && order.status !== 'CLOSED') {
       const numeroMesa = order.table ? order.table.numero || order.table.number : 'Sin Mesa/Llevar';
       const nombreCuenta = item.cuenta || 'Cuenta General'; 
@@ -202,7 +200,6 @@ export const cancelOrderItem = async (req, res) => {
         cancelledBy: userId 
       });
       
-      // 🔥 FIX: Avisamos al cliente que TODA la orden murió
       getIO().emit('orderCancelled', { orderId: id, tableId: order.tableId });
 
       if (order.tableId) {
@@ -281,7 +278,6 @@ export const cancelOrder = async (req, res) => {
       }
     }
 
-    // 🔥 FIX: Avisamos al cliente que TODA la orden murió
     getIO().emit('orderCancelled', { orderId: id, tableId: order.tableId });
 
     for (const [cuentaName, amount] of Object.entries(totalRefundByAccount)) {
@@ -397,7 +393,6 @@ export const restoreOrderItem = async (req, res) => {
     const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
     let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
-    // 🔥 CÁLCULO 1 A 1: Restauramos exactamente el valor que el producto tiene guardado
     let unitPrice = Number(item.subtotal) / item.quantity;
     let amountToRestore = unitPrice * item.quantity;
 
@@ -420,7 +415,13 @@ export const restoreOrderItem = async (req, res) => {
       totalAmount: newTotal,
     });
 
-    getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
+    // 🔥 FIX RESTAURAR: Enviamos el objeto completo para que el cliente lo reconstruya en su pantalla
+    const fullItemToEmit = await OrderItem.findOne({
+      where: { id: item.id },
+      include: [{ model: Product, as: 'product' }]
+    });
+
+    getIO().emit('orderItemRestored', { orderId: id, itemId: item.id, item: fullItemToEmit });
     getIO().emit('pos:update');
 
     res.json({ message: 'Producto restaurado exitosamente', wasRefundReversed: wasPaid });
@@ -488,9 +489,11 @@ export const restoreOrder = async (req, res) => {
         }
 
         await item.update({ status: 'ACTIVE', cancelledAt: null, cancelReason: null, cancelledBy: null });
-        getIO().emit('orderItemRestored', { orderId: id, itemId: item.id });
       }
     }
+
+    // 🔥 FIX RESTAURAR: Le avisamos al cliente para que recargue y recupere su mesa completa
+    getIO().emit('orderRestored', { orderId: id, tableId: order.tableId });
 
     for (const [cuentaName, amount] of Object.entries(totalRestoredByAccount)) {
         if (amount > 0) {

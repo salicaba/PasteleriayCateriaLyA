@@ -7,7 +7,7 @@ import { socket } from '../../../api/socket.js';
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
-  // 🔥 FIX: Inicializamos sincrónicamente para evitar el "falso vacío" que te expulsaba
+  // 🔥 SINCRONIZACIÓN EN TIEMPO REAL CON CAJA
   const [liveCart, setLiveCart] = useState(() => (cart || []).filter(item => item.status !== 'CANCELLED'));
   
   const isFirstRender = useRef(true);
@@ -33,7 +33,45 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 2. Escuchar cancelación de la mesa completa
+    // 🔥 2. NUEVO: Escuchar restauración individual desde la papelera
+    const handleItemRestored = ({ orderId, itemId, item }) => {
+        if (!item) return;
+        setLiveCart(prev => {
+            // Si por alguna extraña razón ya existe en el carrito, solo sumamos cantidad
+            const exists = prev.find(p => String(p.backendItemId || p.id) === String(itemId));
+            if (exists) {
+                return prev.map(p => String(p.backendItemId || p.id) === String(itemId) ? { ...p, qty: item.quantity } : p);
+            }
+            
+            // Reconstruimos el fantasma para que vuelva a ser real
+            let parsedPreps = [];
+            try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
+            
+            // Recuperamos meta de promo si existía
+            const meta = parsedPreps.find(p => p && p._isPromoMeta);
+            
+            const newItem = {
+                id: item.productId,
+                backendItemId: item.id,
+                nombre: item.product?.name || item.nombre || 'Producto',
+                imagen: item.product?.imageUrl || null,
+                precioUnitario: Number(item.subtotal) / (item.quantity || 1),
+                qty: item.quantity,
+                detalles: parsedPreps.filter(p => !p._isPromoMeta)[0] || null,
+                preparaciones: parsedPreps,
+                cuenta: item.cuenta || 'General',
+                isTakeaway: item.isTakeaway,
+                isAutoPromo: meta ? meta.isAutoPromo : false,
+                promoLabel: meta ? meta.promoLabel : null,
+                precioOriginal: meta ? meta.precioOriginal : (item.product?.basePrice || null),
+                status: 'ACTIVE'
+            };
+            
+            return [...prev, newItem];
+        });
+    };
+
+    // 3. Escuchar cancelación de la mesa completa
     const handleOrderCancelled = (data) => {
         if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
             try {
@@ -45,16 +83,29 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             onReset(); // Expulsamos al cliente de la pantalla de éxito
         }
     };
+
+    // 4. Escuchar restauración de la mesa completa
+    const handleOrderRestored = (data) => {
+        if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
+            // Si el cajero restauró la mesa entera, forzamos la recarga para sincronizar todo de golpe
+            window.location.reload();
+        }
+    };
     
     socket.on('orderItemCancelled', handleItemCancelled);
+    socket.on('orderItemRestored', handleItemRestored); // Activando el oído para restaurar
     socket.on('orderCancelled', handleOrderCancelled);
+    socket.on('orderRestored', handleOrderRestored);
+    
     return () => {
        socket.off('orderItemCancelled', handleItemCancelled);
+       socket.off('orderItemRestored', handleItemRestored);
        socket.off('orderCancelled', handleOrderCancelled);
+       socket.off('orderRestored', handleOrderRestored);
     };
   }, [tableId, onReset]);
 
-  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh): Ahora respeta el primer render
+  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh)
   useEffect(() => {
     if (isFirstRender.current) {
         isFirstRender.current = false;
@@ -62,7 +113,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
 
     if (liveCart.length === 0 && cart && cart.length > 0) {
-       onReset(); // Todo fue anulado 1 por 1
+       onReset(); 
     } else if (liveCart.length > 0 && (liveCart.length !== cart.length || liveCart.some((l, i) => cart[i] && l.qty !== cart[i].qty))) {
        try {
            for (let i = 0; i < localStorage.length; i++) {
@@ -85,7 +136,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
 
   const liveTotal = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
 
-  // 🔥 PARSER DEL NOMBRE Y TELÉFONO PARA EL TICKET
   const parsedNameData = clientData?.name || 'Cliente';
   let displayName = parsedNameData;
   let displayPhone = null;
@@ -99,10 +149,8 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  // Obtenemos solo el primer nombre para un trato más cercano
   const primerNombre = displayName.split(' ')[0] || 'Cliente';
 
-  // --- VISTA: Menú Solo Lectura ---
   if (showReadOnlyMenu) {
     return (
       <motion.div 
@@ -177,7 +225,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     );
   }
 
-  // --- VISTA: Resumen de Éxito ---
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }} 
@@ -186,7 +233,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     >
       <div className="flex flex-col items-center justify-start p-6 text-center space-y-7 w-full max-w-sm mx-auto min-h-full pb-24 pt-12 relative">
         
-        {/* BOTÓN DE AJUSTES FLOTANTE EN EL TICKET */}
         <motion.button 
           whileTap={{ scale: 0.95 }} 
           onClick={onOpenSettings}
@@ -195,7 +241,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           <Settings size={20} strokeWidth={2.5} />
         </motion.button>
 
-        {/* Icono de Éxito Animado */}
         <div className="relative mb-4 mt-2">
           <motion.div 
             animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
@@ -227,12 +272,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           </p>
         </div>
 
-        {/* Tarjeta Minimalista tipo Apple Pay / Fintech */}
         <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-[#EADCC9] relative overflow-hidden shrink-0">
           
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
 
-          {/* 🔥 SELLO GIGANTE DE MARCA DE AGUA */}
           <AnimatePresence>
             {isOrderPaid && (
               <motion.div 
