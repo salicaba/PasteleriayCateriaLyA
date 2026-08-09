@@ -205,7 +205,7 @@ export const cancelOrderItem = async (req, res) => {
       if (order.tableId) {
         const remainingOrders = await Order.count({ where: { tableId: order.tableId, status: ['OPEN', 'PAID'] } });
         if (remainingOrders === 0) {
-          await Table.update({ status: 'disponible' }, { where: { id: order.tableId } });
+          await Table.update({ status: 'active' }, { where: { id: order.tableId } });
         }
       }
     } else {
@@ -299,7 +299,7 @@ export const cancelOrder = async (req, res) => {
         where: { tableId: order.tableId, status: ['OPEN', 'PAID'] }
       });
       if (cuentasRestantes === 0) {
-        await Table.update({ status: 'disponible' }, { where: { id: order.tableId } });
+        await Table.update({ status: 'active' }, { where: { id: order.tableId } });
       }
     }
 
