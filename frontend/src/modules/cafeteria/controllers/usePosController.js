@@ -170,7 +170,13 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
         
     } else {
-        // Mesa libre (sin BD) -> Solo usamos el carrito local o el borrador recuperado
+        // 🔥 FIX 400: MESA LIBRE -> Debemos purgar el ID de la orden cancelada 
+        // para que no intente inyectar productos nuevos a un ticket muerto.
+        setActiveOrderId(null);
+        setOrderStatus('OPEN');
+        setPaidAccounts([]);
+
+        // Solo usamos el carrito local o el borrador recuperado
         setCart(prev => {
             const localItems = prev.filter(p => !p.enviadoCocina);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;

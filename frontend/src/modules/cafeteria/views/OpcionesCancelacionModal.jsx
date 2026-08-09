@@ -14,29 +14,22 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   const hasMultipleAccounts = cuentas?.length > 1;
   const isTakeawayGeneral = !hasMultipleAccounts && cuentas?.[0] === 'General';
 
+  // 🔥 FIX 1: Separamos el inicio del modal para que NO apague el loading (isProcessing) 
+  // cuando reciba actualizaciones por WebSocket a mitad del proceso.
   useEffect(() => {
     if (isOpen) {
-      // 🔥 FIX 1: Si solo queda una cuenta visible, forzamos el modo 'cuenta'
-      // para evitar que mande el comando de anular la mesa completa por accidente.
-      setTipoCancelacion(cuentas?.length === 1 ? 'cuenta' : 'mesa'); 
-      setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
-      setMotivo(''); 
-      setIsProcessing(false);
       setErrorMessage('');
+      // Solo ajustamos los selects si NO estamos a mitad de una cancelación
+      if (!isProcessing) {
+        setTipoCancelacion(cuentas?.length === 1 ? 'cuenta' : 'mesa'); 
+        if (!cuentaSeleccionada || !cuentas?.includes(cuentaSeleccionada)) {
+          setCuentaSeleccionada(cuentas && cuentas.length > 0 ? cuentas[0] : '');
+        }
+        setMotivo(''); 
+      }
     }
-  }, [isOpen, cuentas]); 
-
-  useEffect(() => {
-    // Si la cuenta seleccionada ya no existe en el array purgado, la reiniciamos
-    if (isOpen && cuentas?.length > 0 && (!cuentaSeleccionada || !cuentas.includes(cuentaSeleccionada))) {
-      setCuentaSeleccionada(cuentas[0]);
-    }
-  }, [cuentas, isOpen, cuentaSeleccionada]);
-
-  const showError = (msg) => {
-    setErrorMessage(msg);
-    setTimeout(() => setErrorMessage(''), 4000);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, cuentas]); // Quitamos el setIsProcessing(false) que causaba el parpadeo
 
   const handleConfirmar = async () => {
     if (isProcessing) return; // PILAR 3: Bloqueo extra por seguridad anti doble-clic
