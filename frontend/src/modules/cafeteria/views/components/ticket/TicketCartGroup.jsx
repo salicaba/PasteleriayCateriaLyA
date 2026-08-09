@@ -496,13 +496,11 @@ export const TicketCartGroup = ({
                 )}
                 
                 {/* 🔥 BOTONERA DE CANCELACIÓN INDEPENDIENTE (NEO-BENTO) 🔥 */}
-                {!isLockedPromo && (
+                {!isLockedPromo && !item.enviadoCocina && !isCuentaPagada && (
                   <div className={clsx(
                     "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
                     isVitrina ? "w-full justify-between" : "shrink-0"
                   )}>
-                    {!item.enviadoCocina && !isCuentaPagada && (
-                      <>
                         <motion.button 
                             whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
                             disabled={isRemovingLocal}
@@ -553,8 +551,6 @@ export const TicketCartGroup = ({
                         >
                             {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         </motion.button>
-                      </>
-                    )}
                   </div>
                 )}
                 
