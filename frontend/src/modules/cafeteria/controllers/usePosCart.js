@@ -744,8 +744,18 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   };
   const getProductQty = (id) => _cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva && p.status !== 'CANCELLED' && (!p.isAutoPromo || p.promoLabel === 'OFERTA')).reduce((acc, item) => acc + item.qty, 0);
 
+  // 🔥 ARMAS ANTI-ZOMBIES
+  const clearCartByAccount = (cuentaTarget) => {
+    setCart(prev => prev.filter(item => item.cuenta !== cuentaTarget));
+  };
+  
+  const clearEntireCart = () => {
+    setCart([]);
+  };
+
   return {
     cart: _cart, setCart, addToCart, removeFromCart, deleteLine, toggleItemTakeaway, total, unsentTotal, hasUnsentItems, getSubtotalByCuenta, getProductQty,
+    clearCartByAccount, clearEntireCart, // <-- Asegúrate de exportarlas aquí
     promoWarning, confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(), cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel()
   };
 };

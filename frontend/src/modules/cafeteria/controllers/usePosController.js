@@ -42,7 +42,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   });
 
   // 4. EL ORQUESTADOR DE SINCRONIZACIÓN (Base de Datos a UI)
-  const { setCart } = cartLogic;
+  const { setCart, clearEntireCart, clearCartByAccount } = cartLogic;
   const { 
     setPaidAccounts, 
     setNombresCuentas, 
@@ -188,6 +188,24 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mesaId, mesaEstado, mesaOrderId, mesaOrderStatus, dbItemsString, paidAccountsString]);
 
+  // 🔥 WRAPPERS ANTI-ZOMBIES: Limpiamos la memoria local y el localStorage al cancelar
+  const wrappedCancelFullOrder = async (motivo) => {
+    await mutations.cancelFullOrder(motivo);
+    if (clearEntireCart) clearEntireCart();
+    localStorage.removeItem(`lya_draft_${mesaId}`);
+  };
+
+  const wrappedCancelAccountItems = async (cuenta, motivo) => {
+    await mutations.cancelAccountItems(cuenta, motivo);
+    if (clearCartByAccount) clearCartByAccount(cuenta);
+    
+    // Si la cuenta que acabamos de matar era la única con productos nuevos, destruimos el borrador
+    const remainingUnsent = cartLogic.cart.filter(p => p.cuenta !== cuenta && !p.enviadoCocina && p.status !== 'CANCELLED');
+    if (remainingUnsent.length === 0) {
+      localStorage.removeItem(`lya_draft_${mesaId}`);
+    }
+  };
+
   // 5. Cálculos Derivados (Orquestados)
   const cuentasDisponibles = useMemo(() => 
     Array.from(new Set([...accounts.nombresCuentas, ...cartLogic.cart.map(i => i.cuenta || 'General')])), 
@@ -237,8 +255,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     validateAllDelivered: mutations.validateAllDelivered,
     deliverAllActiveItems: mutations.deliverAllActiveItems, 
     cancelItem: mutations.cancelItem, 
-    cancelFullOrder: mutations.cancelFullOrder, 
-    cancelAccountItems: mutations.cancelAccountItems, 
+    cancelFullOrder: wrappedCancelFullOrder, 
+    cancelAccountItems: wrappedCancelAccountItems, 
     releaseAccount: mutations.releaseAccount,
     
     notification, 
