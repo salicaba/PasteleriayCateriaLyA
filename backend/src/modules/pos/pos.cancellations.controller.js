@@ -60,7 +60,7 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 };
 
 // ==========================================
-// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL
+// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL (Blindado anti-errores)
 // ==========================================
 export const cancelOrderItem = async (req, res) => {
   try {
@@ -68,7 +68,11 @@ export const cancelOrderItem = async (req, res) => {
     const { cancelReason, cancelQty } = req.body; 
     const userId = req.user?.id; 
 
-    const item = await OrderItem.findOne({ where: { id: itemId, orderId: id }, include: [{ model: Product, as: 'product' }] });
+    const item = await OrderItem.findOne({ 
+      where: { id: itemId, orderId: id }, 
+      include: [{ model: Product, as: 'product' }] 
+    });
+    
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
 
     const order = await Order.findByPk(id, {
@@ -78,14 +82,47 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    const unitPrice = Number(item.subtotal) / item.quantity;
-    const refundAmount = unitPrice * qtyToCancel;
+    // 🔥 FIX PROMOCIONES: Calculamos el reembolso real basado en si es Promo Automática
+    let unitPrice = Number(item.subtotal) / item.quantity;
+    let refundAmount = unitPrice * qtyToCancel;
+    
+    // Verificamos si era una promo
+    let isPromoItem = false;
+    let originalPriceForPromo = 0;
+    try {
+        const notesArray = JSON.parse(item.notes || '[]');
+        if (Array.isArray(notesArray)) {
+            const promoMeta = notesArray.find(n => n && n._isPromoMeta);
+            if (promoMeta && promoMeta.isAutoPromo) {
+                isPromoItem = true;
+                originalPriceForPromo = Number(promoMeta.precioOriginal || 0);
+            }
+        }
+    } catch(e) {}
+
+    // Si es promo, el reembolso no puede ser 0 o menor al precio base, debe reflejar la pérdida real del combo.
+    if (isPromoItem && unitPrice === 0) {
+        // Buscamos si hay productos "Normales" en la misma cuenta para recalcular
+        const normalPartner = await OrderItem.findOne({
+            where: { 
+                orderId: id, 
+                productId: item.productId, 
+                cuenta: item.cuenta,
+                status: 'ACTIVE'
+            }
+        });
+        if (normalPartner && Number(normalPartner.subtotal) > 0) {
+            refundAmount = (Number(normalPartner.subtotal) / normalPartner.quantity) * qtyToCancel;
+        } else {
+            refundAmount = originalPriceForPromo * qtyToCancel;
+        }
+    }
 
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId);
+      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto} (${item.cuenta})`, userId);
     }
 
     const previousKitchenStatus = item.kitchenStatus;
@@ -101,27 +138,28 @@ export const cancelOrderItem = async (req, res) => {
             orderId: item.orderId,
             productId: item.productId,
             quantity: qtyToCancel,
-            subtotal: refundAmount,
+            subtotal: refundAmount, // El subtotal de la línea cancelada
             cuenta: item.cuenta,
             isTakeaway: item.isTakeaway,
             notes: JSON.stringify(cancelledNotes),
             kitchenStatus: item.kitchenStatus,
             status: 'CANCELLED',
             cancelledAt: new Date(),
-            cancelReason: cancelReason || 'Cancelación parcial desde POS',
+            cancelReason: cancelReason || `Cancelación parcial desde POS (${item.cuenta})`,
             cancelledBy: userId
         });
 
+        // Actualizamos el original restando el reembolso real
         await item.update({
             quantity: item.quantity - qtyToCancel,
-            subtotal: Number(item.subtotal) - refundAmount,
+            subtotal: Math.max(0, Number(item.subtotal) - refundAmount), 
             notes: JSON.stringify(remainingNotes)
         });
     } else {
         await item.update({
           status: 'CANCELLED',
           cancelledAt: new Date(),
-          cancelReason: cancelReason || 'Cancelado desde POS',
+          cancelReason: cancelReason || `Cancelado desde POS (${item.cuenta})`,
           cancelledBy: userId
         });
     }
@@ -343,11 +381,22 @@ export const restoreOrderItem = async (req, res) => {
     let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
     if (wasPaid) {
-      const unitPrice = Number(item.subtotal) / item.quantity;
-      const amountToRestore = unitPrice * item.quantity;
+      // 🔥 FIX RESTAURAR PROMOCIONES
+      let unitPrice = Number(item.subtotal) / item.quantity;
+      let amountToRestore = unitPrice * item.quantity;
+
+      try {
+          const notesArray = JSON.parse(item.notes || '[]');
+          if (Array.isArray(notesArray)) {
+              const promoMeta = notesArray.find(n => n && n._isPromoMeta);
+              if (promoMeta && promoMeta.isAutoPromo && unitPrice === 0) {
+                  amountToRestore = Number(promoMeta.precioOriginal || 0) * item.quantity;
+              }
+          }
+      } catch(e) {}
+
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      
-      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId);
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto} (${item.cuenta})`, userId);
     }
 
     await item.update({
