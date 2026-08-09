@@ -115,7 +115,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       if (draftStr) recoveredDraft = JSON.parse(draftStr);
     } catch (e) {}
 
-    const isMesaActiva = mesaEstado === 'ocupada' || mesaOrderId != null || activeOrderId != null || rawItems.length > 0;
+    // 🔥 FIX: Seguro de Vida para Mesas Virtuales
+    const isLlevarVirtual = mesaActual?.zona === 'llevar' || mesaActual?.orderType === 'LLEVAR';
+    // Si es Mostrador o Llevar, la consideramos SIEMPRE activa mientras la pantalla esté abierta. ¡Jamás la borrará por error!
+    const isMesaActiva = isVitrina || isLlevarVirtual || mesaEstado === 'ocupada' || mesaOrderId != null || activeOrderId != null || rawItems.length > 0;
 
     if (isMesaActiva) {
         setActiveOrderId(mesaOrderId || activeOrderId);

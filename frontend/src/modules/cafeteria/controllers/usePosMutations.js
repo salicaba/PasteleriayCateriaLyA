@@ -80,8 +80,10 @@ export const usePosMutations = ({
           tableId: isLlevarMode ? null : mesaActual?.id, 
           ticketId: isLlevarMode ? mesaActual?.numero : null 
         });
-        orderId = res.data.order.id;
-        setActiveOrderId(orderId);
+        
+        // 🔥 FIX 1: Extracción extrema del ID (Abarca todos los formatos posibles de respuesta del backend)
+        orderId = res.data?.order?.id || res.data?.id || res.data?.newOrderId;
+        if (orderId) setActiveOrderId(orderId);
 
         setCuentasTelefonos(prev => {
             if (Object.keys(prev).length > 0) {
@@ -105,19 +107,30 @@ export const usePosMutations = ({
 
       const response = await client.post(`/pos/orders/${orderId}/items`, { items: payload });
       
-      // 🔥 ATRAPAMOS LA CURA: Si el backend nos generó un ID nuevo, lo actualizamos
       if (response.data.newOrderId && response.data.newOrderId !== orderId) {
           setActiveOrderId(response.data.newOrderId);
       }
 
-      let allItemsFromDB = response.data.orderItems || [];
+      let allItemsFromDB = response.data.orderItems || response.data.items || response.data.order?.items || response.data.order?.OrderItems || [];
       
-      const updatedCart = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
-
-      setCart(prev => {
-          const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
-          return [...updatedCart, ...unsentLocal];
-      });
+      if (allItemsFromDB.length > 0) {
+          const updatedNewItems = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
+          setCart(prev => {
+              const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
+              // 🔥 FIX 2: MEMORIA FOTOGRÁFICA
+              // Conservamos celosamente los items que YA estaban enviados desde antes y no vienen en este POST.
+              // ¡Esto evita que el primer producto desaparezca cuando agregas un segundo producto!
+              const previouslySent = prev.filter(p => p.enviadoCocina && !allItemsFromDB.some(db => String(db.id) === String(p.backendItemId)));
+              
+              return [...previouslySent, ...updatedNewItems, ...unsentLocal];
+          });
+      } else {
+          setCart(prev => prev.map(p => 
+              itemsNuevos.includes(p) 
+                  ? { ...p, enviadoCocina: true, kitchenStatus: 'PENDING' } 
+                  : p
+          ));
+      }
       
       setTimeout(() => { 
         setIsSuccess(false); 
