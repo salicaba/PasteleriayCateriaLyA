@@ -1,3 +1,4 @@
+// backend/src/modules/pos/pos.cancellations.controller.js
 import { Op } from 'sequelize';
 import { getIO } from '../../config/socket.js'; 
 import Order from './Order.model.js';
@@ -120,7 +121,8 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa, sin magia.
+    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa.
+    // Si es una promoción de $0, el refundAmount será 0 automáticamente y no tocará la caja.
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
 
@@ -172,6 +174,7 @@ export const cancelOrderItem = async (req, res) => {
         });
     }
 
+    // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) para que se borre de su vista en vivo
     if (['PENDING', 'PREPARING', 'READY'].includes(previousKitchenStatus)) {
       getIO().emit('orderItemCancelled', { orderId: id, itemId: item.id });
     }

@@ -1,10 +1,31 @@
 // src/modules/client/views/ClientOrderSuccess.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Gift, Tag } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag } from 'lucide-react';
+import { socket } from '../../../api/socket.js';
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
+
+  // 🔥 SINCRONIZACIÓN EN TIEMPO REAL CON CAJA
+  const [liveCart, setLiveCart] = useState(cart || []);
+  
+  useEffect(() => {
+    setLiveCart(cart || []);
+  }, [cart]);
+
+  useEffect(() => {
+    const handleItemCancelled = ({ orderId, itemId }) => {
+        setLiveCart(prev => prev.filter(item => 
+            String(item.backendItemId || item.id) !== String(itemId)
+        ));
+    };
+    
+    socket.on('orderItemCancelled', handleItemCancelled);
+    return () => socket.off('orderItemCancelled', handleItemCancelled);
+  }, []);
+
+  const liveTotal = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
 
   // 🔥 PARSER DEL NOMBRE Y TELÉFONO PARA EL TICKET
   const parsedNameData = clientData?.name || 'Cliente';
@@ -100,7 +121,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
 
   // --- VISTA: Resumen de Éxito ---
   return (
-    // 🔥 SOLUCIÓN DE SCROLL: Contenedor absoluto que permite el desbordamiento infinito
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }} 
       animate={{ opacity: 1, scale: 1 }} 
@@ -117,7 +137,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           <Settings size={20} strokeWidth={2.5} />
         </motion.button>
 
-        {/* Icono de Éxito Animado (Spring + Latido + Glow) */}
+        {/* Icono de Éxito Animado */}
         <div className="relative mb-4 mt-2">
           <motion.div 
             animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
@@ -152,7 +172,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         {/* Tarjeta Minimalista tipo Apple Pay / Fintech */}
         <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-[#EADCC9] relative overflow-hidden shrink-0">
           
-          {/* Barra de color superior */}
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
 
           {/* 🔥 SELLO GIGANTE DE MARCA DE AGUA */}
@@ -171,7 +190,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             )}
           </AnimatePresence>
 
-          {/* Encabezado del Recibo */}
           <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]/50 pb-4 mb-4 mt-2 relative z-10">
             <div className="text-left flex flex-col gap-1">
               <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">
@@ -196,9 +214,8 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </div>
           </div>
 
-          {/* Lista de Productos BLINDADA ANTI-AMNESIA */}
           <div className="space-y-4 max-h-[25vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
-            {cart.map((item, idx) => {
+            {liveCart.map((item, idx) => {
               const isGhost = item.isAutoPromo && item.precioUnitario === 0;
 
               return (
@@ -230,7 +247,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                         </div>
                       )}
                       
-                      {/* MEMORIA VISUAL ANTI-AMNESIA EN RECIBO */}
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         {item.promoLabel && (
                           <span className="inline-flex items-center gap-1 bg-rose-500 dark:bg-rose-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm">
@@ -269,18 +285,16 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             })}
           </div>
 
-          {/* Zona del Total */}
           <div className="mt-5 pt-5 border-t border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex flex-col items-center justify-center gap-1 relative z-10">
             <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/80">
               Total a Pagar
             </span>
             <span className="text-4xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tighter">
-              ${totalCart.toFixed(2)}
+              ${liveTotal.toFixed(2)}
             </span>
           </div>
         </div>
 
-        {/* Mensaje Informativo Común */}
         <div className="w-full text-xs font-semibold text-gray-600 dark:text-gray-300 lya:text-[#7A6353] bg-gray-100 dark:bg-gray-800 lya:bg-white px-5 py-4 rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm shrink-0 text-center">
           <p className="flex items-center justify-center gap-2 mb-1.5 text-gray-900 dark:text-white lya:text-[#3E2723] font-black text-sm">
             <span className="text-orange-500">🛎️</span> ¿Necesitas tu cuenta?
@@ -290,11 +304,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           </p>
         </div>
 
-        {/* Botones de Acción / Modos Restringidos */}
         <div className="w-full space-y-4 shrink-0 pt-1 relative z-30">
           <AnimatePresence mode="wait">
             {isOrderPaid ? (
-              /* 🔥 BLOQUEO POR PAGO */
               <motion.div 
                 key="paid-message"
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}

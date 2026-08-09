@@ -23,7 +23,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
       setIsProcessing(false);
       setErrorMessage('');
     }
-  }, [isOpen]); 
+  }, [isOpen, cuentas]); 
 
   useEffect(() => {
     // Si la cuenta seleccionada ya no existe en el array purgado, la reiniciamos
@@ -38,7 +38,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
   };
 
   const handleConfirmar = async () => {
-    if (isProcessing) return; // PILAR 3: Bloqueo extra por seguridad
+    if (isProcessing) return; // PILAR 3: Bloqueo extra por seguridad anti doble-clic
     setIsProcessing(true);
     setErrorMessage('');
     
@@ -60,6 +60,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
       {isOpen && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors">
           
+          {/* PILAR 5: Notificación Flotante "Cápsula Neo-Bento" para Errores */}
           <AnimatePresence>
             {errorMessage && (
               <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -78,6 +79,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
             )}
           </AnimatePresence>
 
+          {/* PILAR 4: Geometría Premium y Entrada Animada */}
           <motion.div 
             initial={{ scale: 0.95, y: 20, opacity: 0 }} 
             animate={{ scale: 1, y: 0, opacity: 1 }} 
@@ -92,6 +94,8 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
             <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">
               {isTakeawayGeneral ? 'Cancelar Pedido' : (hasMultipleAccounts ? 'Opciones de Cancelación' : 'Cancelar Orden')}
             </h3>
+            
+            {/* PILAR 4: Textos de confirmación centrados */}
             <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-6 leading-relaxed font-medium text-center px-2">
               {isTakeawayGeneral 
                 ? 'Ingresa un motivo para cancelar este pedido para llevar.' 
@@ -105,6 +109,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
               {hasMultipleAccounts && (
                 <>
                   <div className="flex flex-col gap-3 mb-4">
+                    {/* PILAR 2: Blindaje Táctil md:hover */}
                     <label className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                       isProcessing ? 'opacity-50 pointer-events-none' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/50 lya:md:hover:bg-lya-bg/50'
                     } ${

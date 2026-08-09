@@ -297,11 +297,14 @@ export const usePosMutations = ({
     }
   };
 
+  // 🔥 NUEVA LÓGICA INTELIGENTE: Cancelación Individual (Promos vs Normal)
   const cancelItem = async (item, cancelReason = 'Cancelación desde POS', cancelQty = item.qty) => {
+    // Si no ha ido a cocina, lo borramos en local directamente
     if (!item.enviadoCocina) { 
       setCart(prev => prev.filter(p => !(p === item))); 
       return; 
     }
+    
     if (!activeOrderId || !item.backendItemId) return;
     
     if (lockRef.current) return;
@@ -310,6 +313,8 @@ export const usePosMutations = ({
 
     try {
         const response = await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty });
+        
+        // Si el backend nos devuelve el carrito actualizado, lo mapeamos
         if (response.data.orderItems) {
             const updatedCart = response.data.orderItems.map(dbItem => mapDBItemToLocal(dbItem));
             setCart(prev => { 
@@ -317,13 +322,20 @@ export const usePosMutations = ({
               return [...updatedCart, ...unsentLocal]; 
             });
         } else {
+            // Si no, matamos el producto en local marcándolo como CANCELLED
             setCart(prev => prev.map(p => String(p.backendItemId) === String(item.backendItemId) ? { ...p, status: 'CANCELLED' } : p));
         }
         
-        if (response.data.wasRefunded) triggerNotification('Cancelado. Reembolso registrado en caja.', 'success');
-        else triggerNotification('Item cancelado de la orden.', 'success');
+        // Notificaciones diferenciadas según si era promo o producto normal cobrado
+        if (item.isAutoPromo) {
+            triggerNotification('Promoción eliminada correctamente.', 'success');
+        } else if (response.data.wasRefunded) {
+            triggerNotification('Cancelado. Reembolso registrado en caja.', 'success');
+        } else {
+            triggerNotification('Item cancelado de la orden.', 'success');
+        }
     } catch (error) { 
-      triggerNotification("Error al cancelar el ítem.", "error");
+      triggerNotification(error?.response?.data?.message || "Error al cancelar el ítem.", "error");
       throw error; 
     } finally {
       lockRef.current = false;

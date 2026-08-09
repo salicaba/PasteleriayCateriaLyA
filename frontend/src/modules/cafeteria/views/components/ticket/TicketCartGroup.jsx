@@ -31,6 +31,7 @@ export const TicketCartGroup = ({
   showToast 
 }) => {
 
+  // 🔥 PILAR 3: Locks Asíncronos
   const [actionLocks, setActionLocks] = useState({});
 
   const executeWithLock = async (e, lockKey, actionFn) => {
@@ -46,7 +47,7 @@ export const TicketCartGroup = ({
     } finally {
       setTimeout(() => {
         setActionLocks(prev => ({ ...prev, [lockKey]: false }));
-      }, 400);
+      }, 400); // Pequeño debounce anti-rebote táctil
     }
   };
 
@@ -144,7 +145,7 @@ export const TicketCartGroup = ({
         handleDropOnCuenta(cuentaName);
       }}
       className={clsx(
-        "rounded-[1.25rem] transition-all duration-300 overflow-hidden shadow-sm",
+        "rounded-[1.5rem] transition-all duration-300 overflow-hidden shadow-sm", // Neo-Bento Radius
         isCuentaPagada ? "border border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-900/10 lya:bg-lya-primary/5 opacity-80"
         : isDragTarget ? "border border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 lya:border-lya-secondary lya:bg-lya-secondary/10 shadow-inner scale-[1.02]" 
         : isActive ? "border-2 border-transparent bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-md" 
@@ -156,7 +157,6 @@ export const TicketCartGroup = ({
               if (isCuentaPagada) {
                   openConfirmModal({
                       title: 'Cuenta Sellada',
-                      // 🔥 APLICANDO FILTRO AQUÍ
                       message: `La cuenta "${parseAccountName(cuentaName)}" ya fue pagada. Si el cliente desea algo adicional, por favor crea una cuenta nueva para no alterar el cobro anterior.`,
                       icon: Lock,
                       color: 'blue',
@@ -266,7 +266,7 @@ export const TicketCartGroup = ({
         </div>
       </div>
 
-      <div className="px-2 pb-2 space-y-1.5">
+      <div className="px-2 pb-2 space-y-2">
         {displayItems.map((item, index) => {
           
           const isCero = Number(item.precio) === 0;
@@ -315,7 +315,8 @@ export const TicketCartGroup = ({
           const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
           const isTakeawayLocal = actionLocks[lockKeyTakeaway];
 
-          let containerClasses = "relative group flex flex-col p-2.5 rounded-xl transition-all overflow-hidden border ";
+          // 🔥 DISEÑO NEO-BENTO PARA PRODUCTOS
+          let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
           
           if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
              containerClasses += "cursor-grab active:cursor-grabbing ";
@@ -363,9 +364,9 @@ export const TicketCartGroup = ({
                 </div>
             )}
 
-            <div className="flex gap-2.5">
+            <div className="flex gap-3">
               <div className={clsx(
-                "w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
+                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
                 isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
               )}>
                 {item.imagen || item.image ? (
@@ -381,7 +382,7 @@ export const TicketCartGroup = ({
                 )}
                 {item.enviadoCocina && availableAccs.length <= 1 && !isVitrina && (
                     <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
-                        <Lock size={12} className="text-orange-600 drop-shadow-sm" />
+                        <Lock size={14} className="text-orange-600 drop-shadow-sm" />
                     </div>
                 )}
               </div>
@@ -389,11 +390,11 @@ export const TicketCartGroup = ({
               <div className="flex-1 min-w-0 flex flex-col justify-center">
                 <div className="flex justify-between items-start mb-0.5 gap-2">
                   <div className="flex flex-col min-w-0">
-                    <h5 className="text-xs font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
+                    <h5 className="text-sm font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
                       {item.nombre}
                     </h5>
                     {isAnyPromo && (
-                       <span className="text-[8px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-0.5 flex items-center gap-1 shadow-sm">
+                       <span className="text-[9px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm">
                          <Tag size={10} strokeWidth={3} /> 
                          <span>{promoText}</span>
                        </span>
@@ -406,29 +407,29 @@ export const TicketCartGroup = ({
                         ${(Number(pOriginal) * item.qty).toFixed(2)}
                       </span>
                     )}
-                    <span className={clsx("text-xs font-black", isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
+                    <span className={clsx("text-sm font-black", isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
                       ${(Number(item.precio) * item.qty).toFixed(2)}
                     </span>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5 mt-1">
-                    {item.qty > 1 && <span className={clsx("px-1 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
+                    {item.qty > 1 && <span className={clsx("px-1.5 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
                     {item.isTakeaway && item.enviadoCocina && !isVitrina && (
-                        <span className="text-[8px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
-                            <ShoppingBag size={8} /> Empacar
+                        <span className="text-[9px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1.5 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
+                            <ShoppingBag size={10} /> Empacar
                         </span>
                     )}
                 </div>
 
                 {hasRealPreparations && (
-                  <div className="space-y-0.5 pointer-events-none mt-1">
+                  <div className="space-y-1 pointer-events-none mt-1.5">
                     {item.preparaciones?.map((prep, pIdx) => {
                       if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
                       return (
-                        <div key={pIdx} className="bg-gray-100/80 dark:bg-gray-900/60 lya:bg-lya-surface rounded p-1 flex flex-col gap-0.5 border border-gray-200/50 dark:border-gray-800/50 lya:border-lya-border/40">
-                          <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase flex items-center gap-1"><Info size={8} /> {prep.tamano} {prep.leche && `• ${prep.leche}`}</span>
-                          {prep.extras?.length > 0 && <span className="text-[8px] font-black text-orange-500 dark:text-orange-400 lya:text-lya-primary">+ {prep.extras.join(', ')}</span>}
+                        <div key={pIdx} className="bg-gray-100/80 dark:bg-gray-900/60 lya:bg-lya-surface rounded-md p-1.5 flex flex-col gap-0.5 border border-gray-200/50 dark:border-gray-800/50 lya:border-lya-border/40">
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase flex items-center gap-1.5"><Info size={10} /> {prep.tamano} {prep.leche && `• ${prep.leche}`}</span>
+                          {prep.extras?.length > 0 && <span className="text-[9px] font-black text-orange-500 dark:text-orange-400 lya:text-lya-primary">+ {prep.extras.join(', ')}</span>}
                         </div>
                       );
                     })}
@@ -438,10 +439,10 @@ export const TicketCartGroup = ({
             </div>
 
             {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
-              <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
+              <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 
                 {!isVitrina && (
-                  <div className="flex-1 flex items-center gap-1.5">
+                  <div className="flex-1 flex items-center gap-2">
                     {item.enviadoCocina ? (
                       <motion.button 
                         whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
@@ -450,27 +451,27 @@ export const TicketCartGroup = ({
                         })} 
                         disabled={isLocalProcessingToggle || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                         className={clsx(
-                            "flex items-center justify-center gap-1 text-[9px] font-black px-2 py-1.5 rounded-lg border uppercase transition-colors w-full text-center shadow-sm outline-none touch-manipulation", 
+                            "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-2 rounded-xl border uppercase transition-colors w-full text-center shadow-sm outline-none touch-manipulation", 
                             isLocalProcessingToggle ? "bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
-                            item.kitchenStatus === 'DELIVERED' ? clsx("text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50", isStatusLocked ? "cursor-default opacity-70" : "cursor-pointer") 
-                            : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 shadow-md cursor-pointer animate-pulse" 
+                            item.kitchenStatus === 'DELIVERED' ? clsx("text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50", isStatusLocked ? "cursor-default opacity-70" : "md:hover:bg-emerald-100 dark:md:hover:bg-emerald-900/40 cursor-pointer") 
+                            : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 shadow-md cursor-pointer animate-pulse" 
                             : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
                         )}
                       >
                         {isLocalProcessingToggle ? (
-                            <><Loader2 size={10} className="animate-spin" /> ...</>
+                            <><Loader2 size={12} className="animate-spin" /> ...</>
                         ) : item.kitchenStatus === 'DELIVERED' ? (
-                            <><CheckCircle size={10} /> Entregado</>
+                            <><CheckCircle size={12} /> Entregado</>
                         ) : item.kitchenStatus === 'READY' ? (
-                            <><CheckCircle size={10} /> Entregar</>
+                            <><CheckCircle size={12} /> Entregar</>
                         ) : (
-                            <><ChefHat size={10} /> Cocina</>
+                            <><ChefHat size={12} /> Cocina</>
                         )}
                       </motion.button>
                     ) : (
                       <>
                         <span className={clsx(
-                          "flex items-center justify-center gap-1 text-[8px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/50 bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-1.5 py-1.5 rounded-lg uppercase border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-center shadow-inner",
+                          "flex items-center justify-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/50 bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-2 py-2 rounded-xl uppercase border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-center shadow-inner",
                           (isLlevar || !toggleItemTakeaway || isLockedPromo) ? "w-full" : "flex-1"
                         )}>
                           Por enviar
@@ -481,12 +482,12 @@ export const TicketCartGroup = ({
                               disabled={isTakeawayLocal}
                               onClick={(e) => executeWithLock(e, lockKeyTakeaway, () => toggleItemTakeaway(item))} 
                               className={clsx(
-                                  "flex items-center justify-center gap-1 text-[8px] font-black px-1.5 py-1.5 rounded-lg border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
+                                  "flex items-center justify-center gap-1.5 text-[9px] font-black px-2 py-2 rounded-xl border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
                                   isTakeawayLocal ? "bg-gray-100 text-gray-400 border-transparent opacity-70 cursor-wait" :
-                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 dark:md:hover:text-orange-400 lya:md:hover:text-lya-primary md:hover:border-orange-300 dark:md:hover:border-orange-700 lya:md:hover:border-lya-primary/50"
+                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 md:hover:bg-orange-100 dark:md:hover:bg-orange-900/50" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 dark:md:hover:text-orange-400 lya:md:hover:text-lya-primary md:hover:border-orange-300 dark:md:hover:border-orange-700 lya:md:hover:border-lya-primary/50"
                               )} 
                           >
-                            {isTakeawayLocal ? <Loader2 size={10} className="animate-spin" /> : <ShoppingBag size={10} className={item.isTakeaway ? "text-orange-600 lya:text-lya-secondary" : "text-gray-400"} />} {item.isTakeaway ? 'Empacar' : 'Mesa'}
+                            {isTakeawayLocal ? <Loader2 size={12} className="animate-spin" /> : <ShoppingBag size={12} className={item.isTakeaway ? "text-orange-600 lya:text-lya-secondary" : "text-gray-400"} />} {item.isTakeaway ? 'Empacar' : 'Mesa'}
                           </motion.button>
                         )}
                       </>
@@ -494,9 +495,10 @@ export const TicketCartGroup = ({
                   </div>
                 )}
                 
+                {/* 🔥 BOTONERA DE CANCELACIÓN INDEPENDIENTE (NEO-BENTO) 🔥 */}
                 {!isLockedPromo && (
                   <div className={clsx(
-                    "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-lg p-0.5 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
+                    "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
                     isVitrina ? "w-full justify-between" : "shrink-0"
                   )}>
                     {!item.enviadoCocina && !isCuentaPagada && (
@@ -506,12 +508,12 @@ export const TicketCartGroup = ({
                             disabled={isRemovingLocal}
                             onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
                             className={clsx(
-                                "rounded-md transition-colors outline-none", 
+                                "rounded-lg transition-colors outline-none", 
                                 isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
-                                isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1"
+                                isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
                             )}
                         >
-                            {isRemovingLocal ? <Loader2 size={isVitrina ? 16 : 12} className="animate-spin" /> : <Minus size={isVitrina ? 16 : 12} />}
+                            {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
                         </motion.button>
                         
                         <motion.button 
@@ -525,8 +527,8 @@ export const TicketCartGroup = ({
                             onAdd(item, cuentaName);
                           })} 
                           className={clsx(
-                            "rounded-md transition-colors flex items-center justify-center outline-none", 
-                            isVitrina ? "flex-1 py-1.5" : "p-1",
+                            "rounded-lg transition-colors flex items-center justify-center outline-none", 
+                            isVitrina ? "flex-1 py-2" : "p-1.5",
                             isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
                             isLimitReached 
                               ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
@@ -534,42 +536,48 @@ export const TicketCartGroup = ({
                           )}
                           title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
                         >
-                          {isAddingLocal ? <Loader2 size={isVitrina ? 16 : 12} className="animate-spin" /> : isLimitReached ? <Lock size={isVitrina ? 16 : 12} /> : <Plus size={isVitrina ? 16 : 12} />}
+                          {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
                         </motion.button>
 
-                        <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-0.5", isVitrina ? "w-px h-5" : "w-px h-3")} />
+                        <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
                         
                         <motion.button 
                             whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                             disabled={isDeletingLocal}
                             onClick={(e) => executeWithLock(e, lockKeyDelete, () => handleDeleteUnsent(item))} 
                             className={clsx(
-                                "rounded-md transition-colors outline-none", 
+                                "rounded-lg transition-colors outline-none", 
                                 isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
-                                isVitrina ? "flex-1 py-1.5 flex justify-center" : "p-1"
+                                isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
                             )}
                         >
-                            {isDeletingLocal ? <Loader2 size={isVitrina ? 16 : 12} className="animate-spin" /> : <Trash2 size={isVitrina ? 16 : 12} />}
+                            {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         </motion.button>
                       </>
                     )}
-                    {item.enviadoCocina && onCancelItem && (
-                        <motion.button 
-                            whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
-                            disabled={isCancelingLocal}
-                            onClick={(e) => executeWithLock(e, lockKeyCancel, () => handleCancelItem(item))} 
-                            className={clsx(
-                                "rounded-md transition-colors outline-none", 
-                                isCancelingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-red-400 md:hover:text-red-600",
-                                isVitrina ? "w-full py-1.5 flex justify-center items-center gap-1.5" : "p-1"
-                            )} 
-                            title="Cancelar Producto"
-                        >
-                          {isCancelingLocal ? <Loader2 size={isVitrina ? 14 : 12} className="animate-spin" /> : <XCircle size={isVitrina ? 14 : 12} />}
-                          {isVitrina && <span className="text-[9px] font-black uppercase tracking-wider">Cancelar</span>}
-                        </motion.button>
-                    )}
                   </div>
+                )}
+                
+                {item.enviadoCocina && onCancelItem && (
+                    <motion.button 
+                        whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
+                        disabled={isCancelingLocal}
+                        onClick={(e) => executeWithLock(e, lockKeyCancel, () => handleCancelItem(item))} 
+                        className={clsx(
+                            "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
+                            isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 
+                            isAnyPromo 
+                                ? "bg-rose-50 border-rose-200 text-rose-600 md:hover:bg-rose-500 md:hover:border-rose-600 md:hover:text-white dark:bg-rose-900/30 dark:border-rose-800/50 dark:text-rose-400" 
+                                : "bg-red-50 border-red-200 text-red-600 md:hover:bg-red-500 md:hover:border-red-600 md:hover:text-white dark:bg-red-900/30 dark:border-red-800/50 dark:text-red-400",
+                            isVitrina ? "w-full py-2.5 flex-1" : "p-2 px-3 flex-1"
+                        )} 
+                        title={isAnyPromo ? "Anular Promoción" : "Cancelar Producto"}
+                    >
+                      {isCancelingLocal ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                      <span className="text-[10px] font-black uppercase tracking-wider">
+                          {isAnyPromo ? "Quitar Promo" : "Anular"}
+                      </span>
+                    </motion.button>
                 )}
               </div>
             )}
