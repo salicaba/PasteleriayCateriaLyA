@@ -626,7 +626,7 @@ export default function ClientApp({ type }) {
                   <ClientMenu 
                     clientData={clientData} 
                     type={clientData.type || effectiveType} 
-                    tableId={visualTableData}
+                    tableId={clientData.tableId || effectiveTableId} 
                     onLogout={handleClientLogout}
                     setActiveOrdersCount={setActiveOrdersCount}
                   />
