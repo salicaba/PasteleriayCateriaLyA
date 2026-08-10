@@ -1,10 +1,11 @@
 // src/modules/cafeteria/views/QrControlPage.jsx
+// src/modules/cafeteria/views/QrControlPage.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, Trash2, Smartphone, 
-  Link as LinkIcon, LayoutGrid, ShoppingBag, Printer, Plus, X, Loader2, ScanLine,
-  AlertCircle, Power, PowerOff, CheckSquare, Square
+  Link as LinkIcon, LayoutGrid, ShoppingBag, Plus, X, Loader2, ScanLine,
+  AlertCircle, Power, PowerOff, CheckSquare, Square, Download
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
@@ -70,6 +71,7 @@ export const QrControlPage = () => {
 
   // 🚀 FUNCIÓN POKA-YOKE PARA APAGAR/ENCENDER QR INDIVIDUAL
   const toggleGranularQr = async (identifier) => {
+    // PILAR 3: Lock Asíncrono
     setIsTogglingLocal(identifier);
     try {
       const isCurrentlyDisabled = disabledQrs.includes(identifier);
@@ -132,6 +134,7 @@ export const QrControlPage = () => {
   };
 
   const executePrint = async () => {
+    // PILAR 3: Lock Asíncrono
     if (isPrinting || selectedToPrint.length === 0) return;
     setIsPrinting(true);
     try {
@@ -166,6 +169,7 @@ export const QrControlPage = () => {
     );
   }
 
+  // PILAR 1: Responsividad Estricta y Flexbox (Anti-Ghost Scroll)
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -173,16 +177,18 @@ export const QrControlPage = () => {
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:!bg-white print:!text-black print:p-0 print:h-auto print:block print:overflow-visible"
     >
+      {/* Notificaciones controladas */}
       <ToastNotification message={activeMessage} type={activeType} />
 
+      {/* 🛡️ BLINDAJE DE IMPRESIÓN EXTREMO */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { margin: 1cm; size: A4 portrait; }
           html, body, #root, main { 
             background-color: #ffffff !important; 
             color: #000000 !important; 
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
             overflow: visible !important;
             height: auto !important;
           }
@@ -193,8 +199,8 @@ export const QrControlPage = () => {
         }
       `}} />
 
-      {/* GRID DE IMPRESIÓN OCULTO */}
-      <div className="hidden print:grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-[21cm] mx-auto pb-10 print:!bg-white">
+      {/* GRID DE IMPRESIÓN OCULTO (Renderiza solo en papel/PDF) */}
+      <div className="hidden print:grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-[21cm] mx-auto pb-10 print:!bg-white print:!text-black">
         {selectedToPrint.includes('llevar') && (
           <div className="flex flex-col items-center text-center p-6 border-2 border-dashed border-gray-400 rounded-3xl break-inside-avoid shadow-none !bg-white !text-black">
             <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mostrador 𝓛𝔂𝓪</h2>
@@ -253,8 +259,8 @@ export const QrControlPage = () => {
             onClick={handleOpenPrintModal}
             className="flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text select-none touch-manipulation outline-none"
           >
-            <Printer size={18} className="text-gray-600 dark:text-gray-300 lya:text-lya-text pointer-events-none" />
-            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Imprimir QRs</span>
+            <Download size={18} className="text-gray-600 dark:text-gray-300 lya:text-lya-text pointer-events-none" />
+            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Guardar PDF / Imprimir</span>
           </motion.button>
 
           <motion.button 
@@ -285,7 +291,7 @@ export const QrControlPage = () => {
                 key={zona.id}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setZonaActiva(zona.id)}
-                className={`flex flex-1 md:flex-none justify-center items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap select-none outline-none ${
+                className={`flex flex-1 md:flex-none justify-center items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap select-none outline-none md:hover:shadow-sm ${
                   zonaActiva === zona.id 
                     ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-orange-600 dark:text-orange-400 lya:text-lya-primary shadow-sm border border-gray-100 dark:border-gray-600 lya:border-lya-primary/30' 
                     : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:text-gray-700 dark:md:hover:text-gray-200 lya:hover:text-lya-text border border-transparent'
@@ -565,10 +571,10 @@ export const QrControlPage = () => {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="bg-orange-100 dark:bg-orange-900/40 lya:bg-lya-primary/10 p-3 rounded-xl shadow-sm text-orange-600 dark:text-orange-400 lya:text-lya-primary">
-                    <Printer size={24} />
+                    <Download size={24} />
                   </div>
                   <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
-                    Impresión Selectiva
+                    Descargar o Imprimir
                   </h3>
                 </div>
                 <motion.button 
@@ -637,12 +643,12 @@ export const QrControlPage = () => {
                 {isPrinting ? (
                   <>
                     <Loader2 size={18} className="animate-spin pointer-events-none" />
-                    <span className="pointer-events-none">Preparando Impresión...</span>
+                    <span className="pointer-events-none">Preparando Documento...</span>
                   </>
                 ) : (
                   <>
-                    <Printer size={18} className="pointer-events-none" />
-                    <span className="pointer-events-none">Imprimir Selección ({selectedToPrint.length})</span>
+                    <Download size={18} className="pointer-events-none" />
+                    <span className="pointer-events-none">Guardar PDF / Imprimir ({selectedToPrint.length})</span>
                   </>
                 )}
               </motion.button>
