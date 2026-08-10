@@ -7,13 +7,13 @@ import { socket } from '../../../api/socket.js';
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
 
-  // 🔥 SINCRONIZACIÓN EN TIEMPO REAL CON CAJA
-  const [liveCart, setLiveCart] = useState(() => (cart || []).filter(item => item.status !== 'CANCELLED'));
+  // 🔥 FIX 1: Quitamos el filtro que eliminaba los cancelados para poder pintarlos de rojo
+  const [liveCart, setLiveCart] = useState(() => cart || []);
   
   const isFirstRender = useRef(true);
   
   useEffect(() => {
-    setLiveCart((cart || []).filter(item => item.status !== 'CANCELLED'));
+    setLiveCart(cart || []);
   }, [cart]);
 
   useEffect(() => {
@@ -21,33 +21,33 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     const handleItemCancelled = ({ orderId, itemId, productId, cancelQty }) => {
         setLiveCart(prev => {
             let found = false;
-            const newCart = prev.map(item => {
+            return prev.map(item => {
                 if (!found && (String(item.backendItemId || item.id) === String(itemId) || String(item.id) === String(productId))) {
                     found = true;
-                    const newQty = item.qty - (cancelQty || 1);
+                    const newQty = item.qty - (cancelQty || item.qty);
+                    // 🔥 FIX 2: Si la cantidad llega a 0, lo dejamos en la lista pero lo marcamos como CANCELLED
+                    if (newQty <= 0) {
+                        return { ...item, status: 'CANCELLED' };
+                    }
                     return { ...item, qty: newQty };
                 }
                 return item;
-            }).filter(item => item.qty > 0);
-            return newCart;
+            });
         });
     };
 
-    // 🔥 2. NUEVO: Escuchar restauración individual desde la papelera
+    // 2. Escuchar restauración individual desde la papelera
     const handleItemRestored = ({ orderId, itemId, item }) => {
         if (!item) return;
         setLiveCart(prev => {
-            // Si por alguna extraña razón ya existe en el carrito, solo sumamos cantidad
             const exists = prev.find(p => String(p.backendItemId || p.id) === String(itemId));
             if (exists) {
-                return prev.map(p => String(p.backendItemId || p.id) === String(itemId) ? { ...p, qty: item.quantity } : p);
+                return prev.map(p => String(p.backendItemId || p.id) === String(itemId) ? { ...p, qty: item.quantity, status: 'ACTIVE' } : p);
             }
             
-            // Reconstruimos el fantasma para que vuelva a ser real
             let parsedPreps = [];
             try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
             
-            // Recuperamos meta de promo si existía
             const meta = parsedPreps.find(p => p && p._isPromoMeta);
             
             const newItem = {
@@ -80,20 +80,19 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     if (key && (key.includes('lya_') || key.includes('snapshot'))) localStorage.removeItem(key);
                 }
             } catch(e) {}
-            onReset(); // Expulsamos al cliente de la pantalla de éxito
+            onReset(); 
         }
     };
 
     // 4. Escuchar restauración de la mesa completa
     const handleOrderRestored = (data) => {
         if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
-            // Si el cajero restauró la mesa entera, forzamos la recarga para sincronizar todo de golpe
             window.location.reload();
         }
     };
     
     socket.on('orderItemCancelled', handleItemCancelled);
-    socket.on('orderItemRestored', handleItemRestored); // Activando el oído para restaurar
+    socket.on('orderItemRestored', handleItemRestored); 
     socket.on('orderCancelled', handleOrderCancelled);
     socket.on('orderRestored', handleOrderRestored);
     
@@ -105,7 +104,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     };
   }, [tableId, onReset]);
 
-  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh)
+  // FIX CACHÉ (Anti-Amnesia de Refresh)
   useEffect(() => {
     if (isFirstRender.current) {
         isFirstRender.current = false;
@@ -124,7 +123,8 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                        const parsed = JSON.parse(val);
                        if (parsed.items) {
                            parsed.items = liveCart;
-                           parsed.total = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
+                           // 🔥 Mantenemos el cálculo del total ignorando los cancelados
+                           parsed.total = liveCart.filter(i => i.status !== 'CANCELLED').reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
                            localStorage.setItem(key, JSON.stringify(parsed));
                        }
                    }
@@ -134,7 +134,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   }, [liveCart, cart, onReset]);
 
-  const liveTotal = liveCart.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
+  // 🔥 El total real a pagar NO debe sumar los productos cancelados
+  const liveTotal = liveCart
+    .filter(item => item.status !== 'CANCELLED')
+    .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
 
   const parsedNameData = clientData?.name || 'Cliente';
   let displayName = parsedNameData;
@@ -315,12 +318,14 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </div>
           </div>
 
-          <div className="space-y-4 max-h-[25vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
+          <div className="space-y-4 max-h-[30vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
             {liveCart.map((item, idx) => {
               const isGhost = item.isAutoPromo && item.precioUnitario === 0;
+              // 🔥 FIX 3: Detectamos si el producto está cancelado para aplicar los estilos
+              const isCancelled = item.status === 'CANCELLED';
 
               return (
-                <div key={idx} className="flex justify-between items-start text-sm font-medium text-gray-800 dark:text-gray-200 lya:text-[#3E2723] pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0">
+                <div key={idx} className={`flex justify-between items-start text-sm font-medium pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0 transition-opacity ${isCancelled ? 'opacity-60 grayscale' : 'text-gray-800 dark:text-gray-200 lya:text-[#3E2723]'}`}>
                   
                   <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
                     {isGhost ? (
@@ -328,6 +333,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                          <Tag size={14} className="text-rose-500 lya:text-rose-600 mb-0.5" strokeWidth={2.5} />
                          <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 lya:text-rose-600 tracking-wider">x{item.qty}</span>
                        </div>
+                    ) : isCancelled ? (
+                       <span className="text-xs font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                         x{item.qty}
+                       </span>
                     ) : (
                        <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
                          x{item.qty}
@@ -335,7 +344,8 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     )}
                     
                     <div className="flex-1 min-w-0 text-left">
-                      <span className="font-bold block text-gray-900 dark:text-white lya:text-[#3E2723] leading-tight">
+                      {/* Título tachado si está cancelado */}
+                      <span className={`font-bold block leading-tight ${isCancelled ? 'text-red-500 dark:text-red-400 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
                         {item.nombre}
                       </span>
                       
@@ -344,12 +354,19 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                           {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
                           {item.detalles.leche && <span> • {item.detalles.leche}</span>}
                           {item.detalles.extras && item.detalles.extras.length > 0 && <span> • +{item.detalles.extras.join(', ')}</span>}
-                          {item.isTakeaway && <span className="block text-orange-500 dark:text-orange-400 lya:text-[#78350F] font-bold mt-1">Empaque P/Llevar</span>}
+                          {item.isTakeaway && <span className={`block font-bold mt-1 ${isCancelled ? 'text-red-400' : 'text-orange-500 dark:text-orange-400 lya:text-[#78350F]'}`}>Empaque P/Llevar</span>}
                         </div>
                       )}
                       
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        {item.promoLabel && (
+                        {/* Etiqueta visible indicando CANCELADO */}
+                        {isCancelled && (
+                          <span className="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm border border-red-200 dark:border-red-800">
+                            Cancelado
+                          </span>
+                        )}
+
+                        {item.promoLabel && !isCancelled && (
                           <span className="inline-flex items-center gap-1 bg-rose-500 dark:bg-rose-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm">
                             <Tag size={10} strokeWidth={3} />
                             <span>{item.promoLabel}</span>
@@ -362,7 +379,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                           </span>
                         )}
                         
-                        {item.precioOriginal && !isGhost && (
+                        {item.precioOriginal && !isGhost && !isCancelled && (
                           <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through shrink-0">
                             Normal: ${(item.precioOriginal).toFixed(2)}
                           </span>
@@ -372,10 +389,11 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                   </div>
                   
                   <div className="flex flex-col items-end shrink-0">
-                    <span className="font-black text-[15px] text-gray-900 dark:text-white lya:text-[#3E2723]">
+                    {/* Precio tachado si está cancelado */}
+                    <span className={`font-black text-[15px] ${isCancelled ? 'text-red-400 dark:text-red-500 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
                       ${(item.precioUnitario * item.qty).toFixed(2)}
                     </span>
-                    {item.precioOriginal && item.qty > 1 && !isGhost && (
+                    {item.precioOriginal && item.qty > 1 && !isGhost && !isCancelled && (
                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
                          ${(item.precioOriginal * item.qty).toFixed(2)}
                        </span>
