@@ -1,4 +1,5 @@
 // frontend/src/modules/client/views/ClientOrderSuccess.jsx
+// frontend/src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag } from 'lucide-react';
@@ -6,6 +7,10 @@ import { socket } from '../../../api/socket.js';
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
+
+  // 🔥 FIX: Extracción inteligente para separar la lógica de la vista
+  const mesaIdCrudo = tableId?.id || tableId;
+  const numeroVisual = tableId?.numero || tableId;
 
   // 🔥 SINCRONIZACIÓN EN TIEMPO REAL CON CAJA
   const [liveCart, setLiveCart] = useState(() => (cart || []).filter(item => item.status !== 'CANCELLED'));
@@ -33,7 +38,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 🔥 2. NUEVO: Escuchar restauración individual desde la papelera
+    // 2. Escuchar restauración individual desde la papelera
     const handleItemRestored = ({ orderId, itemId, item }) => {
         if (!item) return;
         setLiveCart(prev => {
@@ -71,9 +76,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 3. Escuchar cancelación de la mesa completa
+    // 🔥 FIX: 3. Escuchar cancelación de la mesa completa (Usando mesaIdCrudo)
     const handleOrderCancelled = (data) => {
-        if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
+        if (!mesaIdCrudo || (data?.tableId && String(data.tableId) === String(mesaIdCrudo))) {
             try {
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -84,16 +89,16 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         }
     };
 
-    // 4. Escuchar restauración de la mesa completa
+    // 🔥 FIX: 4. Escuchar restauración de la mesa completa (Usando mesaIdCrudo)
     const handleOrderRestored = (data) => {
-        if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
+        if (!mesaIdCrudo || (data?.tableId && String(data.tableId) === String(mesaIdCrudo))) {
             // Si el cajero restauró la mesa entera, forzamos la recarga para sincronizar todo de golpe
             window.location.reload();
         }
     };
     
     socket.on('orderItemCancelled', handleItemCancelled);
-    socket.on('orderItemRestored', handleItemRestored); // Activando el oído para restaurar
+    socket.on('orderItemRestored', handleItemRestored); 
     socket.on('orderCancelled', handleOrderCancelled);
     socket.on('orderRestored', handleOrderRestored);
     
@@ -103,9 +108,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
        socket.off('orderCancelled', handleOrderCancelled);
        socket.off('orderRestored', handleOrderRestored);
     };
-  }, [tableId, onReset]);
+  // 🔥 FIX: Agregamos mesaIdCrudo como dependencia del useEffect
+  }, [mesaIdCrudo, onReset]);
 
-  // 🔥 FIX CACHÉ (Anti-Amnesia de Refresh)
+  // FIX CACHÉ (Anti-Amnesia de Refresh)
   useEffect(() => {
     if (isFirstRender.current) {
         isFirstRender.current = false;
@@ -310,7 +316,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             <div className="flex flex-col gap-1.5 items-end">
                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-xl border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#3E2723]">
                  {type === 'mesa' ? <Utensils size={14} className="text-orange-500 lya:text-[#78350F]" /> : <ShoppingBag size={14} className="text-orange-500 lya:text-[#78350F]" />}
-                 <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
+                 
+                 {/* 🔥 FIX: Imprimimos la variable numeroVisual */}
+                 <span>{type === 'mesa' ? `Mesa ${numeroVisual}` : 'Llevar'}</span>
+                 
                </div>
             </div>
           </div>
