@@ -37,7 +37,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     !(type === 'llevar' && disabledQrs.includes('llevar')) && 
     !(type === 'mesa' && disabledQrs.includes(`mesa-${tableNumber || tableId}`));
 
-  // 🔥 FIX 1: Wrapper para actualizar isConfirmed y REINICIAR el reloj
+  // 🔥 FIX: Wrapper para actualizar isConfirmed y REINICIAR el reloj
   const [internalIsConfirmed, setInternalIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
@@ -46,8 +46,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   const setIsConfirmed = useCallback((val) => {
     setInternalIsConfirmed(val);
     if (!val) {
-      // Si el cliente decide "pedir más" o se quita la confirmación, reseteamos su reloj
-      // para evitar que el temporizador asuma inactividad y lo desconecte.
       const now = Date.now();
       localStorage.setItem('lya_client_last_activity', now.toString());
       if (lastActivityRef.current) lastActivityRef.current = now;
@@ -152,7 +150,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   // 🔥 TEMPORIZADOR DE INACTIVIDAD REPARADO
   useEffect(() => {
     const updateActivity = () => {
-      if (sessionExpired || finalizedStatus) return; // Quitamos `isConfirmed` para que la actividad siempre reinicie el reloj de ser necesario
+      if (sessionExpired || finalizedStatus) return; 
       const now = Date.now();
       lastActivityRef.current = now;
       localStorage.setItem('lya_client_last_activity', now.toString());
@@ -164,7 +162,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     const checkInactivity = () => {
       if (isConfirmed || isOrderPaid || isSubmitting || finalizedStatus || sessionExpired) return; 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) {  // 25 minutos
+      if (now - lastActivityRef.current > 1500000) { 
         localStorage.setItem('lya_client_session_expired', 'true');
         setSessionExpired(true);
       }
@@ -209,14 +207,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
             finalStatus = 'OPEN'; 
         }
 
-        // 🔥 FIX 3: Quitamos la restricción de finalStatus === 'OPEN'
-        // Esto permite que el carrito del cliente se actualice y muestre los "Cancelados" incluso si ya había pagado.
         if (serverItems && Array.isArray(serverItems)) {
             let newItems = [];
             serverItems.forEach(serverItem => {
                 let parsedNotes = [];
                 try { parsedNotes = JSON.parse(serverItem.notes || '[]'); } catch(e){}
-                const precioUnitario = Number(serverItem.subtotal) / serverItem.quantity;
+                const precioUnitario = Number(serverItem.subtotal) / (serverItem.quantity || 1);
                 
                 for(let i = 0; i < serverItem.quantity; i++) {
                     const note = parsedNotes[i] || {};
@@ -231,8 +227,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                         isTakeaway: serverItem.isTakeaway,
                         isAutoPromo: serverItem.isAutoPromo,
                         promoLabel: serverItem.promoLabel,
-                        precioOriginal: serverItem.precioOriginal,
-                        status: serverItem.status || 'ACTIVE' // <- FIX 3b: Exponemos el estado de la BD a la UI
+                        // 🔥 FIX CRASH 1: Convertimos estrictamente a Number
+                        precioOriginal: serverItem.precioOriginal ? Number(serverItem.precioOriginal) : null,
+                        status: serverItem.status || 'ACTIVE' 
                     };
                     
                     const detailStr = JSON.stringify(newItem.detalles || {});
@@ -240,7 +237,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                         x.id === newItem.id && 
                         x.isTakeaway === newItem.isTakeaway && 
                         !!x.isAutoPromo === !!newItem.isAutoPromo &&
-                        x.status === newItem.status && // Agrupamos por estatus también
+                        x.status === newItem.status && 
                         JSON.stringify(x.detalles || {}) === detailStr
                     );
                     
@@ -252,17 +249,19 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                 }
             });
 
-            // Calculamos el total solo de los productos activos (ignorando CANCELLED)
-            const activeServerItems = newItems.filter(item => item.status !== 'CANCELLED');
-            const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
-            
-            const currentSnapshotStr = localStorage.getItem('lya_client_snapshot');
-            const newSnapshotStr = JSON.stringify({ items: newItems, total: newTotal });
-            
-            if (currentSnapshotStr !== newSnapshotStr) {
-                setConfirmedSnapshot({ items: newItems, total: newTotal });
-                localStorage.setItem('lya_client_snapshot', newSnapshotStr);
-            }
+            setConfirmedSnapshot(prev => {
+                // 🔥 FIX CRASH 2: ESCUDO DE RETENCIÓN DE TICKETS EN $0.00
+                if (newItems.length === 0 && prev.items && prev.items.length > 0 && (finalStatus === 'PAID' || finalStatus === 'CLOSED')) {
+                    return prev;
+                }
+
+                const activeServerItems = newItems.filter(item => item.status !== 'CANCELLED');
+                const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
+                
+                const newState = { items: newItems, total: newTotal };
+                localStorage.setItem('lya_client_snapshot', JSON.stringify(newState));
+                return newState;
+            });
         }
         
         if (finalStatus === 'PAID') {
@@ -337,7 +336,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     window.open(url, '_blank');
   };
 
-  // 🔥 CARGA DE MENÚ
   const loadMenuData = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setIsLoading(true);
@@ -386,7 +384,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }
   }, [sessionExpired, loadMenuData]);
 
-  // 🔥 BLINDAJE SOCKET STOCK
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
       if (!Array.isArray(updates)) return;
@@ -458,7 +455,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       let targetOrderId = activeOrderId;
 
       const createNewOrder = async () => {
-        // 🔥 FIX: Garantizado que usamos el ID Real para crear la orden
         const orderPayload = { orderType: dbOrderType, tableId: isActuallySalon ? tableId : null, ticketId: clientData?.name };
         const orderRes = await client.post('/pos/orders', orderPayload);
         const newId = orderRes.data.order.id;
@@ -479,7 +475,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
           isTakeaway: item.isTakeaway || false,
           isAutoPromo: item.isAutoPromo || false,
           promoLabel: item.promoLabel || null,
-          precioOriginal: item.precioOriginal || null
+          precioOriginal: item.precioOriginal ? Number(item.precioOriginal) : null
         }))
       };
 
