@@ -36,8 +36,11 @@ export default function ClientApp({ type }) {
   const [isAppReady, setIsAppReady] = useState(false);
   const [isGuarding, setIsGuarding] = useState(false);
   const [guardMessage, setGuardMessage] = useState(null);
+  
+  // 🔥 NUEVO ESTADO: Bloquea el renderizado de la UI hasta que validemos a dónde va el usuario
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
 
-  // 🔥 FIX 2: Limpieza de Sesiones Fantasma al arrancar
+  // Limpieza de Sesiones Fantasma al arrancar
   const [clientData, setClientData] = useState(() => {
     const isExpired = localStorage.getItem('lya_client_session_expired') === 'true';
     if (isExpired) {
@@ -117,8 +120,7 @@ export default function ClientApp({ type }) {
     ? String(standaloneSelection.tableId) 
     : (urlTableId ? String(urlTableId) : undefined);
 
-  // 🔥 FIX 4 & 5: MAPEO INTELIGENTE DE ID VS NÚMERO VISUAL
-  // Buscamos la mesa comparando el ID real, el ID en string, o su número visual
+  // Mapeo Inteligente de ID
   const mesaActivaObj = activeTables.find(t => 
     String(t.id) === String(effectiveTableId) || 
     String(t.numero) === String(effectiveTableId) || 
@@ -126,9 +128,7 @@ export default function ClientApp({ type }) {
     String(t.name) === String(effectiveTableId)
   );
 
-  // El ID real que enviaremos a la Base de Datos
   const realDbTableId = mesaActivaObj ? String(mesaActivaObj.id) : effectiveTableId;
-  // El texto bonito que le mostraremos al cliente
   const visualTableNumber = mesaActivaObj ? (mesaActivaObj.name || mesaActivaObj.numero || mesaActivaObj.number) : effectiveTableId;
 
   const [themeIndex] = useState(getInitialTheme);
@@ -210,13 +210,15 @@ export default function ClientApp({ type }) {
 
   useEffect(() => {
     const validateAndRouteSession = async () => {
-      if (!clientData) return;
+      if (!clientData) {
+        setIsSessionChecked(true); // Sin sesión, procedemos normal
+        return;
+      }
       
       const { type: sessionType, tableId: sessionTableId, tableNumber: sessionTableNumber } = clientData;
       let isCollision = false;
       let recoveryPath = '';
 
-      // Usamos el ID real de la BD para la comparación
       if (sessionType && sessionType !== effectiveType) {
         isCollision = true;
         recoveryPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
@@ -242,8 +244,6 @@ export default function ClientApp({ type }) {
 
             if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
               
-              // 🔥 FIX DEFINITIVO: Búsqueda en vivo de la mesa
-              // Usamos el catálogo activo para traducir el ID 29 al número visual 1.
               const mesaEncontrada = activeTables.find(t => String(t.id) === String(sessionTableId));
               const numeroMesaMostrar = mesaEncontrada ? (mesaEncontrada.name || mesaEncontrada.numero || mesaEncontrada.number) : (sessionTableNumber || sessionTableId);
               
@@ -255,6 +255,7 @@ export default function ClientApp({ type }) {
                 navigate(recoveryPath, { replace: true });
                 setIsGuarding(false);
                 setGuardMessage(null);
+                setIsSessionChecked(true); // 🔥 Liberamos la pantalla de carga
               }, 2000);
               return; 
             }
@@ -265,6 +266,7 @@ export default function ClientApp({ type }) {
         
         handleClientLogout();
         setIsGuarding(false);
+        setIsSessionChecked(true); // 🔥 Liberamos la pantalla de carga
         return; 
       }
 
@@ -273,12 +275,13 @@ export default function ClientApp({ type }) {
       } else if (!isCollision && sessionType === 'llevar' && window.location.pathname !== '/llevar') {
         navigate('/llevar', { replace: true });
       }
+      
+      setIsSessionChecked(true); // 🔥 Liberamos la pantalla de carga
     };
 
     if (isAppReady) {
       validateAndRouteSession();
     }
-  // Añadimos isAppReady a las dependencias en lugar de isLoadingTables
   }, [clientData, effectiveType, realDbTableId, urlTableId, navigate, handleClientLogout, activeTables, isAppReady]);
 
   useEffect(() => {
@@ -380,7 +383,7 @@ export default function ClientApp({ type }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {!isAppReady && (
+        {(!isAppReady || !isSessionChecked) && (
           <motion.div
             key="splash-screen"
             initial={{ opacity: 1 }}
@@ -459,17 +462,7 @@ export default function ClientApp({ type }) {
           
           <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative h-full z-10 overflow-hidden">
             <AnimatePresence mode="wait">
-              {isGuarding ? (
-                <motion.div
-                  key="guarding"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm z-[9000]"
-                >
-                  <Loader2 className="w-12 h-12 text-amber-500 animate-spin mb-4" />
-                </motion.div>
-              ) : !clientData ? (
+              {(!isAppReady || !isSessionChecked) ? null : !clientData ? (
                 isGridMode ? (
                   <motion.div
                     key="grid"
@@ -589,14 +582,13 @@ export default function ClientApp({ type }) {
                       </div>
                     )}
 
-                    {/* 🔥 FIX 4: Mandamos el objeto con el nombre visual Y el ID real al login */}
                     <ClientLogin 
                       onLogin={(data) => {
                         const sessionData = { 
                           ...data, 
                           type: effectiveType, 
-                          tableId: realDbTableId, // Mandamos el ID estricto a la BD
-                          tableNumber: visualTableNumber // Guardamos el nombre amigable para la UI
+                          tableId: realDbTableId,
+                          tableNumber: visualTableNumber 
                         };
                         setClientData(sessionData);
                         localStorage.setItem('lya_client_session', JSON.stringify(sessionData));
@@ -640,7 +632,7 @@ export default function ClientApp({ type }) {
                     clientData={clientData} 
                     type={clientData.type || effectiveType} 
                     tableId={clientData.tableId || realDbTableId} 
-                    tableNumber={clientData.tableNumber || visualTableNumber} // Mandamos la etiqueta bonita
+                    tableNumber={clientData.tableNumber || visualTableNumber} 
                     onLogout={handleClientLogout}
                     setActiveOrdersCount={setActiveOrdersCount}
                   />
