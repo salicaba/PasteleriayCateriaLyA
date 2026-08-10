@@ -6,10 +6,7 @@ import { socket } from '../../../api/socket.js';
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
-
-  // 🔥 FIX 1: Quitamos el filtro que eliminaba los cancelados para poder pintarlos de rojo
   const [liveCart, setLiveCart] = useState(() => cart || []);
-  
   const isFirstRender = useRef(true);
   
   useEffect(() => {
@@ -25,7 +22,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                 if (!found && (String(item.backendItemId || item.id) === String(itemId) || String(item.id) === String(productId))) {
                     found = true;
                     const newQty = item.qty - (cancelQty || item.qty);
-                    // 🔥 FIX 2: Si la cantidad llega a 0, lo dejamos en la lista pero lo marcamos como CANCELLED
                     if (newQty <= 0) {
                         return { ...item, status: 'CANCELLED' };
                     }
@@ -36,7 +32,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 2. Escuchar restauración individual desde la papelera
+    // 2. Escuchar restauración individual (LIBRE DE CRASHES)
     const handleItemRestored = ({ orderId, itemId, item }) => {
         if (!item) return;
         setLiveCart(prev => {
@@ -47,23 +43,26 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             
             let parsedPreps = [];
             try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
-            
             const meta = parsedPreps.find(p => p && p._isPromoMeta);
             
+            // 🔥 CONVERSIÓN SEGURA AL 100%
+            const safePrecioUnitario = Number(item.subtotal || 0) / Number(item.quantity || 1);
+            const safePrecioOriginal = meta?.precioOriginal ? Number(meta.precioOriginal) : (item.product?.basePrice ? Number(item.product.basePrice) : null);
+
             const newItem = {
                 id: item.productId,
                 backendItemId: item.id,
                 nombre: item.product?.name || item.nombre || 'Producto',
                 imagen: item.product?.imageUrl || null,
-                precioUnitario: Number(item.subtotal) / (item.quantity || 1),
-                qty: item.quantity,
+                precioUnitario: safePrecioUnitario,
+                qty: Number(item.quantity || 1),
                 detalles: parsedPreps.filter(p => !p._isPromoMeta)[0] || null,
                 preparaciones: parsedPreps,
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway,
                 isAutoPromo: meta ? meta.isAutoPromo : false,
                 promoLabel: meta ? meta.promoLabel : null,
-                precioOriginal: meta ? meta.precioOriginal : (item.product?.basePrice || null),
+                precioOriginal: safePrecioOriginal,
                 status: 'ACTIVE'
             };
             
@@ -123,7 +122,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                        const parsed = JSON.parse(val);
                        if (parsed.items) {
                            parsed.items = liveCart;
-                           // 🔥 Mantenemos el cálculo del total ignorando los cancelados
                            parsed.total = liveCart.filter(i => i.status !== 'CANCELLED').reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
                            localStorage.setItem(key, JSON.stringify(parsed));
                        }
@@ -134,7 +132,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   }, [liveCart, cart, onReset]);
 
-  // 🔥 El total real a pagar NO debe sumar los productos cancelados
+  // 🔥 Total en tiempo real (Ignora los cancelados)
   const liveTotal = liveCart
     .filter(item => item.status !== 'CANCELLED')
     .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
@@ -206,7 +204,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       {product.nombre}
                     </h4>
                     <span className="font-black text-base text-gray-900 dark:text-white lya:text-[#5D4037] tracking-tight mt-1.5 block text-left">
-                      ${product.precio}
+                      ${Number(product.precio).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -321,11 +319,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           <div className="space-y-4 max-h-[30vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
             {liveCart.map((item, idx) => {
               const isGhost = item.isAutoPromo && item.precioUnitario === 0;
-              // 🔥 FIX 3: Detectamos si el producto está cancelado para aplicar los estilos
               const isCancelled = item.status === 'CANCELLED';
 
               return (
-                <div key={idx} className={`flex justify-between items-start text-sm font-medium pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0 transition-opacity ${isCancelled ? 'opacity-60 grayscale' : 'text-gray-800 dark:text-gray-200 lya:text-[#3E2723]'}`}>
+                <div key={idx} className={`flex justify-between items-start text-sm font-medium pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0 transition-opacity ${isCancelled ? 'opacity-50 grayscale' : 'text-gray-800 dark:text-gray-200 lya:text-[#3E2723]'}`}>
                   
                   <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
                     {isGhost ? (
@@ -344,7 +341,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     )}
                     
                     <div className="flex-1 min-w-0 text-left">
-                      {/* Título tachado si está cancelado */}
                       <span className={`font-bold block leading-tight ${isCancelled ? 'text-red-500 dark:text-red-400 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
                         {item.nombre}
                       </span>
@@ -359,7 +355,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       )}
                       
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        {/* Etiqueta visible indicando CANCELADO */}
                         {isCancelled && (
                           <span className="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm border border-red-200 dark:border-red-800">
                             Cancelado
@@ -375,13 +370,13 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                         
                         {item.qty > 1 && !isGhost && (
                           <span className="inline-block text-[9px] font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] tracking-wide uppercase">
-                            Unit: ${item.precioUnitario.toFixed(2)}
+                            Unit: ${(Number(item.precioUnitario)).toFixed(2)}
                           </span>
                         )}
                         
                         {item.precioOriginal && !isGhost && !isCancelled && (
                           <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through shrink-0">
-                            Normal: ${(item.precioOriginal).toFixed(2)}
+                            Normal: ${(Number(item.precioOriginal)).toFixed(2)}
                           </span>
                         )}
                       </div>
@@ -389,13 +384,12 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                   </div>
                   
                   <div className="flex flex-col items-end shrink-0">
-                    {/* Precio tachado si está cancelado */}
                     <span className={`font-black text-[15px] ${isCancelled ? 'text-red-400 dark:text-red-500 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
-                      ${(item.precioUnitario * item.qty).toFixed(2)}
+                      ${(Number(item.precioUnitario) * item.qty).toFixed(2)}
                     </span>
                     {item.precioOriginal && item.qty > 1 && !isGhost && !isCancelled && (
                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
-                         ${(item.precioOriginal * item.qty).toFixed(2)}
+                         ${(Number(item.precioOriginal) * item.qty).toFixed(2)}
                        </span>
                     )}
                   </div>

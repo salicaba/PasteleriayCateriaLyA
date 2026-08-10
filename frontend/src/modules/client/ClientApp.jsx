@@ -37,7 +37,6 @@ export default function ClientApp({ type }) {
   const [isGuarding, setIsGuarding] = useState(false);
   const [guardMessage, setGuardMessage] = useState(null);
   
-  // 🔥 NUEVO ESTADO: Bloquea el renderizado de la UI hasta que validemos a dónde va el usuario
   const [isSessionChecked, setIsSessionChecked] = useState(false);
 
   // Limpieza de Sesiones Fantasma al arrancar
@@ -211,7 +210,7 @@ export default function ClientApp({ type }) {
   useEffect(() => {
     const validateAndRouteSession = async () => {
       if (!clientData) {
-        setIsSessionChecked(true); // Sin sesión, procedemos normal
+        setIsSessionChecked(true);
         return;
       }
       
@@ -238,6 +237,15 @@ export default function ClientApp({ type }) {
             });
             const { status, accountStatus } = res.data || {};
             
+            // 🔥 LA CIRUGÍA MAYOR: Si la mesa fue LIBERADA o CANCELADA, cortamos la sesión de tajo
+            // Esto evita que el cliente se quede en una orden "fantasma" que colisiona con las nuevas
+            if (status === 'CLOSED' || status === 'CANCELLED' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') {
+                handleClientLogout();
+                setIsGuarding(false);
+                setIsSessionChecked(true);
+                return;
+            }
+
             const hasLocalConfirm = localStorage.getItem('lya_client_is_confirmed') === 'true';
             const hasLocalPaid = localStorage.getItem('lya_client_order_paid') === 'true';
             const hasFinalized = localStorage.getItem('lya_client_finalized_status');
@@ -255,7 +263,7 @@ export default function ClientApp({ type }) {
                 navigate(recoveryPath, { replace: true });
                 setIsGuarding(false);
                 setGuardMessage(null);
-                setIsSessionChecked(true); // 🔥 Liberamos la pantalla de carga
+                setIsSessionChecked(true); 
               }, 2000);
               return; 
             }
@@ -266,7 +274,7 @@ export default function ClientApp({ type }) {
         
         handleClientLogout();
         setIsGuarding(false);
-        setIsSessionChecked(true); // 🔥 Liberamos la pantalla de carga
+        setIsSessionChecked(true);
         return; 
       }
 
@@ -276,7 +284,7 @@ export default function ClientApp({ type }) {
         navigate('/llevar', { replace: true });
       }
       
-      setIsSessionChecked(true); // 🔥 Liberamos la pantalla de carga
+      setIsSessionChecked(true); 
     };
 
     if (isAppReady) {
