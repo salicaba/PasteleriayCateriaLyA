@@ -79,7 +79,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // PILAR 3: Locks Asíncronos
+    // PILAR 3: Locks Asíncronos (Prevención Anti-Doble Clic)
     if (isProcessing) return; 
 
     const trimmedName = name.trim();
@@ -97,6 +97,15 @@ export default function ClientLogin({ onLogin, type, tableId }) {
     setIsProcessing(true);
 
     try {
+      // 🛡️ LIMPIEZA PROFUNDA DE SESIONES (Anti-Zombies)
+      // Preservamos las preferencias de UI, destruimos todo lo demás del cliente anterior.
+      const keysToKeep = ['lya_client_theme', 'lya_client_size'];
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('lya_client_') && !keysToKeep.includes(key)) {
+          localStorage.removeItem(key);
+        }
+      });
+
       // MAGIA DE INTEGRACIÓN: Enviamos el formato separado por " | "
       const finalName = phone ? `${trimmedName} | ${phone}` : trimmedName;
       
@@ -111,6 +120,8 @@ export default function ClientLogin({ onLogin, type, tableId }) {
       });
     } catch (error) {
       triggerNotification("Error al iniciar sesión", "error");
+    } finally {
+      // PILAR 3: Liberación segura del botón
       setIsProcessing(false);
     }
   };

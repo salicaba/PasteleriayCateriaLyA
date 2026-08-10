@@ -76,10 +76,11 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🛡️ PURGADO DE CACHÉ VIEJA
+  // 🛡️ PURGADO DE CACHÉ VIEJA (Ajustado a 24 Horas)
   useEffect(() => {
     const lastAct = parseInt(localStorage.getItem('lya_client_last_activity'));
-    if (lastAct && (Date.now() - lastAct > 4 * 60 * 60 * 1000)) { 
+    // 24 * 60 * 60 * 1000 = 86400000 ms
+    if (lastAct && (Date.now() - lastAct > 86400000)) { 
         handleLogout();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,7 +148,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }
   }, []);
 
-  // 🔥 TEMPORIZADOR DE INACTIVIDAD REPARADO
+  // 🔥 TEMPORIZADOR DE INACTIVIDAD EXTENDIDO A 24 HORAS
   useEffect(() => {
     const updateActivity = () => {
       if (sessionExpired || finalizedStatus) return; 
@@ -162,7 +163,8 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     const checkInactivity = () => {
       if (isConfirmed || isOrderPaid || isSubmitting || finalizedStatus || sessionExpired) return; 
       const now = Date.now();
-      if (now - lastActivityRef.current > 1500000) { 
+      // 24 horas = 24 * 60 * 60 * 1000 = 86400000 ms
+      if (now - lastActivityRef.current > 86400000) { 
         localStorage.setItem('lya_client_session_expired', 'true');
         setSessionExpired(true);
       }
@@ -183,7 +185,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     };
   }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
 
-  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO REPARADA
+  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -227,7 +229,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                         isTakeaway: serverItem.isTakeaway,
                         isAutoPromo: serverItem.isAutoPromo,
                         promoLabel: serverItem.promoLabel,
-                        // 🔥 FIX CRASH 1: Convertimos estrictamente a Number
                         precioOriginal: serverItem.precioOriginal ? Number(serverItem.precioOriginal) : null,
                         status: serverItem.status || 'ACTIVE' 
                     };
@@ -250,7 +251,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
             });
 
             setConfirmedSnapshot(prev => {
-                // 🔥 FIX CRASH 2: ESCUDO DE RETENCIÓN DE TICKETS EN $0.00
                 if (newItems.length === 0 && prev.items && prev.items.length > 0 && (finalStatus === 'PAID' || finalStatus === 'CLOSED')) {
                     return prev;
                 }
@@ -307,6 +307,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
 
     await new Promise(resolve => setTimeout(resolve, 1500));
     
+    // Esta lista se mantiene por compatibilidad, aunque el Login ya limpia todo
     const keysToRemove = [
       'lya_client_order_id', 'lya_client_snapshot', 'lya_client_data', 
       'lya_client_session', 'lya_client_finalized_at', 'lya_client_finalized_status', 
