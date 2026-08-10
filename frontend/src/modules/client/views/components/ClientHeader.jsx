@@ -13,9 +13,6 @@ export default function ClientHeader({
   setActiveCategory,
   setShowSettings
 }) {
-  // 🔥 LA CURA: Extraemos el número visual. Si es el objeto nuevo usa .numero, sino usa el valor directo.
-  const numeroVisual = tableId?.numero || tableId;
-
   return (
     <header className="px-6 pt-6 pb-3 shrink-0 space-y-4 z-10 sticky top-0 bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] border-b border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] transition-colors">
       <div className="flex items-center justify-between">
@@ -32,10 +29,7 @@ export default function ClientHeader({
           <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-400 lya:text-[#7A6353] transition-colors md:hover:bg-gray-100 outline-none"><Settings size={18} /></motion.button>
           <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-[10px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#7A6353] rounded-full">
             {type === 'mesa' ? <Utensils size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /> : <ShoppingBag size={12} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" />}
-            
-            {/* 🔥 Aplicamos la variable curada aquí */}
-            <span>{type === 'mesa' ? `Mesa ${numeroVisual}` : 'Llevar'}</span>
-            
+            <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
           </div>
         </div>
       </div>
