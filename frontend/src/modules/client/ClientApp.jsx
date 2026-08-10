@@ -33,11 +33,22 @@ export default function ClientApp({ type }) {
 
   const [isUpdating, setIsUpdating] = useState(false); 
   const [runtimeError, setRuntimeError] = useState(null);
-  
   const [isAppReady, setIsAppReady] = useState(false);
-  
   const [isGuarding, setIsGuarding] = useState(false);
   const [guardMessage, setGuardMessage] = useState(null);
+
+  // 🔥 FIX 2: Limpieza de Sesiones Fantasma al arrancar
+  const [clientData, setClientData] = useState(() => {
+    const isExpired = localStorage.getItem('lya_client_session_expired') === 'true';
+    if (isExpired) {
+      localStorage.removeItem('lya_client_session');
+      localStorage.removeItem('lya_client_order_id');
+      localStorage.removeItem('lya_client_session_expired');
+      return null;
+    }
+    const saved = localStorage.getItem('lya_client_session');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   useEffect(() => {
     const updateMetaColor = () => {
@@ -58,7 +69,6 @@ export default function ClientApp({ type }) {
     };
 
     updateMetaColor(); 
-    
     const observer = new MutationObserver(updateMetaColor);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
@@ -72,9 +82,7 @@ export default function ClientApp({ type }) {
     };
     const handleRejection = (event) => {
       const msg = event.reason?.message || String(event.reason || '');
-      if (msg.includes('Failed to update a ServiceWorker') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-        return; 
-      }
+      if (msg.includes('Failed to update a ServiceWorker') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) return; 
       setRuntimeError(msg || 'Promesa rechazada no manejada');
     };
 
@@ -87,23 +95,15 @@ export default function ClientApp({ type }) {
     };
   }, []);
 
-  const {
-    needRefresh: [needRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
     onRegistered(r) {
       if (r) {
-        setInterval(() => {
-          if (navigator.onLine) {
-            r.update().catch(() => {});
-          }
-        }, 60 * 1000); 
+        setInterval(() => { if (navigator.onLine) r.update().catch(() => {}); }, 60 * 1000); 
       }
     }
   });
 
   const { isInstallable, promptInstall, isStandalone } = usePWA();
-  
   const [standaloneSelection, setStandaloneSelection] = useState(null); 
   const [isProcessingSelection, setIsProcessingSelection] = useState(null); 
   const [isInstalling, setIsInstalling] = useState(false);
@@ -117,21 +117,23 @@ export default function ClientApp({ type }) {
     ? String(standaloneSelection.tableId) 
     : (urlTableId ? String(urlTableId) : undefined);
 
-  // 🔥 FIX BBDD: Mapeamos el ID crudo (Ej. 29) con el número visual (Ej. 1)
-  const mesaActivaObj = activeTables.find(t => String(t.id) === String(effectiveTableId));
-  const visualTableData = mesaActivaObj ? { 
-      id: mesaActivaObj.id, 
-      numero: mesaActivaObj.name || mesaActivaObj.number || mesaActivaObj.numero 
-  } : effectiveTableId;
+  // 🔥 FIX 4 & 5: MAPEO INTELIGENTE DE ID VS NÚMERO VISUAL
+  // Buscamos la mesa comparando el ID real, el ID en string, o su número visual
+  const mesaActivaObj = activeTables.find(t => 
+    String(t.id) === String(effectiveTableId) || 
+    String(t.numero) === String(effectiveTableId) || 
+    String(t.number) === String(effectiveTableId) || 
+    String(t.name) === String(effectiveTableId)
+  );
+
+  // El ID real que enviaremos a la Base de Datos
+  const realDbTableId = mesaActivaObj ? String(mesaActivaObj.id) : effectiveTableId;
+  // El texto bonito que le mostraremos al cliente
+  const visualTableNumber = mesaActivaObj ? (mesaActivaObj.name || mesaActivaObj.numero || mesaActivaObj.number) : effectiveTableId;
 
   const [themeIndex] = useState(getInitialTheme);
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
-
-  const [clientData, setClientData] = useState(() => {
-    const saved = localStorage.getItem('lya_client_session');
-    return saved ? JSON.parse(saved) : null;
-  });
 
   const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection;
 
@@ -146,7 +148,6 @@ export default function ClientApp({ type }) {
 
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) setIsLoadingTables(true);
-    
     try {
       const ts = Date.now();
       const [tablesRes, settingsRes] = await Promise.all([
@@ -201,12 +202,12 @@ export default function ClientApp({ type }) {
   const handleClientLogout = React.useCallback(() => {
     localStorage.removeItem('lya_client_session');
     localStorage.removeItem('lya_client_order_id');
+    localStorage.removeItem('lya_client_session_expired');
     setClientData(null);
     setActiveOrdersCount(0);
     setStandaloneSelection(null); 
   }, []);
 
-  // 🔥 3. FIX: EL GUARDIA COMPASIVO (Session Recovery)
   useEffect(() => {
     const validateAndRouteSession = async () => {
       if (!clientData) return;
@@ -215,10 +216,11 @@ export default function ClientApp({ type }) {
       let isCollision = false;
       let recoveryPath = '';
 
+      // Usamos el ID real de la BD para la comparación
       if (sessionType && sessionType !== effectiveType) {
         isCollision = true;
         recoveryPath = sessionType === 'mesa' ? `/m/${sessionTableId}` : '/llevar';
-      } else if (sessionType === 'mesa' && effectiveType === 'mesa' && sessionTableId && sessionTableId !== effectiveTableId) {
+      } else if (sessionType === 'mesa' && effectiveType === 'mesa' && sessionTableId && sessionTableId !== realDbTableId) {
         isCollision = true;
         recoveryPath = `/m/${sessionTableId}`;
       }
@@ -234,14 +236,12 @@ export default function ClientApp({ type }) {
             });
             const { status, accountStatus } = res.data || {};
             
-            // 🔥 LA SOLUCIÓN: Si está abierta o pagada, o si CUALQUIERA de las banderas locales dice
-            // que la persona seguía interactuando con su nota... NO lo echamos al login, lo redirigimos a su mesa.
             const hasLocalConfirm = localStorage.getItem('lya_client_is_confirmed') === 'true';
             const hasLocalPaid = localStorage.getItem('lya_client_order_paid') === 'true';
             const hasFinalized = localStorage.getItem('lya_client_finalized_status');
 
             if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
-              const locationName = sessionType === 'mesa' ? `Mesa ${sessionTableId}` : 'Para Llevar';
+              const locationName = sessionType === 'mesa' ? `Mesa` : 'Para Llevar';
               setGuardMessage(`Reconectando con tu cuenta en ${locationName}...`);
               
               setTimeout(() => {
@@ -269,7 +269,7 @@ export default function ClientApp({ type }) {
     };
 
     validateAndRouteSession();
-  }, [clientData, effectiveType, effectiveTableId, urlTableId, navigate, handleClientLogout]);
+  }, [clientData, effectiveType, realDbTableId, urlTableId, navigate, handleClientLogout]);
 
   useEffect(() => {
     if (isStandalone) {
@@ -278,9 +278,7 @@ export default function ClientApp({ type }) {
     }
     const verifyQrTokenValidity = async () => {
       if (!urlTableId) return;
-      try {
-        setIsQrValid(true);
-      } catch (error) {
+      try { setIsQrValid(true); } catch (error) {
         setIsQrValid(false);
         handleClientLogout();
       }
@@ -581,15 +579,20 @@ export default function ClientApp({ type }) {
                       </div>
                     )}
 
+                    {/* 🔥 FIX 4: Mandamos el objeto con el nombre visual Y el ID real al login */}
                     <ClientLogin 
                       onLogin={(data) => {
-                        // Guardamos estrictamente el ID de la Base de Datos en la sesión para no romper el backend
-                        const sessionData = { ...data, type: effectiveType, tableId: effectiveTableId };
+                        const sessionData = { 
+                          ...data, 
+                          type: effectiveType, 
+                          tableId: realDbTableId, // Mandamos el ID estricto a la BD
+                          tableNumber: visualTableNumber // Guardamos el nombre amigable para la UI
+                        };
                         setClientData(sessionData);
                         localStorage.setItem('lya_client_session', JSON.stringify(sessionData));
                       }} 
                       type={effectiveType} 
-                      tableId={visualTableData} // 🔥 Le pasamos el objeto visual al Login para arreglar la UI
+                      tableId={{ id: realDbTableId, numero: visualTableNumber }} 
                     />
 
                     {!isStandalone && isInstallable && (
@@ -626,7 +629,8 @@ export default function ClientApp({ type }) {
                   <ClientMenu 
                     clientData={clientData} 
                     type={clientData.type || effectiveType} 
-                    tableId={clientData.tableId || effectiveTableId} 
+                    tableId={clientData.tableId || realDbTableId} 
+                    tableNumber={clientData.tableNumber || visualTableNumber} // Mandamos la etiqueta bonita
                     onLogout={handleClientLogout}
                     setActiveOrdersCount={setActiveOrdersCount}
                   />

@@ -5,7 +5,7 @@ import { socket } from '../../../api/socket';
 import { getInitialTheme, getInitialSize, THEME_CLASSES, SIZES } from '../views/utils/clientMenuUtils';
 import { useClientCart } from './useClientCart';
 
-export function useClientMenuController({ clientData, type, tableId, onLogout, setActiveOrdersCount }) {
+export function useClientMenuController({ clientData, type, tableId, tableNumber, onLogout, setActiveOrdersCount }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,12 +35,26 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
 
   const isServiceActive = globalQrActive && 
     !(type === 'llevar' && disabledQrs.includes('llevar')) && 
-    !(type === 'mesa' && disabledQrs.includes(`mesa-${tableId}`));
+    !(type === 'mesa' && disabledQrs.includes(`mesa-${tableNumber || tableId}`));
 
-  const [isConfirmed, setIsConfirmed] = useState(() => {
+  // 🔥 FIX 1: Wrapper para actualizar isConfirmed y REINICIAR el reloj
+  const [internalIsConfirmed, setInternalIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
   });
+
+  const setIsConfirmed = useCallback((val) => {
+    setInternalIsConfirmed(val);
+    if (!val) {
+      // Si el cliente decide "pedir más" o se quita la confirmación, reseteamos su reloj
+      // para evitar que el temporizador asuma inactividad y lo desconecte.
+      const now = Date.now();
+      localStorage.setItem('lya_client_last_activity', now.toString());
+      if (lastActivityRef.current) lastActivityRef.current = now;
+    }
+  }, []);
+
+  const isConfirmed = internalIsConfirmed;
 
   const triggerNotification = useCallback((msg, notifType = 'success') => {
     setNotification({ msg, type: notifType });
@@ -135,10 +149,10 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     }
   }, []);
 
-  // 🔥 TEMPORIZADOR DE INACTIVIDAD
+  // 🔥 TEMPORIZADOR DE INACTIVIDAD REPARADO
   useEffect(() => {
     const updateActivity = () => {
-      if (sessionExpired || isConfirmed || finalizedStatus) return;
+      if (sessionExpired || finalizedStatus) return; // Quitamos `isConfirmed` para que la actividad siempre reinicie el reloj de ser necesario
       const now = Date.now();
       lastActivityRef.current = now;
       localStorage.setItem('lya_client_last_activity', now.toString());
@@ -171,7 +185,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
     };
   }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
 
-  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO
+  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO REPARADA
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -195,7 +209,9 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
             finalStatus = 'OPEN'; 
         }
 
-        if (serverItems && Array.isArray(serverItems) && finalStatus === 'OPEN') {
+        // 🔥 FIX 3: Quitamos la restricción de finalStatus === 'OPEN'
+        // Esto permite que el carrito del cliente se actualice y muestre los "Cancelados" incluso si ya había pagado.
+        if (serverItems && Array.isArray(serverItems)) {
             let newItems = [];
             serverItems.forEach(serverItem => {
                 let parsedNotes = [];
@@ -206,7 +222,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
                     const note = parsedNotes[i] || {};
                     const newItem = {
                         id: serverItem.productId,
-                        backendItemId: serverItem.id, // 🔥 FIX: Guardamos el ID real para que la cancelación funcione
+                        backendItemId: serverItem.id, 
                         nombre: serverItem.product?.name || 'Producto',
                         imagen: serverItem.product?.imageUrl || null,
                         precioUnitario: precioUnitario,
@@ -215,7 +231,8 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
                         isTakeaway: serverItem.isTakeaway,
                         isAutoPromo: serverItem.isAutoPromo,
                         promoLabel: serverItem.promoLabel,
-                        precioOriginal: serverItem.precioOriginal
+                        precioOriginal: serverItem.precioOriginal,
+                        status: serverItem.status || 'ACTIVE' // <- FIX 3b: Exponemos el estado de la BD a la UI
                     };
                     
                     const detailStr = JSON.stringify(newItem.detalles || {});
@@ -223,6 +240,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
                         x.id === newItem.id && 
                         x.isTakeaway === newItem.isTakeaway && 
                         !!x.isAutoPromo === !!newItem.isAutoPromo &&
+                        x.status === newItem.status && // Agrupamos por estatus también
                         JSON.stringify(x.detalles || {}) === detailStr
                     );
                     
@@ -234,7 +252,10 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
                 }
             });
 
-            const newTotal = newItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
+            // Calculamos el total solo de los productos activos (ignorando CANCELLED)
+            const activeServerItems = newItems.filter(item => item.status !== 'CANCELLED');
+            const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
+            
             const currentSnapshotStr = localStorage.getItem('lya_client_snapshot');
             const newSnapshotStr = JSON.stringify({ items: newItems, total: newTotal });
             
@@ -437,6 +458,7 @@ export function useClientMenuController({ clientData, type, tableId, onLogout, s
       let targetOrderId = activeOrderId;
 
       const createNewOrder = async () => {
+        // 🔥 FIX: Garantizado que usamos el ID Real para crear la orden
         const orderPayload = { orderType: dbOrderType, tableId: isActuallySalon ? tableId : null, ticketId: clientData?.name };
         const orderRes = await client.post('/pos/orders', orderPayload);
         const newId = orderRes.data.order.id;
