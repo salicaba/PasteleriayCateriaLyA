@@ -212,7 +212,8 @@ export default function ClientApp({ type }) {
     const validateAndRouteSession = async () => {
       if (!clientData) return;
       
-      const { type: sessionType, tableId: sessionTableId } = clientData;
+      // 🔥 FIX: Extraemos tableNumber de la sesión (o usamos tableId como respaldo si es una sesión vieja)
+      const { type: sessionType, tableId: sessionTableId, tableNumber: sessionTableNumber } = clientData;
       let isCollision = false;
       let recoveryPath = '';
 
@@ -241,7 +242,10 @@ export default function ClientApp({ type }) {
             const hasFinalized = localStorage.getItem('lya_client_finalized_status');
 
             if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
-              const locationName = sessionType === 'mesa' ? `Mesa` : 'Para Llevar';
+              // 🔥 FIX: Construimos el texto inyectando el número de mesa real y visual
+              const numeroMesaMostrar = sessionTableNumber || sessionTableId;
+              const locationName = sessionType === 'mesa' ? `Mesa ${numeroMesaMostrar}` : 'Para Llevar';
+              
               setGuardMessage(`Reconectando con tu cuenta en ${locationName}...`);
               
               setTimeout(() => {
