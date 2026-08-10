@@ -100,7 +100,7 @@ export default function ClientMenu(props) {
           totalCart={ctrl.confirmedSnapshot.total} 
           clientData={props.clientData} 
           type={props.type} 
-          tableId={props.tableId} 
+          tableId={props.tableNumber || props.tableId} /* 🔥 FIX: Pasamos el número visual (Ej: 3) */
           products={ctrl.products} 
           categories={ctrl.categories} 
           getCategoryName={ctrl.getCategoryName} 
@@ -165,7 +165,7 @@ export default function ClientMenu(props) {
         displayName={ctrl.displayName}
         displayPhone={ctrl.displayPhone}
         type={props.type}
-        tableId={props.tableId}
+        tableId={props.tableNumber || props.tableId} /* 🔥 FIX: Para que la cabecera también diga "Mesa 3" */
         categories={ctrl.categories}
         activeCategory={ctrl.activeCategory}
         setActiveCategory={ctrl.setActiveCategory}
