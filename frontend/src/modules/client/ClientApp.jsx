@@ -275,13 +275,11 @@ export default function ClientApp({ type }) {
       }
     };
 
-    // 🔥 FIX: Le ordenamos que NO valide la sesión hasta que las mesas ya estén descargadas.
-    // Esto asegura que activeTables tenga información para traducir los IDs crudos.
-    if (!isLoadingTables) {
+    if (isAppReady) {
       validateAndRouteSession();
     }
-  // Añadimos activeTables e isLoadingTables a las dependencias
-  }, [clientData, effectiveType, realDbTableId, urlTableId, navigate, handleClientLogout, activeTables, isLoadingTables]);
+  // Añadimos isAppReady a las dependencias en lugar de isLoadingTables
+  }, [clientData, effectiveType, realDbTableId, urlTableId, navigate, handleClientLogout, activeTables, isAppReady]);
 
   useEffect(() => {
     if (isStandalone) {
