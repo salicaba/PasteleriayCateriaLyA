@@ -212,7 +212,6 @@ export default function ClientApp({ type }) {
     const validateAndRouteSession = async () => {
       if (!clientData) return;
       
-      // 🔥 FIX: Extraemos tableNumber de la sesión (o usamos tableId como respaldo si es una sesión vieja)
       const { type: sessionType, tableId: sessionTableId, tableNumber: sessionTableNumber } = clientData;
       let isCollision = false;
       let recoveryPath = '';
@@ -242,8 +241,12 @@ export default function ClientApp({ type }) {
             const hasFinalized = localStorage.getItem('lya_client_finalized_status');
 
             if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
-              // 🔥 FIX: Construimos el texto inyectando el número de mesa real y visual
-              const numeroMesaMostrar = sessionTableNumber || sessionTableId;
+              
+              // 🔥 FIX DEFINITIVO: Búsqueda en vivo de la mesa
+              // Usamos el catálogo activo para traducir el ID 29 al número visual 1.
+              const mesaEncontrada = activeTables.find(t => String(t.id) === String(sessionTableId));
+              const numeroMesaMostrar = mesaEncontrada ? (mesaEncontrada.name || mesaEncontrada.numero || mesaEncontrada.number) : (sessionTableNumber || sessionTableId);
+              
               const locationName = sessionType === 'mesa' ? `Mesa ${numeroMesaMostrar}` : 'Para Llevar';
               
               setGuardMessage(`Reconectando con tu cuenta en ${locationName}...`);
@@ -272,8 +275,13 @@ export default function ClientApp({ type }) {
       }
     };
 
-    validateAndRouteSession();
-  }, [clientData, effectiveType, realDbTableId, urlTableId, navigate, handleClientLogout]);
+    // 🔥 FIX: Le ordenamos que NO valide la sesión hasta que las mesas ya estén descargadas.
+    // Esto asegura que activeTables tenga información para traducir los IDs crudos.
+    if (!isLoadingTables) {
+      validateAndRouteSession();
+    }
+  // Añadimos activeTables e isLoadingTables a las dependencias
+  }, [clientData, effectiveType, realDbTableId, urlTableId, navigate, handleClientLogout, activeTables, isLoadingTables]);
 
   useEffect(() => {
     if (isStandalone) {
