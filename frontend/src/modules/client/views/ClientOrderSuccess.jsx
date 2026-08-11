@@ -23,54 +23,56 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     setLiveCart(cart || []);
   }, [cart]);
 
-  // 🔥 EXTRACTOR INTELIGENTE DE CONFIGURACIONES (Cuentas y WhatsApp)
+  // 🔥 EXTRACTOR INTELIGENTE CON DIAGNÓSTICO (Cuentas y WhatsApp)
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoadingAccounts(true);
-        // Ajusta esta ruta si tu endpoint de configuraciones se llama diferente (ej: /config, /business)
-        const res = await client.get('/settings'); 
-        let rawData = res.data;
+        console.log("🟡 [DEBUG LYA] Pidiendo configuraciones al backend en /settings...");
         
-        if (rawData.data) rawData = rawData.data; // Desestructuración defensiva
+        const res = await client.get('/settings'); 
+        console.log("🟢 [DEBUG LYA] Respuesta exitosa del servidor:", res.data);
+        
+        let rawData = res.data;
+        if (rawData.data) rawData = rawData.data;
 
         let parsedAccounts = [];
         let parsedWa = "";
 
-        // Escenario A: El backend devuelve un Array [{key: 'cuentas', value: '...'}, {key: 'whatsapp', value: '...'}]
         if (Array.isArray(rawData)) {
             const accObj = rawData.find(item => item.key && (item.key.toLowerCase().includes('cuenta') || item.key.toLowerCase().includes('bank')));
             const waObj = rawData.find(item => item.key && item.key.toLowerCase().includes('whatsapp'));
             
             if (accObj) {
                 try { parsedAccounts = typeof accObj.value === 'string' ? JSON.parse(accObj.value) : accObj.value; } catch(e){}
-            } else if (rawData.length > 0 && rawData[0].banco) {
-                // Si el Array en sí mismo son las cuentas (GET /settings/accounts)
+            } else if (rawData.length > 0 && (rawData[0].banco || rawData[0].bank_name)) {
                 parsedAccounts = rawData;
             }
 
             if (waObj) parsedWa = waObj.value;
         } 
-        // Escenario B: El backend devuelve un Objeto { cuentasBancarias: [...], whatsappComprobantes: '...' }
         else if (typeof rawData === 'object') {
-            parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || rawData.cuentas_bancarias || [];
+            parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.bank_accounts || rawData.cuentas || rawData.cuentas_bancarias || [];
             if (typeof parsedAccounts === 'string') {
                 try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
             }
-            parsedWa = rawData.whatsappComprobantes || rawData.whatsapp || rawData.telefono || "";
+            parsedWa = rawData.whatsappComprobantes || rawData.whatsapp_number || rawData.whatsapp || rawData.telefono || "";
         }
+
+        console.log("🔵 [DEBUG LYA] Cuentas extraídas:", parsedAccounts);
+        console.log("🔵 [DEBUG LYA] WhatsApp extraído:", parsedWa);
 
         setBankAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
 
-        // Magia para el WhatsApp: Asegurar Formato Correcto
-        let cleanWa = String(parsedWa).replace(/\D/g, ''); // Quita letras, guiones, espacios
-        if (cleanWa.length === 10) {
-            cleanWa = '52' + cleanWa; // Inyecta el 52 de México automáticamente
-        }
+        let cleanWa = String(parsedWa).replace(/\D/g, ''); 
+        if (cleanWa.length === 10) cleanWa = '52' + cleanWa; 
         setDynamicWa(cleanWa);
 
       } catch (error) {
-        console.error("Error al cargar configuraciones desde el servidor:", error);
+        console.error("🔴 [DEBUG LYA] Error al cargar configuraciones:", error);
+        if (error.response) {
+            console.error("🔴 [DEBUG LYA] Código de error:", error.response.status, error.response.data);
+        }
         setBankAccounts([]);
       } finally {
         setIsLoadingAccounts(false);
