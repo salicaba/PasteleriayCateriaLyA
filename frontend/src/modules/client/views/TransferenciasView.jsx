@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Landmark, Copy, Check, MessageCircle, AlertCircle, Loader2, 
+  Landmark, Copy, Check, MessageCircle, AlertCircle, 
   Settings, Moon, Sun, Droplet, Type, Maximize, Minimize, X 
 } from 'lucide-react';
 import client from '../../../api/client';
@@ -80,74 +80,87 @@ export const TransferenciasView = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // PANTALLAS DE CARGA Y ERROR (Cumplen con Pilar 1: overflow-hidden)
   if (loading) {
     return (
-      <div className="h-[100dvh] w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg flex flex-col items-center justify-center p-6">
+      <div className="h-[100dvh] w-full flex-1 flex flex-col items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6">
         <motion.div animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }}>
           <Landmark size={48} className="text-emerald-500 lya:text-lya-primary mb-4" />
         </motion.div>
-        <p className="font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 animate-pulse">Obteniendo cuentas...</p>
+        <p className="font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 animate-pulse text-center">Obteniendo cuentas...</p>
       </div>
     );
   }
 
   if (error || accounts.length === 0) {
     return (
-      <div className="h-[100dvh] w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg flex flex-col items-center justify-center p-6 text-center">
+      <div className="h-[100dvh] w-full flex-1 flex flex-col items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 text-center">
         <AlertCircle size={48} className="text-gray-300 dark:text-gray-700 lya:text-lya-text/30 mb-4" />
         <h2 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">No hay cuentas disponibles</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60">En este momento no hay información de transferencias registrada.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-center">En este momento no hay información de transferencias registrada.</p>
       </div>
     );
   }
 
   return (
-    /* 🔥 FIX SCROLL: Envolvemos TODO en un contenedor con altura fija y overflow-y-auto */
-    <div className="h-[100dvh] w-full bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-y-auto custom-scrollbar relative transition-colors duration-300">
+    /* 🔥 PILAR 1: Raíz estrictamente bloqueada (Anti-Ghost Scroll) */
+    <div className="h-[100dvh] w-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden relative transition-colors duration-300">
       
-      {/* 🔥 BOTÓN DE AJUSTES FLOTANTE */}
+      {/* 🔥 BOTÓN DE AJUSTES FLOTANTE (Pilar 2: whileTap, md:hover) */}
       <motion.button 
         whileTap={{ scale: 0.9 }}
         onClick={() => setShowSettings(true)}
-        className="fixed top-4 right-4 z-40 p-3 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-full shadow-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-600 dark:text-gray-300 lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500"
+        className="fixed top-4 right-4 z-40 p-3 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-full shadow-lg border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-bg transition-colors outline-none focus:ring-2 focus:ring-emerald-500"
       >
         <Settings size={24} className="animate-spin-slow" style={{ animationDuration: '4s' }} />
       </motion.button>
 
-      <div className="min-h-full py-12 px-4 sm:px-6 flex flex-col items-center">
+      {/* 🔥 PILAR 1: Contenedor interno habilitado para Scroll */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar w-full flex flex-col items-center py-12 px-4 sm:px-6">
+        
         {/* HEADER LOGO */}
-        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center mb-10 w-full max-w-md mt-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.4, ease: "easeOut" }} 
+          className="text-center mb-10 w-full max-w-md mt-6 shrink-0"
+        >
           <div className="mx-auto w-16 h-16 bg-emerald-500/10 dark:bg-emerald-500/20 lya:bg-lya-primary/10 rounded-[1.5rem] flex items-center justify-center mb-4 text-emerald-500 lya:text-lya-primary shadow-inner">
             <Landmark size={32} />
           </div>
           <h1 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tighter" style={{ fontFamily: 'Times New Roman, serif', fontStyle: 'italic' }}>
             𝓛𝔂𝓪
           </h1>
-          <p className="text-xs font-black uppercase tracking-widest text-gray-400 lya:text-lya-text/50 mt-2">Datos para Transferencia</p>
+          <p className="text-xs font-black uppercase tracking-widest text-gray-400 lya:text-lya-text/50 mt-2 text-center">Datos para Transferencia</p>
         </motion.div>
 
         {/* LISTA DE CUENTAS */}
-        <div className="w-full max-w-md space-y-6">
+        <div className="w-full max-w-md space-y-6 shrink-0">
           <AnimatePresence>
             {accounts.map((acc, index) => (
               <motion.div 
                 key={acc.id}
-                initial={{ opacity: 0, y: 20 }}
+                /* 🔥 PILAR 5: Animación de entrada estándar */
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ duration: 0.4, ease: "easeOut", delay: index * 0.1 }}
+                /* 🔥 PILAR 4: Geometría Neo-Bento (rounded-[2rem]) */
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 lya:bg-lya-primary/5 rounded-bl-[100%] pointer-events-none" />
                 
-                <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex items-center gap-2">
-                  <div className="w-2 h-6 bg-emerald-500 lya:bg-lya-primary rounded-full" /> {acc.bank_name}
+                {/* 🔥 PILAR 4: truncate en el título de la tarjeta */}
+                <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex items-center gap-2 truncate">
+                  <div className="w-2 h-6 bg-emerald-500 lya:bg-lya-primary rounded-full shrink-0" /> 
+                  <span className="truncate">{acc.bank_name}</span>
                 </h3>
                 
                 <div className="space-y-4 relative z-10">
                   {acc.account_holder && (
                     <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                       <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Titular de la cuenta</span>
-                      <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm">{acc.account_holder}</span>
+                      {/* 🔥 PILAR 4: truncate por si el nombre es kilométrico */}
+                      <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm block truncate">{acc.account_holder}</span>
                     </div>
                   )}
 
@@ -157,10 +170,11 @@ export const TransferenciasView = () => {
                         <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Número de Cuenta / Tarjeta</span>
                         <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{acc.account_number}</span>
                       </div>
+                      {/* 🔥 PILAR 2: whileTap estricto */}
                       <motion.button 
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleCopy(acc.account_number, `acc-${acc.id}`)}
-                        className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `acc-${acc.id}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm'}`}
+                        className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `acc-${acc.id}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm md:hover:border-emerald-500 lya:md:hover:border-lya-primary'}`}
                       >
                         {copiedId === `acc-${acc.id}` ? <Check size={18} /> : <Copy size={18} />}
                       </motion.button>
@@ -173,10 +187,11 @@ export const TransferenciasView = () => {
                         <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">CLABE Interbancaria</span>
                         <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{acc.clabe}</span>
                       </div>
+                      {/* 🔥 PILAR 2: whileTap estricto */}
                       <motion.button 
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleCopy(acc.clabe, `clabe-${acc.id}`)}
-                        className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `clabe-${acc.id}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm'}`}
+                        className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `clabe-${acc.id}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm md:hover:border-emerald-500 lya:md:hover:border-lya-primary'}`}
                       >
                         {copiedId === `clabe-${acc.id}` ? <Check size={18} /> : <Copy size={18} />}
                       </motion.button>
@@ -191,59 +206,64 @@ export const TransferenciasView = () => {
         {/* WHATSAPP FOOTER */}
         {whatsappNumber && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
+            initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={{ delay: 0.4 }}
-            className="mt-8 w-full max-w-md bg-emerald-50 dark:bg-emerald-900/20 lya:bg-lya-primary/10 border border-emerald-100 dark:border-emerald-800/50 lya:border-lya-primary/20 rounded-[2rem] p-6 text-center shadow-sm"
+            transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
+            className="mt-8 w-full max-w-md shrink-0 bg-emerald-50 dark:bg-emerald-900/20 lya:bg-lya-primary/10 border border-emerald-100 dark:border-emerald-800/50 lya:border-lya-primary/20 rounded-[2rem] p-6 text-center shadow-sm"
           >
             <div className="mx-auto w-12 h-12 bg-emerald-100 dark:bg-emerald-800/50 lya:bg-lya-primary/20 rounded-full flex items-center justify-center mb-3 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">
               <MessageCircle size={24} />
             </div>
-            <h4 className="font-black text-emerald-800 dark:text-emerald-300 lya:text-lya-text text-sm uppercase tracking-wider mb-2">Envía tu comprobante</h4>
-            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400/80 lya:text-lya-text/70 mb-4 leading-relaxed">
+            <h4 className="font-black text-emerald-800 dark:text-emerald-300 lya:text-lya-text text-sm uppercase tracking-wider mb-2 text-center">Envía tu comprobante</h4>
+            {/* 🔥 PILAR 4: Textos largos siempre text-justify o text-center estricto */}
+            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400/80 lya:text-lya-text/70 mb-4 leading-relaxed text-center">
               Por favor, no olvides escribir tu número de <b>Mesa</b> o nombre de <b>Llevar</b> en el concepto de tu transferencia y enviarnos el comprobante.
             </p>
-            <a 
+            {/* 🔥 PILAR 2: md:hover y whileTap para enlaces */}
+            <motion.a 
+              whileTap={{ scale: 0.95 }}
               href={`https://wa.me/52${whatsappNumber}`} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 w-full py-3.5 bg-emerald-500 lya:bg-lya-primary hover:bg-emerald-600 lya:hover:opacity-90 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transition-all active:scale-95 outline-none"
+              className="inline-flex items-center justify-center gap-2 w-full py-3.5 bg-emerald-500 lya:bg-lya-primary md:hover:bg-emerald-600 lya:md:hover:opacity-90 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transition-all outline-none"
             >
               Abrir WhatsApp
-            </a>
+            </motion.a>
           </motion.div>
         )}
 
-        <div className="mt-10 mb-6 opacity-30 pointer-events-none">
+        <div className="mt-10 mb-6 opacity-30 pointer-events-none shrink-0 text-center">
            <h1 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text" style={{ fontFamily: 'Times New Roman, serif', fontStyle: 'italic' }}>𝓛𝔂𝓪</h1>
         </div>
       </div>
 
-      {/* 🔥 MODAL NEO-BENTO DE AJUSTES */}
+      {/* 🔥 MODAL NEO-BENTO DE AJUSTES (Cumple con Pilar 4 y 5) */}
       <AnimatePresence>
         {showSettings && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowSettings(false)}
-              className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-sm"
+              className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
             />
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 10 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              /* 🔥 PILAR 4: Geometría modal rounded-[2.5rem] */
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
             >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight flex items-center gap-2">
                   <Settings size={22} className="text-emerald-500 lya:text-lya-primary"/> Ajustes
                 </h3>
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowSettings(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/50 rounded-full outline-none"><X size={18}/></motion.button>
+                {/* 🔥 PILAR 2: md:hover estricto */}
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowSettings(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 rounded-full outline-none transition-colors"><X size={18}/></motion.button>
               </div>
 
               <div className="space-y-4">
                 <motion.button whileTap={{ scale: 0.98 }} onClick={cycleTheme} className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-2xl md:hover:border-emerald-500 dark:md:hover:border-emerald-400 lya:md:hover:border-lya-primary transition-colors outline-none group">
                   <div className="flex items-center gap-3">
-                    <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-2 rounded-xl shadow-sm group-hover:text-emerald-500 lya:group-hover:text-lya-primary transition-colors">
+                    <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-2 rounded-xl shadow-sm md:group-hover:text-emerald-500 lya:md:group-hover:text-lya-primary transition-colors">
                       {themeIndex === 0 ? <Sun size={18}/> : themeIndex === 1 ? <Moon size={18}/> : <Droplet size={18}/>}
                     </div>
                     <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text text-sm">Apariencia</span>
@@ -255,7 +275,7 @@ export const TransferenciasView = () => {
 
                 <motion.button whileTap={{ scale: 0.98 }} onClick={cycleSize} className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-2xl md:hover:border-emerald-500 dark:md:hover:border-emerald-400 lya:md:hover:border-lya-primary transition-colors outline-none group">
                   <div className="flex items-center gap-3">
-                    <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-2 rounded-xl shadow-sm group-hover:text-emerald-500 lya:group-hover:text-lya-primary transition-colors">
+                    <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-2 rounded-xl shadow-sm md:group-hover:text-emerald-500 lya:md:group-hover:text-lya-primary transition-colors">
                       <Type size={18}/>
                     </div>
                     <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text text-sm">Tamaño</span>
@@ -267,7 +287,7 @@ export const TransferenciasView = () => {
 
                 <motion.button whileTap={{ scale: 0.98 }} onClick={toggleFullscreen} className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 rounded-2xl md:hover:border-emerald-500 dark:md:hover:border-emerald-400 lya:md:hover:border-lya-primary transition-colors outline-none group">
                   <div className="flex items-center gap-3">
-                    <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-2 rounded-xl shadow-sm group-hover:text-emerald-500 lya:group-hover:text-lya-primary transition-colors">
+                    <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface p-2 rounded-xl shadow-sm md:group-hover:text-emerald-500 lya:md:group-hover:text-lya-primary transition-colors">
                       {isFullscreen ? <Minimize size={18}/> : <Maximize size={18}/>}
                     </div>
                     <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text text-sm">Pantalla</span>
