@@ -637,24 +637,26 @@ export const sharePedidoTicket = async (req, res) => {
       </div>
 
       <script>
+        // 🔥 FIX DEFINITIVO: Hoja A4 Centrada con Matemáticas de Márgenes
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightInInches = (element.offsetHeight / 96) + 0.4;
+          
           const options = {
-            margin: [0.2, 0, 0.2, 0],
-            filename: 'Ticket_Lya_Pasteleria_${pedido.id}.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
+            margin:       [20, 54.75, 20, 54.75], // 54.75mm centra perfectamente el ticket de 380px
+            filename:     'Ticket_Lya_Pasteleria_${pedido.id}.pdf',
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff'
+              backgroundColor: '#ffffff' 
             },
-            jsPDF: { 
-              unit: 'in', 
-              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket
+            jsPDF:        { 
+              unit: 'mm', 
+              format: 'a4', 
               orientation: 'portrait' 
             }
           };
+
           html2pdf().set(options).from(element).save();
         }
 
