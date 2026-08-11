@@ -242,13 +242,16 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   };
 
+  // 🚀 GENERADOR INTELIGENTE DE MENSAJE DE WHATSAPP (Anti-Caché)
   const handleWhatsApp = async () => {
     if (isProcessingWa || !whatsappNumber) return;
     setIsProcessingWa(true);
     try {
       const orderTypeStr = type === 'mesa' ? `Mesa ${tableId}` : 'Para Llevar';
       const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${displayName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${liveTotal.toFixed(2)}\n\nAdjunto el comprobante:`);
-      const waUrl = `https://wa.me/${whatsappNumber}?text=${text}`;
+      
+      // 🔥 FIX ARQUITECTÓNICO: Usar api.whatsapp.com fuerza a la App a recargar el texto SIEMPRE
+      const waUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${text}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     } finally {
       setIsProcessingWa(false);
