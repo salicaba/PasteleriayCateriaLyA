@@ -310,6 +310,11 @@ export const CashRegisterPage = ({ user }) => {
                   
                   const payInfo = getPaymentInfo(tx);
 
+                  // 🔥 NUEVA LÓGICA DE MONTO INTELIGENTE (Ingresos vs Egresos)
+                  const rawAmount = parseFloat(tx.amount) || 0;
+                  const isNegative = rawAmount < 0;
+                  const absAmount = Math.abs(rawAmount).toFixed(2);
+
                   return (
                     <motion.tr 
                       key={tx.id} 
@@ -387,11 +392,20 @@ export const CashRegisterPage = ({ user }) => {
                           )}
                         </div>
                       </td>
+                      
+                      {/* 🔥 CELDA DEL MONTO CON INTELIGENCIA FINANCIERA */}
                       <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text">
-                        <span className={isCancelled ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'}>
-                          {isCancelled ? '' : '+'} ${parseFloat(tx.amount).toFixed(2)}
+                        <span className={
+                          isCancelled 
+                            ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' 
+                            : isNegative 
+                              ? 'text-red-500 dark:text-red-400 lya:text-red-600' 
+                              : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'
+                        }>
+                          {isCancelled ? '' : (isNegative ? '-' : '+')} ${absAmount}
                         </span>
                       </td>
+
                       <td className="p-5 text-center">
                         {isCancelled ? (
                           <div className="flex flex-col items-center">
