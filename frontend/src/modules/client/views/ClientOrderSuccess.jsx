@@ -632,7 +632,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                                 return (
                                   <div key={acc.id || index} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-left">
                                     <div className="mb-2">
-                                      <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723] uppercase">{banco}</p>
+                                      <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723]">{banco}</p>
                                       {titular && <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">Titular: {titular}</p>}
                                     </div>
                                     

@@ -434,7 +434,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                         className="group relative p-5 rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 md:hover:shadow-md md:hover:border-gray-200 dark:md:hover:border-gray-600 lya:md:hover:border-lya-primary/30 transition-all flex justify-between items-start"
                       >
                         <div className="flex-1 pr-2 sm:pr-4 space-y-2 min-w-0">
-                          <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text uppercase tracking-tight flex items-center gap-2">
+                          <p className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight flex items-center gap-2">
                             <Landmark size={16} className="text-emerald-500 lya:text-lya-primary shrink-0" /> 
                             <span className="truncate">{acc.bank_name}</span>
                           </p>
