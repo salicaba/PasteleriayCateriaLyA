@@ -3,18 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { socket } from '../../../api/socket.js';
-import client from '../../../api/client.js'; // <- Inyectamos tu cliente Axios configurado
-
-// Constante de Negocio (El número de WhatsApp sí puede quedar aquí o también venir del backend en un futuro)
-const WHATSAPP_NUMBER = "529611191492"; 
+import client from '../../../api/client.js'; 
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
   
-  // Estados para las cuentas dinámicas
+  // Estados Dinámicos desde la Base de Datos
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [dynamicWa, setDynamicWa] = useState("");
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   
   const [isProcessingWa, setIsProcessingWa] = useState(false);
@@ -25,28 +23,62 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     setLiveCart(cart || []);
   }, [cart]);
 
-  // Petición al backend para extraer las cuentas bancarias
+  // 🔥 EXTRACTOR INTELIGENTE DE CONFIGURACIONES (Cuentas y WhatsApp)
   useEffect(() => {
-    const fetchAccounts = async () => {
+    const fetchSettings = async () => {
       try {
         setIsLoadingAccounts(true);
-        // Ajusta la ruta '/settings' según el endpoint de tu settings.controller.js
+        // Ajusta esta ruta si tu endpoint de configuraciones se llama diferente (ej: /config, /business)
         const res = await client.get('/settings'); 
+        let rawData = res.data;
         
-        // Ajusta el nombre del array según cómo lo devuelva tu backend (ej. res.data.cuentas)
-        const accountsData = res.data?.bankAccounts || res.data?.cuentas || res.data?.cuentasBancarias || [];
-        setBankAccounts(accountsData);
+        if (rawData.data) rawData = rawData.data; // Desestructuración defensiva
+
+        let parsedAccounts = [];
+        let parsedWa = "";
+
+        // Escenario A: El backend devuelve un Array [{key: 'cuentas', value: '...'}, {key: 'whatsapp', value: '...'}]
+        if (Array.isArray(rawData)) {
+            const accObj = rawData.find(item => item.key && (item.key.toLowerCase().includes('cuenta') || item.key.toLowerCase().includes('bank')));
+            const waObj = rawData.find(item => item.key && item.key.toLowerCase().includes('whatsapp'));
+            
+            if (accObj) {
+                try { parsedAccounts = typeof accObj.value === 'string' ? JSON.parse(accObj.value) : accObj.value; } catch(e){}
+            } else if (rawData.length > 0 && rawData[0].banco) {
+                // Si el Array en sí mismo son las cuentas (GET /settings/accounts)
+                parsedAccounts = rawData;
+            }
+
+            if (waObj) parsedWa = waObj.value;
+        } 
+        // Escenario B: El backend devuelve un Objeto { cuentasBancarias: [...], whatsappComprobantes: '...' }
+        else if (typeof rawData === 'object') {
+            parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || rawData.cuentas_bancarias || [];
+            if (typeof parsedAccounts === 'string') {
+                try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
+            }
+            parsedWa = rawData.whatsappComprobantes || rawData.whatsapp || rawData.telefono || "";
+        }
+
+        setBankAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
+
+        // Magia para el WhatsApp: Asegurar Formato Correcto
+        let cleanWa = String(parsedWa).replace(/\D/g, ''); // Quita letras, guiones, espacios
+        if (cleanWa.length === 10) {
+            cleanWa = '52' + cleanWa; // Inyecta el 52 de México automáticamente
+        }
+        setDynamicWa(cleanWa);
+
       } catch (error) {
-        console.error("Error al cargar cuentas bancarias desde el servidor:", error);
-        setBankAccounts([]); // Fallback para no romper la app
+        console.error("Error al cargar configuraciones desde el servidor:", error);
+        setBankAccounts([]);
       } finally {
         setIsLoadingAccounts(false);
       }
     };
 
-    // Estrategia de optimización: Solo buscar cuentas si el pedido AÚN NO está pagado
     if (!isOrderPaid) {
-      fetchAccounts();
+      fetchSettings();
     }
   }, [isOrderPaid]);
 
@@ -208,12 +240,13 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   };
 
   const handleWhatsApp = async () => {
-    if (isProcessingWa) return;
+    if (isProcessingWa || !dynamicWa) return; // Bloquea si no hay número
     setIsProcessingWa(true);
     try {
       const orderTypeStr = type === 'mesa' ? `Mesa ${tableId}` : 'Para Llevar';
+      // Utilizamos Emojis estables que no dan error de codificación
       const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${displayName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${liveTotal.toFixed(2)}\n\nAdjunto el comprobante:`);
-      const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
+      const waUrl = `https://wa.me/${dynamicWa}?text=${text}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     } finally {
       setIsProcessingWa(false);
@@ -604,7 +637,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={handleWhatsApp}
-                      disabled={isProcessingWa || bankAccounts.length === 0}
+                      disabled={isProcessingWa || bankAccounts.length === 0 || !dynamicWa}
                       className="w-full py-3.5 rounded-2xl font-black text-sm bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/30 outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {isProcessingWa ? (
@@ -612,7 +645,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       ) : (
                         <>
                           <MessageCircle size={18} strokeWidth={2.5} />
-                          <span>Enviar Comprobante</span>
+                          <span>{dynamicWa ? 'Enviar Comprobante' : 'WhatsApp no configurado'}</span>
                         </>
                       )}
                     </motion.button>

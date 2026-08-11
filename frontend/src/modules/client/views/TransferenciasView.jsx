@@ -23,21 +23,56 @@ export const TransferenciasView = () => {
 
   // 🔥 ESTADOS DE CONFIGURACIÓN (Settings)
   const [showSettings, setShowSettings] = useState(false);
-  // 🔥 FIX: Cambiamos el '0' por '2' para que el tema por defecto sea 'theme-lya'
   const [themeIndex, setThemeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_theme') || '2'));
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Carga de datos de la base de datos
+  // 🔥 EXTRACTOR INTELIGENTE DE CONFIGURACIONES (Cuentas y WhatsApp)
   useEffect(() => {
     const fetchSettings = async () => {
       try {
+        setLoading(true);
         const res = await client.get('/settings');
-        if (res.data) {
-          if (Array.isArray(res.data.bank_accounts)) setAccounts(res.data.bank_accounts);
-          if (res.data.whatsapp_number) setWhatsappNumber(res.data.whatsapp_number);
+        let rawData = res.data;
+        
+        if (rawData.data) rawData = rawData.data;
+
+        let parsedAccounts = [];
+        let parsedWa = "";
+
+        // Escenario A: El backend devuelve un Array
+        if (Array.isArray(rawData)) {
+            const accObj = rawData.find(item => item.key && (item.key.toLowerCase().includes('cuenta') || item.key.toLowerCase().includes('bank')));
+            const waObj = rawData.find(item => item.key && item.key.toLowerCase().includes('whatsapp'));
+            
+            if (accObj) {
+                try { parsedAccounts = typeof accObj.value === 'string' ? JSON.parse(accObj.value) : accObj.value; } catch(e){}
+            } else if (rawData.length > 0 && (rawData[0].banco || rawData[0].bank_name)) {
+                parsedAccounts = rawData;
+            }
+
+            if (waObj) parsedWa = waObj.value;
+        } 
+        // Escenario B: El backend devuelve un Objeto
+        else if (typeof rawData === 'object') {
+            parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.bank_accounts || rawData.cuentas || rawData.cuentas_bancarias || [];
+            if (typeof parsedAccounts === 'string') {
+                try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
+            }
+            parsedWa = rawData.whatsappComprobantes || rawData.whatsapp_number || rawData.whatsapp || rawData.telefono || "";
         }
+
+        setAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
+
+        // Magia para el WhatsApp: Asegurar Formato Correcto
+        let cleanWa = String(parsedWa).replace(/\D/g, ''); 
+        if (cleanWa.length === 10) {
+            cleanWa = '52' + cleanWa; 
+        }
+        setWhatsappNumber(cleanWa);
+
       } catch (err) {
+        console.error("Error al cargar configuraciones:", err);
         setError(true);
       } finally {
         setLoading(false);
@@ -63,14 +98,10 @@ export const TransferenciasView = () => {
   // 🔥 ESCUDO ANTI-INSTALACIÓN: Bloquea el banner nativo de Chrome/Android para instalar la PWA
   useEffect(() => {
     const preventInstallPrompt = (e) => {
-      e.preventDefault(); // Matamos el evento nativo del navegador
+      e.preventDefault(); 
     };
-    
     window.addEventListener('beforeinstallprompt', preventInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', preventInstallPrompt);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', preventInstallPrompt);
   }, []);
 
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
@@ -88,10 +119,14 @@ export const TransferenciasView = () => {
     }
   };
 
-  const handleCopy = (text, id) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = async (text, id) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Error copiando al portapapeles', err);
+    }
   };
 
   // PANTALLAS DE CARGA Y ERROR (Cumplen con Pilar 1: overflow-hidden)
@@ -151,69 +186,77 @@ export const TransferenciasView = () => {
         {/* LISTA DE CUENTAS */}
         <div className="w-full max-w-md space-y-6 shrink-0">
           <AnimatePresence>
-            {accounts.map((acc, index) => (
-              <motion.div 
-                key={acc.id}
-                /* 🔥 PILAR 5: Animación de entrada estándar */
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut", delay: index * 0.1 }}
-                /* 🔥 PILAR 4: Geometría Neo-Bento (rounded-[2rem]) */
-                className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 lya:bg-lya-primary/5 rounded-bl-[100%] pointer-events-none" />
-                
-                {/* 🔥 PILAR 4: truncate en el título de la tarjeta */}
-                <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex items-center gap-2 truncate">
-                  <div className="w-2 h-6 bg-emerald-500 lya:bg-lya-primary rounded-full shrink-0" /> 
-                  <span className="truncate">{acc.bank_name}</span>
-                </h3>
-                
-                <div className="space-y-4 relative z-10">
-                  {acc.account_holder && (
-                    <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
-                      <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Titular de la cuenta</span>
-                      {/* 🔥 PILAR 4: truncate por si el nombre es kilométrico */}
-                      <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm block truncate">{acc.account_holder}</span>
-                    </div>
-                  )}
+            {accounts.map((acc, index) => {
+              // Desestructuración defensiva adaptativa
+              const banco = acc.banco || acc.bank_name || 'Banco';
+              const titular = acc.titular || acc.account_holder;
+              const cuenta = acc.cuenta || acc.account_number;
+              const clabe = acc.clabe;
 
-                  {acc.account_number && (
-                    <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Número de Cuenta / Tarjeta</span>
-                        <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{acc.account_number}</span>
+              return (
+                <motion.div 
+                  key={acc.id || index}
+                  /* 🔥 PILAR 5: Animación de entrada estándar */
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: index * 0.1 }}
+                  /* 🔥 PILAR 4: Geometría Neo-Bento (rounded-[2rem]) */
+                  className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 lya:bg-lya-primary/5 rounded-bl-[100%] pointer-events-none" />
+                  
+                  {/* 🔥 PILAR 4: truncate en el título de la tarjeta */}
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex items-center gap-2 truncate">
+                    <div className="w-2 h-6 bg-emerald-500 lya:bg-lya-primary rounded-full shrink-0" /> 
+                    <span className="truncate">{banco}</span>
+                  </h3>
+                  
+                  <div className="space-y-4 relative z-10">
+                    {titular && (
+                      <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                        <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Titular de la cuenta</span>
+                        {/* 🔥 PILAR 4: truncate por si el nombre es kilométrico */}
+                        <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm block truncate">{titular}</span>
                       </div>
-                      {/* 🔥 PILAR 2: whileTap estricto */}
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleCopy(acc.account_number, `acc-${acc.id}`)}
-                        className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `acc-${acc.id}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm md:hover:border-emerald-500 lya:md:hover:border-lya-primary'}`}
-                      >
-                        {copiedId === `acc-${acc.id}` ? <Check size={18} /> : <Copy size={18} />}
-                      </motion.button>
-                    </div>
-                  )}
+                    )}
 
-                  {acc.clabe && (
-                    <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">CLABE Interbancaria</span>
-                        <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{acc.clabe}</span>
+                    {cuenta && (
+                      <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Número de Cuenta / Tarjeta</span>
+                          <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{cuenta}</span>
+                        </div>
+                        {/* 🔥 PILAR 2: whileTap estricto */}
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => handleCopy(cuenta, `acc-${acc.id || index}`)}
+                          className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `acc-${acc.id || index}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm md:hover:border-emerald-500 lya:md:hover:border-lya-primary'}`}
+                        >
+                          {copiedId === `acc-${acc.id || index}` ? <Check size={18} /> : <Copy size={18} />}
+                        </motion.button>
                       </div>
-                      {/* 🔥 PILAR 2: whileTap estricto */}
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleCopy(acc.clabe, `clabe-${acc.id}`)}
-                        className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `clabe-${acc.id}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm md:hover:border-emerald-500 lya:md:hover:border-lya-primary'}`}
-                      >
-                        {copiedId === `clabe-${acc.id}` ? <Check size={18} /> : <Copy size={18} />}
-                      </motion.button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                    )}
+
+                    {clabe && (
+                      <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">CLABE Interbancaria</span>
+                          <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{clabe}</span>
+                        </div>
+                        {/* 🔥 PILAR 2: whileTap estricto */}
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => handleCopy(clabe, `clabe-${acc.id || index}`)}
+                          className={`shrink-0 p-3 rounded-xl transition-colors outline-none ${copiedId === `clabe-${acc.id || index}` ? 'bg-emerald-500 lya:bg-lya-primary text-white shadow-md' : 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-gray-500 dark:text-gray-300 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 shadow-sm md:hover:border-emerald-500 lya:md:hover:border-lya-primary'}`}
+                        >
+                          {copiedId === `clabe-${acc.id || index}` ? <Check size={18} /> : <Copy size={18} />}
+                        </motion.button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
 
@@ -231,12 +274,12 @@ export const TransferenciasView = () => {
             <h4 className="font-black text-emerald-800 dark:text-emerald-300 lya:text-lya-text text-sm uppercase tracking-wider mb-2 text-center">Envía tu comprobante</h4>
             {/* 🔥 PILAR 4: Textos largos siempre text-justify o text-center estricto */}
             <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400/80 lya:text-lya-text/70 mb-4 leading-relaxed text-center">
-              Por favor, no olvides escribir tu número de <b>Mesa</b> o nombre de <b>Llevar</b> en el concepto de tu transferencia y enviarnos el comprobante.
+              Por favor, no olvides escribir tu nombre o detalles en el concepto de tu transferencia y enviarnos el comprobante al dar clic abajo.
             </p>
             {/* 🔥 PILAR 2: md:hover y whileTap para enlaces */}
             <motion.a 
               whileTap={{ scale: 0.95 }}
-              href={`https://wa.me/52${whatsappNumber}`} 
+              href={`https://wa.me/${whatsappNumber}`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 w-full py-3.5 bg-emerald-500 lya:bg-lya-primary md:hover:bg-emerald-600 lya:md:hover:opacity-90 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transition-all outline-none"
