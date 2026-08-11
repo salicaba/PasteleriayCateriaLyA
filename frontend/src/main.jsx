@@ -1,9 +1,13 @@
+// src/main.jsx
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import ClientApp from './modules/client/ClientApp.jsx'
+
+// 🔥 IMPORTAMOS LA NUEVA VISTA DE TRANSFERENCIAS
+import { TransferenciasView } from './modules/client/views/TransferenciasView.jsx'
 
 // 🔥 1. IMPORTAMOS EL MOTOR DE REGISTRO DEL SERVICE WORKER
 import { registerSW } from 'virtual:pwa-register'
@@ -25,6 +29,9 @@ createRoot(document.getElementById('root')).render(
           <Route path="/m/:tableId" element={<ClientApp key="mesa" type="mesa" />} />
           <Route path="/llevar" element={<ClientApp key="llevar" type="llevar" />} />
           
+          {/* 🚀 RUTA EXCLUSIVA PARA EL CÓDIGO QR DE CUENTAS */}
+          <Route path="/transferencias" element={<TransferenciasView />} />
+          
           <Route path="/*" element={<Navigate to="/" replace />} />
         </Routes>
       ) : (
@@ -33,6 +40,9 @@ createRoot(document.getElementById('root')).render(
           <Route path="/m/:tableId" element={<ClientApp key="mesa" type="mesa" />} />
           <Route path="/llevar" element={<ClientApp key="llevar" type="llevar" />} />
           <Route path="/kiosko" element={<ClientApp key="kiosko" type="kiosko" />} />
+          
+          {/* 🚀 RUTA EXCLUSIVA PARA EL CÓDIGO QR DE CUENTAS (También en Admin por seguridad) */}
+          <Route path="/transferencias" element={<TransferenciasView />} />
           
           <Route path="/*" element={<App />} />
         </Routes>
