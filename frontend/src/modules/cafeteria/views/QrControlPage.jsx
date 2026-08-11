@@ -1,5 +1,4 @@
 // src/modules/cafeteria/views/QrControlPage.jsx
-// src/modules/cafeteria/views/QrControlPage.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -10,8 +9,8 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 import { ToastNotification } from './components/ToastNotification';
+import html2pdf from 'html2pdf.js'; // 🚀 LIBRERÍA PARA DESCARGA DIRECTA DE PDF
 
-// 🚀 INYECCIONES PARA EL CONTROL GRANULAR EN TIEMPO REAL
 import client from '../../../api/client';
 import { socket } from '../../../api/socket';
 
@@ -27,14 +26,11 @@ export const QrControlPage = () => {
   const [mesaToDelete, setMesaToDelete] = useState(null); 
   const [showToggleModal, setShowToggleModal] = useState(false); 
   
-  // Estados para la Impresión Selectiva
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [selectedToPrint, setSelectedToPrint] = useState([]);
   const [isPrinting, setIsPrinting] = useState(false);
 
   const [localToast, setLocalToast] = useState({ message: '', type: '' });
-
-  // 🚀 ESTADOS DEL CONTROL GRANULAR (MESAS APAGADAS)
   const [disabledQrs, setDisabledQrs] = useState([]);
   const [isTogglingLocal, setIsTogglingLocal] = useState(null);
 
@@ -43,11 +39,10 @@ export const QrControlPage = () => {
     setTimeout(() => setLocalToast({ message: '', type: '' }), 4000);
   };
 
-  // 🚀 CEREBRO DE ESTADO GRANULAR: Sincronización en tiempo real
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const res = await client.get('/settings'); // Usamos la raíz
+        const res = await client.get('/settings');
         if (res.data.disabled_qrs) {
           const parsed = typeof res.data.disabled_qrs === 'string' ? JSON.parse(res.data.disabled_qrs) : res.data.disabled_qrs;
           setDisabledQrs(Array.isArray(parsed) ? parsed : []);
@@ -69,9 +64,7 @@ export const QrControlPage = () => {
     return () => socket.off('config:update', handleConfigUpdate);
   }, []);
 
-  // 🚀 FUNCIÓN POKA-YOKE PARA APAGAR/ENCENDER QR INDIVIDUAL
   const toggleGranularQr = async (identifier) => {
-    // PILAR 3: Lock Asíncrono
     setIsTogglingLocal(identifier);
     try {
       const isCurrentlyDisabled = disabledQrs.includes(identifier);
@@ -83,10 +76,7 @@ export const QrControlPage = () => {
         newDisabledList = [...disabledQrs, identifier];
       }
       
-      // Guardamos en la base de datos (Usando PUT como dicta tu router)
       await client.put('/settings', { disabled_qrs: newDisabledList });
-      
-      // Actualización optimista
       setDisabledQrs(newDisabledList);
       
       const isMesa = identifier.startsWith('mesa-');
@@ -106,10 +96,7 @@ export const QrControlPage = () => {
   };
 
   const isPageLoading = (isLoading && mesas.length === 0) || !zonas;
-  
-  // 🚀 CEREBRO DIVISOR: Usa el dominio de clientes de Vercel, si no existe usa el actual (localhost)
   const baseUrl = import.meta.env.VITE_CLIENT_URL || window.location.origin;
-  
   const displayBaseUrl = baseUrl.replace(/^https?:\/\//, '');
 
   const handleOpenPrintModal = () => {
@@ -133,14 +120,31 @@ export const QrControlPage = () => {
     }
   };
 
-  const executePrint = async () => {
-    // PILAR 3: Lock Asíncrono
+  // 🚀 GENERADOR DE PDF ANTI-BLANCO
+  const executeDownloadPDF = async () => {
     if (isPrinting || selectedToPrint.length === 0) return;
     setIsPrinting(true);
+    
     try {
+      // Damos 300ms a React para que el contenedor oculto procese el nuevo estado
       await new Promise(resolve => setTimeout(resolve, 300));
-      window.print();
+
+      const element = document.getElementById('pdf-qr-container');
+      const opt = {
+        margin:       10,
+        filename:     'Control_QRs_Lya.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['css', 'legacy'] } // 🚀 Le indicamos que respete las clases CSS de salto
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      
       setShowPrintModal(false);
+      showLocalToast('PDF generado y descargado exitosamente', 'success');
+    } catch (error) {
+      showLocalToast('Error al generar el PDF', 'error');
     } finally {
       setIsPrinting(false);
     }
@@ -169,76 +173,80 @@ export const QrControlPage = () => {
     );
   }
 
-  // PILAR 1: Responsividad Estricta y Flexbox (Anti-Ghost Scroll)
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative print:!bg-white print:!text-black print:p-0 print:h-auto print:block print:overflow-visible"
+      className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 overflow-hidden relative"
     >
-      {/* Notificaciones controladas */}
       <ToastNotification message={activeMessage} type={activeType} />
 
-      {/* 🛡️ BLINDAJE DE IMPRESIÓN EXTREMO */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page { margin: 1cm; size: A4 portrait; }
-          html, body, #root, main { 
-            background-color: #ffffff !important; 
-            color: #000000 !important; 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
-            overflow: visible !important;
-            height: auto !important;
-          }
-          .no-print, header, nav, aside { display: none !important; }
-          * {
-            box-shadow: none !important;
-          }
-        }
-      `}} />
+      {/* 🚀 CONTENEDOR OCULTO PARA PDF CON SALTOS DE PÁGINA FORZADOS */}
+      <div style={{ height: 0, overflow: 'hidden' }}>
+        <div id="pdf-qr-container" style={{ width: '700px', backgroundColor: '#ffffff', boxSizing: 'border-box', margin: '0 auto' }}>
+          {(() => {
+            // 1. Recopilamos todo lo que se va a imprimir en un solo arreglo
+            const itemsToPrint = [];
+            if (selectedToPrint.includes('llevar')) {
+              itemsToPrint.push({ type: 'llevar', id: 'llevar' });
+            }
+            mesas.filter(m => selectedToPrint.includes(m.id)).forEach(mesa => {
+              itemsToPrint.push({ type: 'mesa', data: mesa, id: mesa.id });
+            });
 
-      {/* GRID DE IMPRESIÓN OCULTO (Renderiza solo en papel/PDF) */}
-      <div className="hidden print:grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-[21cm] mx-auto pb-10 print:!bg-white print:!text-black">
-        {selectedToPrint.includes('llevar') && (
-          <div className="flex flex-col items-center text-center p-6 border-2 border-dashed border-gray-400 rounded-3xl break-inside-avoid shadow-none !bg-white !text-black">
-            <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mostrador 𝓛𝔂𝓪</h2>
-            <p className="text-sm font-bold text-gray-700 italic mb-4">"Ordena sin filas"</p>
-            <QRCodeSVG 
-              value={`${baseUrl}/llevar?qr=true`} 
-              size={140} 
-              level="Q"
-              className="mb-4 !opacity-100 !grayscale-0"
-              bgColor="#ffffff"
-              fgColor="#000000"
-            />
-            <p className="text-[11px] font-black tracking-widest text-black">
-              {displayBaseUrl}/llevar
-            </p>
-          </div>
-        )}
+            // 2. Partimos el arreglo en "Páginas" de máximo 4 QRs cada una
+            const pages = [];
+            for (let i = 0; i < itemsToPrint.length; i += 4) {
+              pages.push(itemsToPrint.slice(i, i + 4));
+            }
 
-        {mesas.filter(m => selectedToPrint.includes(m.id)).map((mesa) => (
-          <div key={mesa.id} className="flex flex-col items-center text-center p-6 border-2 border-dashed border-gray-400 rounded-3xl break-inside-avoid shadow-none !bg-white !text-black">
-            <h2 className="text-2xl font-black text-black tracking-tight mb-1">Mesa {mesa.number}</h2>
-            <p className="text-sm font-bold text-gray-700 italic mb-4">"Escanea para ordenar"</p>
-            <QRCodeSVG 
-              value={`${baseUrl}/m/${mesa.number}?qr=true`}
-              size={140} 
-              level="Q"
-              className="mb-4 !opacity-100 !grayscale-0"
-              bgColor="#ffffff"
-              fgColor="#000000"
-            />
-            <p className="text-[11px] font-black tracking-widest text-black">
-              {displayBaseUrl}/m/{mesa.number}
-            </p>
-          </div>
-        ))}
+            // 3. Renderizamos cada página con su salto de hoja
+            return pages.map((pageItems, pageIndex) => (
+              <React.Fragment key={`page-${pageIndex}`}>
+                {/* Contenedor de la hoja (Padding interno en vez de global para no arrastrar el margen) */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', justifyContent: 'flex-start', padding: '30px', backgroundColor: '#ffffff' }}>
+                  
+                  {pageItems.map((item) => {
+                    if (item.type === 'llevar') {
+                      return (
+                        <div key="llevar" style={{ width: 'calc(50% - 15px)', border: '2px dashed #9ca3af', padding: '30px', borderRadius: '20px', textAlign: 'center', backgroundColor: '#ffffff', boxSizing: 'border-box' }}>
+                          <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 5px 0', color: '#000', fontFamily: 'sans-serif' }}>Mostrador 𝓛𝔂𝓪</h2>
+                          <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#4b5563', fontStyle: 'italic', margin: '0 0 20px 0' }}>"Ordena sin filas"</p>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                             <QRCodeSVG value={`${baseUrl}/llevar?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
+                          </div>
+                          <p style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', margin: 0, color: '#000' }}>{displayBaseUrl}/llevar</p>
+                        </div>
+                      );
+                    } else {
+                      const mesa = item.data;
+                      return (
+                        <div key={mesa.id} style={{ width: 'calc(50% - 15px)', border: '2px dashed #9ca3af', padding: '30px', borderRadius: '20px', textAlign: 'center', backgroundColor: '#ffffff', boxSizing: 'border-box' }}>
+                          <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 5px 0', color: '#000', fontFamily: 'sans-serif' }}>Mesa {mesa.number}</h2>
+                          <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#4b5563', fontStyle: 'italic', margin: '0 0 20px 0' }}>"Escanea para ordenar"</p>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                             <QRCodeSVG value={`${baseUrl}/m/${mesa.number}?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
+                          </div>
+                          <p style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', margin: 0, color: '#000' }}>{displayBaseUrl}/m/{mesa.number}</p>
+                        </div>
+                      );
+                    }
+                  })}
+
+                </div>
+                
+                {/* 🚀 EL TRUCO: Forzamos el salto de página si NO es la última hoja */}
+                {pageIndex < pages.length - 1 && (
+                  <div className="html2pdf__page-break"></div>
+                )}
+              </React.Fragment>
+            ));
+          })()}
+        </div>
       </div>
 
-      <header className="no-print flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
+      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 dark:shadow-orange-900/30 lya:shadow-lya-primary/20">
             <ScanLine size={28} />
@@ -260,7 +268,7 @@ export const QrControlPage = () => {
             className="flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-3.5 rounded-[2rem] font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:shadow-md bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text select-none touch-manipulation outline-none"
           >
             <Download size={18} className="text-gray-600 dark:text-gray-300 lya:text-lya-text pointer-events-none" />
-            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Guardar PDF / Imprimir</span>
+            <span className="tracking-wide text-sm pointer-events-none whitespace-nowrap">Guardar PDF</span>
           </motion.button>
 
           <motion.button 
@@ -282,7 +290,7 @@ export const QrControlPage = () => {
         </div>
       </header>
 
-      <div className="no-print flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0 z-10">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0 z-10">
         <div className="flex gap-2 bg-gray-200/50 dark:bg-gray-800/80 lya:bg-lya-border/20 p-1.5 rounded-[1.25rem] overflow-x-auto shadow-inner border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 custom-scrollbar w-full md:w-auto">
           {zonas.map(zona => {
             const displayLabel = zona.id === 'salon' ? 'Mesas' : 'Público';
@@ -291,7 +299,7 @@ export const QrControlPage = () => {
                 key={zona.id}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setZonaActiva(zona.id)}
-                className={`flex flex-1 md:flex-none justify-center items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap select-none outline-none md:hover:shadow-sm ${
+                className={`flex flex-1 md:flex-none justify-center items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap select-none outline-none ${
                   zonaActiva === zona.id 
                     ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface text-orange-600 dark:text-orange-400 lya:text-lya-primary shadow-sm border border-gray-100 dark:border-gray-600 lya:border-lya-primary/30' 
                     : 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60 md:hover:text-gray-700 dark:md:hover:text-gray-200 lya:hover:text-lya-text border border-transparent'
@@ -317,7 +325,7 @@ export const QrControlPage = () => {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-24 relative no-print">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-24 relative">
         <AnimatePresence mode='wait'>
           {zonaActiva === 'salon' ? (
             <motion.div 
@@ -329,7 +337,6 @@ export const QrControlPage = () => {
                 {mesas.map((mesa) => {
                   const identifier = `mesa-${mesa.number}`;
                   const isLocallyDisabled = disabledQrs.includes(identifier);
-                  // La mesa está activa solo si el global está encendido Y no está en la lista negra
                   const isThisMesaActive = isQrActive && !isLocallyDisabled;
 
                   return (
@@ -354,7 +361,6 @@ export const QrControlPage = () => {
                         </div>
                         
                         <div className="flex items-center gap-1">
-                          {/* 🚀 BOTÓN DE CONTROL GRANULAR */}
                           <motion.button
                             whileTap={{ scale: 0.9 }}
                             onClick={() => toggleGranularQr(identifier)}
@@ -397,7 +403,6 @@ export const QrControlPage = () => {
                            className={`drop-shadow-sm transition-all duration-300 ${isThisMesaActive ? 'opacity-90' : 'opacity-10 grayscale blur-[1px]'}`}
                          />
                          
-                         {/* 🚀 SELLO VISUAL NEO-BENTO DE MESA APAGADA */}
                          {!isThisMesaActive && (
                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                              <div className="bg-red-500/90 dark:bg-red-600/90 backdrop-blur-sm text-white text-[11px] font-black tracking-widest uppercase px-4 py-1.5 rounded-full shadow-lg border border-red-400/50 transform -rotate-6">
@@ -419,7 +424,6 @@ export const QrControlPage = () => {
                         </a>
                       </div>
                       
-                      {/* 🔥 FIX APLICADO: Botón Pantalla Completa naranja cuando está activo */}
                       <motion.button 
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setPreviewMesa(mesa)}
@@ -468,7 +472,6 @@ export const QrControlPage = () => {
                   }`}>
                     
                     <div className="w-full flex justify-end mb-2">
-                      {/* 🚀 BOTÓN DE CONTROL GRANULAR (PARA LLEVAR) */}
                       <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => toggleGranularQr('llevar')}
@@ -550,10 +553,10 @@ export const QrControlPage = () => {
         </AnimatePresence>
       </div>
 
-      {/* MODAL DE SELECCIÓN DE IMPRESIÓN */}
+      {/* MODAL DE DESCARGA PDF NEO-BENTO */}
       <AnimatePresence>
         {showPrintModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => {
@@ -574,7 +577,7 @@ export const QrControlPage = () => {
                     <Download size={24} />
                   </div>
                   <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
-                    Descargar o Imprimir
+                    Descargar QRs
                   </h3>
                 </div>
                 <motion.button 
@@ -636,19 +639,19 @@ export const QrControlPage = () => {
               
               <motion.button 
                 whileTap={!isPrinting && selectedToPrint.length > 0 ? { scale: 0.95 } : {}}
-                onClick={executePrint} 
+                onClick={executeDownloadPDF} 
                 disabled={isPrinting || selectedToPrint.length === 0}
                 className="w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-white shadow-lg bg-orange-500 md:hover:bg-orange-600 shadow-orange-500/30 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none outline-none select-none"
               >
                 {isPrinting ? (
                   <>
                     <Loader2 size={18} className="animate-spin pointer-events-none" />
-                    <span className="pointer-events-none">Preparando Documento...</span>
+                    <span className="pointer-events-none">Preparando PDF...</span>
                   </>
                 ) : (
                   <>
                     <Download size={18} className="pointer-events-none" />
-                    <span className="pointer-events-none">Guardar PDF / Imprimir ({selectedToPrint.length})</span>
+                    <span className="pointer-events-none">Generar PDF ({selectedToPrint.length})</span>
                   </>
                 )}
               </motion.button>
@@ -660,7 +663,7 @@ export const QrControlPage = () => {
       {/* MODAL DE PANTALLA COMPLETA (PREVIEW) */}
       <AnimatePresence>
         {previewMesa && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 no-print">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setPreviewMesa(null)}
@@ -711,10 +714,9 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL ORIGINAL: CONFIRMAR KILL-SWITCH GLOBAL */}
       <AnimatePresence>
         {showToggleModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => {
@@ -794,10 +796,9 @@ export const QrControlPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL ORIGINAL: ELIMINAR MESA */}
       <AnimatePresence>
         {mesaToDelete && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 no-print">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => {

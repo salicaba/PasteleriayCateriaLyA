@@ -1,8 +1,13 @@
 // src/modules/admin/views/settings-tabs/AccountsTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Landmark, Plus, Trash2, Edit2, Check, Printer, Sliders, Info, MessageCircle, Save, Loader2 } from 'lucide-react';
+import { 
+  Landmark, Plus, Trash2, Edit2, Check, Download, 
+  Sliders, Info, MessageCircle, Save, Loader2, QrCode, Maximize, X, Link as LinkIcon 
+} from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react'; // 🚀 IMPORTACIÓN DEL QR
 import client from '../../../../api/client';
+import html2pdf from 'html2pdf.js';
 
 export const AccountsTab = ({ showNotification, globalScroll }) => {
   const [accounts, setAccounts] = useState([]);
@@ -11,7 +16,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
   const [isSavingWhatsapp, setIsSavingWhatsapp] = useState(false);
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   
-  // --- NUEVOS ESTADOS PARA ELIMINACIÓN SEGURA ---
   const [accountToDelete, setAccountToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -21,6 +25,15 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
 
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printQuantity, setPrintQuantity] = useState(2);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  // 🚀 ESTADOS PARA EL NUEVO QR
+  const [previewQR, setPreviewQR] = useState(false);
+  const [isPrintingQR, setIsPrintingQR] = useState(false);
+
+  // 🚀 OBTENER DOMINIO PARA EL QR
+  const baseUrl = import.meta.env.VITE_CLIENT_URL || window.location.origin;
+  const displayBaseUrl = baseUrl.replace(/^https?:\/\//, '');
 
   useEffect(() => {
     fetchAccountsData();
@@ -59,10 +72,21 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     }
   };
 
+  const handleWhatsappChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 10) {
+      setWhatsappNumber(value);
+    }
+  };
+
   const handleSaveWhatsapp = async () => {
     if (!whatsappNumber.trim()) {
       return showNotification('error', "El número de WhatsApp no puede estar vacío.");
     }
+    if (whatsappNumber.length !== 10) {
+      return showNotification('error', "El número de WhatsApp debe tener exactamente 10 dígitos.");
+    }
+
     setIsSavingWhatsapp(true);
     try {
       await saveSettingsToDB({ whatsapp_number: whatsappNumber });
@@ -77,11 +101,11 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     }
     
     if (form.account_number.length < 10 || form.account_number.length > 16) {
-      return showNotification('warning', "El número de cuenta o tarjeta debe tener entre 10 y 16 dígitos.");
+      return showNotification('error', "El número de cuenta o tarjeta debe tener entre 10 y 16 dígitos.");
     }
 
     if (form.clabe.length !== 18) {
-      return showNotification('warning', "La CLABE interbancaria debe tener exactamente 18 dígitos.");
+      return showNotification('error', "La CLABE interbancaria debe tener exactamente 18 dígitos.");
     }
 
     setIsSavingAccount(true);
@@ -112,7 +136,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     setForm({ id: '', bank_name: '', account_number: '', account_holder: '', clabe: '' }); 
   };
   
-  // --- NUEVA LÓGICA DE ELIMINACIÓN CON LOCK ASÍNCRONO ---
   const confirmDeleteAccount = (acc) => {
     setAccountToDelete(acc);
   };
@@ -124,72 +147,65 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     try {
       await saveSettingsToDB({ bank_accounts: newAccounts });
       setAccounts(newAccounts); 
-      setAccountToDelete(null); // Cierra el modal solo si tuvo éxito
+      setAccountToDelete(null); 
     } catch (err) {
     } finally {
-      setIsDeleting(false); // Libera el botón siempre
+      setIsDeleting(false); 
     }
   };
-  // ------------------------------------------------------
 
-  const executePrint = () => {
+  const executeDownloadPDF = async () => {
     const cantidad = parseInt(printQuantity);
     if (isNaN(cantidad) || cantidad <= 0) return;
-    setShowPrintModal(false);
     
-    const tarjetasArray = Array.from({ length: cantidad });
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute'; iframe.style.width = '0px'; iframe.style.height = '0px'; iframe.style.border = 'none';
-    document.body.appendChild(iframe);
+    setIsPrinting(true);
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const element = document.getElementById('pdf-accounts-container');
+      
+      const opt = {
+        margin:       10,
+        filename:     'Cuentas_Bancarias_Lya.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      };
 
-    const footerText = whatsappNumber 
-      ? `<b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b>.<br>Envía tu comprobante al WhatsApp <b>${whatsappNumber}</b> o muéstraselo a tu mesero. ¡Gracias!`
-      : `<b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b>.<br>Muestra tu comprobante al mesero. ¡Gracias!`;
+      await html2pdf().set(opt).from(element).save();
+      
+      setShowPrintModal(false);
+      showNotification('success', "PDF generado y descargado correctamente");
+      
+    } catch (error) {
+      showNotification('error', "Ocurrió un error al generar el PDF");
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
-    const htmlContent = `
-      <html>
-        <head>
-          <title>Datos de Transferencia - 𝓛𝔂𝓪</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; background: white; margin: 0; }
-            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-            .card { border: 2px dashed #D4A373; padding: 20px; border-radius: 15px; text-align: center; page-break-inside: avoid; }
-            .logo { font-size: 26px; font-weight: bold; color: #4A2B29; margin-bottom: 5px; display: inline-block; font-family: serif; }
-            .subtitle { font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 1px; margin-bottom: 15px; }
-            .bank { font-size: 16px; font-weight: 800; color: #D4A373; margin: 10px 0; }
-            .info-group { margin-bottom: 8px; text-align: left; background: #f9f9f9; padding: 8px; border-radius: 8px; }
-            .label { font-size: 9px; font-weight: bold; color: #999; text-transform: uppercase; display: block; }
-            .val { font-size: 13px; font-weight: bold; color: #333; word-break: break-all; }
-            .footer { font-size: 9px; margin-top: 15px; font-style: italic; color: #666; line-height: 1.4; background: #fff5eb; padding: 10px; border-radius: 8px; border: 1px solid #ffe8cc; text-align: center; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="grid">
-            ${tarjetasArray.map(() => `
-              <div class="card">
-                <div class="logo"> 𝓛𝔂𝓪 </div>
-                <div class="subtitle">Datos de Transferencia</div>
-                ${accounts.map(acc => `
-                  <div class="bank">${acc.bank_name}</div>
-                  ${acc.account_holder ? `<div class="info-group"><span class="label">Titular</span><span class="val">${acc.account_holder}</span></div>` : ''}
-                  <div class="info-group"><span class="label">Cuenta</span><span class="val">${acc.account_number}</span></div>
-                  ${acc.clabe ? `<div class="info-group"><span class="label">CLABE</span><span class="val">${acc.clabe}</span></div>` : ''}
-                `).join('<hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">')}
-                <div class="footer">${footerText}</div>
-              </div>
-            `).join('')}
-          </div>
-          <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }</script>
-        </body>
-      </html>
-    `;
-    
-    iframe.contentWindow.document.open(); 
-    iframe.contentWindow.document.write(htmlContent); 
-    iframe.contentWindow.document.close();
-    
-    setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 10000);
+  // 🚀 DESCARGA EXCLUSIVA DEL QR DE TRANSFERENCIAS
+  const executeDownloadQR = async () => {
+    setIsPrintingQR(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const element = document.getElementById('pdf-transfer-qr-container');
+      const opt = {
+        margin:       10,
+        filename:     'QR_Transferencias_Lya.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      await html2pdf().set(opt).from(element).save();
+      showNotification('success', 'QR descargado correctamente');
+    } catch (error) {
+      showNotification('error', 'Error al generar el QR');
+    } finally {
+      setIsPrintingQR(false);
+    }
   };
 
   if (fetching) {
@@ -233,38 +249,80 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       </div>
 
       <div className={`flex-1 w-full relative ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
-        <motion.div 
-          whileHover={{ y: -2, scale: 1.01 }}
-          className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col md:flex-row items-center gap-6 transition-all"
-        >
-          <div className="w-16 h-16 rounded-full bg-emerald-500/10 lya:bg-lya-primary/10 flex items-center justify-center shrink-0">
-              <MessageCircle size={32} className="text-emerald-500 lya:text-lya-primary" />
-          </div>
-          <div className="flex-1 w-full text-center md:text-left">
-            <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">WhatsApp para Comprobantes</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 text-justify md:text-left leading-relaxed">
-              Este número se imprimirá en los tickets de transferencia generados, permitiendo a los clientes enviar sus comprobantes de pago de manera directa.
-            </p>
-          </div>
-          <div className="w-full md:w-80 flex items-center gap-2">
-            <input 
-              type="text" 
-              value={whatsappNumber} 
-              onChange={e => setWhatsappNumber(e.target.value)} 
-              placeholder="Ej. 961 123 4567" 
-              className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-bold" 
-            />
-            <motion.button 
-              whileTap={!isSavingWhatsapp ? { scale: 0.95 } : {}}
-              onClick={handleSaveWhatsapp} 
-              disabled={isSavingWhatsapp}
-              className="h-[56px] px-5 min-w-[56px] bg-gray-900 md:hover:bg-black dark:bg-emerald-500 dark:md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-colors shadow-md flex items-center justify-center disabled:opacity-50" 
-              title="Guardar Número"
-            >
-              {isSavingWhatsapp ? <Loader2 className="animate-spin w-6 h-6"/> : <Save size={24}/>}
-            </motion.button>
-          </div>
-        </motion.div>
+        
+        {/* 🚀 NUEVA CONFIGURACIÓN: GRID PARA WHATSAPP Y QR DE TRANSFERENCIAS */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          
+          {/* Tarjeta de WhatsApp */}
+          <motion.div 
+            whileHover={{ y: -2, scale: 1.01 }}
+            className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col sm:flex-row items-center gap-6 transition-all"
+          >
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 lya:bg-lya-primary/10 flex items-center justify-center shrink-0">
+                <MessageCircle size={32} className="text-emerald-500 lya:text-lya-primary" />
+            </div>
+            <div className="flex-1 w-full text-center sm:text-left">
+              <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">WhatsApp para Comprobantes</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 text-justify sm:text-left leading-relaxed">
+                Este número se imprimirá en los tickets generados, permitiendo a los clientes enviar sus comprobantes.
+              </p>
+            </div>
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <input 
+                type="text" 
+                value={whatsappNumber} 
+                onChange={handleWhatsappChange} 
+                placeholder="Ej. 961 123 4567" 
+                className="w-full sm:w-40 px-4 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-emerald-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text font-bold" 
+              />
+              <motion.button 
+                whileTap={!isSavingWhatsapp ? { scale: 0.95 } : {}}
+                onClick={handleSaveWhatsapp} 
+                disabled={isSavingWhatsapp}
+                className="h-[56px] px-5 min-w-[56px] bg-gray-900 md:hover:bg-black dark:bg-emerald-500 dark:md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-colors shadow-md flex items-center justify-center disabled:opacity-50" 
+                title="Guardar Número"
+              >
+                {isSavingWhatsapp ? <Loader2 className="animate-spin w-6 h-6"/> : <Save size={24}/>}
+              </motion.button>
+            </div>
+          </motion.div>
+
+          {/* 🚀 NUEVA TARJETA: QR DE TRANSFERENCIAS */}
+          <motion.div 
+            whileHover={{ y: -2, scale: 1.01 }}
+            className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col sm:flex-row items-center gap-6 transition-all"
+          >
+            <div className="w-16 h-16 rounded-full bg-orange-500/10 lya:bg-lya-secondary/10 flex items-center justify-center shrink-0">
+                <QrCode size={32} className="text-orange-500 lya:text-lya-secondary" />
+            </div>
+            <div className="flex-1 w-full text-center sm:text-left">
+              <h2 className="font-bold text-lg text-gray-900 dark:text-white lya:text-lya-text">Portal de Cuentas QR</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 text-justify sm:text-left leading-relaxed">
+                QR Inteligente para que los clientes escaneen y copien directamente los números de cuenta en sus celulares.
+              </p>
+            </div>
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setPreviewQR(true)}
+                className="h-[56px] px-5 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text rounded-2xl font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
+                title="Pantalla Completa"
+              >
+                <Maximize size={20} />
+              </motion.button>
+              <motion.button 
+                whileTap={!isPrintingQR ? { scale: 0.95 } : {}}
+                onClick={executeDownloadQR} 
+                disabled={isPrintingQR}
+                className="h-[56px] px-5 bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90 text-white rounded-2xl font-bold transition-colors shadow-md shadow-orange-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 disabled:opacity-50" 
+                title="Descargar QR en PDF"
+              >
+                {isPrintingQR ? <Loader2 className="animate-spin w-6 h-6"/> : <Download size={20}/>}
+              </motion.button>
+            </div>
+          </motion.div>
+
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <section className="space-y-6">
@@ -406,15 +464,14 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                           <motion.button 
                             whileTap={{ scale: 0.9 }}
                             onClick={() => editAccount(acc)} 
-                            className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 md:hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40"
+                            className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-blue-500 md:hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none"
                           >
                             <Edit2 size={18}/>
                           </motion.button>
-                          {/* BOTÓN QUE ABRE EL MODAL DE ELIMINACIÓN */}
                           <motion.button 
                             whileTap={{ scale: 0.9 }}
                             onClick={() => confirmDeleteAccount(acc)} 
-                            className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 md:hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40"
+                            className="p-2.5 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-xl shadow-sm text-red-500 md:hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 outline-none"
                           >
                             <Trash2 size={18}/>
                           </motion.button>
@@ -428,10 +485,10 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               <div className="pt-6 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/20 shrink-0">
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => accounts.length > 0 ? setShowPrintModal(true) : showNotification('error', "No hay cuentas para imprimir")}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-2xl text-sm font-bold shadow-sm md:hover:bg-gray-100 dark:md:hover:bg-gray-600 transition-colors"
+                  onClick={() => accounts.length > 0 ? setShowPrintModal(true) : showNotification('error', "No hay cuentas para descargar")}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 rounded-2xl text-sm font-bold shadow-sm md:hover:bg-gray-100 dark:md:hover:bg-gray-600 transition-colors outline-none"
                 >
-                  <Printer size={20} /> Imprimir Tickets de Transferencia
+                  <Download size={20} /> Generar PDF de Tickets Físicos
                 </motion.button>
               </div>
             </div>
@@ -439,6 +496,106 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
+      {/* 🚀 CONTENEDOR OCULTO PARA EL PDF DEL TICKET FÍSICO */}
+      <div style={{ height: 0, overflow: 'hidden' }}>
+        <div id="pdf-accounts-container" style={{ width: '700px', backgroundColor: '#ffffff', padding: '30px', boxSizing: 'border-box', margin: '0 auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px' }}>
+            {Array.from({ length: printQuantity }).map((_, idx) => (
+               <div key={idx} style={{ width: 'calc(50% - 15px)', border: '2px dashed #D4A373', padding: '20px', borderRadius: '15px', textAlign: 'center', backgroundColor: '#ffffff', boxSizing: 'border-box', pageBreakInside: 'avoid' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#4A2B29', marginBottom: '5px', fontFamily: 'serif' }}> 𝓛𝔂𝓪 </div>
+                  <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#888', letterSpacing: '1px', marginBottom: '15px' }}>Datos de Transferencia</div>
+                  {accounts.map((acc, i) => (
+                    <div key={acc.id} style={{ marginBottom: '15px' }}>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#D4A373', margin: '10px 0' }}>{acc.bank_name}</div>
+                      {acc.account_holder && <div style={{ marginBottom: '8px', textAlign: 'left', background: '#f9f9f9', padding: '8px', borderRadius: '8px' }}><span style={{ fontSize: '9px', fontWeight: 'bold', color: '#999', textTransform: 'uppercase', display: 'block' }}>Titular</span><span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', wordBreak: 'break-all' }}>{acc.account_holder}</span></div>}
+                      <div style={{ marginBottom: '8px', textAlign: 'left', background: '#f9f9f9', padding: '8px', borderRadius: '8px' }}><span style={{ fontSize: '9px', fontWeight: 'bold', color: '#999', textTransform: 'uppercase', display: 'block' }}>Cuenta</span><span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', wordBreak: 'break-all' }}>{acc.account_number}</span></div>
+                      {acc.clabe && <div style={{ marginBottom: '8px', textAlign: 'left', background: '#f9f9f9', padding: '8px', borderRadius: '8px' }}><span style={{ fontSize: '9px', fontWeight: 'bold', color: '#999', textTransform: 'uppercase', display: 'block' }}>CLABE</span><span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', wordBreak: 'break-all' }}>{acc.clabe}</span></div>}
+                      {i !== accounts.length - 1 && <hr style={{ border: 0, borderTop: '1px solid #eee', margin: '15px 0' }} />}
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '9px', marginTop: '15px', fontStyle: 'italic', color: '#666', lineHeight: 1.4, background: '#fff5eb', padding: '10px', borderRadius: '8px', border: '1px solid #ffe8cc', textAlign: 'center' }}>
+                    <b>Importante:</b> En el concepto de tu transferencia escribe tu número de <b>Mesa</b> o tu identificador de <b>Llevar</b>.<br/>
+                    {whatsappNumber ? (
+                      <>Envía tu comprobante al WhatsApp <b>{whatsappNumber}</b> o muéstraselo a tu mesero. ¡Gracias!</>
+                    ) : (
+                      'Muestra tu comprobante al mesero. ¡Gracias!'
+                    )}
+                  </div>
+               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 🚀 CONTENEDOR OCULTO PARA EL PDF EXCLUSIVO DEL QR */}
+      <div style={{ height: 0, overflow: 'hidden' }}>
+        <div id="pdf-transfer-qr-container" style={{ width: '700px', backgroundColor: '#ffffff', boxSizing: 'border-box', margin: '0 auto', padding: '40px' }}>
+          <div style={{ border: '2px dashed #D4A373', borderRadius: '20px', padding: '40px', backgroundColor: '#ffffff', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#4A2B29', margin: '0 0 10px 0', fontFamily: 'serif' }}> 𝓛𝔂𝓪 </h2>
+            <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#000', margin: '0 0 5px 0' }}>Datos de Transferencia</h3>
+            <p style={{ fontSize: '16px', color: '#666', fontStyle: 'italic', margin: '0 0 30px 0' }}>"Escanea para copiar los números de cuenta"</p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+               <QRCodeSVG value={`${baseUrl}/transferencias`} size={250} level="Q" bgColor="#ffffff" fgColor="#000000" />
+            </div>
+            <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#000', margin: 0 }}>{displayBaseUrl}/transferencias</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 🚀 MODAL NEO-BENTO DE PANTALLA COMPLETA DEL QR */}
+      <AnimatePresence>
+        {previewQR && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setPreviewQR(false)}
+              className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
+            >
+              <motion.button 
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setPreviewQR(false)} 
+                className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
+              >
+                <X size={20} strokeWidth={2.5} className="pointer-events-none" />
+              </motion.button>
+              
+              <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
+                Escanear para copiar
+              </div>
+              
+              <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
+                Cuentas 𝓛𝔂𝓪
+              </h2>
+
+              <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
+                <QRCodeSVG 
+                   value={`${baseUrl}/transferencias`} 
+                   size={220} 
+                   bgColor="transparent" 
+                   fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
+                   level="Q"
+                />
+              </div>
+
+              <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-sm">
+                <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0" />
+                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest text-center">
+                  {displayBaseUrl}/transferencias
+                </span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE DESCARGA PDF DE TICKETS FÍSICOS (EL ORIGINAL) */}
       <AnimatePresence>
         {showPrintModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -446,7 +603,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
-              onClick={() => setShowPrintModal(false)} 
+              onClick={() => { if (!isPrinting) setShowPrintModal(false) }} 
               className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
             />
             <motion.div 
@@ -457,22 +614,23 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
             >
               <div className="mx-auto bg-emerald-500/10 lya:bg-lya-primary/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
-                <Printer size={40} className="text-emerald-500 lya:text-lya-primary" />
+                <Download size={40} className="text-emerald-500 lya:text-lya-primary" />
               </div>
               
               <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">
-                Imprimir Tickets
+                Descargar PDF
               </h3>
               
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-center leading-relaxed">
-                ¿Cuántos tickets de datos bancarios deseas imprimir para entregar?
+                ¿Cuántos tickets de datos bancarios deseas generar en el documento?
               </p>
               
               <div className="flex items-center justify-center gap-6 mb-10">
                 <motion.button 
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={!isPrinting ? { scale: 0.9 } : {}}
                   onClick={() => setPrintQuantity(Math.max(1, printQuantity - 1))} 
-                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors"
+                  disabled={isPrinting}
+                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                 >
                   -
                 </motion.button>
@@ -480,9 +638,10 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   {printQuantity}
                 </span>
                 <motion.button 
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={!isPrinting ? { scale: 0.9 } : {}}
                   onClick={() => setPrintQuantity(printQuantity + 1)} 
-                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors"
+                  disabled={isPrinting}
+                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                 >
                   +
                 </motion.button>
@@ -490,18 +649,24 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               
               <div className="flex gap-4">
                 <motion.button 
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={!isPrinting ? { scale: 0.95 } : {}}
                   onClick={() => setShowPrintModal(false)} 
-                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors"
+                  disabled={isPrinting}
+                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                 >
                   Cancelar
                 </motion.button>
                 <motion.button 
-                  whileTap={{ scale: 0.95 }}
-                  onClick={executePrint} 
-                  className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg transition-all"
+                  whileTap={!isPrinting ? { scale: 0.95 } : {}}
+                  onClick={executeDownloadPDF} 
+                  disabled={isPrinting}
+                  className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
                 >
-                  Imprimir
+                  {isPrinting ? (
+                    <><Loader2 className="animate-spin" size={18} /> Generando...</>
+                  ) : (
+                    "Descargar"
+                  )}
                 </motion.button>
               </div>
             </motion.div>
@@ -509,7 +674,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         )}
       </AnimatePresence>
 
-      {/* --- MODAL NEO-BENTO DE CONFIRMACIÓN DE ELIMINACIÓN --- */}
       <AnimatePresence>
         {accountToDelete && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -535,7 +699,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 ¿Eliminar Cuenta?
               </h3>
               
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-center leading-relaxed">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-justify leading-relaxed">
                 Estás a punto de eliminar la cuenta de <strong>{accountToDelete.bank_name}</strong>. Esta acción no se puede deshacer.
               </p>
               
@@ -544,7 +708,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   whileTap={!isDeleting ? { scale: 0.95 } : {}}
                   onClick={() => setAccountToDelete(null)} 
                   disabled={isDeleting}
-                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                 >
                   Cancelar
                 </motion.button>
@@ -552,7 +716,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   whileTap={!isDeleting ? { scale: 0.95 } : {}}
                   onClick={handleDeleteConfirm} 
                   disabled={isDeleting}
-                  className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
                 >
                   {isDeleting ? (
                     <><Loader2 className="animate-spin" size={20} /> Eliminando...</>

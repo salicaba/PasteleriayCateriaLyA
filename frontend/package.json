@@ -19,6 +19,7 @@
     "date-fns": "^4.4.0",
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.1",
+    "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.574.0",
