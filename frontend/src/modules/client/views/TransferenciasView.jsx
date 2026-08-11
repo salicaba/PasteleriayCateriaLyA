@@ -28,7 +28,7 @@ export const TransferenciasView = () => {
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // 🔥 EXTRACTOR INTELIGENTE + TIEMPO REAL
+  // 🔥 EXTRACTOR INTELIGENTE UNIFICADO + TIEMPO REAL
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -53,11 +53,11 @@ export const TransferenciasView = () => {
             if (waObj) parsedWa = waObj.value;
         } 
         else if (typeof rawData === 'object') {
-            parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.bank_accounts || rawData.cuentas || rawData.cuentas_bancarias || [];
+            parsedAccounts = rawData.bank_accounts || rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || [];
             if (typeof parsedAccounts === 'string') {
                 try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
             }
-            parsedWa = rawData.whatsappComprobantes || rawData.whatsapp_number || rawData.whatsapp || rawData.telefono || "";
+            parsedWa = rawData.whatsapp_number || rawData.whatsappComprobantes || rawData.whatsapp || rawData.telefono || "";
         }
 
         setAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
@@ -134,6 +134,44 @@ export const TransferenciasView = () => {
     }
   };
 
+  // 🚀 GENERADOR INTELIGENTE DE MENSAJE DE WHATSAPP (Anti-Caché)
+  const handleWhatsApp = () => {
+    if (!whatsappNumber) return;
+
+    let clientName = 'Cliente';
+    let orderTypeStr = 'General';
+    let orderTotal = '0.00';
+
+    // Extracción de datos del pedido
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.toLowerCase().includes('client') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('cart') || key.toLowerCase().includes('order'))) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (parsed.clientData?.name) {
+               // Extraer solo el nombre si tiene teléfono concatenado
+               clientName = parsed.clientData.name.split(' | ')[0].split(' - ')[0].trim();
+            }
+            if (parsed.type) {
+              orderTypeStr = parsed.type === 'mesa' ? `Mesa ${parsed.tableId || ''}` : 'Para Llevar';
+            }
+            if (parsed.total) orderTotal = Number(parsed.total).toFixed(2);
+            break; // Rompemos el ciclo al encontrar los datos
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Mensaje exacto e idéntico a la nota del cliente
+    const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${clientName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${orderTotal}\n\nAdjunto el comprobante:`);
+    
+    // 🔥 FIX ARQUITECTÓNICO: Usar api.whatsapp.com fuerza a la App a recargar el texto SIEMPRE
+    const waUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${text}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // PANTALLAS DE CARGA Y ERROR (Cumplen con Pilar 1: overflow-hidden)
   if (loading) {
     return (
@@ -183,34 +221,30 @@ export const TransferenciasView = () => {
             <Landmark size={32} />
           </div>
           <h1 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tighter" style={{ fontFamily: 'Times New Roman, serif', fontStyle: 'italic' }}>
-            𝓛𝔂𝓪
+            𝓛𝔂𝐚
           </h1>
           <p className="text-xs font-black uppercase tracking-widest text-gray-400 lya:text-lya-text/50 mt-2 text-center">Datos para Transferencia</p>
         </motion.div>
 
-        {/* LISTA DE CUENTAS */}
+        {/* LISTA DE CUENTAS DIRECTAS (Diseño Original sin Acordeón) */}
         <div className="w-full max-w-md space-y-6 shrink-0">
           <AnimatePresence>
             {accounts.map((acc, index) => {
-              // Desestructuración defensiva adaptativa
-              const banco = acc.banco || acc.bank_name || 'Banco';
-              const titular = acc.titular || acc.account_holder;
-              const cuenta = acc.cuenta || acc.account_number;
+              const banco = acc.bank_name || acc.banco || 'Banco';
+              const titular = acc.account_holder || acc.titular;
+              const cuenta = acc.account_number || acc.cuenta;
               const clabe = acc.clabe;
 
               return (
                 <motion.div 
                   key={acc.id || index}
-                  /* 🔥 PILAR 5: Animación de entrada estándar */
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: "easeOut", delay: index * 0.1 }}
-                  /* 🔥 PILAR 4: Geometría Neo-Bento (rounded-[2rem]) */
                   className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 lya:bg-lya-primary/5 rounded-bl-[100%] pointer-events-none" />
                   
-                  {/* 🔥 PILAR 4: truncate en el título de la tarjeta */}
                   <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex items-center gap-2 truncate">
                     <div className="w-2 h-6 bg-emerald-500 lya:bg-lya-primary rounded-full shrink-0" /> 
                     <span className="truncate">{banco}</span>
@@ -220,7 +254,6 @@ export const TransferenciasView = () => {
                     {titular && (
                       <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                         <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Titular de la cuenta</span>
-                        {/* 🔥 PILAR 4: truncate por si el nombre es kilométrico */}
                         <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm block truncate">{titular}</span>
                       </div>
                     )}
@@ -231,7 +264,6 @@ export const TransferenciasView = () => {
                           <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Número de Cuenta / Tarjeta</span>
                           <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{cuenta}</span>
                         </div>
-                        {/* 🔥 PILAR 2: whileTap estricto */}
                         <motion.button 
                           whileTap={{ scale: 0.9 }}
                           onClick={() => handleCopy(cuenta, `acc-${acc.id || index}`)}
@@ -248,7 +280,6 @@ export const TransferenciasView = () => {
                           <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">CLABE Interbancaria</span>
                           <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{clabe}</span>
                         </div>
-                        {/* 🔥 PILAR 2: whileTap estricto */}
                         <motion.button 
                           whileTap={{ scale: 0.9 }}
                           onClick={() => handleCopy(clabe, `clabe-${acc.id || index}`)}
@@ -265,7 +296,7 @@ export const TransferenciasView = () => {
           </AnimatePresence>
         </div>
 
-        {/* WHATSAPP FOOTER */}
+        {/* WHATSAPP FOOTER CON MENSAJE ESTRUCTURADO HOMOLOGADO */}
         {whatsappNumber && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }} 
@@ -277,29 +308,26 @@ export const TransferenciasView = () => {
               <MessageCircle size={24} />
             </div>
             <h4 className="font-black text-emerald-800 dark:text-emerald-300 lya:text-lya-text text-sm uppercase tracking-wider mb-2 text-center">Envía tu comprobante</h4>
-            {/* 🔥 PILAR 4: Textos largos siempre text-justify o text-center estricto */}
             <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400/80 lya:text-lya-text/70 mb-4 leading-relaxed text-center">
-              Por favor, no olvides escribir tu nombre o detalles en el concepto de tu transferencia y enviarnos el comprobante al dar clic abajo.
+              Por favor, no olvides escribir tu número de mesa o nombre en el concepto de tu transferencia y enviarnos tu comprobante.
             </p>
-            {/* 🔥 PILAR 2: md:hover y whileTap para enlaces */}
-            <motion.a 
+            <motion.button 
               whileTap={{ scale: 0.95 }}
-              href={`https://wa.me/${whatsappNumber}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
+              onClick={handleWhatsApp}
               className="inline-flex items-center justify-center gap-2 w-full py-3.5 bg-emerald-500 lya:bg-lya-primary md:hover:bg-emerald-600 lya:md:hover:opacity-90 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transition-all outline-none"
             >
-              Abrir WhatsApp
-            </motion.a>
+              <MessageCircle size={18} strokeWidth={2.5} />
+              <span>Abrir WhatsApp</span>
+            </motion.button>
           </motion.div>
         )}
 
         <div className="mt-10 mb-6 opacity-30 pointer-events-none shrink-0 text-center">
-           <h1 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text" style={{ fontFamily: 'Times New Roman, serif', fontStyle: 'italic' }}>𝓛𝔂𝓪</h1>
+           <h1 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text" style={{ fontFamily: 'Times New Roman, serif', fontStyle: 'italic' }}>𝓛𝔂𝐚</h1>
         </div>
       </div>
 
-      {/* 🔥 MODAL NEO-BENTO DE AJUSTES (Cumple con Pilar 4 y 5) */}
+      {/* MODAL DE AJUSTES */}
       <AnimatePresence>
         {showSettings && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -311,14 +339,12 @@ export const TransferenciasView = () => {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 10 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              /* 🔥 PILAR 4: Geometría modal rounded-[2.5rem] */
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
             >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight flex items-center gap-2">
                   <Settings size={22} className="text-emerald-500 lya:text-lya-primary"/> Ajustes
                 </h3>
-                {/* 🔥 PILAR 2: md:hover estricto */}
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowSettings(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 rounded-full outline-none transition-colors"><X size={18}/></motion.button>
               </div>
 
