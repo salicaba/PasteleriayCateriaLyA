@@ -3,18 +3,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { socket } from '../../../api/socket.js';
+import client from '../../../api/client.js'; // <- Inyectamos tu cliente Axios configurado
 
-// Constantes de Negocio (Actualiza el número de WhatsApp aquí)
+// Constante de Negocio (El número de WhatsApp sí puede quedar aquí o también venir del backend en un futuro)
 const WHATSAPP_NUMBER = "529611191492"; 
-const BANK_ACCOUNTS = [
-  { id: 1, banco: 'BBVA Bancomer', titular: 'Pastelería y Cafetería LyA', cuenta: '0123456789', clabe: '012345678901234567' },
-  { id: 2, banco: 'Santander', titular: 'Pastelería y Cafetería LyA', cuenta: '9876543210', clabe: '098765432109876543' }
-];
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
+  
+  // Estados para las cuentas dinámicas
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  
   const [isProcessingWa, setIsProcessingWa] = useState(false);
   const [copyingId, setCopyingId] = useState(null);
   const isFirstRender = useRef(true);
@@ -22,6 +24,31 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   useEffect(() => {
     setLiveCart(cart || []);
   }, [cart]);
+
+  // Petición al backend para extraer las cuentas bancarias
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        setIsLoadingAccounts(true);
+        // Ajusta la ruta '/settings' según el endpoint de tu settings.controller.js
+        const res = await client.get('/settings'); 
+        
+        // Ajusta el nombre del array según cómo lo devuelva tu backend (ej. res.data.cuentas)
+        const accountsData = res.data?.bankAccounts || res.data?.cuentas || res.data?.cuentasBancarias || [];
+        setBankAccounts(accountsData);
+      } catch (error) {
+        console.error("Error al cargar cuentas bancarias desde el servidor:", error);
+        setBankAccounts([]); // Fallback para no romper la app
+      } finally {
+        setIsLoadingAccounts(false);
+      }
+    };
+
+    // Estrategia de optimización: Solo buscar cuentas si el pedido AÚN NO está pagado
+    if (!isOrderPaid) {
+      fetchAccounts();
+    }
+  }, [isOrderPaid]);
 
   useEffect(() => {
     // 1. Escuchar cancelación individual
@@ -147,7 +174,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     .filter(item => item.status !== 'CANCELLED')
     .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
 
-  const parsedNameData = clientData?.name || 'Cliente';
+  const parsedNameData = clientData?.name || 'Cliente Lya';
   let displayName = parsedNameData;
   let displayPhone = null;
 
@@ -160,7 +187,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   displayName = displayName.trim();
   if (displayPhone) displayPhone = displayPhone.trim();
 
-  const primerNombre = displayName.split(' ')[0] || 'Cliente';
+  const primerNombre = displayName.split(' ')[0] || 'Cliente Lya';
 
   // Utils para copiar y notificar (Cápsulas Neo-Bento)
   const showToast = (message) => {
@@ -185,7 +212,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     setIsProcessingWa(true);
     try {
       const orderTypeStr = type === 'mesa' ? `Mesa ${tableId}` : 'Para Llevar';
-      const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n👤 *Cliente:* ${displayName}\n🛎️ *Orden:* ${orderTypeStr}\n💰 *Total Pagado:* $${liveTotal.toFixed(2)}\n\nAdjunto el comprobante:`);
+      const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${displayName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${liveTotal.toFixed(2)}\n\nAdjunto el comprobante:`);
       const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     } finally {
@@ -513,7 +540,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                   exit={{ opacity: 0 }} 
                   className="space-y-6 w-full"
                 >
-                  {/* Módulo de Transferencias Neo-Bento */}
+                  {/* Módulo Dinámico de Transferencias Neo-Bento */}
                   <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-5 rounded-[2rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-center">
                     <div className="flex items-center justify-center gap-2 mb-3">
                       <Landmark className="text-orange-500 lya:text-[#78350F]" size={20} strokeWidth={2.5} />
@@ -524,49 +551,60 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       Si prefieres pagar vía transferencia electrónica, utiliza los siguientes datos y envíanos tu comprobante.
                     </p>
 
-                    <div className="space-y-3 mb-5">
-                      {BANK_ACCOUNTS.map((acc) => (
-                        <div key={acc.id} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9]">
-                          <div className="text-left mb-2">
-                            <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723]">{acc.banco}</p>
-                            <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">{acc.titular}</p>
-                          </div>
-                          
-                          <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] mb-2">
-                            <div className="text-left flex-1 min-w-0">
-                              <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">Cuenta</p>
-                              <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{acc.cuenta}</p>
+                    {isLoadingAccounts ? (
+                      <div className="flex flex-col items-center justify-center py-6">
+                        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} strokeWidth={3} />
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Conectando...</p>
+                      </div>
+                    ) : bankAccounts.length === 0 ? (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 lya:bg-[#EADCC9]/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 mb-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">No hay cuentas bancarias configuradas por el momento.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 mb-5">
+                        {bankAccounts.map((acc, index) => (
+                          <div key={acc.id || index} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9]">
+                            <div className="text-left mb-2">
+                              <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723]">{acc.banco}</p>
+                              <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">{acc.titular}</p>
                             </div>
-                            <motion.button
-                              whileTap={{ scale: 0.90 }}
-                              onClick={() => handleCopy(acc.cuenta, 'Cuenta', acc.id)}
-                              className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
-                            >
-                              {copyingId === `${acc.id}-Cuenta` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                            </motion.button>
-                          </div>
+                            
+                            <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] mb-2">
+                              <div className="text-left flex-1 min-w-0">
+                                <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">Cuenta</p>
+                                <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{acc.cuenta}</p>
+                              </div>
+                              <motion.button
+                                whileTap={{ scale: 0.90 }}
+                                onClick={() => handleCopy(acc.cuenta, 'Cuenta', acc.id || index)}
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
+                              >
+                                {copyingId === `${acc.id || index}-Cuenta` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                              </motion.button>
+                            </div>
 
-                          <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]">
-                            <div className="text-left flex-1 min-w-0">
-                              <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">CLABE Interbancaria</p>
-                              <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{acc.clabe}</p>
+                            <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]">
+                              <div className="text-left flex-1 min-w-0">
+                                <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">CLABE Interbancaria</p>
+                                <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{acc.clabe}</p>
+                              </div>
+                              <motion.button
+                                whileTap={{ scale: 0.90 }}
+                                onClick={() => handleCopy(acc.clabe, 'CLABE', acc.id || index)}
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
+                              >
+                                {copyingId === `${acc.id || index}-CLABE` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                              </motion.button>
                             </div>
-                            <motion.button
-                              whileTap={{ scale: 0.90 }}
-                              onClick={() => handleCopy(acc.clabe, 'CLABE', acc.id)}
-                              className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
-                            >
-                              {copyingId === `${acc.id}-CLABE` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                            </motion.button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
 
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={handleWhatsApp}
-                      disabled={isProcessingWa}
+                      disabled={isProcessingWa || bankAccounts.length === 0}
                       className="w-full py-3.5 rounded-2xl font-black text-sm bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/30 outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {isProcessingWa ? (
