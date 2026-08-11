@@ -27,7 +27,7 @@ export const TransferenciasView = () => {
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // 🔥 EXTRACTOR INTELIGENTE DE CONFIGURACIONES (Cuentas y WhatsApp)
+  // 🔥 EXTRACTOR INTELIGENTE + TIEMPO REAL
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -40,7 +40,6 @@ export const TransferenciasView = () => {
         let parsedAccounts = [];
         let parsedWa = "";
 
-        // Escenario A: El backend devuelve un Array
         if (Array.isArray(rawData)) {
             const accObj = rawData.find(item => item.key && (item.key.toLowerCase().includes('cuenta') || item.key.toLowerCase().includes('bank')));
             const waObj = rawData.find(item => item.key && item.key.toLowerCase().includes('whatsapp'));
@@ -50,10 +49,8 @@ export const TransferenciasView = () => {
             } else if (rawData.length > 0 && (rawData[0].banco || rawData[0].bank_name)) {
                 parsedAccounts = rawData;
             }
-
             if (waObj) parsedWa = waObj.value;
         } 
-        // Escenario B: El backend devuelve un Objeto
         else if (typeof rawData === 'object') {
             parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.bank_accounts || rawData.cuentas || rawData.cuentas_bancarias || [];
             if (typeof parsedAccounts === 'string') {
@@ -64,11 +61,8 @@ export const TransferenciasView = () => {
 
         setAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
 
-        // Magia para el WhatsApp: Asegurar Formato Correcto
         let cleanWa = String(parsedWa).replace(/\D/g, ''); 
-        if (cleanWa.length === 10) {
-            cleanWa = '52' + cleanWa; 
-        }
+        if (cleanWa.length === 10) cleanWa = '52' + cleanWa; 
         setWhatsappNumber(cleanWa);
 
       } catch (err) {
@@ -78,7 +72,17 @@ export const TransferenciasView = () => {
         setLoading(false);
       }
     };
+
     fetchSettings();
+
+    // ⚡ TIEMPO REAL: Actualización instantánea en pantallas de transferencia
+    socket.on('settingsUpdated', fetchSettings);
+    socket.on('businessConfigUpdated', fetchSettings);
+
+    return () => {
+      socket.off('settingsUpdated', fetchSettings);
+      socket.off('businessConfigUpdated', fetchSettings);
+    };
   }, []);
 
   // Aplicar Tema
