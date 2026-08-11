@@ -192,7 +192,10 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     const checkStatus = async () => {
       try {
         const res = await client.get(`/pos/orders/${activeOrderId}/status`, {
-          params: { cuenta: clientData?.name }
+          params: { 
+            cuenta: clientData?.name,
+            _t: Date.now() // 🔥 FIX: Escudo Anti-Caché para el Navegador
+          }
         });
         
         const data = res?.data || {};
@@ -341,9 +344,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     try {
       if (!isBackground) setIsLoading(true);
       const [catsRes, prodsRes] = await Promise.all([ 
-        client.get('/menu/categories').catch(() => ({ data: [] })), 
-        client.get('/menu/products').catch(() => ({ data: [] })) 
-      ]);
+          client.get(`/menu/categories?_t=${Date.now()}`).catch(() => ({ data: [] })), 
+          client.get(`/menu/products?_t=${Date.now()}`).catch(() => ({ data: [] })) 
+        ]);
       
       const rawCats = catsRes.data?.data || catsRes.data || [];
       const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
