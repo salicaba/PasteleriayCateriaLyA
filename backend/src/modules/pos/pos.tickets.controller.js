@@ -604,25 +604,27 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX MOTOR RENDERING: Configuramos la hoja del PDF como Pulgadas (inches) y evitamos espacios blancos
+        // 🔥 FIX DEFINITIVO: Sin clones, usando matemáticas de márgenes para centrar en A4
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightInInches = (element.offsetHeight / 96) + 0.4; // Altura precisa en pulgadas
+          
+          // Formato margin de html2pdf: [top, left, bottom, right] en milímetros
           const options = {
-            margin: [0.2, 0, 0.2, 0], // Margen de 0.2 pulgadas arriba y abajo
-            filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
+            margin:       [20, 54.75, 20, 54.75], 
+            filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff'
+              backgroundColor: '#ffffff' 
             },
-            jsPDF: { 
-              unit: 'in', // Pulgadas (inches)
-              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket (4.1 pulgadas)
+            jsPDF:        { 
+              unit: 'mm', 
+              format: 'a4', 
               orientation: 'portrait' 
             }
           };
+
           html2pdf().set(options).from(element).save();
         }
 
