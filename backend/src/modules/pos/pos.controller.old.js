@@ -850,7 +850,7 @@ export const shareOrderTicket = async (req, res) => {
             <p class="text-xs text-slate-600 font-medium leading-relaxed">
               Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
             </p>
-            <a href="http://googleusercontent.com/maps.google.com/6" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all">
+            <a href="https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
               📍 Ver en Google Maps
             </a>
           </div>
