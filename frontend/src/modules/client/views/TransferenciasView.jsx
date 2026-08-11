@@ -59,6 +59,19 @@ export const TransferenciasView = () => {
     localStorage.setItem('lya_client_size', sizeIndex);
   }, [sizeIndex]);
 
+  // 🔥 ESCUDO ANTI-INSTALACIÓN: Bloquea el banner nativo de Chrome/Android para instalar la PWA
+  useEffect(() => {
+    const preventInstallPrompt = (e) => {
+      e.preventDefault(); // Matamos el evento nativo del navegador
+    };
+    
+    window.addEventListener('beforeinstallprompt', preventInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', preventInstallPrompt);
+    };
+  }, []);
+
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
   const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 

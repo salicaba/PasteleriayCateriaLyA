@@ -611,7 +611,7 @@ export default function ClientApp({ type }) {
                           <div className="flex items-center gap-3">
                             <div className="bg-white/10 dark:bg-gray-900/10 p-3 rounded-2xl shrink-0"><MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" /></div>
                             <div>
-                              <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya</h4>
+                              <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya para Clientes</h4>
                               <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
                             </div>
                           </div>
