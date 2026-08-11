@@ -604,65 +604,34 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX MOTOR RENDERING: Hoja A4 con Ticket Centrado y Seguro Anti-Cortes
+        // 🔥 FIX MOTOR RENDERING: Configuramos la hoja del PDF como Pulgadas (inches) y evitamos espacios blancos
         function descargarPDF() {
-          const originalElement = document.getElementById('ticket-card');
-          
-          // 1. Creamos un "lienzo" virtual tamaño A4 para evitar el bug de corte de Flexbox
-          const printContainer = document.createElement('div');
-          printContainer.style.width = '794px'; // Ancho de A4 en píxeles
-          printContainer.style.minHeight = '1123px'; // Alto mínimo de A4
-          printContainer.style.backgroundColor = '#ffffff';
-          printContainer.style.padding = '40px 0'; // Espaciado elegante arriba y abajo
-          printContainer.style.display = 'flex';
-          printContainer.style.justifyContent = 'center'; // Centrado perfecto en la hoja
-          printContainer.style.alignItems = 'flex-start';
-          printContainer.style.position = 'absolute';
-          printContainer.style.left = '-9999px'; // Totalmente escondido de la pantalla
-          printContainer.style.top = '0';
-          
-          // 2. Clonamos la tarjeta para no alterar lo que el cliente ve en su pantalla
-          const clone = originalElement.cloneNode(true);
-          clone.style.boxShadow = 'none'; // Quitamos sombras para simular tinta en papel
-          clone.style.border = '1px solid #cbd5e1'; // Borde sutil y limpio
-          clone.style.margin = '0'; 
-          
-          printContainer.appendChild(clone);
-          document.body.appendChild(printContainer);
-          
-          // 3. Generamos el PDF en formato A4 estándar
+          const element = document.getElementById('ticket-card');
+          const heightInInches = (element.offsetHeight / 96) + 0.4; // Altura precisa en pulgadas
           const options = {
-            margin: 0,
+            margin: [0.2, 0, 0.2, 0], // Margen de 0.2 pulgadas arriba y abajo
             filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff' 
+              backgroundColor: '#ffffff'
             },
             jsPDF: { 
-              unit: 'mm', 
-              format: 'a4', 
+              unit: 'in', // Pulgadas (inches)
+              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket (4.1 pulgadas)
               orientation: 'portrait' 
             }
           };
-
-          // 4. Procesamos, descargamos y limpiamos la basura virtual
-          html2pdf().set(options).from(printContainer).save().then(() => {
-            document.body.removeChild(printContainer);
-          });
+          html2pdf().set(options).from(element).save();
         }
 
-        // De paso, le apliqué un pequeño blindaje a la descarga de Imagen para asegurar que no se corte
         function descargarImagen() {
           const element = document.getElementById('ticket-card');
-          window.scrollTo(0,0); // Forzamos el scroll al top para ayudar al motor
           html2canvas(element, { 
             scale: 3, 
             useCORS: true, 
-            backgroundColor: '#ffffff',
-            scrollX: 0,
-            scrollY: 0
+            backgroundColor: '#ffffff'
           }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'Ticket_Lya_${ticketFolioFile}.png';
