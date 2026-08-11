@@ -76,12 +76,12 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
 
     // ⚡ TIEMPO REAL: Actualización instantánea si el Admin edita cuentas o WhatsApp
-    socket.on('settingsUpdated', fetchSettings);
-    socket.on('businessConfigUpdated', fetchSettings);
+    socket.on('config:update', fetchSettings);
+    socket.on('business_config_updated', fetchSettings);
 
     return () => {
-      socket.off('settingsUpdated', fetchSettings);
-      socket.off('businessConfigUpdated', fetchSettings);
+      socket.off('config:update', fetchSettings);
+      socket.off('business_config_updated', fetchSettings);
     };
   }, [isOrderPaid]);
 

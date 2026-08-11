@@ -77,12 +77,12 @@ export const TransferenciasView = () => {
     fetchSettings();
 
     // ⚡ TIEMPO REAL: Actualización instantánea en pantallas de transferencia
-    socket.on('settingsUpdated', fetchSettings);
-    socket.on('businessConfigUpdated', fetchSettings);
+    socket.on('config:update', fetchSettings);
+    socket.on('business_config_updated', fetchSettings);
 
     return () => {
-      socket.off('settingsUpdated', fetchSettings);
-      socket.off('businessConfigUpdated', fetchSettings);
+      socket.off('config:update', fetchSettings);
+      socket.off('business_config_updated', fetchSettings);
     };
   }, []);
 
@@ -134,7 +134,7 @@ export const TransferenciasView = () => {
     }
   };
 
-  // 🚀 GENERADOR INTELIGENTE DE MENSAJE DE WHATSAPP (Anti-Caché)
+  // 🚀 GENERADOR INTELIGENTE DE MENSAJE DE WHATSAPP (Homologado con ClientOrderSuccess)
   const handleWhatsApp = () => {
     if (!whatsappNumber) return;
 
@@ -142,7 +142,6 @@ export const TransferenciasView = () => {
     let orderTypeStr = 'General';
     let orderTotal = '0.00';
 
-    // Extracción de datos del pedido
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -151,20 +150,18 @@ export const TransferenciasView = () => {
           if (val) {
             const parsed = JSON.parse(val);
             if (parsed.clientData?.name) {
-               // Extraer solo el nombre si tiene teléfono concatenado
                clientName = parsed.clientData.name.split(' | ')[0].split(' - ')[0].trim();
             }
             if (parsed.type) {
               orderTypeStr = parsed.type === 'mesa' ? `Mesa ${parsed.tableId || ''}` : 'Para Llevar';
             }
             if (parsed.total) orderTotal = Number(parsed.total).toFixed(2);
-            break; // Rompemos el ciclo al encontrar los datos
+            break;
           }
         }
       }
     } catch (e) {}
 
-    // Mensaje exacto e idéntico a la nota del cliente
     const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${clientName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${orderTotal}\n\nAdjunto el comprobante:`);
     
     // 🔥 FIX ARQUITECTÓNICO: Usar api.whatsapp.com fuerza a la App a recargar el texto SIEMPRE
@@ -226,7 +223,7 @@ export const TransferenciasView = () => {
           <p className="text-xs font-black uppercase tracking-widest text-gray-400 lya:text-lya-text/50 mt-2 text-center">Datos para Transferencia</p>
         </motion.div>
 
-        {/* LISTA DE CUENTAS DIRECTAS (Diseño Original sin Acordeón) */}
+        {/* LISTA DE CUENTAS DIRECTAS (Sin Acordeón) */}
         <div className="w-full max-w-md space-y-6 shrink-0">
           <AnimatePresence>
             {accounts.map((acc, index) => {
