@@ -5,8 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const appType = process.env.VITE_APP_TYPE || 'admin'; 
 
-const pwaName = appType === 'client' ? 'Menú Lya' : 'Sistema Lya';
-const pwaShortName = appType === 'client' ? 'Menú Lya' : 'POS Lya';
+// 🔥 CAMBIO CLAVE: Renombramos la app pública a "Cliente Lya"
+const pwaName = appType === 'client' ? 'Cliente Lya' : 'Sistema Lya';
+const pwaShortName = appType === 'client' ? 'Cliente Lya' : 'POS Lya';
 
 export default defineConfig({
   plugins: [
