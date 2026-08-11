@@ -544,195 +544,202 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       </div>
 
       {/* 🚀 MODAL NEO-BENTO DE PANTALLA COMPLETA DEL QR */}
-      <AnimatePresence>
-        {previewQR && createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setPreviewQR(false)}
-              className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
-            >
-              <motion.button 
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setPreviewQR(false)} 
-                className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
+      {createPortal(
+        <AnimatePresence>
+          {previewQR && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setPreviewQR(false)}
+                className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
               >
-                <X size={20} strokeWidth={2.5} className="pointer-events-none" />
-              </motion.button>
-              
-              <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
-                Escanear para copiar
-              </div>
-              
-              <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
-                Cuentas 𝓛𝔂𝓪
-              </h2>
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setPreviewQR(false)} 
+                  className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
+                >
+                  <X size={20} strokeWidth={2.5} className="pointer-events-none" />
+                </motion.button>
+                
+                <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
+                  Escanear para copiar
+                </div>
+                
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
+                  Cuentas 𝓛𝔂𝓪
+                </h2>
 
-              <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
-                <QRCodeSVG 
-                   value={`${baseUrl}/transferencias`} 
-                   size={220} 
-                   bgColor="transparent" 
-                   fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
-                   level="Q"
-                />
-              </div>
+                <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
+                  <QRCodeSVG 
+                     value={`${baseUrl}/transferencias`} 
+                     size={220} 
+                     bgColor="transparent" 
+                     fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
+                     level="Q"
+                  />
+                </div>
 
-              <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-sm">
-                <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0" />
-                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest text-center">
-                  {displayBaseUrl}/transferencias
-                </span>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-sm">
+                  <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0" />
+                  <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest text-center">
+                    {displayBaseUrl}/transferencias
+                  </span>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* MODAL DE DESCARGA PDF DE TICKETS FÍSICOS (EL ORIGINAL) */}
-      <AnimatePresence>
-        {showPrintModal && createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={() => { if (!isPrinting) setShowPrintModal(false) }} 
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
-            >
-              <div className="mx-auto bg-emerald-500/10 lya:bg-lya-primary/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
-                <Download size={40} className="text-emerald-500 lya:text-lya-primary" />
-              </div>
-              
-              <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">
-                Descargar PDF
-              </h3>
-              
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-center leading-relaxed">
-                ¿Cuántos tickets de datos bancarios deseas generar en el documento?
-              </p>
-              
-              <div className="flex items-center justify-center gap-6 mb-10">
-                <motion.button 
-                  whileTap={!isPrinting ? { scale: 0.9 } : {}}
-                  onClick={() => setPrintQuantity(Math.max(1, printQuantity - 1))} 
-                  disabled={isPrinting}
-                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
-                >
-                  -
-                </motion.button>
-                <span className="text-4xl font-black dark:text-white lya:text-lya-text w-16 text-center">
-                  {printQuantity}
-                </span>
-                <motion.button 
-                  whileTap={!isPrinting ? { scale: 0.9 } : {}}
-                  onClick={() => setPrintQuantity(printQuantity + 1)} 
-                  disabled={isPrinting}
-                  className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
-                >
-                  +
-                </motion.button>
-              </div>
-              
-              <div className="flex gap-4">
-                <motion.button 
-                  whileTap={!isPrinting ? { scale: 0.95 } : {}}
-                  onClick={() => setShowPrintModal(false)} 
-                  disabled={isPrinting}
-                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
-                >
-                  Cancelar
-                </motion.button>
-                <motion.button 
-                  whileTap={!isPrinting ? { scale: 0.95 } : {}}
-                  onClick={executeDownloadPDF} 
-                  disabled={isPrinting}
-                  className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
-                >
-                  {isPrinting ? (
-                    <><Loader2 className="animate-spin" size={18} /> Generando...</>
-                  ) : (
-                    "Descargar"
-                  )}
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
+          {showPrintModal && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => { if (!isPrinting) setShowPrintModal(false) }} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+              >
+                <div className="mx-auto bg-emerald-500/10 lya:bg-lya-primary/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
+                  <Download size={40} className="text-emerald-500 lya:text-lya-primary" />
+                </div>
+                
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">
+                  Descargar PDF
+                </h3>
+                
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-center leading-relaxed">
+                  ¿Cuántos tickets de datos bancarios deseas generar en el documento?
+                </p>
+                
+                <div className="flex items-center justify-center gap-6 mb-10">
+                  <motion.button 
+                    whileTap={!isPrinting ? { scale: 0.9 } : {}}
+                    onClick={() => setPrintQuantity(Math.max(1, printQuantity - 1))} 
+                    disabled={isPrinting}
+                    className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
+                  >
+                    -
+                  </motion.button>
+                  <span className="text-4xl font-black dark:text-white lya:text-lya-text w-16 text-center">
+                    {printQuantity}
+                  </span>
+                  <motion.button 
+                    whileTap={!isPrinting ? { scale: 0.9 } : {}}
+                    onClick={() => setPrintQuantity(printQuantity + 1)} 
+                    disabled={isPrinting}
+                    className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
+                  >
+                    +
+                  </motion.button>
+                </div>
+                
+                <div className="flex gap-4">
+                  <motion.button 
+                    whileTap={!isPrinting ? { scale: 0.95 } : {}}
+                    onClick={() => setShowPrintModal(false)} 
+                    disabled={isPrinting}
+                    className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
+                  >
+                    Cancelar
+                  </motion.button>
+                  <motion.button 
+                    whileTap={!isPrinting ? { scale: 0.95 } : {}}
+                    onClick={executeDownloadPDF} 
+                    disabled={isPrinting}
+                    className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
+                  >
+                    {isPrinting ? (
+                      <><Loader2 className="animate-spin" size={18} /> Generando...</>
+                    ) : (
+                      "Descargar"
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-      <AnimatePresence>
-        {accountToDelete && createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={() => !isDeleting && setAccountToDelete(null)} 
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
-            >
-              <div className="mx-auto bg-red-500/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
-                <Trash2 size={40} className="text-red-500" />
-              </div>
-              
-              <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">
-                ¿Eliminar Cuenta?
-              </h3>
-              
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-justify leading-relaxed">
-                Estás a punto de eliminar la cuenta de <strong>{accountToDelete.bank_name}</strong>. Esta acción no se puede deshacer.
-              </p>
-              
-              <div className="flex gap-4">
-                <motion.button 
-                  whileTap={!isDeleting ? { scale: 0.95 } : {}}
-                  onClick={() => setAccountToDelete(null)} 
-                  disabled={isDeleting}
-                  className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
-                >
-                  Cancelar
-                </motion.button>
-                <motion.button 
-                  whileTap={!isDeleting ? { scale: 0.95 } : {}}
-                  onClick={handleDeleteConfirm} 
-                  disabled={isDeleting}
-                  className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
-                >
-                  {isDeleting ? (
-                    <><Loader2 className="animate-spin" size={20} /> Eliminando...</>
-                  ) : (
-                    "Eliminar"
-                  )}
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+      {/* MODAL ELIMINAR CUENTA */}
+      {createPortal(
+        <AnimatePresence>
+          {accountToDelete && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => !isDeleting && setAccountToDelete(null)} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+              >
+                <div className="mx-auto bg-red-500/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
+                  <Trash2 size={40} className="text-red-500" />
+                </div>
+                
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2">
+                  ¿Eliminar Cuenta?
+                </h3>
+                
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-justify leading-relaxed">
+                  Estás a punto de eliminar la cuenta de <strong>{accountToDelete.bank_name}</strong>. Esta acción no se puede deshacer.
+                </p>
+                
+                <div className="flex gap-4">
+                  <motion.button 
+                    whileTap={!isDeleting ? { scale: 0.95 } : {}}
+                    onClick={() => setAccountToDelete(null)} 
+                    disabled={isDeleting}
+                    className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
+                  >
+                    Cancelar
+                  </motion.button>
+                  <motion.button 
+                    whileTap={!isDeleting ? { scale: 0.95 } : {}}
+                    onClick={handleDeleteConfirm} 
+                    disabled={isDeleting}
+                    className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
+                  >
+                    {isDeleting ? (
+                      <><Loader2 className="animate-spin" size={20} /> Eliminando...</>
+                    ) : (
+                      "Eliminar"
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 };
