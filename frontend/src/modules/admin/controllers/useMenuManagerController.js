@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminMenuModel } from '../models/adminMenuModel';
 import api from '../../../api/client'; // 🔥 Importamos la API para llamadas directas
+import { socket } from '../../../api/socket'; // 🚀 NUEVO: Importamos el socket
 
 // 🔥 AHORA RECIBE LA FUNCIÓN DE NOTIFICACIONES NEO-BENTO
 export const useMenuManagerController = ({ showToast }) => {
@@ -46,6 +47,26 @@ export const useMenuManagerController = ({ showToast }) => {
   }, [showToast]);
 
   useEffect(() => { loadData(true); }, [loadData]);
+
+  // ==========================================
+  // 🚀 NUEVO: SINCRONIZACIÓN DE STOCK EN TIEMPO REAL
+  // ==========================================
+  useEffect(() => {
+    // Función que recarga los datos en segundo plano sin interrumpir la vista
+    const handleBackgroundSync = () => {
+      loadData(false); 
+    };
+
+    // Conectamos los oídos a los eventos del servidor
+    socket.on('stock:update', handleBackgroundSync);
+    socket.on('pos:update', handleBackgroundSync);
+
+    // Limpiamos los oídos cuando se cierra el componente
+    return () => {
+      socket.off('stock:update', handleBackgroundSync);
+      socket.off('pos:update', handleBackgroundSync);
+    };
+  }, [loadData]);
 
   // ==========================================
   // GESTIÓN DE ANALÍTICAS (BUSINESS INTELLIGENCE)
