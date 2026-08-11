@@ -5,6 +5,7 @@ import {
   Landmark, Copy, Check, MessageCircle, AlertCircle, 
   Settings, Moon, Sun, Droplet, Type, Maximize, Minimize, X 
 } from 'lucide-react';
+import { socket } from '../../../api/socket.js';
 import client from '../../../api/client';
 
 const THEMES = ['light', 'dark', 'theme-lya'];
