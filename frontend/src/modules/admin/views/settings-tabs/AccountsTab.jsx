@@ -1,5 +1,6 @@
 // src/modules/admin/views/settings-tabs/AccountsTab.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // 🚀 IMPORTACIÓN CLAVE PARA CUBRIR TODA LA PANTALLA
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Landmark, Plus, Trash2, Edit2, Check, Download, 
@@ -279,7 +280,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 whileTap={!isSavingWhatsapp ? { scale: 0.95 } : {}}
                 onClick={handleSaveWhatsapp} 
                 disabled={isSavingWhatsapp}
-                className="h-[56px] px-5 min-w-[56px] bg-gray-900 md:hover:bg-black dark:bg-emerald-500 dark:md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-colors shadow-md flex items-center justify-center disabled:opacity-50" 
+                className="h-[56px] px-5 min-w-[56px] bg-gray-900 md:hover:bg-black dark:bg-emerald-500 dark:md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white rounded-2xl font-bold transition-colors shadow-md flex items-center justify-center disabled:opacity-50 outline-none" 
                 title="Guardar Número"
               >
                 {isSavingWhatsapp ? <Loader2 className="animate-spin w-6 h-6"/> : <Save size={24}/>}
@@ -305,7 +306,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setPreviewQR(true)}
-                className="h-[56px] px-5 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text rounded-2xl font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
+                className="h-[56px] px-5 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text rounded-2xl font-bold md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 outline-none"
                 title="Pantalla Completa"
               >
                 <Maximize size={20} />
@@ -314,7 +315,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 whileTap={!isPrintingQR ? { scale: 0.95 } : {}}
                 onClick={executeDownloadQR} 
                 disabled={isPrintingQR}
-                className="h-[56px] px-5 bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90 text-white rounded-2xl font-bold transition-colors shadow-md shadow-orange-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 disabled:opacity-50" 
+                className="h-[56px] px-5 bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90 text-white rounded-2xl font-bold transition-colors shadow-md shadow-orange-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 disabled:opacity-50 outline-none" 
                 title="Descargar QR en PDF"
               >
                 {isPrintingQR ? <Loader2 className="animate-spin w-6 h-6"/> : <Download size={20}/>}
@@ -376,7 +377,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   whileTap={!isSavingAccount ? { scale: 0.95 } : {}}
                   onClick={handleAddOrUpdate} 
                   disabled={isSavingAccount} 
-                  className="w-full py-4 bg-emerald-500 lya:bg-lya-primary text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 md:hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:md:hover:scale-100"
+                  className="w-full py-4 bg-emerald-500 lya:bg-lya-primary text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/20 md:hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:md:hover:scale-100 outline-none"
                 >
                   {isSavingAccount ? (
                       <><Loader2 className="animate-spin" size={20}/> Procesando...</>
@@ -391,7 +392,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   <motion.button 
                     whileTap={{ scale: 0.95 }}
                     onClick={resetForm} 
-                    className="w-full text-sm text-gray-400 font-bold md:hover:text-red-500 transition-colors"
+                    className="w-full text-sm text-gray-400 font-bold md:hover:text-red-500 transition-colors outline-none"
                   >
                     Cancelar edición
                   </motion.button>
@@ -544,8 +545,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
 
       {/* 🚀 MODAL NEO-BENTO DE PANTALLA COMPLETA DEL QR */}
       <AnimatePresence>
-        {previewQR && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {previewQR && createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setPreviewQR(false)}
@@ -591,14 +592,15 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 </span>
               </div>
             </motion.div>
-          </div>
+          </div>,
+          document.body
         )}
       </AnimatePresence>
 
       {/* MODAL DE DESCARGA PDF DE TICKETS FÍSICOS (EL ORIGINAL) */}
       <AnimatePresence>
-        {showPrintModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {showPrintModal && createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
@@ -670,13 +672,14 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 </motion.button>
               </div>
             </motion.div>
-          </div>
+          </div>,
+          document.body
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {accountToDelete && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {accountToDelete && createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
@@ -726,7 +729,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 </motion.button>
               </div>
             </motion.div>
-          </div>
+          </div>,
+          document.body
         )}
       </AnimatePresence>
     </motion.div>
