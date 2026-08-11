@@ -1,19 +1,20 @@
 // frontend/src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2, ChevronDown } from 'lucide-react';
 import { socket } from '../../../api/socket.js';
-import client from '../../../api/client.js'; 
+import client from '../../../api/client.js';
 
 export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
   
-  // Estados Dinámicos desde la Base de Datos
+  // Estados Dinámicos Sincronizados
   const [bankAccounts, setBankAccounts] = useState([]);
-  const [dynamicWa, setDynamicWa] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [showBankDetails, setShowBankDetails] = useState(false); // Estado para desplegar cuentas
   
   const [isProcessingWa, setIsProcessingWa] = useState(false);
   const [copyingId, setCopyingId] = useState(null);
@@ -23,13 +24,14 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     setLiveCart(cart || []);
   }, [cart]);
 
-  // 🔥 EXTRACTOR INTELIGENTE Y ESCUCHA EN TIEMPO REAL
+  // 🔥 EXTRACTOR INTELIGENTE UNIFICADO + TIEMPO REAL
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoadingAccounts(true);
-        const res = await client.get('/settings'); 
+        const res = await client.get('/settings');
         let rawData = res.data;
+        
         if (rawData.data) rawData = rawData.data;
 
         let parsedAccounts = [];
@@ -47,21 +49,22 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             if (waObj) parsedWa = waObj.value;
         } 
         else if (typeof rawData === 'object') {
-            parsedAccounts = rawData.cuentasBancarias || rawData.bankAccounts || rawData.bank_accounts || rawData.cuentas || rawData.cuentas_bancarias || [];
+            // Sincronizado exactamente con AccountsTab.jsx (bank_accounts)
+            parsedAccounts = rawData.bank_accounts || rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || [];
             if (typeof parsedAccounts === 'string') {
                 try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
             }
-            parsedWa = rawData.whatsappComprobantes || rawData.whatsapp_number || rawData.whatsapp || rawData.telefono || "";
+            parsedWa = rawData.whatsapp_number || rawData.whatsappComprobantes || rawData.whatsapp || rawData.telefono || "";
         }
 
         setBankAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
 
         let cleanWa = String(parsedWa).replace(/\D/g, ''); 
         if (cleanWa.length === 10) cleanWa = '52' + cleanWa; 
-        setDynamicWa(cleanWa);
+        setWhatsappNumber(cleanWa);
 
-      } catch (error) {
-        console.error("Error al cargar configuraciones:", error);
+      } catch (err) {
+        console.error("Error al cargar configuraciones:", err);
         setBankAccounts([]);
       } finally {
         setIsLoadingAccounts(false);
@@ -72,7 +75,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       fetchSettings();
     }
 
-    // ⚡ TIEMPO REAL: Escuchar cuando el admin actualice cuentas o configuraciones
+    // ⚡ TIEMPO REAL: Actualización instantánea si el Admin edita cuentas o WhatsApp
     socket.on('settingsUpdated', fetchSettings);
     socket.on('businessConfigUpdated', fetchSettings);
 
@@ -240,13 +243,12 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   };
 
   const handleWhatsApp = async () => {
-    if (isProcessingWa || !dynamicWa) return; // Bloquea si no hay número
+    if (isProcessingWa || !whatsappNumber) return;
     setIsProcessingWa(true);
     try {
       const orderTypeStr = type === 'mesa' ? `Mesa ${tableId}` : 'Para Llevar';
-      // Utilizamos Emojis estables que no dan error de codificación
       const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${displayName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${liveTotal.toFixed(2)}\n\nAdjunto el comprobante:`);
-      const waUrl = `https://wa.me/${dynamicWa}?text=${text}`;
+      const waUrl = `https://wa.me/${whatsappNumber}?text=${text}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     } finally {
       setIsProcessingWa(false);
@@ -573,7 +575,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                   exit={{ opacity: 0 }} 
                   className="space-y-6 w-full"
                 >
-                  {/* Módulo Dinámico de Transferencias Neo-Bento */}
+                  {/* Módulo Dinámico con Acordeón Desplegable (Neo-Bento) */}
                   <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-5 rounded-[2rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-center">
                     <div className="flex items-center justify-center gap-2 mb-3">
                       <Landmark className="text-orange-500 lya:text-[#78350F]" size={20} strokeWidth={2.5} />
@@ -581,7 +583,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     </div>
                     
                     <p className="text-[11.5px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-justify mb-4 px-1 leading-relaxed">
-                      Si prefieres pagar vía transferencia electrónica, utiliza los siguientes datos y envíanos tu comprobante.
+                      Si prefieres pagar vía transferencia electrónica, puedes desplegar los datos bancarios y enviarnos tu comprobante.
                     </p>
 
                     {isLoadingAccounts ? (
@@ -595,49 +597,86 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       </div>
                     ) : (
                       <div className="space-y-3 mb-5">
-                        {bankAccounts.map((acc, index) => (
-                          <div key={acc.id || index} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9]">
-                            <div className="text-left mb-2">
-                              <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723]">{acc.banco}</p>
-                              <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">{acc.titular}</p>
-                            </div>
-                            
-                            <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] mb-2">
-                              <div className="text-left flex-1 min-w-0">
-                                <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">Cuenta</p>
-                                <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{acc.cuenta}</p>
-                              </div>
-                              <motion.button
-                                whileTap={{ scale: 0.90 }}
-                                onClick={() => handleCopy(acc.cuenta, 'Cuenta', acc.id || index)}
-                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
-                              >
-                                {copyingId === `${acc.id || index}-Cuenta` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                              </motion.button>
-                            </div>
-
-                            <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]">
-                              <div className="text-left flex-1 min-w-0">
-                                <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">CLABE Interbancaria</p>
-                                <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{acc.clabe}</p>
-                              </div>
-                              <motion.button
-                                whileTap={{ scale: 0.90 }}
-                                onClick={() => handleCopy(acc.clabe, 'CLABE', acc.id || index)}
-                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
-                              >
-                                {copyingId === `${acc.id || index}-CLABE` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                              </motion.button>
-                            </div>
+                        {/* 🚀 BOTÓN DESPLEGABLE (ACORDEÓN) */}
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setShowBankDetails(!showBankDetails)}
+                          className="w-full py-3.5 px-4 rounded-2xl bg-gray-50 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex items-center justify-between text-xs font-black text-gray-800 dark:text-gray-200 lya:text-[#3E2723] shadow-sm outline-none transition-colors md:hover:bg-gray-100 dark:md:hover:bg-gray-800"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Landmark size={16} className="text-orange-500 lya:text-[#78350F]" />
+                            <span>{showBankDetails ? 'Ocultar cuentas bancarias' : `Ver cuentas bancarias (${bankAccounts.length})`}</span>
                           </div>
-                        ))}
+                          <ChevronDown size={16} className={`transition-transform duration-300 ${showBankDetails ? 'rotate-180' : ''}`} />
+                        </motion.button>
+
+                        {/* 🚀 CAJÓN ANIMADO DE CUENTAS */}
+                        <AnimatePresence>
+                          {showBankDetails && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3, ease: "easeInOut" }}
+                              className="overflow-hidden space-y-3 pt-1"
+                            >
+                              {bankAccounts.map((acc, index) => {
+                                const banco = acc.bank_name || acc.banco || 'Banco';
+                                const titular = acc.account_holder || acc.titular;
+                                const cuenta = acc.account_number || acc.cuenta;
+                                const clabe = acc.clabe;
+
+                                return (
+                                  <div key={acc.id || index} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-left">
+                                    <div className="mb-2">
+                                      <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723] uppercase">{banco}</p>
+                                      {titular && <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">Titular: {titular}</p>}
+                                    </div>
+                                    
+                                    {cuenta && (
+                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] mb-2">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">Cuenta</p>
+                                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{cuenta}</p>
+                                        </div>
+                                        <motion.button
+                                          whileTap={{ scale: 0.90 }}
+                                          onClick={() => handleCopy(cuenta, 'Cuenta', acc.id || index)}
+                                          className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
+                                        >
+                                          {copyingId === `${acc.id || index}-Cuenta` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                        </motion.button>
+                                      </div>
+                                    )}
+
+                                    {clabe && (
+                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">CLABE Interbancaria</p>
+                                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{clabe}</p>
+                                        </div>
+                                        <motion.button
+                                          whileTap={{ scale: 0.90 }}
+                                          onClick={() => handleCopy(clabe, 'CLABE', acc.id || index)}
+                                          className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
+                                        >
+                                          {copyingId === `${acc.id || index}-CLABE` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                        </motion.button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
 
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={handleWhatsApp}
-                      disabled={isProcessingWa || bankAccounts.length === 0 || !dynamicWa}
+                      disabled={isProcessingWa || !whatsappNumber}
                       className="w-full py-3.5 rounded-2xl font-black text-sm bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/30 outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {isProcessingWa ? (
@@ -645,7 +684,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       ) : (
                         <>
                           <MessageCircle size={18} strokeWidth={2.5} />
-                          <span>{dynamicWa ? 'Enviar Comprobante' : 'WhatsApp no configurado'}</span>
+                          <span>{whatsappNumber ? 'Enviar Comprobante' : 'WhatsApp no configurado'}</span>
                         </>
                       )}
                     </motion.button>
