@@ -23,16 +23,12 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     setLiveCart(cart || []);
   }, [cart]);
 
-  // 🔥 EXTRACTOR INTELIGENTE CON DIAGNÓSTICO (Cuentas y WhatsApp)
+  // 🔥 EXTRACTOR INTELIGENTE Y ESCUCHA EN TIEMPO REAL
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoadingAccounts(true);
-        console.log("🟡 [DEBUG LYA] Pidiendo configuraciones al backend en /settings...");
-        
         const res = await client.get('/settings'); 
-        console.log("🟢 [DEBUG LYA] Respuesta exitosa del servidor:", res.data);
-        
         let rawData = res.data;
         if (rawData.data) rawData = rawData.data;
 
@@ -48,7 +44,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             } else if (rawData.length > 0 && (rawData[0].banco || rawData[0].bank_name)) {
                 parsedAccounts = rawData;
             }
-
             if (waObj) parsedWa = waObj.value;
         } 
         else if (typeof rawData === 'object') {
@@ -59,9 +54,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             parsedWa = rawData.whatsappComprobantes || rawData.whatsapp_number || rawData.whatsapp || rawData.telefono || "";
         }
 
-        console.log("🔵 [DEBUG LYA] Cuentas extraídas:", parsedAccounts);
-        console.log("🔵 [DEBUG LYA] WhatsApp extraído:", parsedWa);
-
         setBankAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
 
         let cleanWa = String(parsedWa).replace(/\D/g, ''); 
@@ -69,10 +61,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         setDynamicWa(cleanWa);
 
       } catch (error) {
-        console.error("🔴 [DEBUG LYA] Error al cargar configuraciones:", error);
-        if (error.response) {
-            console.error("🔴 [DEBUG LYA] Código de error:", error.response.status, error.response.data);
-        }
+        console.error("Error al cargar configuraciones:", error);
         setBankAccounts([]);
       } finally {
         setIsLoadingAccounts(false);
@@ -82,6 +71,15 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     if (!isOrderPaid) {
       fetchSettings();
     }
+
+    // ⚡ TIEMPO REAL: Escuchar cuando el admin actualice cuentas o configuraciones
+    socket.on('settingsUpdated', fetchSettings);
+    socket.on('businessConfigUpdated', fetchSettings);
+
+    return () => {
+      socket.off('settingsUpdated', fetchSettings);
+      socket.off('businessConfigUpdated', fetchSettings);
+    };
   }, [isOrderPaid]);
 
   useEffect(() => {
