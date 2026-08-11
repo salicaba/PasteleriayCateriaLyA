@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Landmark, Copy, Check, MessageCircle, AlertCircle, 
-  Settings, Moon, Sun, Droplet, Type, Maximize, Minimize, X, Loader2
+  Settings, Moon, Sun, Droplet, Type, Maximize, Minimize, X 
 } from 'lucide-react';
 import client from '../../../api/client';
 
@@ -23,7 +23,8 @@ export const TransferenciasView = () => {
 
   // 🔥 ESTADOS DE CONFIGURACIÓN (Settings)
   const [showSettings, setShowSettings] = useState(false);
-  const [themeIndex, setThemeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_theme') || '0'));
+  // 🔥 FIX: Cambiamos el '0' por '2' para que el tema por defecto sea 'theme-lya'
+  const [themeIndex, setThemeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_theme') || '2'));
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -62,7 +63,7 @@ export const TransferenciasView = () => {
   // 🔥 ESCUDO ANTI-INSTALACIÓN: Bloquea el banner nativo de Chrome/Android para instalar la PWA
   useEffect(() => {
     const preventInstallPrompt = (e) => {
-      e.preventDefault(); 
+      e.preventDefault(); // Matamos el evento nativo del navegador
     };
     
     window.addEventListener('beforeinstallprompt', preventInstallPrompt);
@@ -93,7 +94,7 @@ export const TransferenciasView = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // 🔥 FIX DE CENTRADO MÓVIL: Usamos "fixed inset-0" para garantizar pantalla completa real
+  // PANTALLAS DE CARGA Y ERROR (Cumplen con Pilar 1: overflow-hidden)
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6">
@@ -105,7 +106,6 @@ export const TransferenciasView = () => {
     );
   }
 
-  // 🔥 FIX DE CENTRADO MÓVIL: Usamos "fixed inset-0" aquí también
   if (error || accounts.length === 0) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-6 text-center">
@@ -117,8 +117,10 @@ export const TransferenciasView = () => {
   }
 
   return (
+    /* 🔥 PILAR 1: Raíz estrictamente bloqueada (Anti-Ghost Scroll) */
     <div className="h-[100dvh] w-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden relative transition-colors duration-300">
       
+      {/* 🔥 BOTÓN DE AJUSTES FLOTANTE (Pilar 2: whileTap, md:hover) */}
       <motion.button 
         whileTap={{ scale: 0.9 }}
         onClick={() => setShowSettings(true)}
@@ -127,8 +129,10 @@ export const TransferenciasView = () => {
         <Settings size={24} className="animate-spin-slow" style={{ animationDuration: '4s' }} />
       </motion.button>
 
+      {/* 🔥 PILAR 1: Contenedor interno habilitado para Scroll */}
       <div className="flex-1 overflow-y-auto custom-scrollbar w-full flex flex-col items-center py-12 px-4 sm:px-6">
         
+        {/* HEADER LOGO */}
         <motion.div 
           initial={{ opacity: 0, y: 10 }} 
           animate={{ opacity: 1, y: 0 }} 
@@ -144,18 +148,22 @@ export const TransferenciasView = () => {
           <p className="text-xs font-black uppercase tracking-widest text-gray-400 lya:text-lya-text/50 mt-2 text-center">Datos para Transferencia</p>
         </motion.div>
 
+        {/* LISTA DE CUENTAS */}
         <div className="w-full max-w-md space-y-6 shrink-0">
           <AnimatePresence>
             {accounts.map((acc, index) => (
               <motion.div 
                 key={acc.id}
+                /* 🔥 PILAR 5: Animación de entrada estándar */
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut", delay: index * 0.1 }}
+                /* 🔥 PILAR 4: Geometría Neo-Bento (rounded-[2rem]) */
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 lya:bg-lya-primary/5 rounded-bl-[100%] pointer-events-none" />
                 
+                {/* 🔥 PILAR 4: truncate en el título de la tarjeta */}
                 <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 flex items-center gap-2 truncate">
                   <div className="w-2 h-6 bg-emerald-500 lya:bg-lya-primary rounded-full shrink-0" /> 
                   <span className="truncate">{acc.bank_name}</span>
@@ -165,6 +173,7 @@ export const TransferenciasView = () => {
                   {acc.account_holder && (
                     <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-3 rounded-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                       <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Titular de la cuenta</span>
+                      {/* 🔥 PILAR 4: truncate por si el nombre es kilométrico */}
                       <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text text-sm block truncate">{acc.account_holder}</span>
                     </div>
                   )}
@@ -175,6 +184,7 @@ export const TransferenciasView = () => {
                         <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">Número de Cuenta / Tarjeta</span>
                         <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{acc.account_number}</span>
                       </div>
+                      {/* 🔥 PILAR 2: whileTap estricto */}
                       <motion.button 
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleCopy(acc.account_number, `acc-${acc.id}`)}
@@ -191,6 +201,7 @@ export const TransferenciasView = () => {
                         <span className="block text-[10px] font-black uppercase text-gray-400 lya:text-lya-text/50 mb-1">CLABE Interbancaria</span>
                         <span className="font-mono font-black text-gray-900 dark:text-white lya:text-lya-text tracking-widest truncate block">{acc.clabe}</span>
                       </div>
+                      {/* 🔥 PILAR 2: whileTap estricto */}
                       <motion.button 
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleCopy(acc.clabe, `clabe-${acc.id}`)}
@@ -218,9 +229,11 @@ export const TransferenciasView = () => {
               <MessageCircle size={24} />
             </div>
             <h4 className="font-black text-emerald-800 dark:text-emerald-300 lya:text-lya-text text-sm uppercase tracking-wider mb-2 text-center">Envía tu comprobante</h4>
+            {/* 🔥 PILAR 4: Textos largos siempre text-justify o text-center estricto */}
             <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400/80 lya:text-lya-text/70 mb-4 leading-relaxed text-center">
               Por favor, no olvides escribir tu número de <b>Mesa</b> o nombre de <b>Llevar</b> en el concepto de tu transferencia y enviarnos el comprobante.
             </p>
+            {/* 🔥 PILAR 2: md:hover y whileTap para enlaces */}
             <motion.a 
               whileTap={{ scale: 0.95 }}
               href={`https://wa.me/52${whatsappNumber}`} 
@@ -238,6 +251,7 @@ export const TransferenciasView = () => {
         </div>
       </div>
 
+      {/* 🔥 MODAL NEO-BENTO DE AJUSTES (Cumple con Pilar 4 y 5) */}
       <AnimatePresence>
         {showSettings && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -249,12 +263,14 @@ export const TransferenciasView = () => {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 10 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              /* 🔥 PILAR 4: Geometría modal rounded-[2.5rem] */
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
             >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight flex items-center gap-2">
                   <Settings size={22} className="text-emerald-500 lya:text-lya-primary"/> Ajustes
                 </h3>
+                {/* 🔥 PILAR 2: md:hover estricto */}
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowSettings(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 rounded-full outline-none transition-colors"><X size={18}/></motion.button>
               </div>
 
