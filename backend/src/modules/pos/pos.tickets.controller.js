@@ -604,22 +604,27 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX MOTOR RENDERING: Configuramos la hoja del PDF como Pulgadas (inches) y evitamos espacios blancos
+        // 🔥 FIX MOTOR RENDERING: Rollo Térmico Continuo (Zero-Margin)
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
-          const heightInInches = (element.offsetHeight / 96) + 0.4; // Altura precisa en pulgadas
+          
+          // Calculamos la altura real del elemento en pulgadas (96 DPI es estándar web)
+          // Sumamos 0.05 pulgadas (~1.2 mm) como colchón de seguridad para evitar cortes de pixel.
+          const heightInInches = (element.offsetHeight / 96) + 0.05; 
+          
           const options = {
-            margin: [0.2, 0, 0.2, 0], // Margen de 0.2 pulgadas arriba y abajo
+            margin: 0, // 🔥 CERO MÁRGENES: Evita el espacio blanco arriba y el salto de hoja no deseado
             filename: 'Ticket_Lya_${ticketFolioFile}.pdf',
             image: { type: 'jpeg', quality: 1 },
             html2canvas: { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff'
+              backgroundColor: '#ffffff',
+              windowWidth: element.scrollWidth // Asegura que el canvas entienda el ancho real
             },
             jsPDF: { 
-              unit: 'in', // Pulgadas (inches)
-              format: [4.1, heightInInches], // Hoja exactamente del ancho del ticket (4.1 pulgadas)
+              unit: 'in', 
+              format: [4.1, heightInInches], // Hoja exactamente del ancho y alto del ticket
               orientation: 'portrait' 
             }
           };
