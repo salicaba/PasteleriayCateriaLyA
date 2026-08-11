@@ -413,6 +413,10 @@ export const printPedidoTicket = async (req, res) => {
     console.log(`Atendido:   Caja Pastelería`);
     console.log(`Cliente:    ${pedido.cliente || 'Público General'}`);
     console.log(`Servicio:   ${tipoEntregaStr.toUpperCase()}`);
+    // 🔥 FIX: Mostrar dirección si es a domicilio
+    if (pedido.tipoEntrega === 'domicilio' && pedido.direccion) {
+      console.log(`Dirección:  ${pedido.direccion}`);
+    }
     console.log(`Teléfono:   ${pedido.telefono || 'N/A'}`);
     console.log(`------------------------------------------`);
     console.log(`DETALLES DEL PEDIDO:`);
@@ -534,6 +538,15 @@ export const sharePedidoTicket = async (req, res) => {
                 <span class="shrink-0">Servicio:</span>
                 <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
               </div>
+              
+              <!-- 🔥 FIX: Inyección de Dirección para Domicilio -->
+              ${pedido.tipoEntrega === 'domicilio' && pedido.direccion ? `
+              <div class="flex flex-col gap-1 mt-4 bg-slate-100/80 p-3 rounded-xl border border-slate-200">
+                <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">📍 Dirección de Entrega:</span>
+                <span class="text-sm font-bold text-slate-800 leading-snug break-words">${pedido.direccion}</span>
+              </div>
+              ` : ''}
+
             </div>
 
             <div class="border-t border-slate-200 my-5"></div>

@@ -411,9 +411,30 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                     <motion.button whileTap={{ scale: 0.95 }} type="button" onClick={() => setFormData({...formData, tipoEntrega: 'sucursal'})} disabled={isSubmitting || isCompressing} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${formData.tipoEntrega === 'sucursal' ? 'bg-white dark:bg-gray-700 lya:bg-lya-primary/20 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Store size={18}/> Recoger Aquí</motion.button>
                     <motion.button whileTap={{ scale: 0.95 }} type="button" onClick={() => setFormData({...formData, tipoEntrega: 'domicilio'})} disabled={isSubmitting || isCompressing} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${formData.tipoEntrega === 'domicilio' ? 'bg-white dark:bg-gray-700 lya:bg-lya-primary/20 text-emerald-600 dark:text-emerald-400 lya:text-lya-primary shadow-sm' : 'text-gray-500 lya:text-lya-text/60'}`}><Truck size={18}/> Domicilio</motion.button>
                   </div>
-                  {formData.tipoEntrega === 'domicilio' && (
-                    <motion.input initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} type="text" name="direccion" placeholder="Dirección de envío completa" value={formData.direccion} onChange={handleChange} disabled={isSubmitting || isCompressing} className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 font-medium" />
-                  )}
+                  
+                  <AnimatePresence initial={false}>
+                    {formData.tipoEntrega === 'domicilio' && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }} 
+                        animate={{ opacity: 1, height: 'auto' }} 
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="overflow-hidden w-full"
+                      >
+                        <div className="pt-3">
+                          <input 
+                            type="text" 
+                            name="direccion" 
+                            placeholder="Dirección de envío completa" 
+                            value={formData.direccion} 
+                            onChange={handleChange} 
+                            disabled={isSubmitting || isCompressing} 
+                            className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl px-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 font-medium" 
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <div className="bg-emerald-50 dark:bg-emerald-900/10 lya:bg-lya-primary/5 border border-emerald-100 dark:border-emerald-500/20 lya:border-lya-primary/20 rounded-[2rem] p-5 space-y-4 mt-6">
                     <div className="flex gap-4">
