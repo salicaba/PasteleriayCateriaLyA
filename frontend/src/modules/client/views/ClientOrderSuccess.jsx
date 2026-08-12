@@ -10,14 +10,11 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
   
-  // 🚀 ESTADO LOCAL PARA HOMOLOGAR EL PAGO (Mesa + Para Llevar)
-  const [isPaidLocal, setIsPaidLocal] = useState(isOrderPaid);
-  
   // Estados Dinámicos Sincronizados
   const [bankAccounts, setBankAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
-  const [showBankDetails, setShowBankDetails] = useState(false);
+  const [showBankDetails, setShowBankDetails] = useState(false); // Estado para desplegar cuentas
   
   const [isProcessingWa, setIsProcessingWa] = useState(false);
   const [copyingId, setCopyingId] = useState(null);
@@ -26,11 +23,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   useEffect(() => {
     setLiveCart(cart || []);
   }, [cart]);
-
-  // Sincronizar prop externa con el estado local
-  useEffect(() => {
-    setIsPaidLocal(isOrderPaid);
-  }, [isOrderPaid]);
 
   // 🔥 EXTRACTOR INTELIGENTE UNIFICADO + TIEMPO REAL
   useEffect(() => {
@@ -79,7 +71,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       }
     };
 
-    if (!isPaidLocal) {
+    if (!isOrderPaid) {
       fetchSettings();
     }
 
@@ -91,7 +83,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       socket.off('config:update', fetchSettings);
       socket.off('business_config_updated', fetchSettings);
     };
-  }, [isPaidLocal]);
+  }, [isOrderPaid]);
 
   useEffect(() => {
     // 1. Escuchar cancelación individual
@@ -170,36 +162,18 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         }
     };
     
-    // 5. 🔥 HOMOLOGACIÓN DE PAGO (Mesas + Para Llevar)
-    const handleOrderPaid = (data) => {
-        if (type === 'mesa') {
-            if (data?.tableId && String(data.tableId) === String(tableId)) {
-                setIsPaidLocal(true);
-            }
-        } else {
-            // Flujo Para Llevar: Validamos que no sea el pago de una mesa
-            if (!data?.tableId || data?.isTakeaway) {
-                setIsPaidLocal(true);
-            }
-        }
-    };
-    
     socket.on('orderItemCancelled', handleItemCancelled);
     socket.on('orderItemRestored', handleItemRestored); 
     socket.on('orderCancelled', handleOrderCancelled);
     socket.on('orderRestored', handleOrderRestored);
-    socket.on('orderPaid', handleOrderPaid);
-    socket.on('paymentSuccess', handleOrderPaid); // Alias por seguridad
     
     return () => {
        socket.off('orderItemCancelled', handleItemCancelled);
        socket.off('orderItemRestored', handleItemRestored);
        socket.off('orderCancelled', handleOrderCancelled);
        socket.off('orderRestored', handleOrderRestored);
-       socket.off('orderPaid', handleOrderPaid);
-       socket.off('paymentSuccess', handleOrderPaid);
     };
-  }, [tableId, type, onReset]);
+  }, [tableId, onReset]);
 
   // FIX CACHÉ (Anti-Amnesia de Refresh)
   useEffect(() => {
@@ -438,7 +412,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
 
             <AnimatePresence>
-              {isPaidLocal && (
+              {isOrderPaid && (
                 <motion.div 
                   initial={{ scale: 2, opacity: 0, rotate: -25 }} 
                   animate={{ scale: 1, opacity: 1, rotate: -25 }} 
@@ -571,7 +545,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           {/* Bloque Condicional: Acciones según Estado de Pago */}
           <div className="w-full shrink-0 relative z-30">
             <AnimatePresence mode="wait">
-              {isPaidLocal ? (
+              {isOrderPaid ? (
                 <motion.div 
                   key="paid-message"
                   initial={{ opacity: 0, scale: 0.95, y: 10 }}

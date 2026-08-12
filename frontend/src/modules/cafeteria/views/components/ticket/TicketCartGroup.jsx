@@ -1,6 +1,6 @@
 // src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -126,16 +126,6 @@ export const TicketCartGroup = ({
       } else { 
           displayItems.push({ ...item, _groupedItems: [item] }); 
       }
-  });
-
-  // 🔥 ORDENAMIENTO INTELIGENTE (Arriba: Nuevos | Medio: Listos | Abajo: Cocina)
-  displayItems.sort((a, b) => {
-      const getWeight = (item) => {
-          if (!item.enviadoCocina) return 0;
-          if (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') return 1;
-          return 2;
-      };
-      return getWeight(a) - getWeight(b);
   });
 
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
@@ -277,379 +267,320 @@ export const TicketCartGroup = ({
       </div>
 
       <div className="px-2 pb-2 space-y-2">
-        <AnimatePresence>
-          {displayItems.map((item, index) => {
-            
-            const isCero = Number(item.precio) === 0;
-            const isGhostPromo = item.isAutoPromo && isCero; 
-            
-            const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-            const isLockedPromo = isGhostPromo || isNthPromo;
-            
-            const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
-            const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
-            
-            let promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
+        {displayItems.map((item, index) => {
+          
+          const isCero = Number(item.precio) === 0;
+          const isGhostPromo = item.isAutoPromo && isCero; 
+          
+          const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
+          const isLockedPromo = isGhostPromo || isNthPromo;
+          
+          const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
+          const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
+          
+          let promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
 
-            if (pOriginal && Number(pOriginal) > Number(item.precio) && !isGhostPromo && !item.promoLabel?.includes('º')) {
-                const originalNum = Number(pOriginal);
-                const actualNum = Number(item.precio);
-                const discountAmt = originalNum - actualNum;
-                const percentage = Math.round((discountAmt / originalNum) * 100);
-                promoText = `-${percentage}% OFF`;
-            }
+          if (pOriginal && Number(pOriginal) > Number(item.precio) && !isGhostPromo && !item.promoLabel?.includes('º')) {
+              const originalNum = Number(pOriginal);
+              const actualNum = Number(item.precio);
+              const discountAmt = originalNum - actualNum;
+              const percentage = Math.round((discountAmt / originalNum) * 100);
+              promoText = `-${percentage}% OFF`;
+          }
 
-            const uniqueId = item.backendItemId || item.cartItemId || item.id;
-            const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}-${index}`;
-            
-            const isProcessingParent = processingItems[uniqueId];
-            const isStatusLocked = isCuentaPagada || isCompletamentePagada;
-            const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
+          const uniqueId = item.backendItemId || item.cartItemId || item.id;
+          const currentItemKey = `group-${uniqueId}-${isGhostPromo ? 'ghost' : 'normal'}-${index}`;
+          
+          const isProcessingParent = processingItems[uniqueId];
+          const isStatusLocked = isCuentaPagada || isCompletamentePagada;
+          const isLimitReached = item.controlarStock && globalUnsentQtyMap?.[item.id] >= item.stock && item.stock > 0;
 
-            const hasRealPreparations = item.preparaciones?.some(prep => {
-              if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta) return false;
-              if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
-              return true;
-            });
+          const hasRealPreparations = item.preparaciones?.some(prep => {
+            if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta) return false;
+            if (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0)) return false;
+            return true;
+          });
 
-            const lockKeyAdd = `${uniqueId}-add`;
-            const lockKeyRemove = `${uniqueId}-rem`;
-            const lockKeyDelete = `${uniqueId}-del`;
-            const lockKeyCancel = `${uniqueId}-cancel`;
-            const lockKeyToggle = `${uniqueId}-toggle`;
-            const lockKeyTakeaway = `${uniqueId}-takeaway`;
+          const lockKeyAdd = `${uniqueId}-add`;
+          const lockKeyRemove = `${uniqueId}-rem`;
+          const lockKeyDelete = `${uniqueId}-del`;
+          const lockKeyCancel = `${uniqueId}-cancel`;
+          const lockKeyToggle = `${uniqueId}-toggle`;
+          const lockKeyTakeaway = `${uniqueId}-takeaway`;
 
-            const isAddingLocal = actionLocks[lockKeyAdd];
-            const isRemovingLocal = actionLocks[lockKeyRemove];
-            const isDeletingLocal = actionLocks[lockKeyDelete];
-            const isCancelingLocal = actionLocks[lockKeyCancel];
-            const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
-            const isTakeawayLocal = actionLocks[lockKeyTakeaway];
+          const isAddingLocal = actionLocks[lockKeyAdd];
+          const isRemovingLocal = actionLocks[lockKeyRemove];
+          const isDeletingLocal = actionLocks[lockKeyDelete];
+          const isCancelingLocal = actionLocks[lockKeyCancel];
+          const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
+          const isTakeawayLocal = actionLocks[lockKeyTakeaway];
 
-            // 🔥 DISEÑO NEO-BENTO PARA PRODUCTOS
-            let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
-            
-            if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
-                containerClasses += "cursor-grab active:cursor-grabbing ";
-            }
-            if (draggedItem?.item === item) {
-                containerClasses += "opacity-40 scale-95 ";
-            } else {
-                containerClasses += "opacity-100 ";
-            }
+          // 🔥 DISEÑO NEO-BENTO PARA PRODUCTOS
+          let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
+          
+          if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
+             containerClasses += "cursor-grab active:cursor-grabbing ";
+          }
+          if (draggedItem?.item === item) {
+             containerClasses += "opacity-40 scale-95 ";
+          } else {
+             containerClasses += "opacity-100 ";
+          }
 
-            if (isAnyPromo) {
-                if (item.enviadoCocina) {
-                    containerClasses += "bg-rose-50/70 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30 ";
-                } else {
-                    containerClasses += "bg-rose-50 dark:bg-rose-900/20 border-rose-300 dark:border-rose-700/50 shadow-sm ";
-                }
-            } else {
-                if (item.enviadoCocina) {
-                    containerClasses += "bg-gray-50/80 dark:bg-gray-800/50 lya:bg-lya-bg/50 border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 ";
-                } else {
-                    containerClasses += "bg-white dark:bg-gray-800 lya:bg-lya-bg border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-sm ";
-                }
-            }
+          if (isAnyPromo) {
+             if (item.enviadoCocina) {
+                 containerClasses += "bg-rose-50/70 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30 ";
+             } else {
+                 containerClasses += "bg-rose-50 dark:bg-rose-900/20 border-rose-300 dark:border-rose-700/50 shadow-sm ";
+             }
+          } else {
+             if (item.enviadoCocina) {
+                 containerClasses += "bg-gray-50/80 dark:bg-gray-800/50 lya:bg-lya-bg/50 border-gray-100 dark:border-gray-800/50 lya:border-lya-border/20 ";
+             } else {
+                 containerClasses += "bg-white dark:bg-gray-800 lya:bg-lya-bg border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-sm ";
+             }
+          }
 
-            if (isLocalProcessingToggle || isDeletingLocal || isRemovingLocal || isCancelingLocal) {
-                containerClasses += "pointer-events-none opacity-60 ";
-            }
+          if (isLocalProcessingToggle || isDeletingLocal || isRemovingLocal || isCancelingLocal) {
+             containerClasses += "pointer-events-none opacity-60 ";
+          }
 
-            return (
-            <motion.div 
-              key={currentItemKey} 
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.90, height: 0, padding: 0, margin: 0 }}
-              draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo}
-              onDragStart={(e) => { 
-                  if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo) return; 
-                  onDragStart(item, cuentaName); 
-                  e.dataTransfer.effectAllowed = 'move'; 
-              }}
-              onDragEnd={onDragEnd}
-              className={containerClasses}
-            >
-              {isLocalProcessingToggle && (
-                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 dark:bg-black/40 lya:bg-lya-bg/40 backdrop-blur-[2px] rounded-xl">
-                      <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-primary drop-shadow-md" />
-                      <span className="text-[9px] font-black mt-1 text-orange-700 dark:text-orange-400 lya:text-lya-primary drop-shadow-sm uppercase tracking-wider">Cargando...</span>
-                  </div>
-              )}
-
-              <div className="flex gap-3">
-                <div className={clsx(
-                  "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
-                  isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-                )}>
-                  {item.imagen || item.image ? (
-                    <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={20} />
-                  )}
-                  
-                  {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo && (
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
-                          <GripVertical size={16} className="text-white drop-shadow-md" />
-                      </div>
-                  )}
-                  {item.enviadoCocina && availableAccs.length <= 1 && !isVitrina && (
-                      <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
-                          <Lock size={14} className="text-orange-600 drop-shadow-sm" />
-                      </div>
-                  )}
+          return (
+          <motion.div 
+            key={currentItemKey} layout
+            draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo}
+            onDragStart={(e) => { 
+                if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo) return; 
+                onDragStart(item, cuentaName); 
+                e.dataTransfer.effectAllowed = 'move'; 
+            }}
+            onDragEnd={onDragEnd}
+            className={containerClasses}
+          >
+            {isLocalProcessingToggle && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 dark:bg-black/40 lya:bg-lya-bg/40 backdrop-blur-[2px] rounded-xl">
+                    <Loader2 size={24} className="animate-spin text-orange-500 lya:text-lya-primary drop-shadow-md" />
+                    <span className="text-[9px] font-black mt-1 text-orange-700 dark:text-orange-400 lya:text-lya-primary drop-shadow-sm uppercase tracking-wider">Cargando...</span>
                 </div>
+            )}
 
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="flex justify-between items-start mb-0.5 gap-2">
-                    <div className="flex flex-col min-w-0">
-                      <h5 className="text-sm font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
-                        {item.nombre}
-                      </h5>
-                      {isAnyPromo && (
-                         <span className="text-[9px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm">
-                           <Tag size={10} strokeWidth={3} /> 
-                           <span>{promoText}</span>
-                         </span>
-                      )}
+            <div className="flex gap-3">
+              <div className={clsx(
+                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
+                isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+              )}>
+                {item.imagen || item.image ? (
+                  <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={20} />
+                )}
+                
+                {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo && (
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                        <GripVertical size={16} className="text-white drop-shadow-md" />
                     </div>
-                    
-                    <div className="flex flex-col items-end">
-                      {pOriginal && Number(pOriginal) > Number(item.precio) && (
-                        <span className="text-[10px] md:text-[11px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none mb-0.5">
-                          ${(Number(pOriginal) * item.qty).toFixed(2)}
-                        </span>
-                      )}
-                      <span className={clsx("text-sm font-black", isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
-                        ${(Number(item.precio) * item.qty).toFixed(2)}
-                      </span>
+                )}
+                {item.enviadoCocina && availableAccs.length <= 1 && !isVitrina && (
+                    <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
+                        <Lock size={14} className="text-orange-600 drop-shadow-sm" />
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5 mt-1">
-                      {item.qty > 1 && <span className={clsx("px-1.5 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
-                      {item.isTakeaway && item.enviadoCocina && !isVitrina && (
-                          <span className="text-[9px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1.5 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
-                              <ShoppingBag size={10} /> Empacar
-                          </span>
-                      )}
-                  </div>
-
-                  {hasRealPreparations && (
-                    <div className="space-y-1 pointer-events-none mt-1.5">
-                      {item.preparaciones?.map((prep, pIdx) => {
-                        if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
-                        return (
-                          <div key={pIdx} className="bg-gray-100/80 dark:bg-gray-900/60 lya:bg-lya-surface rounded-md p-1.5 flex flex-col gap-0.5 border border-gray-200/50 dark:border-gray-800/50 lya:border-lya-border/40">
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase flex items-center gap-1.5"><Info size={10} /> {prep.tamano} {prep.leche && `• ${prep.leche}`}</span>
-                            {prep.extras?.length > 0 && <span className="text-[9px] font-black text-orange-500 dark:text-orange-400 lya:text-lya-primary">+ {prep.extras.join(', ')}</span>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
-              {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
-                <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <div className="flex justify-between items-start mb-0.5 gap-2">
+                  <div className="flex flex-col min-w-0">
+                    <h5 className="text-sm font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
+                      {item.nombre}
+                    </h5>
+                    {isAnyPromo && (
+                       <span className="text-[9px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm">
+                         <Tag size={10} strokeWidth={3} /> 
+                         <span>{promoText}</span>
+                       </span>
+                    )}
+                  </div>
                   
-                  {!isVitrina && (
-                    <div className="flex-1 flex items-center gap-2">
-                      {item.enviadoCocina ? (
-                        <motion.button 
-                          whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
-                          onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
-                              await handleToggleStatus(item);
-                          })} 
-                          disabled={isLocalProcessingToggle || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
-                          className={clsx(
-                              "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-2 rounded-xl border uppercase transition-colors w-full text-center shadow-sm outline-none touch-manipulation", 
-                              isLocalProcessingToggle ? "bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
-                              item.kitchenStatus === 'DELIVERED' ? clsx("text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50", isStatusLocked ? "cursor-default opacity-70" : "md:hover:bg-emerald-100 dark:md:hover:bg-emerald-900/40 cursor-pointer") 
-                              : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 shadow-md cursor-pointer animate-pulse" 
-                              : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
-                          )}
-                        >
-                          {isLocalProcessingToggle ? (
-                              <><Loader2 size={12} className="animate-spin" /> ...</>
-                          ) : item.kitchenStatus === 'DELIVERED' ? (
-                              <><CheckCircle size={12} /> Entregado</>
-                          ) : item.kitchenStatus === 'READY' ? (
-                              <><CheckCircle size={12} /> Entregar</>
-                          ) : (
-                              <><ChefHat size={12} /> Cocina</>
-                          )}
-                        </motion.button>
-                      ) : (
-                        <>
-                          <span className={clsx(
-                            "flex items-center justify-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/50 bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-2 py-2 rounded-xl uppercase border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-center shadow-inner",
-                            (isLlevar || !toggleItemTakeaway || isLockedPromo) ? "w-full" : "flex-1"
-                          )}>
-                            Por enviar
-                          </span>
-                          {!isLlevar && toggleItemTakeaway && !isLockedPromo && (
-                            <motion.button 
-                                whileTap={!isTakeawayLocal ? { scale: 0.95 } : {}}
-                                disabled={isTakeawayLocal}
-                                onClick={(e) => executeWithLock(e, lockKeyTakeaway, () => toggleItemTakeaway(item))} 
-                                className={clsx(
-                                    "flex items-center justify-center gap-1.5 text-[9px] font-black px-2 py-2 rounded-xl border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
-                                    isTakeawayLocal ? "bg-gray-100 text-gray-400 border-transparent opacity-70 cursor-wait" :
-                                    item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 md:hover:bg-orange-100 dark:md:hover:bg-orange-900/50" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 dark:md:hover:text-orange-400 lya:md:hover:text-lya-primary md:hover:border-orange-300 dark:md:hover:border-orange-700 lya:md:hover:border-lya-primary/50"
-                                )} 
-                            >
-                              {isTakeawayLocal ? <Loader2 size={12} className="animate-spin" /> : <ShoppingBag size={12} className={item.isTakeaway ? "text-orange-600 lya:text-lya-secondary" : "text-gray-400"} />} {item.isTakeaway ? 'Empacar' : 'Mesa'}
-                            </motion.button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* 🔥 BOTONERA DE CANCELACIÓN INDEPENDIENTE (NEO-BENTO) 🔥 */}
-                  {!item.enviadoCocina && !isCuentaPagada && (
-                    <div className={clsx(
-                      "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
-                      isVitrina ? "w-full justify-between" : "shrink-0"
-                    )}>
-                          {/* Bloqueamos cantidades (+/-) en Promos, pero dejamos libre el botón de Eliminar */}
-                          {!isLockedPromo && (
-                            <>
-                              <motion.button 
-                                  whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
-                                  disabled={isRemovingLocal}
-                                  onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
-                                  className={clsx(
-                                      "rounded-lg transition-colors outline-none", 
-                                      isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
-                                      isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
-                                  )}
-                              >
-                                  {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
-                              </motion.button>
-                              
-                              <motion.button 
-                                whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
-                                disabled={isAddingLocal}
-                                onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
-                                  if (isLimitReached) {
-                                    if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
-                                    return; 
-                                  }
-                                  onAdd(item, cuentaName);
-                                })} 
-                                className={clsx(
-                                  "rounded-lg transition-colors flex items-center justify-center outline-none", 
-                                  isVitrina ? "flex-1 py-2" : "p-1.5",
-                                  isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
-                                  isLimitReached 
-                                    ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
-                                    : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
-                                )}
-                                title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
-                              >
-                                {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
-                              </motion.button>
-
-                              <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
-                            </>
-                          )}
-                          
-                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) */}
-                          <motion.button 
-                              whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
-                              disabled={isDeletingLocal}
-                              onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
-                                  // 🔥 SI HAY 2 O MÁS (qty > 1), PREGUNTAMOS CUÁNTOS DESEA ELIMINAR
-                                  if (item.qty > 1) {
-                                      openConfirmModal({
-                                          title: isLockedPromo ? 'Eliminar Promoción' : 'Eliminar Producto',
-                                          message: `¿Cuántos "${item.nombre}" deseas eliminar? (Máximo: ${item.qty})`,
-                                          icon: Info,
-                                          color: 'red',
-                                          confirmText: 'Eliminar',
-                                          requireInput: true,
-                                          inputType: 'number',
-                                          inputMax: item.qty,
-                                          inputDefault: item.qty.toString(),
-                                          onConfirm: async (val) => {
-                                              const qtyToDelete = parseInt(val, 10);
-                                              if (qtyToDelete > 0 && qtyToDelete <= item.qty) {
-                                                  await new Promise(resolve => setTimeout(resolve, 300));
-                                                  if (qtyToDelete === item.qty) {
-                                                      // Si elimina todos, borramos el ítem completo (funciona tanto para promos como normales)
-                                                      handleDeleteUnsent(item);
-                                                  } else {
-                                                      // Si elimina una cantidad parcial, reducimos de uno en uno
-                                                      for (let i = 0; i < qtyToDelete; i++) {
-                                                          if (onRemove) onRemove(item);
-                                                      }
-                                                  }
-                                              }
-                                          }
-                                      });
-                                  } else {
-                                      // 🔥 SI LA CANTIDAD ES 1
-                                      if (isLockedPromo) {
-                                          openConfirmModal({
-                                              title: 'Eliminar Promoción',
-                                              message: `¿Seguro que deseas eliminar la promoción "${item.nombre}"?`,
-                                              icon: Info,
-                                              color: 'red',
-                                              confirmText: 'Aceptar',
-                                              onConfirm: async () => {
-                                                  await new Promise(resolve => setTimeout(resolve, 300));
-                                                  handleDeleteUnsent(item); // Elimina solo la promo, sin tocar el producto normal
-                                              }
-                                          });
-                                      } else {
-                                          handleDeleteUnsent(item);
-                                      }
-                                  }
-                              })} 
-                              className={clsx(
-                                  "rounded-lg transition-colors outline-none", 
-                                  isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
-                                  isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
-                              )}
-                          >
-                              {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                          </motion.button>
-                    </div>
-                  )}
-                  
-                  {item.enviadoCocina && onCancelItem && (
-                      <motion.button 
-                          whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
-                          disabled={isCancelingLocal}
-                          onClick={(e) => executeWithLock(e, lockKeyCancel, () => handleCancelItem(item))} 
-                          className={clsx(
-                              "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
-                              isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 
-                              isAnyPromo 
-                                  ? "bg-rose-50 border-rose-200 text-rose-600 md:hover:bg-rose-500 md:hover:border-rose-600 md:hover:text-white dark:bg-rose-900/30 dark:border-rose-800/50 dark:text-rose-400" 
-                                  : "bg-red-50 border-red-200 text-red-600 md:hover:bg-red-500 md:hover:border-red-600 md:hover:text-white dark:bg-red-900/30 dark:border-red-800/50 dark:text-red-400",
-                              isVitrina ? "w-full py-2.5 flex-1" : "p-2 px-3 flex-1"
-                          )} 
-                          title={isAnyPromo ? "Anular Promoción" : "Cancelar Producto"}
-                      >
-                        {isCancelingLocal ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-                        <span className="text-[10px] font-black uppercase tracking-wider">
-                            {isAnyPromo ? "Quitar Promo" : "Anular"}
-                        </span>
-                      </motion.button>
-                  )}
+                  <div className="flex flex-col items-end">
+                    {pOriginal && Number(pOriginal) > Number(item.precio) && (
+                      <span className="text-[10px] md:text-[11px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none mb-0.5">
+                        ${(Number(pOriginal) * item.qty).toFixed(2)}
+                      </span>
+                    )}
+                    <span className={clsx("text-sm font-black", isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
+                      ${(Number(item.precio) * item.qty).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-              )}
+                
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5 mt-1">
+                    {item.qty > 1 && <span className={clsx("px-1.5 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
+                    {item.isTakeaway && item.enviadoCocina && !isVitrina && (
+                        <span className="text-[9px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1.5 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
+                            <ShoppingBag size={10} /> Empacar
+                        </span>
+                    )}
+                </div>
 
-            </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                {hasRealPreparations && (
+                  <div className="space-y-1 pointer-events-none mt-1.5">
+                    {item.preparaciones?.map((prep, pIdx) => {
+                      if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
+                      return (
+                        <div key={pIdx} className="bg-gray-100/80 dark:bg-gray-900/60 lya:bg-lya-surface rounded-md p-1.5 flex flex-col gap-0.5 border border-gray-200/50 dark:border-gray-800/50 lya:border-lya-border/40">
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase flex items-center gap-1.5"><Info size={10} /> {prep.tamano} {prep.leche && `• ${prep.leche}`}</span>
+                          {prep.extras?.length > 0 && <span className="text-[9px] font-black text-orange-500 dark:text-orange-400 lya:text-lya-primary">+ {prep.extras.join(', ')}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
+              <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
+                
+                {!isVitrina && (
+                  <div className="flex-1 flex items-center gap-2">
+                    {item.enviadoCocina ? (
+                      <motion.button 
+                        whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
+                        onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
+                            await handleToggleStatus(item);
+                        })} 
+                        disabled={isLocalProcessingToggle || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
+                        className={clsx(
+                            "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-2 rounded-xl border uppercase transition-colors w-full text-center shadow-sm outline-none touch-manipulation", 
+                            isLocalProcessingToggle ? "bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 text-gray-400 opacity-70 cursor-wait" :
+                            item.kitchenStatus === 'DELIVERED' ? clsx("text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50", isStatusLocked ? "cursor-default opacity-70" : "md:hover:bg-emerald-100 dark:md:hover:bg-emerald-900/40 cursor-pointer") 
+                            : item.kitchenStatus === 'READY' ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 shadow-md cursor-pointer animate-pulse" 
+                            : "text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed"
+                        )}
+                      >
+                        {isLocalProcessingToggle ? (
+                            <><Loader2 size={12} className="animate-spin" /> ...</>
+                        ) : item.kitchenStatus === 'DELIVERED' ? (
+                            <><CheckCircle size={12} /> Entregado</>
+                        ) : item.kitchenStatus === 'READY' ? (
+                            <><CheckCircle size={12} /> Entregar</>
+                        ) : (
+                            <><ChefHat size={12} /> Cocina</>
+                        )}
+                      </motion.button>
+                    ) : (
+                      <>
+                        <span className={clsx(
+                          "flex items-center justify-center gap-1 text-[9px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/50 bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-2 py-2 rounded-xl uppercase border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-center shadow-inner",
+                          (isLlevar || !toggleItemTakeaway || isLockedPromo) ? "w-full" : "flex-1"
+                        )}>
+                          Por enviar
+                        </span>
+                        {!isLlevar && toggleItemTakeaway && !isLockedPromo && (
+                          <motion.button 
+                              whileTap={!isTakeawayLocal ? { scale: 0.95 } : {}}
+                              disabled={isTakeawayLocal}
+                              onClick={(e) => executeWithLock(e, lockKeyTakeaway, () => toggleItemTakeaway(item))} 
+                              className={clsx(
+                                  "flex items-center justify-center gap-1.5 text-[9px] font-black px-2 py-2 rounded-xl border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
+                                  isTakeawayLocal ? "bg-gray-100 text-gray-400 border-transparent opacity-70 cursor-wait" :
+                                  item.isTakeaway ? "text-orange-600 bg-orange-50 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700/50 lya:text-lya-secondary lya:bg-lya-secondary/10 lya:border-lya-secondary/30 md:hover:bg-orange-100 dark:md:hover:bg-orange-900/50" : "text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:hover:text-orange-500 dark:md:hover:text-orange-400 lya:md:hover:text-lya-primary md:hover:border-orange-300 dark:md:hover:border-orange-700 lya:md:hover:border-lya-primary/50"
+                              )} 
+                          >
+                            {isTakeawayLocal ? <Loader2 size={12} className="animate-spin" /> : <ShoppingBag size={12} className={item.isTakeaway ? "text-orange-600 lya:text-lya-secondary" : "text-gray-400"} />} {item.isTakeaway ? 'Empacar' : 'Mesa'}
+                          </motion.button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+                
+                {/* 🔥 BOTONERA DE CANCELACIÓN INDEPENDIENTE (NEO-BENTO) 🔥 */}
+                {!isLockedPromo && !item.enviadoCocina && !isCuentaPagada && (
+                  <div className={clsx(
+                    "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
+                    isVitrina ? "w-full justify-between" : "shrink-0"
+                  )}>
+                        <motion.button 
+                            whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
+                            disabled={isRemovingLocal}
+                            onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
+                            className={clsx(
+                                "rounded-lg transition-colors outline-none", 
+                                isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
+                                isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
+                            )}
+                        >
+                            {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
+                        </motion.button>
+                        
+                        <motion.button 
+                          whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
+                          disabled={isAddingLocal}
+                          onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
+                            if (isLimitReached) {
+                              if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
+                              return; 
+                            }
+                            onAdd(item, cuentaName);
+                          })} 
+                          className={clsx(
+                            "rounded-lg transition-colors flex items-center justify-center outline-none", 
+                            isVitrina ? "flex-1 py-2" : "p-1.5",
+                            isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
+                            isLimitReached 
+                              ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
+                              : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
+                          )}
+                          title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
+                        >
+                          {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
+                        </motion.button>
+
+                        <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
+                        
+                        <motion.button 
+                            whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
+                            disabled={isDeletingLocal}
+                            onClick={(e) => executeWithLock(e, lockKeyDelete, () => handleDeleteUnsent(item))} 
+                            className={clsx(
+                                "rounded-lg transition-colors outline-none", 
+                                isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
+                                isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
+                            )}
+                        >
+                            {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </motion.button>
+                  </div>
+                )}
+                
+                {item.enviadoCocina && onCancelItem && (
+                    <motion.button 
+                        whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
+                        disabled={isCancelingLocal}
+                        onClick={(e) => executeWithLock(e, lockKeyCancel, () => handleCancelItem(item))} 
+                        className={clsx(
+                            "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
+                            isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 
+                            isAnyPromo 
+                                ? "bg-rose-50 border-rose-200 text-rose-600 md:hover:bg-rose-500 md:hover:border-rose-600 md:hover:text-white dark:bg-rose-900/30 dark:border-rose-800/50 dark:text-rose-400" 
+                                : "bg-red-50 border-red-200 text-red-600 md:hover:bg-red-500 md:hover:border-red-600 md:hover:text-white dark:bg-red-900/30 dark:border-red-800/50 dark:text-red-400",
+                            isVitrina ? "w-full py-2.5 flex-1" : "p-2 px-3 flex-1"
+                        )} 
+                        title={isAnyPromo ? "Anular Promoción" : "Cancelar Producto"}
+                    >
+                      {isCancelingLocal ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                      <span className="text-[10px] font-black uppercase tracking-wider">
+                          {isAnyPromo ? "Quitar Promo" : "Anular"}
+                      </span>
+                    </motion.button>
+                )}
+              </div>
+            )}
+
+          </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
