@@ -1,10 +1,10 @@
 // frontend/src/modules/client/views/components/ClientServiceShield.jsx
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Store, Coffee, UtensilsCrossed, RotateCcw, QrCode, Loader2 } from 'lucide-react';
+import { Store, Coffee, UtensilsCrossed, RotateCcw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Locks Asíncronos + History Purge)
+// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Locks Asíncronos + Motor de Escaneo Profundo)
 export const ClientServiceShield = ({ 
   activeOrdersCount = 0, 
   hasActiveSession = false, 
@@ -23,10 +23,34 @@ export const ClientServiceShield = ({
 
   if (isGridMode) return null;
 
+  // 🚀 LECTURA INTELIGENTE DE CACHÉ PARA REFORZAR EL MATCHING (ID vs Número)
+  let sessionTableNumber = null;
+  let sessionTableId = null;
+  try {
+    const session = JSON.parse(localStorage.getItem('lya_client_session') || '{}');
+    sessionTableNumber = session.tableNumber;
+    sessionTableId = session.tableId;
+  } catch (e) {}
+
   const isLlevarDisabled = type === 'llevar' && (disabledQrs.includes('llevar') || disabledQrs.includes('takeaway'));
-  const isThisMesaDisabled = type === 'mesa' && (disabledQrs.includes(`mesa-${tableId}`) || disabledQrs.includes(`table-${tableId}`));
+  
+  // 🚀 MOTOR DE BÚSQUEDA PROFUNDA: Mapea la pausa por UUID, por Número o por Nombre de Sesión
+  const isThisMesaDisabled = type === 'mesa' && disabledQrs.some(qr => {
+     const normalizedQr = String(qr).toLowerCase();
+     const possibleMatches = [
+        `mesa-${tableId}`, `table-${tableId}`,
+        sessionTableNumber ? `mesa-${sessionTableNumber}` : null,
+        sessionTableNumber ? `table-${sessionTableNumber}` : null,
+        sessionTableId ? `mesa-${sessionTableId}` : null,
+        sessionTableId ? `table-${sessionTableId}` : null
+     ].filter(Boolean).map(val => String(val).toLowerCase());
+     
+     return possibleMatches.includes(normalizedQr);
+  });
+
   const isLocallyDisabled = isLlevarDisabled || isThisMesaDisabled;
 
+  // Mostramos el escudo solo si está inactivo y NO ha confirmado pedidos aún
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
 
   useEffect(() => {
@@ -35,7 +59,7 @@ export const ClientServiceShield = ({
     }
   }, [shouldShowShield, hasActiveSession, onForceLogout]);
 
-  // 🛡️ PILAR 3: Lock Asíncrono y limpieza estricta del historial del enrutador
+  // 🛡️ PILAR 3: Lock Asíncrono y enrutamiento inteligente (vuelve a la raíz)
   const handleSafeExit = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -43,8 +67,7 @@ export const ClientServiceShield = ({
       if (typeof onForceLogout === 'function') {
         await Promise.resolve(onForceLogout());
       }
-      // Reemplazamos el historial para evitar el bug del botón "atrás" en celulares
-      navigate('/client/login', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       console.error("Error al ejecutar salida segura:", error);
     } finally {
@@ -63,8 +86,8 @@ export const ClientServiceShield = ({
       IconToRender = Coffee;
     } else if (isThisMesaDisabled) {
       shieldTitle = "Mesa Fuera de Servicio";
-      // 🛡️ MENSAJE ACTUALIZADO PARA DISTINGUIR ENTRE CLIENTE Y APP
-      shieldMessage = `La Mesa ${tableId} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada. Si estás en la App, selecciona otra Mesa o Para Llevar presionando el botón de abajo.`;
+      // 🛡️ MENSAJE DINÁMICO: Informa exactamente el número de mesa afectada
+      shieldMessage = `La Mesa ${sessionTableNumber || tableId || ''} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada.${isStandalone ? ' Si estás en la App, selecciona otra Mesa o Para Llevar presionando el botón de abajo.' : ''}`;
       IconToRender = UtensilsCrossed;
     }
   }
@@ -79,24 +102,24 @@ export const ClientServiceShield = ({
           transition={{ duration: 0.5, ease: "easeInOut" }}
           className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 p-6 pointer-events-auto"
         >
-          {/* 🛡️ PILAR 4: Geometría Premium y Entradas Nativas */}
+          {/* 🛡️ PILAR 4: Geometría Neo-Bento */}
           <motion.div 
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300, delay: 0.1 }}
-            className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-8 max-w-sm w-full border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center text-center overflow-hidden relative"
+            className="bg-white dark:bg-gray-900 lya:bg-[#F3EBE0] rounded-[2.5rem] shadow-2xl p-8 max-w-sm w-full border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] flex flex-col items-center text-center overflow-hidden relative"
           >
-            <div className="absolute top-0 left-0 right-0 h-24 bg-orange-500/10 lya:bg-lya-primary/10 rounded-t-[2.5rem]" />
+            <div className="absolute top-0 left-0 right-0 h-24 bg-orange-500/10 lya:bg-[#78350F]/10 rounded-t-[2.5rem]" />
 
-            <div className="w-20 h-20 bg-orange-100 dark:bg-orange-500/20 lya:bg-lya-primary/20 text-orange-600 lya:text-lya-primary rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
+            <div className="w-20 h-20 bg-orange-100 dark:bg-orange-500/20 lya:bg-[#EADCC9] text-orange-600 lya:text-[#78350F] rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
               <IconToRender size={40} strokeWidth={1.5} />
             </div>
             
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight mb-4 relative z-10 text-center">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight mb-4 relative z-10 text-center">
               {shieldTitle}
             </h2>
             
-            <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/70 leading-relaxed font-medium mb-8 relative z-10 text-justify">
+            <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] leading-relaxed font-medium mb-8 relative z-10 text-justify px-1">
               {shieldMessage}
               <br/><br/>
               <span className="block text-center font-bold">¡Será un placer atenderte!</span>
@@ -108,16 +131,14 @@ export const ClientServiceShield = ({
                   whileTap={!isProcessing ? { scale: 0.95 } : {}}
                   disabled={isProcessing}
                   onClick={handleSafeExit} 
-                  className={`w-full bg-gray-900 dark:bg-white lya:bg-lya-primary text-white dark:text-gray-900 lya:text-lya-surface font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 outline-none select-none ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'md:hover:shadow-xl'}`}
+                  className={`w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-[#F3EBE0] font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 outline-none select-none ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'md:hover:shadow-xl'}`}
                 >
                   {isProcessing ? (
                     <Loader2 className="animate-spin" size={20} />
                   ) : (
-                    // 🛡️ ÍCONO ACTUALIZADO (Store)
                     <Store size={20} />
                   )}
-                  {/* 🛡️ TEXTO ACTUALIZADO PARA LA APP */}
-                  {isProcessing ? 'Saliendo...' : 'Seleccionar otra Mesa / Llevar'}
+                  {isProcessing ? 'Saliendo...' : 'Volver a Seleccionar'}
                 </motion.button>
               )}
 
@@ -125,7 +146,7 @@ export const ClientServiceShield = ({
                 whileTap={{ scale: 0.95 }}
                 onClick={() => window.location.reload()}
                 disabled={isProcessing}
-                className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold py-4 rounded-2xl md:hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 outline-none select-none"
+                className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-white text-gray-700 dark:text-gray-300 lya:text-[#7A6353] font-bold py-4 rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 outline-none select-none"
               >
                 <RotateCcw size={18} />
                 Comprobar Servicio
