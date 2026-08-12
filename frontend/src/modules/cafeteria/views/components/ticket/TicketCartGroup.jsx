@@ -114,7 +114,7 @@ export const TicketCartGroup = ({
           d.kitchenStatus === item.kitchenStatus &&
           !!d.isTakeaway === !!item.isTakeaway && 
           !!d.isAutoPromo === !!item.isAutoPromo && 
-          d.promoLabel === item.promoLabel &&       
+          d.promoLabel === item.promoLabel &&      
           getPrepStr(d) === getPrepStr(item)
       );
       
@@ -126,6 +126,37 @@ export const TicketCartGroup = ({
       } else { 
           displayItems.push({ ...item, _groupedItems: [item] }); 
       }
+  });
+
+  // 🔥 ORDEN COMBO BLINDADO: Prioridad -> Alfabético -> Ancla por ID
+  const sortedDisplayItems = [...displayItems].sort((a, b) => {
+    const getPriority = (item) => {
+      const status = (item.kitchenStatus || '').toUpperCase();
+      if (!item.enviadoCocina) return 0; // 1. Arriba: Por enviar
+      if (status === 'READY' || status === 'DELIVERED') return 2; // 3. Abajo: Listos y Entregados (JUNTOS)
+      return 1; // 2. En medio: En cocina / Proceso
+    };
+
+    const priorityA = getPriority(a);
+    const priorityB = getPriority(b);
+
+    // 1. Separamos por el bloque de prioridad
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    // 2. Si tienen el mismo estado, ordenamos alfabéticamente
+    const nameA = (a.nombre || '').toLowerCase();
+    const nameB = (b.nombre || '').toLowerCase();
+    if (nameA !== nameB) {
+      return nameA.localeCompare(nameB);
+    }
+
+    // 3. ANCLA ABSOLUTA: Si tienen la misma prioridad y nombre (ej. un frappé listo y otro entregado), 
+    // usamos el ID para que nunca cambien de posición al actualizar la base de datos.
+    const idA = a.id || a.cartItemId || a.backendItemId || '';
+    const idB = b.id || b.cartItemId || b.backendItemId || '';
+    return String(idA).localeCompare(String(idB));
   });
 
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
@@ -267,10 +298,10 @@ export const TicketCartGroup = ({
       </div>
 
       <div className="px-2 pb-2 space-y-2">
-        {displayItems.map((item, index) => {
+        {sortedDisplayItems.map((item, index) => {
           
           const isCero = Number(item.precio) === 0;
-          const isGhostPromo = item.isAutoPromo && isCero; 
+          const isGhostPromo = item.isAutoPromo && isCero;
           
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
           const isLockedPromo = isGhostPromo || isNthPromo;
@@ -315,7 +346,6 @@ export const TicketCartGroup = ({
           const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
           const isTakeawayLocal = actionLocks[lockKeyTakeaway];
 
-          // 🔥 DISEÑO NEO-BENTO PARA PRODUCTOS
           let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
           
           if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
@@ -495,8 +525,7 @@ export const TicketCartGroup = ({
                   </div>
                 )}
                 
-                {/* 🔥 BOTONERA DE CANCELACIÓN INDEPENDIENTE (NEO-BENTO) 🔥 */}
-                {!isLockedPromo && !item.enviadoCocina && !isCuentaPagada && (
+                {!item.enviadoCocina && !isCuentaPagada && (
                   <div className={clsx(
                     "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
                     isVitrina ? "w-full justify-between" : "shrink-0"
