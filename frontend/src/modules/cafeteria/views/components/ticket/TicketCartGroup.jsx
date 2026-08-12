@@ -571,13 +571,14 @@ export const TicketCartGroup = ({
                                           icon: Info, 
                                           color: 'red',
                                           confirmText: 'Aceptar',
-                                          onConfirm: () => {
-                                              // 🔥 ROMEDOR DE PROMOCIONES: 
-                                              // Si tiene ítems agrupados de origen, eliminamos el padre que genera la promo.
-                                              const targetItem = (item._groupedItems && item._groupedItems.length > 0) 
-                                                  ? item._groupedItems[0] 
-                                                  : item;
-                                              handleDeleteUnsent(targetItem);
+                                          // 🔥 PILAR 3: Convertido a función async con bloqueo de doble clic y loader activo
+                                          onConfirm: async () => {
+                                              const parentItem = items.find(i => i.id === item.id && !i.isAutoPromo && Number(i.precio) > 0) || item;
+                                              
+                                              // Pequeña pausa asíncrona controlada para que el usuario perciba el estado de carga y anti-doble clic
+                                              await new Promise(resolve => setTimeout(resolve, 300));
+                                              
+                                              handleDeleteUnsent(parentItem);
                                           }
                                       });
                                   } else {
