@@ -2,7 +2,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
-import { QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, Coffee, Loader2, ArrowLeft, Download, WifiOff, AlertTriangle } from 'lucide-react';
+import { 
+  QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, 
+  Coffee, Loader2, ArrowLeft, Download, WifiOff, AlertTriangle,
+  Settings, Moon, Sun, Droplet, Type, X // 🚀 Iconos Inyectados
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -16,6 +20,13 @@ import api from '../../api/client';
 import { usePWA } from '../../hooks/usePWA';
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
+
+// 🚀 Tamaños de Letra Dinámicos
+const SIZES = [
+  { label: 'Normal', val: '16px' },
+  { label: 'Mediana', val: '18px' },
+  { label: 'Grande', val: '20px' }
+];
 
 const getInitialTheme = () => {
   const saved = localStorage.getItem('lya_client_theme');
@@ -39,6 +50,11 @@ export default function ClientApp({ type }) {
   
   const [isSessionChecked, setIsSessionChecked] = useState(false);
 
+  // 🚀 Estados del Modal de Ajustes
+  const [showSettings, setShowSettings] = useState(false);
+  const [themeIndex, setThemeIndex] = useState(getInitialTheme);
+  const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
+
   // Limpieza de Sesiones Fantasma al arrancar
   const [clientData, setClientData] = useState(() => {
     const isExpired = localStorage.getItem('lya_client_session_expired') === 'true';
@@ -52,6 +68,25 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // 🚀 Funciones de Ajustes
+  const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
+  const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
+
+  // Aplicar Tamaño de Letra
+  useEffect(() => {
+    document.documentElement.style.fontSize = SIZES[sizeIndex].val;
+    localStorage.setItem('lya_client_size', sizeIndex);
+  }, [sizeIndex]);
+
+  // Aplicar Tema
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark', 'theme-lya');
+    root.classList.add(THEME_CLASSES[themeIndex]);
+    localStorage.setItem('lya_client_theme', themeIndex);
+  }, [themeIndex]);
+
+  // Meta Color
   useEffect(() => {
     const updateMetaColor = () => {
       let metaThemeColor = document.querySelector("meta[name='theme-color']");
@@ -130,20 +165,10 @@ export default function ClientApp({ type }) {
   const realDbTableId = mesaActivaObj ? String(mesaActivaObj.id) : effectiveTableId;
   const visualTableNumber = mesaActivaObj ? (mesaActivaObj.name || mesaActivaObj.numero || mesaActivaObj.number) : effectiveTableId;
 
-  const [themeIndex] = useState(getInitialTheme);
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
   const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection;
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark', 'theme-lya');
-    root.classList.add(THEME_CLASSES[themeIndex]);
-    if (localStorage.getItem('lya_client_theme') === null) {
-      localStorage.setItem('lya_client_theme', themeIndex);
-    }
-  }, [themeIndex]);
 
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) setIsLoadingTables(true);
@@ -238,7 +263,6 @@ export default function ClientApp({ type }) {
             const { status, accountStatus } = res.data || {};
             
             // 🔥 LA CIRUGÍA MAYOR: Si la mesa fue LIBERADA o CANCELADA, cortamos la sesión de tajo
-            // Esto evita que el cliente se quede en una orden "fantasma" que colisiona con las nuevas
             if (status === 'CLOSED' || status === 'CANCELLED' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') {
                 handleClientLogout();
                 setIsGuarding(false);
@@ -480,7 +504,16 @@ export default function ClientApp({ type }) {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex flex-col overflow-y-auto custom-scrollbar p-6 w-full"
                   >
-                    <header className="mb-6 mt-4 text-center">
+                    {/* 🚀 BOTÓN FLOTANTE DE AJUSTES EN EL MAPEO */}
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowSettings(true)}
+                      className="absolute top-6 right-6 w-11 h-11 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-md text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors z-50 outline-none"
+                    >
+                      <Settings size={22} strokeWidth={2.5} className="animate-spin-slow" style={{ animationDuration: '4s' }} />
+                    </motion.button>
+
+                    <header className="mb-6 mt-6 pr-10 text-center">
                       <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
                       <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
                     </header>
@@ -590,6 +623,17 @@ export default function ClientApp({ type }) {
                       </div>
                     )}
 
+                    {/* 🚀 BOTÓN FLOTANTE EN EL LOGIN TAMBIÉN */}
+                    <div className="absolute top-6 right-6 z-50">
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowSettings(true)}
+                        className="w-11 h-11 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 lya:bg-[#EADCC9]/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] shadow-lg text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors outline-none"
+                      >
+                        <Settings size={22} strokeWidth={2.5} className="animate-spin-slow" style={{ animationDuration: '4s' }} />
+                      </motion.button>
+                    </div>
+
                     <ClientLogin 
                       onLogin={(data) => {
                         const sessionData = { 
@@ -670,6 +714,58 @@ export default function ClientApp({ type }) {
               </div>
             )}
           </AnimatePresence>
+
+          {/* 🚀 MODAL NEO-BENTO DE AJUSTES */}
+          <AnimatePresence>
+            {showSettings && (
+              <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  onClick={() => setShowSettings(false)}
+                  className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-[#3E2723]/70 backdrop-blur-md transition-colors"
+                />
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 10 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  className="bg-white dark:bg-gray-900 lya:bg-[#F3EBE0] p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]"
+                >
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight flex items-center gap-2">
+                      <Settings size={22} className="text-emerald-500 lya:text-[#78350F]"/> Ajustes
+                    </h3>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowSettings(false)} className="p-2 bg-gray-100 dark:bg-gray-800 lya:bg-white md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-[#EADCC9] text-gray-500 dark:text-gray-400 lya:text-[#7A6353] rounded-full outline-none transition-colors"><X size={18}/></motion.button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <motion.button whileTap={{ scale: 0.98 }} onClick={cycleTheme} className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-2xl md:hover:border-emerald-500 dark:md:hover:border-emerald-400 lya:md:hover:border-[#78350F] transition-colors outline-none group">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-2 rounded-xl shadow-sm md:group-hover:text-emerald-500 lya:md:group-hover:text-[#78350F] transition-colors">
+                          {themeIndex === 0 ? <Sun size={18}/> : themeIndex === 1 ? <Moon size={18}/> : <Droplet size={18}/>}
+                        </div>
+                        <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-[#3E2723] text-sm">Apariencia</span>
+                      </div>
+                      <span className="text-xs font-black uppercase text-emerald-500 lya:text-[#78350F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#EADCC9]/50 px-3 py-1 rounded-lg">
+                        {THEME_CLASSES[themeIndex] === 'light' ? 'Claro' : THEME_CLASSES[themeIndex] === 'dark' ? 'Oscuro' : 'Lya'}
+                      </span>
+                    </motion.button>
+
+                    <motion.button whileTap={{ scale: 0.98 }} onClick={cycleSize} className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-2xl md:hover:border-emerald-500 dark:md:hover:border-emerald-400 lya:md:hover:border-[#78350F] transition-colors outline-none group">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-2 rounded-xl shadow-sm md:group-hover:text-emerald-500 lya:md:group-hover:text-[#78350F] transition-colors">
+                          <Type size={18}/>
+                        </div>
+                        <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-[#3E2723] text-sm">Tamaño</span>
+                      </div>
+                      <span className="text-xs font-black uppercase text-emerald-500 lya:text-[#78350F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#EADCC9]/50 px-3 py-1 rounded-lg">
+                        {SIZES[sizeIndex].label}
+                      </span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
         </ClientConnectionShield>
       </div>
     </>
