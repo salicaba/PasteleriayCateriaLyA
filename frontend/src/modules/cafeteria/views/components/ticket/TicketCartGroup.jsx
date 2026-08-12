@@ -564,25 +564,51 @@ export const TicketCartGroup = ({
                               whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                               disabled={isDeletingLocal}
                               onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
-                                  if (isLockedPromo) {
+                                  // 🔥 SI HAY 2 O MÁS (qty > 1), PREGUNTAMOS CUÁNTOS DESEA ELIMINAR
+                                  if (item.qty > 1) {
                                       openConfirmModal({
-                                          title: 'Ruptura de Promoción',
-                                          message: `Al eliminar este artículo, perderás la promoción vigente en "${item.nombre}". El artículo de regalo/descuento será eliminado. ¿Deseas continuar?`,
-                                          icon: Info, 
+                                          title: isLockedPromo ? 'Eliminar Promoción' : 'Eliminar Producto',
+                                          message: `¿Cuántos "${item.nombre}" deseas eliminar? (Máximo: ${item.qty})`,
+                                          icon: Info,
                                           color: 'red',
-                                          confirmText: 'Aceptar',
-                                          // 🔥 PILAR 3: Convertido a función async con bloqueo de doble clic y loader activo
-                                          onConfirm: async () => {
-                                              const parentItem = items.find(i => i.id === item.id && !i.isAutoPromo && Number(i.precio) > 0) || item;
-                                              
-                                              // Pequeña pausa asíncrona controlada para que el usuario perciba el estado de carga y anti-doble clic
-                                              await new Promise(resolve => setTimeout(resolve, 300));
-                                              
-                                              handleDeleteUnsent(parentItem);
+                                          confirmText: 'Eliminar',
+                                          requireInput: true,
+                                          inputType: 'number',
+                                          inputMax: item.qty,
+                                          inputDefault: item.qty.toString(),
+                                          onConfirm: async (val) => {
+                                              const qtyToDelete = parseInt(val, 10);
+                                              if (qtyToDelete > 0 && qtyToDelete <= item.qty) {
+                                                  await new Promise(resolve => setTimeout(resolve, 300));
+                                                  if (qtyToDelete === item.qty) {
+                                                      // Si elimina todos, borramos el ítem completo (funciona tanto para promos como normales)
+                                                      handleDeleteUnsent(item);
+                                                  } else {
+                                                      // Si elimina una cantidad parcial, reducimos de uno en uno
+                                                      for (let i = 0; i < qtyToDelete; i++) {
+                                                          if (onRemove) onRemove(item);
+                                                      }
+                                                  }
+                                              }
                                           }
                                       });
                                   } else {
-                                      handleDeleteUnsent(item);
+                                      // 🔥 SI LA CANTIDAD ES 1
+                                      if (isLockedPromo) {
+                                          openConfirmModal({
+                                              title: 'Eliminar Promoción',
+                                              message: `¿Seguro que deseas eliminar la promoción "${item.nombre}"?`,
+                                              icon: Info,
+                                              color: 'red',
+                                              confirmText: 'Aceptar',
+                                              onConfirm: async () => {
+                                                  await new Promise(resolve => setTimeout(resolve, 300));
+                                                  handleDeleteUnsent(item); // Elimina solo la promo, sin tocar el producto normal
+                                              }
+                                          });
+                                      } else {
+                                          handleDeleteUnsent(item);
+                                      }
                                   }
                               })} 
                               className={clsx(
