@@ -1,10 +1,10 @@
 // frontend/src/modules/client/views/components/ClientServiceShield.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Coffee, UtensilsCrossed, RotateCcw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Locks Asíncronos + Motor de Escaneo Profundo)
+// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Sin expulsiones automáticas fantasmas)
 export const ClientServiceShield = ({ 
   activeOrdersCount = 0, 
   hasActiveSession = false, 
@@ -23,7 +23,7 @@ export const ClientServiceShield = ({
 
   if (isGridMode) return null;
 
-  // 🚀 LECTURA INTELIGENTE DE CACHÉ PARA REFORZAR EL MATCHING (ID vs Número)
+  // 🚀 LECTURA INTELIGENTE DE CACHÉ PARA REFORZAR EL MATCHING EN LOGIN Y MENÚ
   let sessionTableNumber = null;
   let sessionTableId = null;
   try {
@@ -32,13 +32,19 @@ export const ClientServiceShield = ({
     sessionTableId = session.tableId;
   } catch (e) {}
 
+  // 🔥 AUTO-BÚSQUEDA DE MESA EN LA URL SI ESTAMOS EN EL LOGIN
+  const urlMatches = window.location.pathname.match(/\/m\/([a-zA-Z0-9-]+)/);
+  const urlParam = urlMatches ? urlMatches[1] : null;
+
   const isLlevarDisabled = type === 'llevar' && (disabledQrs.includes('llevar') || disabledQrs.includes('takeaway'));
   
-  // 🚀 MOTOR DE BÚSQUEDA PROFUNDA: Mapea la pausa por UUID, por Número o por Nombre de Sesión
+  // 🚀 MOTOR DE BÚSQUEDA PROFUNDA: Mapea la pausa por UUID, por Número o por URL
   const isThisMesaDisabled = type === 'mesa' && disabledQrs.some(qr => {
      const normalizedQr = String(qr).toLowerCase();
      const possibleMatches = [
         `mesa-${tableId}`, `table-${tableId}`,
+        urlParam ? `mesa-${urlParam}` : null,
+        urlParam ? `table-${urlParam}` : null,
         sessionTableNumber ? `mesa-${sessionTableNumber}` : null,
         sessionTableNumber ? `table-${sessionTableNumber}` : null,
         sessionTableId ? `mesa-${sessionTableId}` : null,
@@ -50,16 +56,13 @@ export const ClientServiceShield = ({
 
   const isLocallyDisabled = isLlevarDisabled || isThisMesaDisabled;
 
-  // Mostramos el escudo solo si está inactivo y NO ha confirmado pedidos aún
+  // 🛡️ Mostramos el escudo solo si está inactivo y NO ha confirmado pedidos aún
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
 
-  useEffect(() => {
-    if (shouldShowShield && hasActiveSession && typeof onForceLogout === 'function') {
-      onForceLogout();
-    }
-  }, [shouldShowShield, hasActiveSession, onForceLogout]);
+  // 🔥 SE ELIMINÓ EL USEEFFECT AGRESIVO QUE FORZABA EL LOGOUT AL INSTANTE.
+  // Ahora el escudo solo se pone ENCIMA bloqueando la vista, pero mantiene el menú intacto abajo.
 
-  // 🛡️ PILAR 3: Lock Asíncrono y enrutamiento inteligente (vuelve a la raíz)
+  // 🛡️ Lock Asíncrono de salida manual
   const handleSafeExit = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -86,8 +89,7 @@ export const ClientServiceShield = ({
       IconToRender = Coffee;
     } else if (isThisMesaDisabled) {
       shieldTitle = "Mesa Fuera de Servicio";
-      // 🛡️ MENSAJE DINÁMICO: Informa exactamente el número de mesa afectada
-      shieldMessage = `La Mesa ${sessionTableNumber || tableId || ''} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada.${isStandalone ? ' Si estás en la App, selecciona otra Mesa o Para Llevar presionando el botón de abajo.' : ''}`;
+      shieldMessage = `La Mesa ${sessionTableNumber || tableId || urlParam || ''} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada.`;
       IconToRender = UtensilsCrossed;
     }
   }
@@ -126,21 +128,20 @@ export const ClientServiceShield = ({
             </p>
 
             <div className="w-full relative z-10 flex flex-col gap-3">
-              {isStandalone && (
-                <motion.button 
-                  whileTap={!isProcessing ? { scale: 0.95 } : {}}
-                  disabled={isProcessing}
-                  onClick={handleSafeExit} 
-                  className={`w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-[#F3EBE0] font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 outline-none select-none ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'md:hover:shadow-xl'}`}
-                >
-                  {isProcessing ? (
-                    <Loader2 className="animate-spin" size={20} />
-                  ) : (
-                    <Store size={20} />
-                  )}
-                  {isProcessing ? 'Saliendo...' : 'Volver a Seleccionar'}
-                </motion.button>
-              )}
+              {/* 🔥 Se eliminó la restricción de isStandalone para que siempre tengan salida */}
+              <motion.button 
+                whileTap={!isProcessing ? { scale: 0.95 } : {}}
+                disabled={isProcessing}
+                onClick={handleSafeExit} 
+                className={`w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-[#F3EBE0] font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 outline-none select-none ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'md:hover:shadow-xl'}`}
+              >
+                {isProcessing ? (
+                  <Loader2 className="animate-spin" size={20} />
+                ) : (
+                  <Store size={20} />
+                )}
+                {isProcessing ? 'Saliendo...' : 'Volver a Seleccionar'}
+              </motion.button>
 
               <motion.button 
                 whileTap={{ scale: 0.95 }}
