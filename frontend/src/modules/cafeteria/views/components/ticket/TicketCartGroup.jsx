@@ -511,50 +511,55 @@ export const TicketCartGroup = ({
                   )}
                   
                   {/* 🔥 BOTONERA DE CANCELACIÓN INDEPENDIENTE (NEO-BENTO) 🔥 */}
-                  {!isLockedPromo && !item.enviadoCocina && !isCuentaPagada && (
+                  {!item.enviadoCocina && !isCuentaPagada && (
                     <div className={clsx(
                       "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
                       isVitrina ? "w-full justify-between" : "shrink-0"
                     )}>
-                          <motion.button 
-                              whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
-                              disabled={isRemovingLocal}
-                              onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
-                              className={clsx(
-                                  "rounded-lg transition-colors outline-none", 
-                                  isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
-                                  isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
-                              )}
-                          >
-                              {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
-                          </motion.button>
-                          
-                          <motion.button 
-                            whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
-                            disabled={isAddingLocal}
-                            onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
-                              if (isLimitReached) {
-                                if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
-                                return; 
-                              }
-                              onAdd(item, cuentaName);
-                            })} 
-                            className={clsx(
-                              "rounded-lg transition-colors flex items-center justify-center outline-none", 
-                              isVitrina ? "flex-1 py-2" : "p-1.5",
-                              isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
-                              isLimitReached 
-                                ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
-                                : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
-                            )}
-                            title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
-                          >
-                            {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
-                          </motion.button>
+                          {/* Bloqueamos cantidades (+/-) en Promos, pero dejamos libre el botón de Eliminar */}
+                          {!isLockedPromo && (
+                            <>
+                              <motion.button 
+                                  whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
+                                  disabled={isRemovingLocal}
+                                  onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
+                                  className={clsx(
+                                      "rounded-lg transition-colors outline-none", 
+                                      isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
+                                      isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
+                                  )}
+                              >
+                                  {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
+                              </motion.button>
+                              
+                              <motion.button 
+                                whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
+                                disabled={isAddingLocal}
+                                onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
+                                  if (isLimitReached) {
+                                    if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
+                                    return; 
+                                  }
+                                  onAdd(item, cuentaName);
+                                })} 
+                                className={clsx(
+                                  "rounded-lg transition-colors flex items-center justify-center outline-none", 
+                                  isVitrina ? "flex-1 py-2" : "p-1.5",
+                                  isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
+                                  isLimitReached 
+                                    ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
+                                    : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
+                                )}
+                                title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
+                              >
+                                {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
+                              </motion.button>
 
-                          <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
+                              <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
+                            </>
+                          )}
                           
-                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) */}
+                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) - ¡AHORA SIEMPRE VISIBLE! */}
                           <motion.button 
                               whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                               disabled={isDeletingLocal}
