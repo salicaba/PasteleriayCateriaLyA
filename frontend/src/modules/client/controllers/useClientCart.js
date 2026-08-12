@@ -23,12 +23,52 @@ export const useClientCart = (triggerNotification) => {
   const [_cart, _setCart] = useState([]);
   const [promotions, setPromotions] = useState([]);
   
+  // Estados para sincronización de pago y estatus de orden
+  const [isPaid, setIsPaid] = useState(false);
+  const [orderStatus, setOrderStatus] = useState('active');
+  
   const isProcessingRef = useRef(false);
   const notifiedPromos = useRef({});
 
   const [promoWarning, setPromoWarning] = useState({
     isOpen: false, message: '', onConfirm: null, onCancel: null
   });
+
+  // Sincronización en tiempo real del estado de pago y órdenes por WebSockets
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOrderUpdate = (data) => {
+      if (data.status === 'paid' || data.isPaid || data.pagado) {
+        setIsPaid(true);
+        setOrderStatus('paid');
+        if (triggerNotification) triggerNotification('¡Cuenta pagada con éxito!', 'success');
+      }
+    };
+
+    const handlePaymentConfirmed = (data) => {
+      setIsPaid(true);
+      setOrderStatus('paid');
+      if (triggerNotification) triggerNotification('Su cuenta ha sido marcada como PAGADA.', 'success');
+    };
+
+    socket.on('order_updated', handleOrderUpdate);
+    socket.on('payment_confirmed', handlePaymentConfirmed);
+    socket.on('account_paid', handlePaymentConfirmed);
+    socket.on('pos:update', (data) => {
+      if (data && (data.status === 'paid' || data.isPaid)) {
+        setIsPaid(true);
+        setOrderStatus('paid');
+      }
+    });
+
+    return () => {
+      socket.off('order_updated', handleOrderUpdate);
+      socket.off('payment_confirmed', handlePaymentConfirmed);
+      socket.off('account_paid', handlePaymentConfirmed);
+      socket.off('pos:update');
+    };
+  }, [triggerNotification]);
 
   // 1. CARGA INICIAL Y LISTENERS DE PROMO POR SOCKET (100% Retrocompatible)
   useEffect(() => {
@@ -356,13 +396,11 @@ export const useClientCart = (triggerNotification) => {
     return cleanCart;
   };
 
-  // 🔥 NUEVO EFFECT: Recalcula pasivamente el carrito si las promociones cambian vía Sockets
   useEffect(() => {
     _setCart(prevCart => {
       if (prevCart.length === 0) return prevCart;
       return syncPromotions(prevCart, promotions);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promotions]);
 
   const setCart = (action) => {
@@ -415,9 +453,9 @@ export const useClientCart = (triggerNotification) => {
 
            if (activePromo.type === 'NTH_FIXED' || activePromo.type === 'NxM') {
                if (nextExpectedGhosts < currentGhosts && nextExpectedGhosts < prevExpectedGhosts) {
-                 needsWarning = true;
-                 ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
-                 break;
+                needsWarning = true;
+                ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
+                break;
                }
            }
         }
@@ -532,7 +570,6 @@ export const useClientCart = (triggerNotification) => {
     }
   };
 
-  // 2. AJUSTE DINÁMICO DE CANTIDADES SEGÚN STOCK
   useEffect(() => {
     const handleStockAdjustment = (updates) => {
       setCart(prevCart => {
@@ -587,6 +624,35 @@ export const useClientCart = (triggerNotification) => {
     return () => socket.off('stock:update', handleStockAdjustment);
   }, [triggerNotification, promotions]); 
 
+  // Ordenamiento jerárquico estricto del carrito:
+  // 1. Sin enviar a cocina -> Arriba
+  // 2. Listos para entregar -> Medio
+  // 3. Enviados a cocina en preparación -> Abajo
+  const sortedCart = useMemo(() => {
+    return [..._cart].sort((a, b) => {
+      const getPriority = (item) => {
+        // No enviado a cocina / local / nuevo
+        if (!item.sentToKitchen && item.status !== 'sent' && item.status !== 'cooking' && item.status !== 'ready' && item.status !== 'listo') {
+          return 1;
+        }
+        // Listos para entregar
+        if (item.status === 'ready' || item.status === 'listo' || item.readyToDeliver) {
+          return 2;
+        }
+        // Enviados a cocina en preparación
+        return 3;
+      };
+
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+  }, [_cart]);
+
   const totalCart = useMemo(() => 
     _cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0), 
   [_cart]);
@@ -596,7 +662,8 @@ export const useClientCart = (triggerNotification) => {
   [_cart]);
 
   return {
-    cart: _cart,
+    cart: sortedCart,
+    rawCart: _cart,
     setCart,
     addToCart,
     removeFromCart,
@@ -606,6 +673,10 @@ export const useClientCart = (triggerNotification) => {
     totalItems,
     getPromoBadge,
     promoWarning,
+    isPaid,
+    orderStatus,
+    setIsPaid,
+    setOrderStatus,
     confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(),
     cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel()
   };

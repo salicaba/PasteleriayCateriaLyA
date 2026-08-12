@@ -5,7 +5,7 @@ import { Toaster, toast } from 'react-hot-toast';
 import { 
   QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, 
   Coffee, Loader2, ArrowLeft, Download, WifiOff, AlertTriangle,
-  Settings, Moon, Sun, Droplet, Type, X // 🚀 Iconos Inyectados
+  Settings, Moon, Sun, Droplet, Type, X 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,7 +21,6 @@ import { usePWA } from '../../hooks/usePWA';
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 
-// 🚀 Tamaños de Letra Dinámicos
 const SIZES = [
   { label: 'Normal', val: '16px' },
   { label: 'Mediana', val: '18px' },
@@ -50,12 +49,10 @@ export default function ClientApp({ type }) {
   
   const [isSessionChecked, setIsSessionChecked] = useState(false);
 
-  // 🚀 Estados del Modal de Ajustes
   const [showSettings, setShowSettings] = useState(false);
   const [themeIndex, setThemeIndex] = useState(getInitialTheme);
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
 
-  // Limpieza de Sesiones Fantasma al arrancar
   const [clientData, setClientData] = useState(() => {
     const isExpired = localStorage.getItem('lya_client_session_expired') === 'true';
     if (isExpired) {
@@ -68,17 +65,14 @@ export default function ClientApp({ type }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // 🚀 Funciones de Ajustes
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
   const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 
-  // Aplicar Tamaño de Letra
   useEffect(() => {
     document.documentElement.style.fontSize = SIZES[sizeIndex].val;
     localStorage.setItem('lya_client_size', sizeIndex);
   }, [sizeIndex]);
 
-  // Aplicar Tema
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark', 'theme-lya');
@@ -86,7 +80,6 @@ export default function ClientApp({ type }) {
     localStorage.setItem('lya_client_theme', themeIndex);
   }, [themeIndex]);
 
-  // Meta Color
   useEffect(() => {
     const updateMetaColor = () => {
       let metaThemeColor = document.querySelector("meta[name='theme-color']");
@@ -154,7 +147,6 @@ export default function ClientApp({ type }) {
     ? String(standaloneSelection.tableId) 
     : (urlTableId ? String(urlTableId) : undefined);
 
-  // Mapeo Inteligente de ID
   const mesaActivaObj = activeTables.find(t => 
     String(t.id) === String(effectiveTableId) || 
     String(t.numero) === String(effectiveTableId) || 
@@ -209,12 +201,14 @@ export default function ClientApp({ type }) {
     fetchStoreData(true);
   }, [fetchStoreData]);
 
+  // Sincronización general por sockets (Configs y estado de pagos/órdenes)
   useEffect(() => {
     const handleUpdate = () => fetchStoreData(false);
     const socketEvents = [
       'config:update', 'business_config_updated', 'settings:updated',
       'settings_updated', 'qr:status_changed', 'service_status_changed', 
-      'pos:update', 'table_status_updated', 'table:updated'
+      'pos:update', 'table_status_updated', 'table:updated',
+      'order_updated', 'payment_confirmed', 'account_paid'
     ];
 
     socketEvents.forEach(event => socket.on(event, handleUpdate));
@@ -227,6 +221,8 @@ export default function ClientApp({ type }) {
     localStorage.removeItem('lya_client_session');
     localStorage.removeItem('lya_client_order_id');
     localStorage.removeItem('lya_client_session_expired');
+    localStorage.removeItem('lya_client_order_paid');
+    localStorage.removeItem('lya_client_finalized_status');
     setClientData(null);
     setActiveOrdersCount(0);
     setStandaloneSelection(null); 
@@ -262,7 +258,6 @@ export default function ClientApp({ type }) {
             });
             const { status, accountStatus } = res.data || {};
             
-            // 🔥 LA CIRUGÍA MAYOR: Si la mesa fue LIBERADA o CANCELADA, cortamos la sesión de tajo
             if (status === 'CLOSED' || status === 'CANCELLED' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') {
                 handleClientLogout();
                 setIsGuarding(false);
@@ -275,7 +270,6 @@ export default function ClientApp({ type }) {
             const hasFinalized = localStorage.getItem('lya_client_finalized_status');
 
             if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
-              
               const mesaEncontrada = activeTables.find(t => String(t.id) === String(sessionTableId));
               const numeroMesaMostrar = mesaEncontrada ? (mesaEncontrada.name || mesaEncontrada.numero || mesaEncontrada.number) : (sessionTableNumber || sessionTableId);
               
@@ -430,7 +424,7 @@ export default function ClientApp({ type }) {
             >
               <Coffee size={48} strokeWidth={1.5} />
             </motion.div>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">Lya</h1>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight">𝓛𝔂𝓐</h1>
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 font-bold text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>Cargando servicios...</span>
@@ -504,7 +498,6 @@ export default function ClientApp({ type }) {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex flex-col overflow-y-auto custom-scrollbar p-6 w-full"
                   >
-                    {/* 🚀 BOTÓN FLOTANTE DE AJUSTES EN EL MAPEO */}
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setShowSettings(true)}
@@ -514,7 +507,7 @@ export default function ClientApp({ type }) {
                     </motion.button>
 
                     <header className="mb-6 mt-6 pr-10 text-center">
-                      <h1 className="text-2xl font-black mb-1">Bienvenido a Lya</h1>
+                      <h1 className="text-2xl font-black mb-1">Bienvenido a 𝓛𝔂𝓐</h1>
                       <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Selecciona cómo deseas ordenar</p>
                     </header>
 
@@ -623,7 +616,6 @@ export default function ClientApp({ type }) {
                       </div>
                     )}
 
-                    {/* 🚀 BOTÓN FLOTANTE EN EL LOGIN TAMBIÉN */}
                     <div className="absolute top-6 right-6 z-50">
                       <motion.button
                         whileTap={{ scale: 0.95 }}
@@ -655,7 +647,7 @@ export default function ClientApp({ type }) {
                           <div className="flex items-center gap-3">
                             <div className="bg-white/10 dark:bg-gray-900/10 p-3 rounded-2xl shrink-0"><MonitorSmartphone className="w-5 h-5 text-white dark:text-gray-900" /></div>
                             <div>
-                              <h4 className="text-sm font-bold text-white dark:text-gray-900">App de Lya para Clientes</h4>
+                              <h4 className="text-sm font-bold text-white dark:text-gray-900">App de 𝓛𝔂𝓐 para Clientes</h4>
                               <p className="text-[11px] text-gray-300 dark:text-gray-600 leading-tight mt-0.5">Más rápida, sin escanear QR.</p>
                             </div>
                           </div>
@@ -715,7 +707,6 @@ export default function ClientApp({ type }) {
             )}
           </AnimatePresence>
 
-          {/* 🚀 MODAL NEO-BENTO DE AJUSTES */}
           <AnimatePresence>
             {showSettings && (
               <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
@@ -745,7 +736,7 @@ export default function ClientApp({ type }) {
                         <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-[#3E2723] text-sm">Apariencia</span>
                       </div>
                       <span className="text-xs font-black uppercase text-emerald-500 lya:text-[#78350F] bg-emerald-50 dark:bg-emerald-500/10 lya:bg-[#EADCC9]/50 px-3 py-1 rounded-lg">
-                        {THEME_CLASSES[themeIndex] === 'light' ? 'Claro' : THEME_CLASSES[themeIndex] === 'dark' ? 'Oscuro' : 'Lya'}
+                        {THEME_CLASSES[themeIndex] === 'light' ? 'Claro' : THEME_CLASSES[themeIndex] === 'dark' ? 'Oscuro' : '𝓛𝔂𝓐'}
                       </span>
                     </motion.button>
 

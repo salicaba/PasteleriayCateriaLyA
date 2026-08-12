@@ -67,7 +67,7 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
   const seconds = timeLeft % 60;
   const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-  const isClosed = finalizedStatus === 'CLOSED';
+  const isClosed = finalizedStatus === 'CLOSED' || finalizedStatus === 'PAID';
   const isTakeawayMode = type === 'llevar';
   
   const bgColor = isClosed 
@@ -76,19 +76,19 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
     
   const TitleIcon = isClosed ? CheckCircle2 : XCircle;
 
-  let headerText = isClosed ? '¡Mesa Liberada!' : 'Pedido Cancelado';
-  let subText = isClosed ? 'Tu mesa ha sido cerrada exitosamente. ¡Gracias por tu visita a 𝓛𝔂𝓪!' : 'La orden ha sido cancelada desde caja.';
+  let headerText = isClosed ? '¡Cuenta Pagada!' : 'Pedido Cancelado';
+  let subText = isClosed ? 'Tu cuenta ha sido cobrada y cerrada exitosamente. ¡Gracias por tu visita a 𝓛𝔂🇦!' : 'La orden ha sido cancelada desde caja.';
 
   if (isTakeawayMode) {
     headerText = isClosed ? '¡Cuenta Archivada!' : 'Pedido Cancelado';
-    subText = isClosed ? 'Tu pedido para llevar ha sido completado y archivado. ¡Disfruta tus delicias de 𝓛𝔂𝓪!' : 'Esta cuenta para llevar ha sido cancelada por caja.';
+    subText = isClosed ? 'Tu pedido para llevar ha sido completado y archivado. ¡Disfruta tus delicias de 𝓛𝔂🇦!' : 'Esta cuenta para llevar ha sido cancelada por caja.';
   }
 
   const onDownloadTicket = async () => {
     if (isDownloading || isLoggingOut) return;
     setIsDownloading(true);
     try {
-      await handleDownloadTicket();
+      if (handleDownloadTicket) await handleDownloadTicket();
     } catch (error) {
       console.error("Error al descargar el comprobante:", error);
     } finally {
@@ -100,7 +100,7 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
     if (isLoggingOut || isDownloading) return;
     setIsLoggingOut(true);
     try {
-      await handleLogout();
+      if (handleLogout) await handleLogout();
     } catch (error) {
       console.error("Error al salir de la cuenta:", error);
       setIsLoggingOut(false);
@@ -116,7 +116,7 @@ export default function ClientFinalizedOverlay({ finalizedStatus, type, handleDo
         className="max-w-[420px] w-full bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-[2.5rem] flex flex-col items-center text-center relative z-10 shadow-2xl"
       >
         <TitleIcon size={68} className="mb-5 shadow-lg rounded-full bg-white/20 p-3 animate-bounce" />
-        <h2 className="text-3xl font-black tracking-tight mb-3 text-center uppercase drop-shadow-sm">
+        <h2 className="text-3xl font-black tracking-tight mb-3 text-center uppercase drop-shadow-sm truncate w-full">
            {headerText}
         </h2>
         <p className="font-medium text-sm mb-6 opacity-90 text-justify px-2 leading-relaxed">
