@@ -559,16 +559,23 @@ export const TicketCartGroup = ({
                             </>
                           )}
                           
-                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) */}
+                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) - ¡AHORA SIEMPRE VISIBLE! */}
                           <motion.button 
                               whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                               disabled={isDeletingLocal}
                               onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
-                                  // FIX PROMOCIONES: Si es una promo inyectada, no podemos hacer "Delete" 
-                                  // porque se regenera. Hacemos un "Remove" (restar 1) para romper la condición del motor.
-                                  if (isLockedPromo && handleRemoveUnsent) {
-                                      handleRemoveUnsent(item);
+                                  // 🔥 Lógica nativa para pedir confirmación en Promociones
+                                  if (isLockedPromo) {
+                                      openConfirmModal({
+                                          title: 'Ruptura de Promoción',
+                                          message: `Al eliminar este artículo, perderás la promoción vigente en "${item.nombre}". El artículo de regalo/descuento será eliminado. ¿Deseas continuar?`,
+                                          icon: Info, // El ícono Info ya está importado arriba
+                                          color: 'orange',
+                                          confirmText: 'Aceptar',
+                                          onConfirm: () => handleDeleteUnsent(item)
+                                      });
                                   } else {
+                                      // Flujo normal para productos sin candado
                                       handleDeleteUnsent(item);
                                   }
                               })} 
