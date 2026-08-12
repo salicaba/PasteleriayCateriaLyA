@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Coffee, UtensilsCrossed, RotateCcw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Sin expulsiones automáticas fantasmas)
+// 🔥 COMPONENTE CONTROLADO Y BLINDADO (Comportamiento Simétrico Post-Login)
 export const ClientServiceShield = ({ 
   activeOrdersCount = 0, 
   hasActiveSession = false, 
@@ -21,9 +21,10 @@ export const ClientServiceShield = ({
   const globalActive = systemConfig.isQrActive;
   const disabledQrs = systemConfig.disabledQrs || [];
 
+  // Si estamos en la vista de tarjetas principal (Mapeo), el escudo no hace nada aquí.
   if (isGridMode) return null;
 
-  // 🚀 LECTURA INTELIGENTE DE CACHÉ PARA REFORZAR EL MATCHING EN LOGIN Y MENÚ
+  // 🚀 LECTURA INTELIGENTE DE CACHÉ
   let sessionTableNumber = null;
   let sessionTableId = null;
   try {
@@ -32,8 +33,6 @@ export const ClientServiceShield = ({
     sessionTableId = session.tableId;
   } catch (e) {}
 
-  // 🔥 AUTO-BÚSQUEDA DE MESA EN LA URL (ID TÉCNICO O UUID)
-  // Fundamental para atrapar la pausa ANTES de que inicie sesión
   const urlMatches = window.location.pathname.match(/\/m\/([a-zA-Z0-9-]+)/);
   const urlParam = urlMatches ? urlMatches[1] : null;
 
@@ -42,8 +41,6 @@ export const ClientServiceShield = ({
   // 🚀 MOTOR DE BÚSQUEDA PROFUNDA: Mapea la pausa por UUID, por Número o por URL
   const isThisMesaDisabled = type === 'mesa' && disabledQrs.some(qr => {
      const normalizedQr = String(qr).toLowerCase();
-     
-     // Construimos todas las posibles firmas de la mesa para atraparla
      const possibleMatches = [
         tableId ? `mesa-${tableId}` : null, 
         tableId ? `table-${tableId}` : null,
@@ -60,8 +57,9 @@ export const ClientServiceShield = ({
 
   const isLocallyDisabled = isLlevarDisabled || isThisMesaDisabled;
 
-  // 🛡️ Mostramos el escudo solo si está inactivo y NO ha confirmado pedidos aún
-  const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
+  // 🔥 EL CAMBIO MAESTRO: Solo mostramos el escudo si YA INICIÓ SESIÓN (hasActiveSession === true)
+  // Así garantizamos que tanto "Para Llevar" como "Mesas" pasen el Login primero de forma idéntica.
+  const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0 && hasActiveSession;
 
   // 🛡️ Lock Asíncrono de salida manual
   const handleSafeExit = async () => {
@@ -90,10 +88,7 @@ export const ClientServiceShield = ({
       IconToRender = Coffee;
     } else if (isThisMesaDisabled) {
       shieldTitle = "Mesa Fuera de Servicio";
-      
-      // Construimos un identificador amigable para el mensaje
       const displayId = sessionTableNumber || (tableId && tableId.length < 10 ? tableId : 'Seleccionada');
-      
       shieldMessage = `La Mesa ${displayId} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada.`;
       IconToRender = UtensilsCrossed;
     }
