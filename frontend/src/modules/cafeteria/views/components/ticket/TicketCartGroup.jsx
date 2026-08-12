@@ -569,9 +569,16 @@ export const TicketCartGroup = ({
                                           title: 'Ruptura de Promoción',
                                           message: `Al eliminar este artículo, perderás la promoción vigente en "${item.nombre}". El artículo de regalo/descuento será eliminado. ¿Deseas continuar?`,
                                           icon: Info, 
-                                          color: 'red', // 🔥 Usamos 'red' porque es un color existente en ConfirmActionModal
+                                          color: 'red',
                                           confirmText: 'Aceptar',
-                                          onConfirm: () => handleDeleteUnsent(item)
+                                          onConfirm: () => {
+                                              // 🔥 ROMEDOR DE PROMOCIONES: 
+                                              // Si tiene ítems agrupados de origen, eliminamos el padre que genera la promo.
+                                              const targetItem = (item._groupedItems && item._groupedItems.length > 0) 
+                                                  ? item._groupedItems[0] 
+                                                  : item;
+                                              handleDeleteUnsent(targetItem);
+                                          }
                                       });
                                   } else {
                                       handleDeleteUnsent(item);
@@ -583,7 +590,7 @@ export const TicketCartGroup = ({
                                   isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
                               )}
                           >
-                              {isDeletingLocal ? <Loader2 size5={16} className="animate-spin" /> : <Trash2 size={16} />}
+                              {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                           </motion.button>
                     </div>
                   )}
