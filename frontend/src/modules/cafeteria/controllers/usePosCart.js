@@ -145,7 +145,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         for (let i = cleanCart.length - 1; i >= 0; i--) {
           const item = cleanCart[i];
           
-          // 🔥 EVITAMOS TOCAR ÍTEMS EN COCINA
           if (item.enviadoCocina) continue;
 
           const isTrueGhost = item.isAutoPromo && item.promoLabel !== 'OFERTA';
@@ -158,12 +157,12 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                const prepStr = JSON.stringify(prepsToRestore[0] || {});
                
                const existingNormalIdx = cleanCart.findIndex(p => 
-                 String(p.id) === String(productId) && 
-                 String(p.cuenta) === String(cuenta) && 
-                 !p.isAutoPromo && 
-                 Number(p.precio).toFixed(2) === Number(originalPrice).toFixed(2) && 
-                 JSON.stringify(p.preparaciones[0] || {}) === prepStr &&
-                 !p.enviadoCocina
+                String(p.id) === String(productId) && 
+                String(p.cuenta) === String(cuenta) && 
+                !p.isAutoPromo && 
+                Number(p.precio).toFixed(2) === Number(originalPrice).toFixed(2) && 
+                JSON.stringify(p.preparaciones[0] || {}) === prepStr &&
+                !p.enviadoCocina
                );
 
                if (toRemove >= item.qty) {
@@ -206,11 +205,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             for (let i = cleanCart.length - 1; i >= 0; i--) {
                const item = cleanCart[i];
                
-               // 🔥 EVITAMOS TOCAR ÍTEMS EN COCINA
                if (item.enviadoCocina) continue;
 
                if (!item.isAutoPromo && Number(item.precio) > 0 && String(item.id) === String(productId) && String(item.cuenta) === String(cuenta)) {
-                  
+                 
                   const baseOriginal = parseFloat(item.precioBase || item.precio || 0);
                   const costoExtras = parseFloat(item.precio) - baseOriginal;
                   const finalGhostPrice = ghostPrice + (costoExtras > 0 ? costoExtras : 0);
@@ -258,9 +256,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             
             let ghostDetails = {};
             if (ops && typeof ops === 'object') {
-               if (ops.defaults?.tamano) ghostDetails.tamano = ops.defaults.tamano;
-               if (ops.defaults?.leche) ghostDetails.leche = ops.defaults.leche;
-               ghostDetails.extras = []; 
+                if (ops.defaults?.tamano) ghostDetails.tamano = ops.defaults.tamano;
+                if (ops.defaults?.leche) ghostDetails.leche = ops.defaults.leche;
+                ghostDetails.extras = []; 
             }
 
             let ghostOriginalPrice = parseFloat(sampleItem.precioBase || sampleItem.precio || 0);
@@ -299,7 +297,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
 
     cleanCart = cleanCart.map(item => {
-      // 🔥 CIRUGÍA: Si el ítem ya está en cocina, lo saltamos y preservamos sus promos.
       if (item.enviadoCocina) return item; 
 
       if (item.isAutoPromo && item.promoLabel !== 'OFERTA') return item; 
@@ -398,9 +395,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
            if (activePromo.type === 'NTH_FIXED' || activePromo.type === 'NxM') {
                if (nextExpectedGhosts < currentGhosts && nextExpectedGhosts < prevExpectedGhosts) {
-                 needsWarning = true;
-                 ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
-                 break;
+                needsWarning = true;
+                ruptureProductName = prev.find(p => String(p.id) === String(productId))?.nombre || 'Producto';
+                break;
                }
            }
         }
@@ -735,6 +732,31 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     }
   };
 
+  // 🔥 ORDENAMIENTO JERÁRQUICO ESTRICTO DE ÍTEMS EN EL POS (EMPLEADO):
+  // 1. Productos sin enviar a cocina ("Por enviar") -> Arriba (Prioridad 1)
+  // 2. Productos listos para entregar ("Listos" / ready) -> Medio (Prioridad 2)
+  // 3. Productos enviados a cocina en preparación -> Abajo (Prioridad 3)
+  const sortedCart = useMemo(() => {
+    return [..._cart].sort((a, b) => {
+      const getPriority = (item) => {
+        const isSentToKitchen = item.enviadoCocina || item.status === 'sent' || item.status === 'cooking' || item.status === 'ready' || item.status === 'listo';
+        const isReady = item.status === 'ready' || item.status === 'listo' || item.readyToDeliver;
+
+        if (!isSentToKitchen) return 1; // Sin enviar a cocina -> Arriba
+        if (isReady) return 2;          // Listos para entregar -> Medio
+        return 3;                       // En preparación -> Abajo
+      };
+
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+  }, [_cart]);
+
   const total = useMemo(() => _cart.filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [_cart, cuentasPagadasReales]);
   const unsentTotal = useMemo(() => _cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [_cart]);
   const hasUnsentItems = useMemo(() => _cart.some(p => !p.enviadoCocina), [_cart]);
@@ -744,7 +766,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   };
   const getProductQty = (id) => _cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva && p.status !== 'CANCELLED' && (!p.isAutoPromo || p.promoLabel === 'OFERTA')).reduce((acc, item) => acc + item.qty, 0);
 
-  // 🔥 ARMAS ANTI-ZOMBIES
   const clearCartByAccount = (cuentaTarget) => {
     setCart(prev => prev.filter(item => item.cuenta !== cuentaTarget));
   };
@@ -754,8 +775,22 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   };
 
   return {
-    cart: _cart, setCart, addToCart, removeFromCart, deleteLine, toggleItemTakeaway, total, unsentTotal, hasUnsentItems, getSubtotalByCuenta, getProductQty,
-    clearCartByAccount, clearEntireCart, // <-- Asegúrate de exportarlas aquí
-    promoWarning, confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(), cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel()
+    cart: sortedCart, 
+    rawCart: _cart,
+    setCart, 
+    addToCart, 
+    removeFromCart, 
+    deleteLine, 
+    toggleItemTakeaway, 
+    total, 
+    unsentTotal, 
+    hasUnsentItems, 
+    getSubtotalByCuenta, 
+    getProductQty,
+    clearCartByAccount, 
+    clearEntireCart, 
+    promoWarning, 
+    confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(), 
+    cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel()
   };
 };
