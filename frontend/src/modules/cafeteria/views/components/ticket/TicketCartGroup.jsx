@@ -559,11 +559,19 @@ export const TicketCartGroup = ({
                             </>
                           )}
                           
-                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) - ¡AHORA SIEMPRE VISIBLE! */}
+                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) */}
                           <motion.button 
                               whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                               disabled={isDeletingLocal}
-                              onClick={(e) => executeWithLock(e, lockKeyDelete, () => handleDeleteUnsent(item))} 
+                              onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
+                                  // FIX PROMOCIONES: Si es una promo inyectada, no podemos hacer "Delete" 
+                                  // porque se regenera. Hacemos un "Remove" (restar 1) para romper la condición del motor.
+                                  if (isLockedPromo && handleRemoveUnsent) {
+                                      handleRemoveUnsent(item);
+                                  } else {
+                                      handleDeleteUnsent(item);
+                                  }
+                              })} 
                               className={clsx(
                                   "rounded-lg transition-colors outline-none", 
                                   isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
