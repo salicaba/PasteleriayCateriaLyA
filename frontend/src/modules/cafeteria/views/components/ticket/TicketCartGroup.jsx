@@ -559,23 +559,21 @@ export const TicketCartGroup = ({
                             </>
                           )}
                           
-                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) - ¡AHORA SIEMPRE VISIBLE! */}
+                          {/* 🗑️ BOTÓN FÍSICO DE ELIMINACIÓN (NEO-BENTO) */}
                           <motion.button 
                               whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                               disabled={isDeletingLocal}
                               onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
-                                  // 🔥 Lógica nativa para pedir confirmación en Promociones
                                   if (isLockedPromo) {
                                       openConfirmModal({
                                           title: 'Ruptura de Promoción',
                                           message: `Al eliminar este artículo, perderás la promoción vigente en "${item.nombre}". El artículo de regalo/descuento será eliminado. ¿Deseas continuar?`,
-                                          icon: Info, // El ícono Info ya está importado arriba
-                                          color: 'orange',
+                                          icon: Info, 
+                                          color: 'red', // 🔥 Usamos 'red' porque es un color existente en ConfirmActionModal
                                           confirmText: 'Aceptar',
                                           onConfirm: () => handleDeleteUnsent(item)
                                       });
                                   } else {
-                                      // Flujo normal para productos sin candado
                                       handleDeleteUnsent(item);
                                   }
                               })} 
@@ -585,7 +583,7 @@ export const TicketCartGroup = ({
                                   isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
                               )}
                           >
-                              {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                              {isDeletingLocal ? <Loader2 size5={16} className="animate-spin" /> : <Trash2 size={16} />}
                           </motion.button>
                     </div>
                   )}
