@@ -32,7 +32,8 @@ export const ClientServiceShield = ({
     sessionTableId = session.tableId;
   } catch (e) {}
 
-  // 🔥 AUTO-BÚSQUEDA DE MESA EN LA URL SI ESTAMOS EN EL LOGIN
+  // 🔥 AUTO-BÚSQUEDA DE MESA EN LA URL (ID TÉCNICO O UUID)
+  // Fundamental para atrapar la pausa ANTES de que inicie sesión
   const urlMatches = window.location.pathname.match(/\/m\/([a-zA-Z0-9-]+)/);
   const urlParam = urlMatches ? urlMatches[1] : null;
 
@@ -41,8 +42,11 @@ export const ClientServiceShield = ({
   // 🚀 MOTOR DE BÚSQUEDA PROFUNDA: Mapea la pausa por UUID, por Número o por URL
   const isThisMesaDisabled = type === 'mesa' && disabledQrs.some(qr => {
      const normalizedQr = String(qr).toLowerCase();
+     
+     // Construimos todas las posibles firmas de la mesa para atraparla
      const possibleMatches = [
-        `mesa-${tableId}`, `table-${tableId}`,
+        tableId ? `mesa-${tableId}` : null, 
+        tableId ? `table-${tableId}` : null,
         urlParam ? `mesa-${urlParam}` : null,
         urlParam ? `table-${urlParam}` : null,
         sessionTableNumber ? `mesa-${sessionTableNumber}` : null,
@@ -58,9 +62,6 @@ export const ClientServiceShield = ({
 
   // 🛡️ Mostramos el escudo solo si está inactivo y NO ha confirmado pedidos aún
   const shouldShowShield = (!globalActive || isLocallyDisabled) && activeOrdersCount === 0;
-
-  // 🔥 SE ELIMINÓ EL USEEFFECT AGRESIVO QUE FORZABA EL LOGOUT AL INSTANTE.
-  // Ahora el escudo solo se pone ENCIMA bloqueando la vista, pero mantiene el menú intacto abajo.
 
   // 🛡️ Lock Asíncrono de salida manual
   const handleSafeExit = async () => {
@@ -89,7 +90,11 @@ export const ClientServiceShield = ({
       IconToRender = Coffee;
     } else if (isThisMesaDisabled) {
       shieldTitle = "Mesa Fuera de Servicio";
-      shieldMessage = `La Mesa ${sessionTableNumber || tableId || urlParam || ''} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada.`;
+      
+      // Construimos un identificador amigable para el mensaje
+      const displayId = sessionTableNumber || (tableId && tableId.length < 10 ? tableId : 'Seleccionada');
+      
+      shieldMessage = `La Mesa ${displayId} se encuentra temporalmente fuera de servicio para pedidos digitales. Por favor, solicita a nuestro personal que te asigne a otra mesa habilitada.`;
       IconToRender = UtensilsCrossed;
     }
   }
@@ -128,7 +133,6 @@ export const ClientServiceShield = ({
             </p>
 
             <div className="w-full relative z-10 flex flex-col gap-3">
-              {/* 🔥 Se eliminó la restricción de isStandalone para que siempre tengan salida */}
               <motion.button 
                 whileTap={!isProcessing ? { scale: 0.95 } : {}}
                 disabled={isProcessing}
