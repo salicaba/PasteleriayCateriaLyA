@@ -428,33 +428,11 @@ export const shareOrderTicket = async (req, res) => {
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
-        
-        /* 🔥 CLASES DE IMPRESIÓN BLINDADAS 🔥 */
-        @media print { 
-          .no-print { display: none !important; } 
-          body { 
-            background-color: white !important; 
-            padding: 0 !important; 
-            display: block !important; 
-            min-height: auto !important; 
-          }
-          #ticket-download-area {
-            padding: 0 !important;
-            margin: 0 !important;
-            display: block !important;
-          }
-          /* Forzamos a que el ticket no se fragmente y pierda los padding-tops */
-          #ticket-card {
-            margin: 0 auto !important; 
-            box-shadow: none !important; 
-            border: none !important; 
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        @media print { .no-print { display: none !important; } }
       </style>
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
@@ -475,10 +453,9 @@ export const shareOrderTicket = async (req, res) => {
         </div>
         ` : ''}
 
-        <!-- 🔥 CONTENEDOR FLEXIBLE PARA LA LIBRERÍA 🔥 -->
+        <!-- 🔥 CENTRADOR FIJO (Evita que el PDF se aviente a la izquierda) 🔥 -->
         <div class="w-full flex justify-center">
-          <!-- 🔥 Se cambió width y max-width a porcentajes para que la librería respire 🔥 -->
-          <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">☕</div>
@@ -627,44 +604,19 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX SUPREMO Y BLINDADO: El "Estudio Fotográfico" (Clonación) 🔥
+        // 🔥 FIX DEFINITIVO: Sin clones, usando matemáticas de márgenes para centrar en A4
         function descargarPDF() {
-          // 1. Tomamos el elemento original intacto
-          const original = document.getElementById('ticket-card');
-
-          // 2. Creamos un contenedor temporal invisible y pegado a la esquina (Pixel 0,0)
-          const wrapper = document.createElement('div');
-          wrapper.style.position = 'absolute';
-          wrapper.style.top = '0';
-          wrapper.style.left = '0';
-          wrapper.style.width = '380px'; // Forzamos el ancho exacto del ticket
-          wrapper.style.background = '#ffffff';
-          wrapper.style.zIndex = '-9999'; // Lo mandamos detrás para que nadie lo vea
-
-          // 3. Clonamos el ticket para no arruinar tu diseño en pantalla
-          const clone = original.cloneNode(true);
-          clone.style.margin = '0'; // Quitamos márgenes
-          clone.style.boxShadow = 'none'; // Quitamos la sombra para el papel
-          clone.style.border = 'none';
-          clone.style.maxWidth = '100%';
-
-          wrapper.appendChild(clone);
-          document.body.appendChild(wrapper);
-
-          // 4. Configuración matemática exacta
+          const element = document.getElementById('ticket-card');
+          
+          // Formato margin de html2pdf: [top, left, bottom, right] en milímetros
           const options = {
-            margin:       [15, 54.75, 15, 54.75], // Centra exactamente 380px en una A4
+            margin:       [20, 54.75, 20, 54.75], 
             filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
             image:        { type: 'jpeg', quality: 1 },
             html2canvas:  { 
               scale: 2, 
               useCORS: true, 
-              backgroundColor: '#ffffff',
-              x: 0, // ¡Fotografía desde el pixel 0 izquierdo!
-              y: 0, // ¡Fotografía desde el pixel 0 superior!
-              scrollX: 0,
-              scrollY: 0,
-              windowWidth: 380 // Obligamos a la cámara a medir 380px
+              backgroundColor: '#ffffff' 
             },
             jsPDF:        { 
               unit: 'mm', 
@@ -673,12 +625,20 @@ export const shareOrderTicket = async (req, res) => {
             }
           };
 
-          // 5. Generamos, guardamos y limpiamos la "basura"
-          html2pdf().set(options).from(wrapper).save().then(() => {
-            document.body.removeChild(wrapper); // Destruimos el clon
-          }).catch(err => {
-            console.error("Error PDF:", err);
-            document.body.removeChild(wrapper); // Destruimos el clon incluso si falla
+          html2pdf().set(options).from(element).save();
+        }
+
+        function descargarImagen() {
+          const element = document.getElementById('ticket-card');
+          html2canvas(element, { 
+            scale: 3, 
+            useCORS: true, 
+            backgroundColor: '#ffffff'
+          }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'Ticket_Lya_${ticketFolioFile}.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
           });
         }
       </script>
