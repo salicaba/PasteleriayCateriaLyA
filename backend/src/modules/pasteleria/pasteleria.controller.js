@@ -163,8 +163,8 @@ export const updatePedido = async (req, res) => {
         // 1. Crear transacción de SALIDA en la caja
         const tx = await Transaction.create({
           source: 'PASTELERIA',
-          paymentMethod: 'CASH', // Se asume que le devuelves el billete en mano
-          amount: -Math.abs(devolucion), // 🔥 FIX FINANCIERO CRÍTICO: Debe ser estrictamente negativo para restar de Caja
+          paymentMethod: 'CASH', 
+          amount: -Math.abs(devolucion), 
           description: `Devolución de saldo a favor por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
           createdBy: userId
@@ -174,7 +174,7 @@ export const updatePedido = async (req, res) => {
         const abonoReembolso = {
           id: tx.id,
           fecha: new Date().toISOString(),
-          monto: -Math.abs(devolucion), // Monto negativo para equilibrar el total pagado en el pedido
+          monto: -Math.abs(devolucion), 
           metodo: 'efectivo',
           nota: 'Devolución automática'
         };
@@ -251,7 +251,6 @@ export const addAbono = async (req, res) => {
 // 🔄 CONTROL DE ESTADOS (Manejo de Caja Sincronizado)
 // ==========================================
 
-// Controlador global de estado (Para mantener retrocompatibilidad)
 export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
@@ -285,7 +284,6 @@ export const updateEstado = async (req, res) => {
   }
 };
 
-// Acciones Específicas de Estado
 export const entregarPedido = async (req, res) => {
   try {
     const { id } = req.params;
@@ -315,11 +313,9 @@ export const cancelarPedido = async (req, res) => {
       return res.status(404).json({ message: 'Pedido no encontrado' });
     }
 
-    // Cambiar estado del pedido
     pedido.estado = 'cancelado';
     await pedido.save({ transaction: t });
 
-    // Anular transacciones financieras en Caja sin alterar su createdAt
     await Transaction.update(
       { status: 'CANCELLED', cancelledBy: userId, cancelledAt: new Date() },
       { 
@@ -348,11 +344,9 @@ export const restaurarPedido = async (req, res) => {
       return res.status(404).json({ message: 'Pedido no encontrado' });
     }
 
-    // Regresar el pedido a pendiente
     pedido.estado = 'pendiente';
     await pedido.save({ transaction: t });
 
-    // Revivir las transacciones para que el dinero vuelva a la Caja en sus fechas originales
     await Transaction.update(
       { status: 'ACTIVE', cancelledBy: null, cancelledAt: null },
       { 
@@ -369,7 +363,6 @@ export const restaurarPedido = async (req, res) => {
     res.status(500).json({ message: 'Error interno al restaurar el pedido' });
   }
 };
-
 
 // ==========================================
 // 🖨️ IMPRIMIR TICKET (MOCK NATIVO EN CONSOLA)
@@ -448,7 +441,7 @@ export const printPedidoTicket = async (req, res) => {
 };
 
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL (NATIVA NAVEGADOR)
+// 📱 GENERAR VISTA DEL TICKET DIGITAL (HTML/WHATSAPP)
 // ==========================================
 export const sharePedidoTicket = async (req, res) => {
   try {
@@ -490,50 +483,32 @@ export const sharePedidoTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Ticket_Lya_Pasteleria_${pedido.id}</title>
+      <title>Ticket de Pedido #${pedido.id} - 𝓛𝔂𝓪</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <!-- 🔥 ADIÓS LIBRERÍAS EXTERNAS DE PDF 🔥 -->
+      <!-- 🔥 JS PARA TICKET TÉRMICO DIGITAL 🔥 -->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
-        
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
-        .logo-lya { font-family: 'Dancing Script', cursive; }
-
-        /* 🔥 CSS NATIVO PARA PDF 🔥 */
-        @media print { 
-          @page { margin: 15mm; size: auto; }
-          body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; } 
-          
-          #ticket-card { 
-            box-shadow: none !important; 
-            border: 2px dashed #e2e8f0 !important; 
-            margin: 0 auto !important; 
-            page-break-inside: avoid;
-            border-radius: 20px !important;
-            padding: 2rem !important;
-          }
-        }
+        @media print { .no-print { display: none !important; } }
       </style>
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
-        
-        <!-- 🔥 CONTENEDOR FLEXIBLE 🔥 -->
-        <div class="w-full flex justify-center relative">
-          <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+        <!-- 🔥 CENTRADOR FIJO 🔥 -->
+        <div class="w-full flex justify-center">
+          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
-            <div class="flex flex-col items-center mb-8 text-center">
-              <div class="text-4xl h-12 flex items-center justify-center text-slate-800 mb-2">🎂</div>
-              <div class="h-16 flex items-center justify-center mb-1">
-                <h1 class="text-6xl font-black text-slate-900 tracking-wider logo-lya" style="line-height: normal; margin: 0; padding: 0;">Lya</h1>
-              </div>
-              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 m-0">Pastelería</p>
-              <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-5">${pedido.id}</h2>
+            <div class="flex flex-col items-center mb-6 text-center">
+              <div class="text-4xl mb-2 text-slate-800">🎂</div>
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Pastelería</p>
+              <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
             </div>
 
             <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
@@ -558,6 +533,7 @@ export const sharePedidoTicket = async (req, res) => {
                 <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
               </div>
               
+              <!-- 🔥 FIX: Inyección de Dirección para Domicilio -->
               ${pedido.tipoEntrega === 'domicilio' && pedido.direccion ? `
               <div class="flex flex-col gap-1 mt-4 bg-slate-100/80 p-3 rounded-xl border border-slate-200">
                 <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">📍 Dirección de Entrega:</span>
@@ -661,13 +637,61 @@ export const sharePedidoTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="w-full max-w-[380px] px-2 mx-auto">
-          <!-- 🔥 BOTÓN NATIVO PARA IMPRIMIR/GUARDAR PDF 🔥 -->
-          <button onclick="window.print()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
-            🖨️ Guardar o Imprimir PDF
+          <button id="btn-descargar" onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+            📥 Descargar Comprobante PDF
           </button>
         </div>
       </div>
 
+      <script>
+        // 🔥 MOTOR DE GENERACIÓN PDF TIPO "TICKET ROLLO"
+        async function descargarPDF() {
+          const btn = document.getElementById('btn-descargar');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '⏳ Generando...';
+          btn.style.opacity = '0.7';
+          btn.style.pointerEvents = 'none';
+
+          const element = document.getElementById('ticket-card');
+
+          try {
+            // Asegurar que estamos hasta arriba y que la fuente cargó
+            window.scrollTo(0, 0);
+            await document.fonts.ready;
+
+            const canvas = await html2canvas(element, { 
+              scale: 3, 
+              useCORS: true, 
+              backgroundColor: '#ffffff',
+              scrollY: 0,
+              scrollX: 0
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+
+            const pdfWidth = 80; 
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: [pdfWidth, pdfHeight] 
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('Ticket_Lya_Pasteleria_${pedido.id}.pdf');
+
+          } catch (err) {
+            console.error("Error al generar el PDF:", err);
+            alert("Hubo un error al generar el comprobante.");
+          } finally {
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+          }
+        }
+      </script>
     </body>
     </html>
     `;
