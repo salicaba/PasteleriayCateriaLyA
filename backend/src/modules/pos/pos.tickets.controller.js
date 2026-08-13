@@ -101,7 +101,7 @@ export const printOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }]
         }
       ]
     });
@@ -457,11 +457,13 @@ export const shareOrderTicket = async (req, res) => {
         <div class="w-full flex justify-center relative">
           <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
-            <!-- 🔥 FIX RENDERING: Ajuste de line-height y márgenes para html2canvas 🔥 -->
-            <div class="flex flex-col items-center mb-6 text-center">
-              <div class="text-4xl mb-3 text-slate-800 leading-none">☕</div>
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider mb-2" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 1;">𝓛𝔂𝓪</h1>
-              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Cafetería</p>
+            <!-- 🔥 FIX RENDERING ESTRUCTURAL: Contenedores rígidos para evitar solapamiento en html2canvas 🔥 -->
+            <div class="flex flex-col items-center mb-8 text-center">
+              <div class="text-4xl h-12 flex items-center justify-center text-slate-800 mb-2">☕</div>
+              <div class="h-16 flex items-center justify-center mb-1">
+                <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: normal; margin: 0; padding: 0;">𝓛𝔂𝓪</h1>
+              </div>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 m-0">Cafetería</p>
               <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-5 leading-tight">${ticketFolioHTML}</h2>
             </div>
 
@@ -613,10 +615,19 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
 
           try {
+            // 🔥 CRÍTICO PARA HTML2CANVAS: Forzamos el scroll al top absoluto antes de capturar
+            // Esto evita que si el cliente escroleó, el lienzo salga "mocho" o desalineado.
+            window.scrollTo(0, 0);
+
+            // Esperamos que las fuentes se procesen
+            await document.fonts.ready;
+
             const canvas = await html2canvas(element, { 
               scale: 3, 
               useCORS: true, 
-              backgroundColor: '#ffffff'
+              backgroundColor: '#ffffff',
+              scrollY: 0,
+              scrollX: 0
             });
 
             const imgData = canvas.toDataURL('image/png');
