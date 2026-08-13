@@ -194,7 +194,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         const res = await client.get(`/pos/orders/${activeOrderId}/status`, {
           params: { 
             cuenta: clientData?.name,
-            _t: Date.now() // 🔥 FIX: Escudo Anti-Caché para el Navegador
+            _t: Date.now()
           }
         });
         
@@ -203,9 +203,13 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         const accountStatus = data.accountStatus;
         const serverItems = data.items; 
         
+        // 🔥 FIX ESTRUCTURAL: Mapeo correcto para "Para Llevar" donde el pago es Total (globalStatus === 'PAID')
         let finalStatus = 'OPEN';
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
+        } else if (globalStatus === 'PAID') {
+            // Si la orden completa está pagada, la cuenta automáticamente lo está.
+            finalStatus = 'PAID';
         } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') { 
             finalStatus = accountStatus;
         } else {
@@ -283,15 +287,32 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       }
     };
 
+    // 🔥 NUEVO: Atrapamos el evento Socket A NIVEL CONTROLADOR para garantizar el LocalStorage.
+    const handleOrderPaid = (data) => {
+      const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+      const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+
+      if (isMyTable || isMyTakeaway) {
+          if (data.isFullPayment || (data.cuentaName && data.cuentaName.toLowerCase() === displayName.toLowerCase())) {
+              setIsOrderPaid(true);
+              localStorage.setItem('lya_client_order_paid', 'true');
+              setIsConfirmed(true);
+          }
+      }
+    };
+
     const interval = setInterval(checkStatus, 5000);
     socket.on('pos:update', checkStatus);
+    socket.on('orderPaid', handleOrderPaid);
+    
     checkStatus(); 
 
     return () => {
        clearInterval(interval);
        socket.off('pos:update', checkStatus);
+       socket.off('orderPaid', handleOrderPaid);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name]);
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName]);
 
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {
