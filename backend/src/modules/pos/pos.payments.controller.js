@@ -134,7 +134,17 @@ export const payOrder = async (req, res) => {
       });
     }
 
+    // 🔥 EMITIR ACTUALIZACIÓN AL ECOSISTEMA
     getIO().emit('pos:update');
+    // 👇 NUEVO EVENTO: Le avisa directamente a la PWA cliente que su nota fue pagada
+    getIO().emit('orderPaid', { 
+      orderId: order.id, 
+      tableId: order.tableId, 
+      ticketId: order.ticketId, 
+      isFullPayment, 
+      cuentaName 
+    });
+
     res.json({ message: 'Pago registrado con éxito en Caja', order });
   } catch (error) { 
     console.error('Error al procesar pago:', error);

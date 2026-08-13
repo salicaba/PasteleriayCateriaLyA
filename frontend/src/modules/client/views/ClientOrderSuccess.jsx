@@ -10,6 +10,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
   
+  // 🔥 NUEVO: Estado local reactivo para sincronización instantánea de pagos
+  const [localIsPaid, setLocalIsPaid] = useState(isOrderPaid);
+  
   // Estados Dinámicos Sincronizados
   const [bankAccounts, setBankAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -20,9 +23,30 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   const [copyingId, setCopyingId] = useState(null);
   const isFirstRender = useRef(true);
   
+  // Pre-calcular nombre para que el Socket pueda hacer match
+  const parsedNameData = clientData?.name || 'Cliente Lya';
+  let displayName = parsedNameData;
+  let displayPhone = null;
+
+  if (parsedNameData.includes(' | ')) {
+    [displayName, displayPhone] = parsedNameData.split(' | ');
+  } else if (parsedNameData.includes(' - ')) {
+    [displayName, displayPhone] = parsedNameData.split(' - ');
+  }
+  
+  displayName = displayName.trim();
+  if (displayPhone) displayPhone = displayPhone.trim();
+
+  const primerNombre = displayName.split(' ')[0] || 'Cliente Lya';
+
   useEffect(() => {
     setLiveCart(cart || []);
   }, [cart]);
+
+  // Mantener la prop sincronizada si cambia desde arriba
+  useEffect(() => {
+    setLocalIsPaid(isOrderPaid);
+  }, [isOrderPaid]);
 
   // 🔥 EXTRACTOR INTELIGENTE UNIFICADO + TIEMPO REAL
   useEffect(() => {
@@ -71,7 +95,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       }
     };
 
-    if (!isOrderPaid) {
+    if (!localIsPaid) {
       fetchSettings();
     }
 
@@ -83,7 +107,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       socket.off('config:update', fetchSettings);
       socket.off('business_config_updated', fetchSettings);
     };
-  }, [isOrderPaid]);
+  }, [localIsPaid]);
 
   useEffect(() => {
     // 1. Escuchar cancelación individual
@@ -142,9 +166,13 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 3. Escuchar cancelación de la mesa completa
+    // 3. Escuchar cancelación de la orden
     const handleOrderCancelled = (data) => {
-        if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
+        const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+        // Validar también por ticketId para pedidos Para Llevar
+        const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+        
+        if (isMyTable || isMyTakeaway) {
             try {
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -155,10 +183,25 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         }
     };
 
-    // 4. Escuchar restauración de la mesa completa
+    // 4. Escuchar restauración de la orden
     const handleOrderRestored = (data) => {
-        if (!tableId || (data?.tableId && String(data.tableId) === String(tableId))) {
+        const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+        const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+        
+        if (isMyTable || isMyTakeaway) {
             window.location.reload();
+        }
+    };
+
+    // 5. 🔥 Escuchar PAGO DE LA ORDEN en tiempo real
+    const handleOrderPaid = (data) => {
+        const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+        const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+
+        if (isMyTable || isMyTakeaway) {
+            if (data.isFullPayment || (data.cuentaName && data.cuentaName.toLowerCase() === displayName.toLowerCase())) {
+                setLocalIsPaid(true);
+            }
         }
     };
     
@@ -166,14 +209,16 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     socket.on('orderItemRestored', handleItemRestored); 
     socket.on('orderCancelled', handleOrderCancelled);
     socket.on('orderRestored', handleOrderRestored);
+    socket.on('orderPaid', handleOrderPaid);
     
     return () => {
        socket.off('orderItemCancelled', handleItemCancelled);
        socket.off('orderItemRestored', handleItemRestored);
        socket.off('orderCancelled', handleOrderCancelled);
        socket.off('orderRestored', handleOrderRestored);
+       socket.off('orderPaid', handleOrderPaid);
     };
-  }, [tableId, onReset]);
+  }, [tableId, type, displayName, onReset]);
 
   // FIX CACHÉ (Anti-Amnesia de Refresh)
   useEffect(() => {
@@ -208,21 +253,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   const liveTotal = liveCart
     .filter(item => item.status !== 'CANCELLED')
     .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
-
-  const parsedNameData = clientData?.name || 'Cliente Lya';
-  let displayName = parsedNameData;
-  let displayPhone = null;
-
-  if (parsedNameData.includes(' | ')) {
-    [displayName, displayPhone] = parsedNameData.split(' | ');
-  } else if (parsedNameData.includes(' - ')) {
-    [displayName, displayPhone] = parsedNameData.split(' - ');
-  }
-  
-  displayName = displayName.trim();
-  if (displayPhone) displayPhone = displayPhone.trim();
-
-  const primerNombre = displayName.split(' ')[0] || 'Cliente Lya';
 
   // Utils para copiar y notificar (Cápsulas Neo-Bento)
   const showToast = (message) => {
@@ -411,8 +441,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
 
+            {/* OVERLAY DE PAGADO EN TIEMPO REAL */}
             <AnimatePresence>
-              {isOrderPaid && (
+              {localIsPaid && (
                 <motion.div 
                   initial={{ scale: 2, opacity: 0, rotate: -25 }} 
                   animate={{ scale: 1, opacity: 1, rotate: -25 }} 
@@ -545,7 +576,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           {/* Bloque Condicional: Acciones según Estado de Pago */}
           <div className="w-full shrink-0 relative z-30">
             <AnimatePresence mode="wait">
-              {isOrderPaid ? (
+              {localIsPaid ? (
                 <motion.div 
                   key="paid-message"
                   initial={{ opacity: 0, scale: 0.95, y: 10 }}
