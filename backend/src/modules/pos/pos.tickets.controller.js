@@ -314,7 +314,7 @@ export const printOrderTicket = async (req, res) => {
 };
 
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL (USANDO NATIVE BROWSER PRINT)
+// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE
 // ==========================================
 export const shareOrderTicket = async (req, res) => {
   try {
@@ -417,32 +417,20 @@ export const shareOrderTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Ticket_Lya_${ticketFolioFile}</title>
+      <title>Ticket de Consumo #${ticketFolioFile} - Lya</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <!-- 🔥 ADIÓS LIBRERÍAS DE PDF EXTERNAS 🔥 -->
+      <!-- LIBRERÍAS PARA DESCARGA DIRECTA EN FORMATO TICKET -->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+        /* 🔥 FIX DEFINITIVO: Importamos una fuente cursiva real para el logo y evitamos bugs de renderizado de html2canvas 🔥 */
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
         
-        /* 🔥 ESTA ES LA MAGIA: CSS NATIVO PARA PDF 🔥 */
-        @media print { 
-          @page { margin: 15mm; size: auto; } /* Margen automático perfecto del OS */
-          body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; } 
-          
-          #ticket-card { 
-            box-shadow: none !important; 
-            /* Agregamos un borde sutil para que el ticket resalte limpio sobre la hoja blanca */
-            border: 2px dashed #e2e8f0 !important; 
-            margin: 0 auto !important; 
-            page-break-inside: avoid;
-            border-radius: 20px !important;
-            padding: 2rem !important;
-          }
-        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+        .logo-lya { font-family: 'Dancing Script', cursive; }
       </style>
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
@@ -468,10 +456,10 @@ export const shareOrderTicket = async (req, res) => {
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">☕</div>
-              <!-- Textos limpios sin forcejeos de librerías -->
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
-              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
-              <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
+              <!-- 🔥 FIX DE FUENTE APLICADO: Usamos texto normal y la fuente cursiva Dancing Script 🔥 -->
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider mb-2 logo-lya" style="line-height: 1;">Lya</h1>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-1">Cafetería</p>
+              <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-5 leading-tight">${ticketFolioHTML}</h2>
             </div>
 
             <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
@@ -605,13 +593,61 @@ export const shareOrderTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="w-full max-w-[380px] px-2 mx-auto">
-          <!-- 🔥 AQUÍ SE LLAMA A LA FUNCIÓN NATIVA DE IMPRESIÓN/PDF DEL SISTEMA 🔥 -->
-          <button onclick="window.print()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
-            🖨️ Guardar o Imprimir PDF
+          <button id="btn-descargar" onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+            📥 Descargar Comprobante PDF
           </button>
         </div>
       </div>
 
+      <script>
+        async function descargarPDF() {
+          const btn = document.getElementById('btn-descargar');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '⏳ Generando...';
+          btn.style.opacity = '0.7';
+          btn.style.pointerEvents = 'none';
+
+          const element = document.getElementById('ticket-card');
+
+          try {
+            window.scrollTo(0, 0);
+            
+            // 🔥 CRÍTICO: Esperamos que la fuente de Google cargue completamente antes de tomar la foto
+            await document.fonts.ready;
+
+            const canvas = await html2canvas(element, { 
+              scale: 3, 
+              useCORS: true, 
+              backgroundColor: '#ffffff',
+              scrollY: 0,
+              scrollX: 0
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+
+            const pdfWidth = 80; 
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: [pdfWidth, pdfHeight] 
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('Ticket_Lya_${ticketFolioFile}.pdf');
+
+          } catch (err) {
+            console.error("Error al generar el PDF:", err);
+            alert("Hubo un error al generar el comprobante.");
+          } finally {
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+          }
+        }
+      </script>
     </body>
     </html>
     `;
