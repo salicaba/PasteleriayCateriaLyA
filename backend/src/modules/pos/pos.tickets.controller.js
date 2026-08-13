@@ -155,7 +155,6 @@ export const printOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salon'}`;
     }
 
-    // 🔥 FOLIOS DINÁMICOS POR DEPARTAMENTO
     const baseFolioStr = order.id.split('-')[0].toUpperCase();
     const hasPasteleria = order.items.some(i => i.product?.departamento === 'pasteleria');
     const hasCafeteria = order.items.some(i => i.product?.departamento !== 'pasteleria');
@@ -168,7 +167,6 @@ export const printOrderTicket = async (req, res) => {
     printer.println("COMPROBANTE DE VENTA");
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
-    // Imprime un folio debajo del otro automáticamente
     foliosArr.forEach(folio => printer.println(folio));
     printer.setTextNormal();
     printer.drawLine();
@@ -316,7 +314,7 @@ export const printOrderTicket = async (req, res) => {
 };
 
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE (WHATSAPP/PDF)
+// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE (NUEVA LIBRERÍA)
 // ==========================================
 export const shareOrderTicket = async (req, res) => {
   try {
@@ -347,7 +345,7 @@ export const shareOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] 
         }
       ]
     });
@@ -376,7 +374,6 @@ export const shareOrderTicket = async (req, res) => {
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
-    // 🔥 Nombre limpio para el ticket
     const nombreCliente = parseAccountName(order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General'));
     
     const d = new Date(order.createdAt);
@@ -403,7 +400,6 @@ export const shareOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salón'}`;
     }
 
-    // 🔥 FOLIOS DINÁMICOS POR DEPARTAMENTO
     const baseFolioStr = order.id.split('-')[0].toUpperCase();
     const hasPasteleria = itemsFiltrados.some(i => i.product?.departamento === 'pasteleria');
     const hasCafeteria = itemsFiltrados.some(i => i.product?.departamento !== 'pasteleria');
@@ -412,7 +408,6 @@ export const shareOrderTicket = async (req, res) => {
     if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${baseFolioStr}`);
     if (hasPasteleria) foliosArr.push(`PAS-${baseFolioStr}`);
     
-    // Para el HTML usamos un salto de línea (<br>), para el archivo usamos un guion bajo (_)
     const ticketFolioHTML = foliosArr.join('<br>');
     const ticketFolioFile = foliosArr.join('_');
 
@@ -427,12 +422,18 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+      <!-- 🔥 ADIÓS HTML2PDF, HOLA JSPDF Y HTML2CANVAS 🔥 -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        @media print { .no-print { display: none !important; } }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+        
+        @media print { 
+          .no-print { display: none !important; } 
+          body { background-color: white !important; padding: 0 !important; }
+          #ticket-card { box-shadow: none !important; border: none !important; margin: 0 auto !important; }
+        }
       </style>
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
@@ -453,13 +454,11 @@ export const shareOrderTicket = async (req, res) => {
         </div>
         ` : ''}
 
-        <!-- 🔥 CENTRADOR FIJO (Evita que el PDF se aviente a la izquierda) 🔥 -->
-        <div class="w-full flex justify-center">
-          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+        <div class="w-full flex justify-center relative">
+          <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">☕</div>
-              <!-- 🔥 FIX LYA (Separado de la palabra cafetería) 🔥 -->
               <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
               <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
               <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
@@ -528,7 +527,6 @@ export const shareOrderTicket = async (req, res) => {
 
                       return `
                       <div class="flex items-start gap-3 text-sm px-1 mb-3">
-                        <!-- 🔥 FIX CANTIDADES (Cuadro fijo min-w-[28px]) 🔥 -->
                         <span class="font-black text-slate-800 bg-slate-100 min-w-[28px] h-6 flex items-center justify-center rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
                         <div class="flex-1 min-w-0">
                           <p class="font-bold text-slate-900 break-words leading-tight">
@@ -597,49 +595,57 @@ export const shareOrderTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="w-full max-w-[380px] px-2 mx-auto">
-          <button onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+          <button id="btn-descargar" onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
             📥 Descargar Comprobante PDF
           </button>
         </div>
       </div>
 
       <script>
-        // 🔥 FIX DEFINITIVO: Sin clones, usando matemáticas de márgenes para centrar en A4
-        function descargarPDF() {
+        // 🔥 FIX SUPREMO: PDF DINÁMICO TAMAÑO TICKET 🔥
+        async function descargarPDF() {
+          const btn = document.getElementById('btn-descargar');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '⏳ Generando...';
+          btn.style.opacity = '0.7';
+          btn.style.pointerEvents = 'none';
+
           const element = document.getElementById('ticket-card');
-          
-          // Formato margin de html2pdf: [top, left, bottom, right] en milímetros
-          const options = {
-            margin:       [20, 54.75, 20, 54.75], 
-            filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { 
-              scale: 2, 
+
+          try {
+            // 1. Tomamos una captura de alta calidad del ticket sin que el Flexbox interfiera
+            const canvas = await html2canvas(element, { 
+              scale: 3, 
               useCORS: true, 
-              backgroundColor: '#ffffff' 
-            },
-            jsPDF:        { 
-              unit: 'mm', 
-              format: 'a4', 
-              orientation: 'portrait' 
-            }
-          };
+              backgroundColor: '#ffffff'
+            });
 
-          html2pdf().set(options).from(element).save();
-        }
+            const imgData = canvas.toDataURL('image/png');
 
-        function descargarImagen() {
-          const element = document.getElementById('ticket-card');
-          html2canvas(element, { 
-            scale: 3, 
-            useCORS: true, 
-            backgroundColor: '#ffffff'
-          }).then(canvas => {
-            const link = document.createElement('a');
-            link.download = 'Ticket_Lya_${ticketFolioFile}.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-          });
+            // 2. En lugar de una hoja A4, creamos un PDF con formato de "Ticket de Caja"
+            const pdfWidth = 80; // Ancho estándar de un ticket en mm
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; // Calculamos el alto perfecto
+
+            // 3. Inicializamos jsPDF nativo
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: [pdfWidth, pdfHeight] // 🔥 ¡MAGIA! El PDF tiene el tamaño exacto del ticket
+            });
+
+            // 4. Pegamos la imagen cubriendo el 100% del PDF y descargamos
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('Ticket_Lya_${ticketFolioFile}.pdf');
+
+          } catch (err) {
+            console.error("Error al generar el PDF:", err);
+            alert("Hubo un error al generar el comprobante.");
+          } finally {
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+          }
         }
       </script>
     </body>
