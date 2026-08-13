@@ -627,33 +627,43 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX ESTRUCTURAL DEL MOTOR DE GENERACIÓN PDF 🔥
+        // 🔥 FIX DEFINITIVO PARA PDF EN BLANCO O DESPLAZADO 🔥
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
+          const wrapper = element.parentElement; // El contenedor flex
+
+          // 1. ANTES DE CAPTURAR: Quitamos el flex y centramos el elemento desde la izquierda
+          // Esto garantiza que html2pdf empiece a "leer" desde el pixel 0,0 del ticket.
+          const originalWrapperStyle = wrapper.getAttribute('style') || '';
+          wrapper.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 !important;');
           
-          // 1. Reducimos márgenes y optimizamos para tickets alargados
-          // margin en html2pdf: [top, left, bottom, right] en milímetros
+          const originalElementStyle = element.getAttribute('style') || '';
+          element.setAttribute('style', 'width: 380px; max-width: 380px; margin: 0 auto; box-shadow: none !important;');
+
+          // 2. Opciones de PDF ajustadas para centrado automático
           const options = {
-            margin:       [10, 0, 10, 0], // Margen top y bottom suave. Lados 0 para usar auto-centrado
+            margin:       [10, 'auto', 10, 'auto'], // Arriba y abajo 10mm, centrado automático a los lados
             filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
             image:        { type: 'jpeg', quality: 1 },
             html2canvas:  { 
               scale: 2, 
               useCORS: true, 
               backgroundColor: '#ffffff',
-              windowWidth: element.scrollWidth // Fuerza a capturar solo el ancho del elemento
+              windowWidth: 380 // Obligamos al canvas a leer exactamente el ancho de la tarjeta
             },
             jsPDF:        { 
               unit: 'mm', 
-              format: 'a4', // Mantener a4 es buena práctica para compatibilidad global
+              format: 'a4', 
               orientation: 'portrait' 
             }
           };
 
-          // 2. Centrado Automático mediante Flexbox en el motor PDF
-          html2pdf().set(options).from(element).toContainer().toCanvas().toImg().toPdf().get('pdf').then(function (pdf) {
-            // Este proceso es interno pero la librería ajustará el ancho del ticket al A4 sin los monstruosos 54mm de margen que asfixiaban al PDF.
-          }).save();
+          // 3. Generamos el PDF
+          html2pdf().set(options).from(element).save().then(() => {
+            // 4. DESPUÉS DE CAPTURAR: Devolvemos todo a la normalidad en la pantalla del usuario
+            wrapper.setAttribute('style', originalWrapperStyle);
+            element.setAttribute('style', originalElementStyle);
+          });
         }
       </script>
     </body>
