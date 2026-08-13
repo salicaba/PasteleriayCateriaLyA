@@ -1,6 +1,7 @@
+//frontend/src/modules/client/views/ClientMenu.jsx
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, LogOut } from 'lucide-react';
+import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -100,7 +101,7 @@ export default function ClientMenu(props) {
           totalCart={ctrl.confirmedSnapshot.total} 
           clientData={props.clientData} 
           type={props.type} 
-          tableId={props.tableNumber || props.tableId} /* 🔥 FIX: Pasamos el número visual (Ej: 3) */
+          tableId={props.tableNumber || props.tableId} 
           products={ctrl.products} 
           categories={ctrl.categories} 
           getCategoryName={ctrl.getCategoryName} 
@@ -108,23 +109,9 @@ export default function ClientMenu(props) {
           onReset={() => { if (!ctrl.isOrderPaid) ctrl.setIsConfirmed(false); }} 
           onOpenSettings={() => ctrl.setShowSettings(true)}
           isQrActive={ctrl.isServiceActive} 
+          // 🔥 Pasamos el control del cierre al hijo
+          onLogoutClick={() => ctrl.setShowLogoutConfirm(true)}
         />
-
-        {ctrl.isOrderPaid && (
-           <motion.div 
-             initial={{ y: 50, opacity: 0 }} 
-             animate={{ y: 0, opacity: 1 }}
-             className="fixed bottom-6 left-0 right-0 px-6 z-40 flex justify-center pointer-events-none"
-           >
-             <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => ctrl.setShowLogoutConfirm(true)}
-                className="pointer-events-auto bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-4 rounded-full font-black shadow-2xl flex items-center gap-2 border border-gray-700 md:hover:scale-105 transition-transform"
-             >
-                <LogOut size={18} /> Ya me retiro (Cerrar)
-             </motion.button>
-           </motion.div>
-        )}
 
         <AnimatePresence>
           {ctrl.showSettings && (
@@ -165,7 +152,7 @@ export default function ClientMenu(props) {
         displayName={ctrl.displayName}
         displayPhone={ctrl.displayPhone}
         type={props.type}
-        tableId={props.tableNumber || props.tableId} /* 🔥 FIX: Para que la cabecera también diga "Mesa 3" */
+        tableId={props.tableNumber || props.tableId}
         categories={ctrl.categories}
         activeCategory={ctrl.activeCategory}
         setActiveCategory={ctrl.setActiveCategory}

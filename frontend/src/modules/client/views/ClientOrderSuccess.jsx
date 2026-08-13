@@ -1,29 +1,27 @@
-// frontend/src/modules/client/views/ClientOrderSuccess.jsx
+//frontend/src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2, ChevronDown } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2, ChevronDown, LogOut } from 'lucide-react';
 import { socket } from '../../../api/socket.js';
 import client from '../../../api/client.js';
 
-export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid }) {
+// 🔥 Añadido onLogoutClick en las props
+export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid, onLogoutClick }) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
   
-  // 🔥 NUEVO: Estado local reactivo para sincronización instantánea de pagos
   const [localIsPaid, setLocalIsPaid] = useState(isOrderPaid);
   
-  // Estados Dinámicos Sincronizados
   const [bankAccounts, setBankAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
-  const [showBankDetails, setShowBankDetails] = useState(false); // Estado para desplegar cuentas
+  const [showBankDetails, setShowBankDetails] = useState(false); 
   
   const [isProcessingWa, setIsProcessingWa] = useState(false);
   const [copyingId, setCopyingId] = useState(null);
   const isFirstRender = useRef(true);
   
-  // Pre-calcular nombre para que el Socket pueda hacer match
   const parsedNameData = clientData?.name || 'Cliente Lya';
   let displayName = parsedNameData;
   let displayPhone = null;
@@ -43,12 +41,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     setLiveCart(cart || []);
   }, [cart]);
 
-  // Mantener la prop sincronizada si cambia desde arriba
   useEffect(() => {
     setLocalIsPaid(isOrderPaid);
   }, [isOrderPaid]);
 
-  // 🔥 EXTRACTOR INTELIGENTE UNIFICADO + TIEMPO REAL
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -73,7 +69,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             if (waObj) parsedWa = waObj.value;
         } 
         else if (typeof rawData === 'object') {
-            // Sincronizado exactamente con AccountsTab.jsx (bank_accounts)
             parsedAccounts = rawData.bank_accounts || rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || [];
             if (typeof parsedAccounts === 'string') {
                 try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
@@ -99,7 +94,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       fetchSettings();
     }
 
-    // ⚡ TIEMPO REAL: Actualización instantánea si el Admin edita cuentas o WhatsApp
     socket.on('config:update', fetchSettings);
     socket.on('business_config_updated', fetchSettings);
 
@@ -110,7 +104,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
   }, [localIsPaid]);
 
   useEffect(() => {
-    // 1. Escuchar cancelación individual
     const handleItemCancelled = ({ orderId, itemId, productId, cancelQty }) => {
         setLiveCart(prev => {
             let found = false;
@@ -128,7 +121,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 2. Escuchar restauración individual (LIBRE DE CRASHES)
     const handleItemRestored = ({ orderId, itemId, item }) => {
         if (!item) return;
         setLiveCart(prev => {
@@ -141,7 +133,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
             const meta = parsedPreps.find(p => p && p._isPromoMeta);
             
-            // 🔥 CONVERSIÓN SEGURA AL 100%
             const safePrecioUnitario = Number(item.subtotal || 0) / Number(item.quantity || 1);
             const safePrecioOriginal = meta?.precioOriginal ? Number(meta.precioOriginal) : (item.product?.basePrice ? Number(item.product.basePrice) : null);
 
@@ -166,10 +157,8 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         });
     };
 
-    // 3. Escuchar cancelación de la orden
     const handleOrderCancelled = (data) => {
         const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
-        // Validar también por ticketId para pedidos Para Llevar
         const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
         
         if (isMyTable || isMyTakeaway) {
@@ -183,7 +172,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         }
     };
 
-    // 4. Escuchar restauración de la orden
     const handleOrderRestored = (data) => {
         const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
         const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
@@ -193,7 +181,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         }
     };
 
-    // 5. 🔥 Escuchar PAGO DE LA ORDEN en tiempo real
     const handleOrderPaid = (data) => {
         const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
         const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
@@ -220,7 +207,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     };
   }, [tableId, type, displayName, onReset]);
 
-  // FIX CACHÉ (Anti-Amnesia de Refresh)
   useEffect(() => {
     if (isFirstRender.current) {
         isFirstRender.current = false;
@@ -249,12 +235,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   }, [liveCart, cart, onReset]);
 
-  // 🔥 Total en tiempo real (Ignora los cancelados)
   const liveTotal = liveCart
     .filter(item => item.status !== 'CANCELLED')
     .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
 
-  // Utils para copiar y notificar (Cápsulas Neo-Bento)
   const showToast = (message) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
@@ -272,7 +256,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   };
 
-  // 🚀 GENERADOR INTELIGENTE DE MENSAJE DE WHATSAPP (Anti-Caché)
   const handleWhatsApp = async () => {
     if (isProcessingWa || !whatsappNumber) return;
     setIsProcessingWa(true);
@@ -280,7 +263,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       const orderTypeStr = type === 'mesa' ? `Mesa ${tableId}` : 'Para Llevar';
       const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${displayName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${liveTotal.toFixed(2)}\n\nAdjunto el comprobante:`);
       
-      // 🔥 FIX ARQUITECTÓNICO: Usar api.whatsapp.com fuerza a la App a recargar el texto SIEMPRE
       const waUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${text}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     } finally {
@@ -288,7 +270,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   };
 
-  // VISTA DE SOLO LECTURA (MENÚ)
   if (showReadOnlyMenu) {
     return (
       <motion.div 
@@ -363,14 +344,12 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     );
   }
 
-  // VISTA PRINCIPAL (TICKET Y TRANSFERENCIAS)
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }} 
       animate={{ opacity: 1, scale: 1 }} 
       className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative"
     >
-      {/* Notificación Cápsula Neo-Bento */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -392,9 +371,8 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
       </AnimatePresence>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar w-full relative">
-        <div className="flex flex-col items-center justify-start p-6 text-center w-full max-w-sm mx-auto min-h-full pb-24 pt-12">
+        <div className="flex flex-col items-center justify-start p-6 text-center w-full max-w-sm mx-auto min-h-full pb-32 pt-12">
           
-          {/* Botón de Configuración Superior */}
           <motion.button 
             whileTap={{ scale: 0.95 }} 
             onClick={onOpenSettings}
@@ -403,7 +381,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             <Settings size={20} strokeWidth={2.5} />
           </motion.button>
 
-          {/* Animación de Éxito Circular */}
           <div className="relative mb-6 mt-2">
             <motion.div 
               animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
@@ -426,7 +403,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </motion.div>
           </div>
 
-          {/* Textos de Bienvenida */}
           <div className="space-y-1.5 mb-8">
             <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white lya:text-[#3E2723] leading-none text-center">
               ¡Listo, {primerNombre}!
@@ -436,12 +412,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </p>
           </div>
 
-          {/* Tarjeta del Ticket (Neo-Bento) */}
           <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-700/80 lya:border-[#EADCC9] relative overflow-hidden shrink-0 mb-6">
             
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 lya:from-[#78350F] lya:to-orange-500" />
 
-            {/* OVERLAY DE PAGADO EN TIEMPO REAL */}
             <AnimatePresence>
               {localIsPaid && (
                 <motion.div 
@@ -573,7 +547,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </div>
           </div>
 
-          {/* Bloque Condicional: Acciones según Estado de Pago */}
           <div className="w-full shrink-0 relative z-30">
             <AnimatePresence mode="wait">
               {localIsPaid ? (
@@ -587,7 +560,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     <CheckCircle size={18} strokeWidth={2.5} /> Cuenta Pagada
                   </p>
                   <p className="text-emerald-700/80 dark:text-emerald-300/80 text-[11.5px] font-bold leading-relaxed px-2 text-justify mb-4">
-                    Tu cuenta ha sido saldada exitosamente y este ticket ha sido bloqueado. En breve nuestro personal liberará la mesa digitalmente. ¡Gracias por elegir 𝓛𝔂𝓪!
+                    Tu cuenta ha sido saldada exitosamente y este ticket ha sido bloqueado. En breve nuestro personal liberará la orden. ¡Gracias por elegir 𝓛𝔂𝓪!
                   </p>
                   
                   <div className="border-t border-emerald-200/60 dark:border-emerald-800/50 pt-4">
@@ -609,7 +582,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                   exit={{ opacity: 0 }} 
                   className="space-y-6 w-full"
                 >
-                  {/* Módulo Dinámico con Acordeón Desplegable (Neo-Bento) */}
                   <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-5 rounded-[2rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-center">
                     <div className="flex items-center justify-center gap-2 mb-3">
                       <Landmark className="text-orange-500 lya:text-[#78350F]" size={20} strokeWidth={2.5} />
@@ -631,7 +603,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                       </div>
                     ) : (
                       <div className="space-y-3 mb-5">
-                        {/* 🚀 BOTÓN DESPLEGABLE (ACORDEÓN) */}
                         <motion.button
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setShowBankDetails(!showBankDetails)}
@@ -644,7 +615,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                           <ChevronDown size={16} className={`transition-transform duration-300 ${showBankDetails ? 'rotate-180' : ''}`} />
                         </motion.button>
 
-                        {/* 🚀 CAJÓN ANIMADO DE CUENTAS */}
                         <AnimatePresence>
                           {showBankDetails && (
                             <motion.div
@@ -724,7 +694,6 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     </motion.button>
                   </div>
 
-                  {/* Acciones del Pedido Originales */}
                   {isQrActive ? (
                     <div className="space-y-2">
                       <motion.button 
@@ -771,6 +740,26 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
           </div>
         </div>
       </div>
+
+      {/* 🔥 NUEVO: Botón Flotante de Retiro movido aquí (Dinámico para Mesa/Llevar y oculto en Solo Lectura) */}
+      <AnimatePresence>
+        {localIsPaid && !showReadOnlyMenu && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-6 left-0 right-0 px-6 z-40 flex justify-center pointer-events-none"
+          >
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={onLogoutClick}
+              className="pointer-events-auto bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-4 rounded-full font-black shadow-2xl flex items-center gap-2 border border-gray-700 md:hover:scale-105 transition-transform"
+            >
+              <LogOut size={18} /> {type === 'llevar' ? 'Cerrar mi cuenta (Salir)' : 'Ya me retiro (Cerrar)'}
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
