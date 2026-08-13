@@ -448,7 +448,7 @@ export const printPedidoTicket = async (req, res) => {
 };
 
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL (HTML/WHATSAPP)
+// 📱 GENERAR VISTA DEL TICKET DIGITAL (NATIVA NAVEGADOR)
 // ==========================================
 export const sharePedidoTicket = async (req, res) => {
   try {
@@ -490,31 +490,50 @@ export const sharePedidoTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Ticket de Pedido #${pedido.id} - 𝓛𝔂𝓪</title>
+      <title>Ticket_Lya_Pasteleria_${pedido.id}</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      <!-- 🔥 ADIÓS LIBRERÍAS EXTERNAS DE PDF 🔥 -->
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        @media print { .no-print { display: none !important; } }
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
+        
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+        .logo-lya { font-family: 'Dancing Script', cursive; }
+
+        /* 🔥 CSS NATIVO PARA PDF 🔥 */
+        @media print { 
+          @page { margin: 15mm; size: auto; }
+          body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .no-print { display: none !important; } 
+          
+          #ticket-card { 
+            box-shadow: none !important; 
+            border: 2px dashed #e2e8f0 !important; 
+            margin: 0 auto !important; 
+            page-break-inside: avoid;
+            border-radius: 20px !important;
+            padding: 2rem !important;
+          }
+        }
       </style>
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
-        <!-- 🔥 CENTRADOR FIJO 🔥 -->
-        <div class="w-full flex justify-center">
-          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+        
+        <!-- 🔥 CONTENEDOR FLEXIBLE 🔥 -->
+        <div class="w-full flex justify-center relative">
+          <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
-            <div class="flex flex-col items-center mb-6 text-center">
-              <div class="text-4xl mb-2 text-slate-800">🎂</div>
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
-              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Pastelería</p>
-              <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-4">${pedido.id}</h2>
+            <div class="flex flex-col items-center mb-8 text-center">
+              <div class="text-4xl h-12 flex items-center justify-center text-slate-800 mb-2">🎂</div>
+              <div class="h-16 flex items-center justify-center mb-1">
+                <h1 class="text-6xl font-black text-slate-900 tracking-wider logo-lya" style="line-height: normal; margin: 0; padding: 0;">Lya</h1>
+              </div>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 m-0">Pastelería</p>
+              <h2 class="text-2xl font-black text-slate-900 tracking-wider mt-5">${pedido.id}</h2>
             </div>
 
             <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
@@ -539,7 +558,6 @@ export const sharePedidoTicket = async (req, res) => {
                 <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
               </div>
               
-              <!-- 🔥 FIX: Inyección de Dirección para Domicilio -->
               ${pedido.tipoEntrega === 'domicilio' && pedido.direccion ? `
               <div class="flex flex-col gap-1 mt-4 bg-slate-100/80 p-3 rounded-xl border border-slate-200">
                 <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">📍 Dirección de Entrega:</span>
@@ -625,7 +643,7 @@ export const sharePedidoTicket = async (req, res) => {
               <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
                 Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
               </p>
-              <a href="https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
+              <a href="https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline no-print">
                 📍 Ver en Google Maps
               </a>
             </div>
@@ -643,50 +661,13 @@ export const sharePedidoTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="w-full max-w-[380px] px-2 mx-auto">
-          <button onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
-            📥 Descargar Comprobante PDF
+          <!-- 🔥 BOTÓN NATIVO PARA IMPRIMIR/GUARDAR PDF 🔥 -->
+          <button onclick="window.print()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+            🖨️ Guardar o Imprimir PDF
           </button>
         </div>
       </div>
 
-      <script>
-        // 🔥 FIX DEFINITIVO: Hoja A4 Centrada con Matemáticas de Márgenes
-        function descargarPDF() {
-          const element = document.getElementById('ticket-card');
-          
-          const options = {
-            margin:       [20, 54.75, 20, 54.75], // 54.75mm centra perfectamente el ticket de 380px
-            filename:     'Ticket_Lya_Pasteleria_${pedido.id}.pdf',
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { 
-              scale: 2, 
-              useCORS: true, 
-              backgroundColor: '#ffffff' 
-            },
-            jsPDF:        { 
-              unit: 'mm', 
-              format: 'a4', 
-              orientation: 'portrait' 
-            }
-          };
-
-          html2pdf().set(options).from(element).save();
-        }
-
-        function descargarImagen() {
-          const element = document.getElementById('ticket-card');
-          html2canvas(element, { 
-            scale: 3, 
-            useCORS: true, 
-            backgroundColor: '#ffffff'
-          }).then(canvas => {
-            const link = document.createElement('a');
-            link.download = 'Ticket_Lya_Pasteleria_${pedido.id}.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-          });
-        }
-      </script>
     </body>
     </html>
     `;
