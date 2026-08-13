@@ -357,7 +357,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
     }
     const shortId = activeOrderId.split('-')[0];
-    const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(clientData?.name || '')}`;
+    
+    // 🔥 FIX: Si es "Llevar", el backend guardó los items en la cuenta "General".
+    // Si es "Mesa", los guardó con el nombre del cliente.
+    const cuentaTicket = type === 'llevar' ? 'General' : (clientData?.name || '');
+    
+    const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(cuentaTicket)}`;
     window.open(url, '_blank');
   };
 
