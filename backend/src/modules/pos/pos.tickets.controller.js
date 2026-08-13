@@ -627,30 +627,44 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX DEFINITIVO: Sin colapsos y centrado perfecto 🔥
+        // 🔥 FIX SUPREMO Y BLINDADO: El "Estudio Fotográfico" (Clonación) 🔥
         function descargarPDF() {
-          const element = document.getElementById('ticket-card');
-          const wrapper = element.parentElement; // El contenedor flex
+          // 1. Tomamos el elemento original intacto
+          const original = document.getElementById('ticket-card');
 
-          // 1. ANTES DE CAPTURAR: Quitamos el flex (justify-center) temporalmente
-          // Esto pega el ticket a la esquina superior izquierda del DOM (Pixel 0,0 real)
-          // y evita el "doble desplazamiento" en el PDF.
-          const originalWrapperClass = wrapper.className;
-          wrapper.className = "w-full block"; 
-          
-          const originalElementStyle = element.getAttribute('style') || '';
-          element.setAttribute('style', 'width: 380px; max-width: 380px; margin: 0; box-shadow: none !important; border: none !important;');
+          // 2. Creamos un contenedor temporal invisible y pegado a la esquina (Pixel 0,0)
+          const wrapper = document.createElement('div');
+          wrapper.style.position = 'absolute';
+          wrapper.style.top = '0';
+          wrapper.style.left = '0';
+          wrapper.style.width = '380px'; // Forzamos el ancho exacto del ticket
+          wrapper.style.background = '#ffffff';
+          wrapper.style.zIndex = '-9999'; // Lo mandamos detrás para que nadie lo vea
 
-          // 2. Opciones con la matemática exacta (solo números)
+          // 3. Clonamos el ticket para no arruinar tu diseño en pantalla
+          const clone = original.cloneNode(true);
+          clone.style.margin = '0'; // Quitamos márgenes
+          clone.style.boxShadow = 'none'; // Quitamos la sombra para el papel
+          clone.style.border = 'none';
+          clone.style.maxWidth = '100%';
+
+          wrapper.appendChild(clone);
+          document.body.appendChild(wrapper);
+
+          // 4. Configuración matemática exacta
           const options = {
-            margin:       [15, 54.75, 15, 54.75], // 54.75mm centra los 380px en una A4
+            margin:       [15, 54.75, 15, 54.75], // Centra exactamente 380px en una A4
             filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
             image:        { type: 'jpeg', quality: 1 },
             html2canvas:  { 
               scale: 2, 
               useCORS: true, 
               backgroundColor: '#ffffff',
-              windowWidth: 380
+              x: 0, // ¡Fotografía desde el pixel 0 izquierdo!
+              y: 0, // ¡Fotografía desde el pixel 0 superior!
+              scrollX: 0,
+              scrollY: 0,
+              windowWidth: 380 // Obligamos a la cámara a medir 380px
             },
             jsPDF:        { 
               unit: 'mm', 
@@ -659,15 +673,12 @@ export const shareOrderTicket = async (req, res) => {
             }
           };
 
-          // 3. Generamos el PDF
-          html2pdf().set(options).from(element).save().then(() => {
-            // 4. DESPUÉS DE CAPTURAR: Restauramos el diseño del cliente al instante
-            wrapper.className = originalWrapperClass;
-            element.setAttribute('style', originalElementStyle);
+          // 5. Generamos, guardamos y limpiamos la "basura"
+          html2pdf().set(options).from(wrapper).save().then(() => {
+            document.body.removeChild(wrapper); // Destruimos el clon
           }).catch(err => {
-            console.error("Error al generar PDF:", err);
-            wrapper.className = originalWrapperClass;
-            element.setAttribute('style', originalElementStyle);
+            console.error("Error PDF:", err);
+            document.body.removeChild(wrapper); // Destruimos el clon incluso si falla
           });
         }
       </script>
