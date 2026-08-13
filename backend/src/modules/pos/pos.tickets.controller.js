@@ -627,29 +627,30 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX DEFINITIVO PARA PDF EN BLANCO O DESPLAZADO 🔥
+        // 🔥 FIX DEFINITIVO: Sin colapsos y centrado perfecto 🔥
         function descargarPDF() {
           const element = document.getElementById('ticket-card');
           const wrapper = element.parentElement; // El contenedor flex
 
-          // 1. ANTES DE CAPTURAR: Quitamos el flex y centramos el elemento desde la izquierda
-          // Esto garantiza que html2pdf empiece a "leer" desde el pixel 0,0 del ticket.
-          const originalWrapperStyle = wrapper.getAttribute('style') || '';
-          wrapper.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 !important;');
+          // 1. ANTES DE CAPTURAR: Quitamos el flex (justify-center) temporalmente
+          // Esto pega el ticket a la esquina superior izquierda del DOM (Pixel 0,0 real)
+          // y evita el "doble desplazamiento" en el PDF.
+          const originalWrapperClass = wrapper.className;
+          wrapper.className = "w-full block"; 
           
           const originalElementStyle = element.getAttribute('style') || '';
-          element.setAttribute('style', 'width: 380px; max-width: 380px; margin: 0 auto; box-shadow: none !important;');
+          element.setAttribute('style', 'width: 380px; max-width: 380px; margin: 0; box-shadow: none !important; border: none !important;');
 
-          // 2. Opciones de PDF ajustadas para centrado automático
+          // 2. Opciones con la matemática exacta (solo números)
           const options = {
-            margin:       [10, 'auto', 10, 'auto'], // Arriba y abajo 10mm, centrado automático a los lados
+            margin:       [15, 54.75, 15, 54.75], // 54.75mm centra los 380px en una A4
             filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
             image:        { type: 'jpeg', quality: 1 },
             html2canvas:  { 
               scale: 2, 
               useCORS: true, 
               backgroundColor: '#ffffff',
-              windowWidth: 380 // Obligamos al canvas a leer exactamente el ancho de la tarjeta
+              windowWidth: 380
             },
             jsPDF:        { 
               unit: 'mm', 
@@ -660,8 +661,12 @@ export const shareOrderTicket = async (req, res) => {
 
           // 3. Generamos el PDF
           html2pdf().set(options).from(element).save().then(() => {
-            // 4. DESPUÉS DE CAPTURAR: Devolvemos todo a la normalidad en la pantalla del usuario
-            wrapper.setAttribute('style', originalWrapperStyle);
+            // 4. DESPUÉS DE CAPTURAR: Restauramos el diseño del cliente al instante
+            wrapper.className = originalWrapperClass;
+            element.setAttribute('style', originalElementStyle);
+          }).catch(err => {
+            console.error("Error al generar PDF:", err);
+            wrapper.className = originalWrapperClass;
             element.setAttribute('style', originalElementStyle);
           });
         }
