@@ -358,11 +358,15 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }
     const shortId = activeOrderId.split('-')[0];
     
-    // 🔥 FIX: Si es "Llevar", el backend guardó los items en la cuenta "General".
-    // Si es "Mesa", los guardó con el nombre del cliente.
-    const cuentaTicket = type === 'llevar' ? 'General' : (clientData?.name || '');
-    
-    const url = `${baseApiUrl}/pos/ticket/${shortId}?cuenta=${encodeURIComponent(cuentaTicket)}`;
+    // 🔥 FIX DEFINITIVO Y BLINDADO:
+    // Si es "Llevar", NO filtramos por cuenta. Pedimos la orden completa.
+    // El backend sumará todo y usará el nombre real del cliente (guardado en ticketId).
+    // Si es "Mesa", SÍ filtramos por su nombre para no cobrarle lo de los demás comensales.
+    const queryParam = type === 'llevar' 
+      ? '' 
+      : `?cuenta=${encodeURIComponent(clientData?.name || '')}`;
+      
+    const url = `${baseApiUrl}/pos/ticket/${shortId}${queryParam}`;
     window.open(url, '_blank');
   };
 
