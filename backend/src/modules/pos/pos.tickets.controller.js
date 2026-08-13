@@ -101,7 +101,7 @@ export const printOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }]
         }
       ]
     });
@@ -155,7 +155,6 @@ export const printOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salon'}`;
     }
 
-    // 🔥 FOLIOS DINÁMICOS POR DEPARTAMENTO
     const baseFolioStr = order.id.split('-')[0].toUpperCase();
     const hasPasteleria = order.items.some(i => i.product?.departamento === 'pasteleria');
     const hasCafeteria = order.items.some(i => i.product?.departamento !== 'pasteleria');
@@ -168,7 +167,6 @@ export const printOrderTicket = async (req, res) => {
     printer.println("COMPROBANTE DE VENTA");
     printer.setTextDoubleHeight();
     printer.setTextDoubleWidth();
-    // Imprime un folio debajo del otro automáticamente
     foliosArr.forEach(folio => printer.println(folio));
     printer.setTextNormal();
     printer.drawLine();
@@ -316,7 +314,7 @@ export const printOrderTicket = async (req, res) => {
 };
 
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE (WHATSAPP/PDF)
+// 📱 GENERAR VISTA DEL TICKET DIGITAL (USANDO NATIVE BROWSER PRINT)
 // ==========================================
 export const shareOrderTicket = async (req, res) => {
   try {
@@ -347,7 +345,7 @@ export const shareOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] 
         }
       ]
     });
@@ -376,7 +374,6 @@ export const shareOrderTicket = async (req, res) => {
 
     const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
-    // 🔥 Nombre limpio para el ticket
     const nombreCliente = parseAccountName(order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General'));
     
     const d = new Date(order.createdAt);
@@ -403,7 +400,6 @@ export const shareOrderTicket = async (req, res) => {
       identificadorMesa = `Mesa #${order.table?.number || 'Salón'}`;
     }
 
-    // 🔥 FOLIOS DINÁMICOS POR DEPARTAMENTO
     const baseFolioStr = order.id.split('-')[0].toUpperCase();
     const hasPasteleria = itemsFiltrados.some(i => i.product?.departamento === 'pasteleria');
     const hasCafeteria = itemsFiltrados.some(i => i.product?.departamento !== 'pasteleria');
@@ -412,7 +408,6 @@ export const shareOrderTicket = async (req, res) => {
     if (hasCafeteria || !hasPasteleria) foliosArr.push(`CAF-${baseFolioStr}`);
     if (hasPasteleria) foliosArr.push(`PAS-${baseFolioStr}`);
     
-    // Para el HTML usamos un salto de línea (<br>), para el archivo usamos un guion bajo (_)
     const ticketFolioHTML = foliosArr.join('<br>');
     const ticketFolioFile = foliosArr.join('_');
 
@@ -422,17 +417,32 @@ export const shareOrderTicket = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Ticket de Consumo #${ticketFolioFile} - 𝓛𝔂𝓪</title>
+      <title>Ticket_Lya_${ticketFolioFile}</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      <!-- 🔥 ADIÓS LIBRERÍAS DE PDF EXTERNAS 🔥 -->
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        @media print { .no-print { display: none !important; } }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+        
+        /* 🔥 ESTA ES LA MAGIA: CSS NATIVO PARA PDF 🔥 */
+        @media print { 
+          @page { margin: 15mm; size: auto; } /* Margen automático perfecto del OS */
+          body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .no-print { display: none !important; } 
+          
+          #ticket-card { 
+            box-shadow: none !important; 
+            /* Agregamos un borde sutil para que el ticket resalte limpio sobre la hoja blanca */
+            border: 2px dashed #e2e8f0 !important; 
+            margin: 0 auto !important; 
+            page-break-inside: avoid;
+            border-radius: 20px !important;
+            padding: 2rem !important;
+          }
+        }
       </style>
     </head>
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
@@ -453,13 +463,12 @@ export const shareOrderTicket = async (req, res) => {
         </div>
         ` : ''}
 
-        <!-- 🔥 CENTRADOR FIJO (Evita que el PDF se aviente a la izquierda) 🔥 -->
-        <div class="w-full flex justify-center">
-          <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
+        <div class="w-full flex justify-center relative">
+          <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
             <div class="flex flex-col items-center mb-6 text-center">
               <div class="text-4xl mb-2 text-slate-800">☕</div>
-              <!-- 🔥 FIX LYA (Separado de la palabra cafetería) 🔥 -->
+              <!-- Textos limpios sin forcejeos de librerías -->
               <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
               <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
               <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
@@ -528,7 +537,6 @@ export const shareOrderTicket = async (req, res) => {
 
                       return `
                       <div class="flex items-start gap-3 text-sm px-1 mb-3">
-                        <!-- 🔥 FIX CANTIDADES (Cuadro fijo min-w-[28px]) 🔥 -->
                         <span class="font-black text-slate-800 bg-slate-100 min-w-[28px] h-6 flex items-center justify-center rounded-md text-xs mt-0.5 shrink-0">${item.quantity}x</span>
                         <div class="flex-1 min-w-0">
                           <p class="font-bold text-slate-900 break-words leading-tight">
@@ -579,7 +587,7 @@ export const shareOrderTicket = async (req, res) => {
               <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
                 Segunda Calle Ote. Nte., Nuevo Mexico,<br>30540 Pijijiapan, Chis.
               </p>
-              <a href="https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline">
+              <a href="https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a" target="_blank" class="inline-flex items-center justify-center gap-1.5 mt-3 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95 transition-all no-underline no-print">
                 📍 Ver en Google Maps
               </a>
             </div>
@@ -597,51 +605,13 @@ export const shareOrderTicket = async (req, res) => {
 
       <div class="fixed bottom-6 left-0 right-0 flex justify-center p-4 no-print z-50">
         <div class="w-full max-w-[380px] px-2 mx-auto">
-          <button onclick="descargarPDF()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
-            📥 Descargar Comprobante PDF
+          <!-- 🔥 AQUÍ SE LLAMA A LA FUNCIÓN NATIVA DE IMPRESIÓN/PDF DEL SISTEMA 🔥 -->
+          <button onclick="window.print()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+            🖨️ Guardar o Imprimir PDF
           </button>
         </div>
       </div>
 
-      <script>
-        // 🔥 FIX DEFINITIVO: Sin clones, usando matemáticas de márgenes para centrar en A4
-        function descargarPDF() {
-          const element = document.getElementById('ticket-card');
-          
-          // Formato margin de html2pdf: [top, left, bottom, right] en milímetros
-          const options = {
-            margin:       [20, 54.75, 20, 54.75], 
-            filename:     'Ticket_Lya_${ticketFolioFile}.pdf',
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { 
-              scale: 2, 
-              useCORS: true, 
-              backgroundColor: '#ffffff' 
-            },
-            jsPDF:        { 
-              unit: 'mm', 
-              format: 'a4', 
-              orientation: 'portrait' 
-            }
-          };
-
-          html2pdf().set(options).from(element).save();
-        }
-
-        function descargarImagen() {
-          const element = document.getElementById('ticket-card');
-          html2canvas(element, { 
-            scale: 3, 
-            useCORS: true, 
-            backgroundColor: '#ffffff'
-          }).then(canvas => {
-            const link = document.createElement('a');
-            link.download = 'Ticket_Lya_${ticketFolioFile}.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-          });
-        }
-      </script>
     </body>
     </html>
     `;
