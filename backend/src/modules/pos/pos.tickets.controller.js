@@ -422,7 +422,7 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <!-- 🔥 ADIÓS HTML2PDF, HOLA JSPDF Y HTML2CANVAS 🔥 -->
+      <!-- 🔥 JSPDF Y HTML2CANVAS 🔥 -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
       <style>
@@ -457,11 +457,12 @@ export const shareOrderTicket = async (req, res) => {
         <div class="w-full flex justify-center relative">
           <div id="ticket-card" style="width: 100%; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
+            <!-- 🔥 FIX RENDERING: Ajuste de line-height y márgenes para html2canvas 🔥 -->
             <div class="flex flex-col items-center mb-6 text-center">
-              <div class="text-4xl mb-2 text-slate-800">☕</div>
-              <h1 class="text-6xl font-black text-slate-900 tracking-wider" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 0.85; margin-bottom: 0.25rem;">𝓛𝔂𝓪</h1>
-              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 mt-2">Cafetería</p>
-              <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-4 leading-tight">${ticketFolioHTML}</h2>
+              <div class="text-4xl mb-3 text-slate-800 leading-none">☕</div>
+              <h1 class="text-6xl font-black text-slate-900 tracking-wider mb-2" style="font-family: 'Times New Roman', serif; font-style: italic; line-height: 1;">𝓛𝔂𝓪</h1>
+              <p class="text-[10px] uppercase tracking-widest font-extrabold text-slate-500">Cafetería</p>
+              <h2 class="text-[20px] sm:text-[22px] font-black text-slate-900 tracking-wider mt-5 leading-tight">${ticketFolioHTML}</h2>
             </div>
 
             <div class="space-y-2 text-sm font-medium text-slate-600 mb-6 px-1">
@@ -602,7 +603,6 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX SUPREMO: PDF DINÁMICO TAMAÑO TICKET 🔥
         async function descargarPDF() {
           const btn = document.getElementById('btn-descargar');
           const originalText = btn.innerHTML;
@@ -613,7 +613,6 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
 
           try {
-            // 1. Tomamos una captura de alta calidad del ticket sin que el Flexbox interfiera
             const canvas = await html2canvas(element, { 
               scale: 3, 
               useCORS: true, 
@@ -622,19 +621,16 @@ export const shareOrderTicket = async (req, res) => {
 
             const imgData = canvas.toDataURL('image/png');
 
-            // 2. En lugar de una hoja A4, creamos un PDF con formato de "Ticket de Caja"
-            const pdfWidth = 80; // Ancho estándar de un ticket en mm
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; // Calculamos el alto perfecto
+            const pdfWidth = 80; 
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
 
-            // 3. Inicializamos jsPDF nativo
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({
               orientation: 'portrait',
               unit: 'mm',
-              format: [pdfWidth, pdfHeight] // 🔥 ¡MAGIA! El PDF tiene el tamaño exacto del ticket
+              format: [pdfWidth, pdfHeight] 
             });
 
-            // 4. Pegamos la imagen cubriendo el 100% del PDF y descargamos
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
             pdf.save('Ticket_Lya_${ticketFolioFile}.pdf');
 
