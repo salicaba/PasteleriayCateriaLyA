@@ -165,6 +165,24 @@ export default function ClientApp({ type }) {
   const realDbTableId = mesaActivaObj ? String(mesaActivaObj.id) : effectiveTableId;
   const visualTableNumber = mesaActivaObj ? (mesaActivaObj.name || mesaActivaObj.numero || mesaActivaObj.number) : effectiveTableId;
 
+  // 🔥 TÍTULO DINÁMICO DE PESTAÑA (Pilar UX)
+  useEffect(() => {
+    // isGridMode es true cuando el usuario no ha escogido si es mesa o llevar
+    const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection;
+    
+    if (isGridMode) {
+      document.title = "Lya | Menú Digital";
+    } else if (effectiveType === 'mesa' && visualTableNumber) {
+      // Si visualTableNumber ya incluye la palabra "Mesa", evitamos ponerla doble
+      const tableTitle = String(visualTableNumber).toLowerCase().includes('mesa') 
+        ? visualTableNumber 
+        : `Mesa ${visualTableNumber}`;
+      document.title = `Lya | ${tableTitle}`;
+    } else if (effectiveType === 'llevar') {
+      document.title = "Lya | Para Llevar";
+    }
+  }, [clientData, urlTableId, isScannedQr, standaloneSelection, effectiveType, visualTableNumber]);
+
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
