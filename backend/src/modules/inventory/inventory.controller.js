@@ -1,4 +1,3 @@
-// backend/src/modules/inventory/inventory.controller.js
 import { Op } from 'sequelize';
 import InventoryItem from './InventoryItem.model.js';
 import InventoryTransaction from './InventoryTransaction.model.js';
@@ -6,7 +5,7 @@ import InventoryReconciliation from './InventoryReconciliation.model.js';
 import InventoryReconciliationDetail from './InventoryReconciliationDetail.model.js';
 import sequelize from '../../config/database.js';
 import User from '../users/User.model.js';
-import { getIO } from '../../config/socket.js'; // 🔥 FIX: Importar Sockets
+import { getIO } from '../../config/socket.js';
 
 // 1. Obtener todo el inventario activo
 export const getInventory = async (req, res) => {
@@ -102,7 +101,6 @@ export const registerTransaction = async (req, res) => {
 
     await t.commit(); 
 
-    // 🔥 FIX: Emitir el cambio de stock en tiempo real
     getIO().emit('stock:update', [{
       id: inventoryItemId,
       stock: newStock
@@ -163,21 +161,45 @@ export const processReconciliation = async (req, res) => {
   const t = await sequelize.transaction();
   
   try {
-    const { items, notes, userId } = req.body;
+    const { items, notes, userId, date } = req.body;
 
     if (!items || !items.length) {
       throw new Error('No se enviaron insumos para el arqueo.');
     }
 
+    const realExecutionDate = new Date(); 
+    let accountingDate = realExecutionDate; 
+    let isRetroactive = false;
+
+    // 🔥 FIX ZONA HORARIA: Obtenemos la fecha local estricta sin usar .toISOString()
+    const localYear = realExecutionDate.getFullYear();
+    const localMonth = String(realExecutionDate.getMonth() + 1).padStart(2, '0');
+    const localDay = String(realExecutionDate.getDate()).padStart(2, '0');
+    const todayLocalStr = `${localYear}-${localMonth}-${localDay}`;
+
+    if (date && date !== todayLocalStr) {
+      isRetroactive = true;
+      // Rompemos el string YYYY-MM-DD para armar la fecha en horario local evitando el UTC Shift
+      const [y, m, d] = date.split('-');
+      // Meses en JavaScript van de 0 a 11 (por eso m - 1)
+      accountingDate = new Date(y, m - 1, d, 23, 59, 59, 999); 
+    }
+
+    const baseNote = notes || 'Arqueo periódico';
+    const finalNote = isRetroactive 
+      ? `[Registrado el: ${realExecutionDate.toLocaleString()}] ${baseNote}` 
+      : baseNote;
+
     const reconciliation = await InventoryReconciliation.create({
       userId: userId || null,
       status: 'COMPLETED',
       totalConsumptionValue: 0, 
-      notes: notes || 'Arqueo periódico',
+      notes: finalNote,
+      createdAt: accountingDate 
     }, { transaction: t });
 
     let totalCOGS = 0;
-    const stockUpdates = []; // 🔥 FIX: Recolector de emisiones
+    const stockUpdates = []; 
 
     for (const count of items) {
       const { inventoryItemId, physicalStock } = count;
@@ -198,7 +220,8 @@ export const processReconciliation = async (req, res) => {
         physicalStock: parsedPhysical,
         difference: difference,
         averageCostAtTime: averageCost,
-        totalDifferenceCost: differenceCost 
+        totalDifferenceCost: differenceCost,
+        createdAt: accountingDate 
       }, { transaction: t });
 
       if (difference < 0) {
@@ -215,7 +238,8 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: consumedCost,
           reference: `Arqueo #${reconciliation.id}`,
-          notes: notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'
+          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString()}] Ajuste negativo diferido` : (notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'),
+          createdAt: accountingDate 
         }, { transaction: t });
 
       } else if (difference > 0) {
@@ -227,13 +251,13 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: Math.abs(differenceCost),
           reference: `Arqueo #${reconciliation.id}`,
-          notes: notes ? `Ajuste positivo: ${notes}` : 'Ajuste positivo por arqueo'
+          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString()}] Ajuste positivo diferido` : (notes ? `Ajuste: ${notes}` : 'Ajuste positivo por arqueo'),
+          createdAt: accountingDate 
         }, { transaction: t });
       }
 
       await item.update({ currentStock: parsedPhysical }, { transaction: t });
 
-      // 🔥 FIX: Guardar para emitir masivamente
       stockUpdates.push({
         id: item.id,
         stock: parsedPhysical
@@ -244,7 +268,6 @@ export const processReconciliation = async (req, res) => {
 
     await t.commit();
 
-    // 🔥 FIX: Emitimos todos los cambios de inventario al sistema de una vez
     if (stockUpdates.length > 0) {
       getIO().emit('stock:update', stockUpdates);
     }
@@ -270,13 +293,17 @@ export const getGlobalHistory = async (req, res) => {
     const { startDate, endDate } = req.query;
     let dateFilter = {};
     
+    // 🔥 FIX ZONA HORARIA PARA FILTROS
     if (startDate && endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      const [sy, sm, sd] = startDate.split('-');
+      const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0); // Inicio del día en hora local
+      
+      const [ey, em, ed] = endDate.split('-');
+      const end = new Date(ey, em - 1, ed, 23, 59, 59, 999); // Fin del día en hora local
       
       dateFilter = {
         createdAt: {
-          [Op.between]: [new Date(startDate), end]
+          [Op.between]: [start, end]
         }
       };
     }
@@ -284,17 +311,21 @@ export const getGlobalHistory = async (req, res) => {
     const transactions = await InventoryTransaction.findAll({
       where: dateFilter,
       include: [
-        { model: InventoryItem, as: 'InventoryItem', attributes: ['id', 'name', 'sku', 'unit'] }, 
+        { model: InventoryItem, as: 'item', attributes: ['id', 'name', 'sku', 'unit'] }, 
         { model: User, as: 'user', attributes: ['id', 'username', 'fullName'] }
       ],
       order: [['createdAt', 'DESC']]
     });
 
     const totalSpent = transactions
-      .filter(t => t.type === 'IN')
+      .filter(t => ['IN', 'ADJUSTMENT'].includes(t.type))
       .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);
 
-    res.status(200).json({ transactions, totalSpent });
+    const totalOut = transactions
+      .filter(t => ['WASTE', 'CONSUMPTION'].includes(t.type))
+      .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);
+
+    res.status(200).json({ transactions, totalSpent, totalOut });
   } catch (error) {
     console.error('Error fetching global history:', error);
     res.status(500).json({ message: 'Error al obtener el Kardex global.' });

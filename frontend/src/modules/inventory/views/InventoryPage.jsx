@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PackagePlus, Search, AlertCircle, Boxes, Loader2, CheckCircle2, TrendingUp, History, Calendar, Wallet, ChevronDown } from 'lucide-react';
+import { PackagePlus, Search, AlertCircle, Boxes, Loader2, CheckCircle2, TrendingUp, History, Calendar, Wallet, ChevronDown, Activity } from 'lucide-react';
 import { useInventoryController } from '../controllers/useInventoryController';
 import NewItemModal from './NewItemModal';
 import ItemDetailsModal from './ItemDetailsModal';
@@ -72,8 +72,8 @@ export default function InventoryPage() {
   const controller = useInventoryController();
   const { 
     inventory, isLoading, createItem, successScreen, 
-    globalKardex, globalKpiSpent, isKardexLoading, fetchGlobalKardex 
-  } = controller;
+    globalKardex, globalKpiSpent, globalKpiOut, isKardexLoading, fetchGlobalKardex 
+  } = controller; 
   
   const [activeTab, setActiveTab] = useState('catalog'); 
   const [timeFilter, setTimeFilter] = useState('month'); 
@@ -110,7 +110,6 @@ export default function InventoryPage() {
   useEffect(() => {
     if (activeTab === 'kardex') {
       if (timeFilter === 'custom') {
-        // Solo carga si ambas fechas están seleccionadas
         if (customDates.start && customDates.end) {
           fetchGlobalKardex(customDates.start, customDates.end);
         }
@@ -121,7 +120,6 @@ export default function InventoryPage() {
     }
   }, [activeTab, timeFilter, customDates.start, customDates.end, fetchGlobalKardex]);
 
-  // 🔥 AQUÍ ESTÁ LA MAGIA: Si el catálogo O el kardex están cargando, mostramos la pantalla completa
   if (isLoading || isKardexLoading) return <InventoryLoader />;
 
   const filteredInventory = inventory.filter(item => 
@@ -143,6 +141,10 @@ export default function InventoryPage() {
     };
     return styles[type] || { label: type, classes: 'text-gray-700 bg-gray-100 border-gray-200' };
   };
+
+  // 🔥 CÁLCULO DEL BALANCE NETO
+  const netBalance = globalKpiSpent - globalKpiOut;
+  const isBalancePositive = netBalance >= 0;
 
   return (
     <motion.div 
@@ -332,19 +334,41 @@ export default function InventoryPage() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0">
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white dark:to-gray-200 rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden text-white dark:text-gray-900">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 shrink-0">
+              
+              {/* Tarjeta 1: Entradas y Ajustes */}
+              <div className="bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white dark:to-gray-200 rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden text-white dark:text-gray-900 transition-all md:hover:-translate-y-1">
                 <div className="absolute top-0 right-0 p-8 opacity-10"><Wallet size={120} /></div>
                 <div className="relative z-10">
-                  <p className="text-gray-300 dark:text-gray-600 font-bold mb-2">Gasto en Insumos (Periodo)</p>
-                  <h3 className="text-4xl lg:text-5xl font-black truncate">${globalKpiSpent.toFixed(2)}</h3>
+                  <p className="text-gray-300 dark:text-gray-600 font-bold mb-2 uppercase tracking-wider text-[10px]">Valor Ingresado (Periodo)</p>
+                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black truncate">${globalKpiSpent.toFixed(2)}</h3>
                 </div>
               </div>
-              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-5"><TrendingUp size={120} className="text-blue-500" /></div>
+
+              {/* Tarjeta 2: Mermas y Consumos */}
+              <div className="bg-gradient-to-br from-rose-500 to-red-600 rounded-[2.5rem] p-8 shadow-xl shadow-red-500/20 relative overflow-hidden text-white transition-all md:hover:-translate-y-1">
+                <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp size={120} className="rotate-180" /></div>
                 <div className="relative z-10">
-                  <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Costo Total Valorizado (Almacén Actual)</p>
-                  <h3 className="text-4xl lg:text-5xl font-black text-gray-900 dark:text-white truncate">${currentTotalWarehouseValue.toFixed(2)}</h3>
+                  <p className="text-red-100 font-bold mb-2 uppercase tracking-wider text-[10px]">Costo Descontado (Periodo)</p>
+                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black truncate">${globalKpiOut.toFixed(2)}</h3>
+                </div>
+              </div>
+
+              {/* 🔥 Tarjeta 3: Balance Neto Dinámico */}
+              <div className={`rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden text-white transition-all md:hover:-translate-y-1 ${isBalancePositive ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20' : 'bg-gradient-to-br from-orange-500 to-red-600 shadow-red-500/20'}`}>
+                <div className="absolute top-0 right-0 p-8 opacity-10"><Activity size={120} /></div>
+                <div className="relative z-10">
+                  <p className="text-white/80 font-bold mb-2 uppercase tracking-wider text-[10px]">Balance Neto (Periodo)</p>
+                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black truncate">{isBalancePositive ? '+' : '-'}${Math.abs(netBalance).toFixed(2)}</h3>
+                </div>
+              </div>
+
+              {/* Tarjeta 4: Valor Total Almacén */}
+              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all md:hover:-translate-y-1 md:hover:shadow-md">
+                <div className="absolute top-0 right-0 p-8 opacity-5"><Boxes size={120} className="text-blue-500" /></div>
+                <div className="relative z-10">
+                  <p className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase tracking-wider text-[10px]">Valor Almacén (Actual)</p>
+                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white truncate">${currentTotalWarehouseValue.toFixed(2)}</h3>
                 </div>
               </div>
             </div>
@@ -376,15 +400,39 @@ export default function InventoryPage() {
                     ) : (
                       globalKardex.map((tx) => {
                         const style = getTxStyles(tx.type);
+                        
+                        const auditMatch = tx.notes?.match(/\[Registrado el: (.*?)\]/);
+                        const realAuditDateTime = auditMatch ? auditMatch[1] : null;
+                        const displayNotes = tx.notes ? tx.notes.replace(/\[Registrado el: .*?\]\s*/, '') : '-';
+
+                        const accountingDateObj = new Date(tx.createdAt);
+                        const accountingDateStr = accountingDateObj.toLocaleDateString();
+                        const accountingTimeStr = accountingDateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                         return (
                           <tr key={tx.id} className="md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 transition-colors">
                             <td className="p-5 whitespace-nowrap">
-                              <div className="font-bold text-gray-800 dark:text-gray-200">{new Date(tx.createdAt).toLocaleDateString()}</div>
-                              <div className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleTimeString()}</div>
+                              {realAuditDateTime ? (
+                                <div className="flex flex-col gap-1.5">
+                                  <div className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                    {accountingDateStr} 
+                                    <span className="text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider">Diferido</span>
+                                  </div>
+                                  <div className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                                    Teclado: {realAuditDateTime}
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="font-bold text-gray-800 dark:text-gray-200">{accountingDateStr}</div>
+                                  <div className="text-xs text-gray-400 mt-0.5">{accountingTimeStr}</div>
+                                </>
+                              )}
                             </td>
+
                             <td className="p-5">
-                              <div className="font-bold text-gray-800 dark:text-white line-clamp-2">{tx.InventoryItem?.name || 'Desconocido'}</div>
-                              <div className="text-xs text-gray-400 font-mono mt-0.5">{tx.InventoryItem?.sku || ''}</div>
+                              <div className="font-bold text-gray-800 dark:text-white line-clamp-2">{tx.item?.name || 'Desconocido'}</div>
+                              <div className="text-xs text-gray-400 font-mono mt-0.5">{tx.item?.sku || ''}</div>
                             </td>
                             <td className="p-5">
                               <span className={`px-3 py-1 rounded-full text-xs font-bold border ${style.classes}`}>
@@ -392,13 +440,17 @@ export default function InventoryPage() {
                               </span>
                             </td>
                             <td className="p-5 font-black text-gray-900 dark:text-white">
-                              {tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? '+' : '-'}{Number(tx.quantity).toFixed(2)} {tx.InventoryItem?.unit}
+                              <span className={tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                                {tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? '+' : '-'}{Number(tx.quantity).toFixed(2)} {tx.item?.unit}
+                              </span>
                             </td>
                             <td className="p-5 text-gray-600 dark:text-gray-400">
                               ${Number(tx.unitCost).toFixed(2)}
                             </td>
-                            <td className="p-5 font-bold text-gray-800 dark:text-gray-200">
-                              ${Number(tx.totalCost).toFixed(2)}
+                            <td className="p-5 font-bold">
+                              <span className={tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                                {tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? '+' : '-'}${Number(tx.totalCost).toFixed(2)}
+                              </span>
                             </td>
                             <td className="p-5">
                               <div className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-xl inline-block">
@@ -407,7 +459,7 @@ export default function InventoryPage() {
                             </td>
                             <td className="p-5 max-w-[200px]">
                               <p className="text-xs text-gray-500 dark:text-gray-400 text-justify line-clamp-2">
-                                {tx.notes || tx.reference || '-'}
+                                {displayNotes || tx.reference || '-'}
                               </p>
                             </td>
                           </tr>

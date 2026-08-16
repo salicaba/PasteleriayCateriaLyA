@@ -10,13 +10,42 @@ export const useInventoryController = () => {
   // Estados para el Kardex Global
   const [globalKardex, setGlobalKardex] = useState([]);
   const [globalKpiSpent, setGlobalKpiSpent] = useState(0);
+  const [globalKpiOut, setGlobalKpiOut] = useState(0); // 🔥 NUEVO ESTADO
   const [isKardexLoading, setIsKardexLoading] = useState(false);
+
+  // 🔥 SOLUCIÓN: Función maestra para garantizar que TODAS las peticiones lleven el Token de 24h
+  const getAuthHeaders = () => {
+    let token = localStorage.getItem('lya_token');
+    const sessionStr = localStorage.getItem('lya_pos_session');
+    
+    if (sessionStr && !token) {
+      const sessionData = JSON.parse(sessionStr);
+      token = sessionData.userData?.token;
+    }
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  };
+
+  const getUserIdFromSession = () => {
+    const sessionStr = localStorage.getItem('lya_pos_session');
+    if (sessionStr) {
+      return JSON.parse(sessionStr).userData?.id || null;
+    }
+    return null;
+  };
 
   // 1. Obtener el catálogo de inventario
   const fetchInventory = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true); 
     try {
-      const response = await fetch(`${API_URL}/inventory`);
+      const response = await fetch(`${API_URL}/inventory`, {
+        headers: getAuthHeaders() // Inyectamos Header
+      });
       if (!response.ok) throw new Error('Error al cargar el inventario');
       const data = await response.json();
       setInventory(data);
@@ -37,7 +66,7 @@ export const useInventoryController = () => {
     try {
       const response = await fetch(`${API_URL}/inventory`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(), // Inyectamos Header
         body: JSON.stringify(itemData),
       });
       if (!response.ok) {
@@ -54,7 +83,9 @@ export const useInventoryController = () => {
   // 3. Obtener historial (Kardex) de un insumo específico
   const getItemHistory = async (itemId) => {
     try {
-      const response = await fetch(`${API_URL}/inventory/${itemId}/history`);
+      const response = await fetch(`${API_URL}/inventory/${itemId}/history`, {
+        headers: getAuthHeaders() // Inyectamos Header
+      });
       if (!response.ok) throw new Error('Error al obtener el historial');
       return await response.json();
     } catch (err) {
@@ -66,15 +97,11 @@ export const useInventoryController = () => {
   // 4. Registrar una transacción (Entrada o Merma)
   const registerTransaction = async (transactionData) => {
     try {
-      const session = localStorage.getItem('lya_pos_session');
-      let userId = null;
-      if (session) {
-        userId = JSON.parse(session).userData?.id;
-      }
+      const userId = getUserIdFromSession();
 
       const response = await fetch(`${API_URL}/inventory/transaction`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(), // Inyectamos Header
         body: JSON.stringify({ ...transactionData, userId }),
       });
 
@@ -95,6 +122,7 @@ export const useInventoryController = () => {
     try {
       const response = await fetch(`${API_URL}/inventory/${itemId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders() // Inyectamos Header
       });
       if (!response.ok) throw new Error('Error al eliminar el insumo');
       
@@ -107,7 +135,7 @@ export const useInventoryController = () => {
   };
 
   // 6. PROCESAR ARQUEO
-  const processReconciliation = async (itemsCounted, notes = '') => {
+  const processReconciliation = async (itemsCounted, notes = '', customDate = null) => {
     try {
       const sessionStr = localStorage.getItem('lya_pos_session');
       let token = localStorage.getItem('lya_token'); 
@@ -131,7 +159,12 @@ export const useInventoryController = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ items: itemsCounted, notes, userId }),
+        body: JSON.stringify({ 
+          items: itemsCounted, 
+          notes, 
+          userId, 
+          date: customDate // Inyectamos la fecha elegida
+        }),
       });
 
       if (!response.ok) {
@@ -149,11 +182,9 @@ export const useInventoryController = () => {
     }
   };
 
-  // 7. OBTENER KARDEX GLOBAL POR FECHAS (Con retardo artificial anti-parpadeo)
+  // 7. OBTENER KARDEX GLOBAL POR FECHAS
   const fetchGlobalKardex = useCallback(async (startDate, endDate) => {
     setIsKardexLoading(true);
-    
-    // 🔥 Creamos un temporizador que obligue a la promesa a esperar 800ms
     const minLoadTime = new Promise(resolve => setTimeout(resolve, 800));
     
     try {
@@ -161,17 +192,21 @@ export const useInventoryController = () => {
       if (startDate && endDate) {
         queryParams = `?startDate=${startDate}&endDate=${endDate}`;
       }
-      const response = await fetch(`${API_URL}/inventory/history/global${queryParams}`);
+      
+      const response = await fetch(`${API_URL}/inventory/history/global${queryParams}`, {
+        headers: getAuthHeaders()
+      });
+      
       if (!response.ok) throw new Error('Error al cargar el Kardex global');
       
       const data = await response.json();
       setGlobalKardex(data.transactions || []);
       setGlobalKpiSpent(data.totalSpent || 0);
+      setGlobalKpiOut(data.totalOut || 0); // 🔥 ATRAPAMOS EL NUEVO DATO
     } catch (err) {
       console.error(err);
       setError(err.message);
     } finally {
-      // Esperamos a que terminen los 800ms antes de ocultar el loader
       await minLoadTime;
       setIsKardexLoading(false);
     }
@@ -189,6 +224,7 @@ export const useInventoryController = () => {
     processReconciliation,
     globalKardex,
     globalKpiSpent,
+    globalKpiOut, // 🔥 LO EXPORTAMOS
     isKardexLoading,
     fetchGlobalKardex
   };

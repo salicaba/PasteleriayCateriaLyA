@@ -6,23 +6,25 @@ import {
   getItemHistory, 
   deleteItem,
   processReconciliation,
-  getGlobalHistory // 🔥 1. Importamos la nueva función del controlador
+  getGlobalHistory 
 } from './inventory.controller.js';
 
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
-router.get('/', getInventory);
-router.post('/', createItem);
+// 🔥 1. Blindaje total: Todas las rutas de inventario deben estar protegidas
+router.get('/', verifyToken, getInventory);
+router.post('/', verifyToken, createItem);
 
-// 🔥 2. COLOCAR AQUÍ: La ruta global debe ir antes de cualquier ruta dinámica con parámetros (/:id)
+// 🔥 2. RUTAS ESTÁTICAS: La ruta global DEBE ir antes de las dinámicas (/:id)
 router.get('/history/global', verifyToken, getGlobalHistory);
 
 router.post('/reconciliation', verifyToken, processReconciliation);
-router.post('/transaction', registerTransaction);
+router.post('/transaction', verifyToken, registerTransaction);
 
-router.get('/:id/history', getItemHistory);
-router.delete('/:id', deleteItem);
+// 🔥 3. RUTAS DINÁMICAS: Siempre al final
+router.get('/:id/history', verifyToken, getItemHistory);
+router.delete('/:id', verifyToken, deleteItem);
 
 export default router;

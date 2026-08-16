@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInventoryController } from '../controllers/useInventoryController';
-import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2 } from 'lucide-react';
+import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2, CalendarDays } from 'lucide-react';
 
 // --- PANTALLA DE CARGA EXCLUSIVA PARA EL ARQUEO ---
 const ReconciliationLoader = () => (
@@ -31,6 +31,9 @@ export const InventoryReconciliationPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notes, setNotes] = useState('');
+  
+  // 🔥 ESTADO DE FECHA (Se inicializa en HOY y se mantiene estático al guardar)
+  const [reconciliationDate, setReconciliationDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [toastContent, setToastContent] = useState(null);
   const [toastType, setToastType] = useState('success');
@@ -101,7 +104,15 @@ export const InventoryReconciliationPage = () => {
     if (itemsToProcess.length === 0) return;
     try {
       setIsProcessing(true);
-      await processReconciliation(itemsToProcess, notes);
+      
+      // 🔥 Comparamos si la fecha seleccionada es distinta a hoy
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isRetroactive = reconciliationDate !== todayStr;
+      const dateToSend = isRetroactive ? reconciliationDate : null;
+
+      // Enviamos 'dateToSend' al controlador
+      await processReconciliation(itemsToProcess, notes, dateToSend);
+      
       setIsModalOpen(false);
       setCounts({});
       setNotes('');
@@ -145,19 +156,24 @@ export const InventoryReconciliationPage = () => {
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
-        <div className="flex items-center space-x-4">
+      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors flex-wrap">
+        
+        {/* Título e Icono */}
+        <div className="flex items-center space-x-4 shrink-0">
           <div className="bg-blue-500 dark:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-blue-500/20 dark:shadow-blue-900/30 lya:shadow-lya-secondary/20">
             <ClipboardCheck size={28} />
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight transition-colors">Arqueo de Inventario</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Registra tu conteo físico y el sistema calculará el consumo automáticamente.</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1 transition-colors">Registra tu conteo físico y calcula el consumo.</p>
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-          <div className="relative w-full sm:w-64">
+        {/* Controles Dinámicos (Buscador, Fecha, Procesar) */}
+        <div className="flex flex-row flex-wrap items-center justify-start xl:justify-end gap-3 w-full xl:w-auto mt-2 xl:mt-0">
+          
+          {/* BARRA DE BÚSQUEDA */}
+          <div className="relative flex-grow sm:flex-none sm:w-64 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 lya:text-lya-text/40 transition-colors" size={18} />
             <input 
               type="text" 
@@ -168,18 +184,41 @@ export const InventoryReconciliationPage = () => {
             />
           </div>
 
+          {/* SELECTOR DE FECHA PERSONALIZADA Y BOTÓN HOY */}
+          <div className="flex items-center gap-2 flex-grow sm:flex-none">
+            <div className="relative flex-1 sm:w-40 min-w-[140px]">
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" size={18} />
+              <input 
+                type="date" 
+                max={new Date().toISOString().split('T')[0]} // 🔥 BLOQUEO DE FECHAS FUTURAS
+                value={reconciliationDate}
+                onChange={(e) => setReconciliationDate(e.target.value)}
+                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text [&::-webkit-calendar-picker-indicator]:opacity-50 dark:[&::-webkit-calendar-picker-indicator]:invert"
+              />
+            </div>
+            <motion.button 
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setReconciliationDate(new Date().toISOString().split('T')[0])}
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors font-bold shadow-sm text-sm shrink-0"
+            >
+              Hoy
+            </motion.button>
+          </div>
+
+          {/* BOTÓN PROCESAR */}
           <button 
             onClick={handleProcessClick}
             disabled={itemsToProcess.length === 0}
-            className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 ${
+            className={`flex-grow sm:flex-none px-6 py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center space-x-2 shrink-0 ${
               itemsToProcess.length > 0 
-                ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 transform hover:-translate-y-0.5' 
+                ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 transform md:hover:-translate-y-0.5' 
                 : 'bg-gray-300 dark:bg-gray-800 text-gray-500 dark:text-gray-600 lya:bg-lya-border/40 lya:text-lya-text/40 cursor-not-allowed shadow-none'
             }`}
           >
             <Calculator size={20} />
-            <span>Procesar Arqueo ({itemsToProcess.length})</span>
+            <span className="whitespace-nowrap">Procesar Arqueo ({itemsToProcess.length})</span>
           </button>
+
         </div>
       </header>
 
@@ -188,9 +227,9 @@ export const InventoryReconciliationPage = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs uppercase tracking-wider font-bold transition-colors">
-                <th className="p-5">Insumo</th>
-                <th className="p-5 text-center">Stock Lógico</th>
-                <th className="p-5 text-center">Conteo Físico</th>
+                <th className="p-5 text-left">Insumo</th>
+                <th className="p-5 text-right">Stock Lógico</th>
+                <th className="p-5 text-right">Conteo Físico</th>
                 <th className="p-5 text-right">Diferencia</th>
               </tr>
             </thead>
@@ -207,7 +246,7 @@ export const InventoryReconciliationPage = () => {
                       animate={{ opacity: 1, y: 0 }} 
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.02, 0.2) }}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 lya:hover:bg-lya-bg/40 transition-colors"
+                      className="md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40 transition-colors"
                     >
                       <td className="p-5">
                         <p className="font-bold text-gray-800 dark:text-gray-100 lya:text-lya-text transition-colors">{item.name}</p>
@@ -215,18 +254,18 @@ export const InventoryReconciliationPage = () => {
                       </td>
                       
                       <td className="p-5">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text transition-colors">
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text transition-colors tabular-nums">
                             {parseFloat(item.currentStock).toFixed(2)}
                           </span>
-                          <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors">
+                          <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors w-12 text-center shrink-0">
                             {item.unit}
                           </span>
                         </div>
                       </td>
                       
                       <td className="p-5">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-end gap-3">
                           <input
                             type="number"
                             min="0"
@@ -234,9 +273,9 @@ export const InventoryReconciliationPage = () => {
                             placeholder="0.00"
                             value={counts[item.id] !== undefined ? counts[item.id] : ''}
                             onChange={(e) => handleCountChange(item.id, e.target.value)}
-                            className="w-24 text-center p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-500/50 lya:focus:ring-lya-secondary/40 font-bold transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-28 text-right p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-900 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-500/50 lya:focus:ring-lya-secondary/40 font-bold transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums"
                           />
-                          <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors">
+                          <span className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-600 dark:text-gray-400 lya:text-lya-text/70 px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors w-12 text-center shrink-0">
                             {item.unit}
                           </span>
                         </div>
@@ -246,11 +285,11 @@ export const InventoryReconciliationPage = () => {
                         {!item.hasCount ? (
                           <span className="text-gray-400 dark:text-gray-600 lya:text-lya-text/40 font-bold transition-colors">-</span>
                         ) : item.difference < 0 ? (
-                          <span className="text-red-500 dark:text-red-400 lya:text-red-500 flex items-center justify-end gap-1 font-bold transition-colors">
+                          <span className="text-red-500 dark:text-red-400 lya:text-red-500 flex items-center justify-end gap-1 font-bold transition-colors tabular-nums">
                             <AlertCircle size={16} /> {item.difference.toFixed(2)}
                           </span>
                         ) : item.difference > 0 ? (
-                          <span className="text-emerald-500 dark:text-emerald-400 lya:text-lya-secondary flex items-center justify-end gap-1 font-bold transition-colors">
+                          <span className="text-emerald-500 dark:text-emerald-400 lya:text-lya-secondary flex items-center justify-end gap-1 font-bold transition-colors tabular-nums">
                             <CheckCircle2 size={16} /> +{item.difference.toFixed(2)}
                           </span>
                         ) : (
@@ -320,14 +359,14 @@ export const InventoryReconciliationPage = () => {
                 <button 
                   onClick={() => setIsModalOpen(false)}
                   disabled={isProcessing}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 transition-colors disabled:opacity-50"
+                  className="flex-1 py-3 px-4 rounded-xl font-bold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-bg lya:hover:bg-lya-bg/80 text-gray-700 dark:text-gray-300 lya:text-lya-text/80 transition-colors disabled:opacity-50 md:hover:scale-[0.98]"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleConfirmReconciliation}
                   disabled={isProcessing}
-                  className={`flex-1 py-3 px-4 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-lg shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 transform transition-all ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'hover:-translate-y-0.5'}`}
+                  className={`flex-1 py-3 px-4 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white shadow-lg shadow-blue-500/30 dark:shadow-blue-900/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 transform transition-all ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'md:hover:-translate-y-0.5'}`}
                 >
                   {isProcessing ? <><Loader2 size={18} className="animate-spin" /> Procesando...</> : 'Confirmar'}
                 </button>
