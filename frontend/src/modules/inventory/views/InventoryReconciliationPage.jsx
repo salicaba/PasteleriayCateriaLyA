@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useInventoryController } from '../controllers/useInventoryController';
 import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2, CalendarDays } from 'lucide-react';
 
-// --- PANTALLA DE CARGA EXCLUSIVA PARA EL ARQUEO ---
 const ReconciliationLoader = () => (
   <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
@@ -31,8 +30,6 @@ export const InventoryReconciliationPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notes, setNotes] = useState('');
-  
-  // 🔥 ESTADO DE FECHA (Se inicializa en HOY y se mantiene estático al guardar)
   const [reconciliationDate, setReconciliationDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [toastContent, setToastContent] = useState(null);
@@ -90,13 +87,11 @@ export const InventoryReconciliationPage = () => {
 
   const handleProcessClick = () => {
     if (itemsToProcess.length === 0) return;
-
     if (!hasDifferences) {
       showToast('¡Todo cuadra perfectamente! El stock coincide, no hay ajustes.', 'success');
       setCounts({}); 
       return;
     }
-
     setIsModalOpen(true);
   };
 
@@ -104,36 +99,30 @@ export const InventoryReconciliationPage = () => {
     if (itemsToProcess.length === 0) return;
     try {
       setIsProcessing(true);
-      
-      // 🔥 Comparamos si la fecha seleccionada es distinta a hoy
       const todayStr = new Date().toISOString().split('T')[0];
       const isRetroactive = reconciliationDate !== todayStr;
       const dateToSend = isRetroactive ? reconciliationDate : null;
 
-      // Enviamos 'dateToSend' al controlador
       await processReconciliation(itemsToProcess, notes, dateToSend);
-      
       setIsModalOpen(false);
       setCounts({});
       setNotes('');
       
       showToast(
         <div className="flex flex-col text-left w-full gap-0.5 py-0.5">
-          <span className="text-[15px] font-black">¡Arqueo procesado!</span>
-          <div className="text-[13px] font-medium opacity-90 mt-1 space-y-1.5">
+          <span className="text-[15px] font-black text-center">¡Arqueo procesado!</span>
+          <div className="text-[13px] font-medium opacity-90 mt-1 space-y-1.5 text-center">
             <p className="leading-tight">El inventario se ha actualizado correctamente.</p>
-            
             {totalCOGS > 0 && (
               <div className="flex justify-between items-center border-t border-black/10 dark:border-white/10 pt-1.5 mt-1">
                 <span>Merma / Consumo:</span>
-                <span className="text-red-500 dark:text-red-400 font-bold ml-4">-${totalCOGS.toFixed(2)}</span>
+                <span className="text-red-500 dark:text-red-400 font-bold ml-4 tabular-nums">-${totalCOGS.toFixed(2)}</span>
               </div>
             )}
-            
             {totalSurplus > 0 && (
               <div className="flex justify-between items-center border-t border-black/10 dark:border-white/10 pt-1.5 mt-1">
                 <span>Ajuste Positivo:</span>
-                <span className="text-emerald-500 dark:text-emerald-400 font-bold ml-4">+${totalSurplus.toFixed(2)}</span>
+                <span className="text-emerald-500 dark:text-emerald-400 font-bold ml-4 tabular-nums">+${totalSurplus.toFixed(2)}</span>
               </div>
             )}
           </div>
@@ -150,6 +139,7 @@ export const InventoryReconciliationPage = () => {
   };
 
   return (
+    // PILAR 1: Raíz estricta overflow-hidden
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
@@ -157,8 +147,6 @@ export const InventoryReconciliationPage = () => {
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors flex-wrap">
-        
-        {/* Título e Icono */}
         <div className="flex items-center space-x-4 shrink-0">
           <div className="bg-blue-500 dark:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-blue-500/20 dark:shadow-blue-900/30 lya:shadow-lya-secondary/20">
             <ClipboardCheck size={28} />
@@ -169,10 +157,7 @@ export const InventoryReconciliationPage = () => {
           </div>
         </div>
         
-        {/* Controles Dinámicos (Buscador, Fecha, Procesar) */}
         <div className="flex flex-row flex-wrap items-center justify-start xl:justify-end gap-3 w-full xl:w-auto mt-2 xl:mt-0">
-          
-          {/* BARRA DE BÚSQUEDA */}
           <div className="relative flex-grow sm:flex-none sm:w-64 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 lya:text-lya-text/40 transition-colors" size={18} />
             <input 
@@ -184,13 +169,12 @@ export const InventoryReconciliationPage = () => {
             />
           </div>
 
-          {/* SELECTOR DE FECHA PERSONALIZADA Y BOTÓN HOY */}
           <div className="flex items-center gap-2 flex-grow sm:flex-none">
             <div className="relative flex-1 sm:w-40 min-w-[140px]">
               <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" size={18} />
               <input 
                 type="date" 
-                max={new Date().toISOString().split('T')[0]} // 🔥 BLOQUEO DE FECHAS FUTURAS
+                max={new Date().toISOString().split('T')[0]}
                 value={reconciliationDate}
                 onChange={(e) => setReconciliationDate(e.target.value)}
                 className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text [&::-webkit-calendar-picker-indicator]:opacity-50 dark:[&::-webkit-calendar-picker-indicator]:invert"
@@ -205,7 +189,6 @@ export const InventoryReconciliationPage = () => {
             </motion.button>
           </div>
 
-          {/* BOTÓN PROCESAR */}
           <button 
             onClick={handleProcessClick}
             disabled={itemsToProcess.length === 0}
@@ -218,15 +201,15 @@ export const InventoryReconciliationPage = () => {
             <Calculator size={20} />
             <span className="whitespace-nowrap">Procesar Arqueo ({itemsToProcess.length})</span>
           </button>
-
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto hide-scrollbar bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 mb-4 pb-20 transition-colors">
-        <div className="overflow-x-auto hide-scrollbar">
+      {/* 🔥 PILAR 1: CONTENEDOR CON SCROLL AISLADO SÓLO PARA LA TABLA */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors">
+        <div className="flex-1 overflow-auto hide-scrollbar relative">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 dark:bg-gray-950/50 lya:bg-lya-bg/50 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs uppercase tracking-wider font-bold transition-colors">
+            <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-sm">
+              <tr className="border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 text-gray-500 dark:text-gray-400 lya:text-lya-text/70 text-xs uppercase tracking-wider font-bold transition-colors">
                 <th className="p-5 text-left">Insumo</th>
                 <th className="p-5 text-right">Stock Lógico</th>
                 <th className="p-5 text-right">Conteo Físico</th>
@@ -319,39 +302,39 @@ export const InventoryReconciliationPage = () => {
                   <Calculator size={28} className="text-blue-500 dark:text-blue-400 lya:text-lya-secondary" />
                 </div>
                 <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-white lya:text-lya-text transition-colors">Confirmar Arqueo</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 transition-colors">Vas a actualizar el sistema con tu conteo físico. Revisa el impacto financiero:</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 transition-colors text-center">Vas a actualizar el sistema con tu conteo físico. Revisa el impacto financiero:</p>
               </div>
 
               <div className="flex flex-col gap-3 mb-6">
                 {totalCOGS > 0 && (
                   <div className="bg-red-50 dark:bg-red-900/10 lya:bg-red-900/20 border border-red-100 dark:border-red-900/30 lya:border-red-900/50 rounded-2xl p-4 text-center transition-colors">
                     <span className="text-red-600 dark:text-red-400 lya:text-red-400 text-[10px] font-black uppercase tracking-widest transition-colors">Costo de Ventas / Consumo</span>
-                    <p className="text-3xl font-black text-red-600 dark:text-red-500 lya:text-red-400 mt-1 transition-colors">
+                    <p className="text-3xl font-black text-red-600 dark:text-red-500 lya:text-red-400 mt-1 transition-colors tabular-nums">
                       -${totalCOGS.toFixed(2)}
                     </p>
-                    <p className="text-xs text-red-500/80 dark:text-red-400/80 mt-1 font-medium transition-colors">Este valor se descontará de las ganancias (insumos consumidos o mermas).</p>
+                    <p className="text-xs text-red-500/80 dark:text-red-400/80 mt-1 font-medium transition-colors text-center">Este valor se descontará de las ganancias (insumos consumidos o mermas).</p>
                   </div>
                 )}
 
                 {totalSurplus > 0 && (
                   <div className="bg-emerald-50 dark:bg-emerald-900/10 lya:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 lya:border-emerald-900/50 rounded-2xl p-4 text-center transition-colors">
                     <span className="text-emerald-600 dark:text-emerald-400 lya:text-emerald-400 text-[10px] font-black uppercase tracking-widest transition-colors">Ajuste Positivo / Sobrante</span>
-                    <p className="text-3xl font-black text-emerald-600 dark:text-emerald-500 lya:text-emerald-400 mt-1 transition-colors">
+                    <p className="text-3xl font-black text-emerald-600 dark:text-emerald-500 lya:text-emerald-400 mt-1 transition-colors tabular-nums">
                       +${totalSurplus.toFixed(2)}
                     </p>
-                    <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium transition-colors">Este valor se sumará al inventario (producto encontrado a favor).</p>
+                    <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium transition-colors text-center">Este valor se sumará al inventario (producto encontrado a favor).</p>
                   </div>
                 )}
               </div>
 
               <div className="mb-6">
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-gray-300 mb-2 uppercase tracking-wider transition-colors">Notas del Arqueo (Opcional)</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-gray-300 mb-2 uppercase tracking-wider transition-colors text-center">Notas del Arqueo (Opcional)</label>
                 <textarea 
                   rows="2"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej: Conteo cierre de turno, faltó leche..."
-                  className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-gray-50 dark:bg-gray-800 lya:bg-lya-ui text-gray-800 dark:text-gray-200 lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 text-sm resize-none transition-all"
+                  className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border bg-gray-50 dark:bg-gray-800 lya:bg-lya-ui text-gray-800 dark:text-gray-200 lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 text-sm resize-none transition-all text-justify"
                 ></textarea>
               </div>
 
@@ -390,7 +373,7 @@ export const InventoryReconciliationPage = () => {
                 {toastType === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
               </div>
               <div className="flex flex-col flex-1">
-                {typeof toastContent === 'string' ? <span className="text-sm mt-1">{toastContent}</span> : toastContent}
+                {typeof toastContent === 'string' ? <span className="text-sm mt-1 text-center">{toastContent}</span> : toastContent}
               </div>
             </motion.div>
           </div>

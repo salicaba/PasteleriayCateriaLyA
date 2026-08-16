@@ -1,3 +1,4 @@
+// frontend/src/modules/inventory/views/InventoryPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PackagePlus, Search, AlertCircle, Boxes, Loader2, CheckCircle2, TrendingUp, History, Calendar, Wallet, ChevronDown, Activity } from 'lucide-react';
@@ -44,7 +45,7 @@ const getDates = (filter) => {
       break;
     case 'month':
       start = new Date(now.getFullYear(), now.getMonth(), 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Día 0 del próximo mes = Último día del mes actual
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       break;
     case 'lastMonth':
       start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -95,7 +96,6 @@ export default function InventoryPage() {
     setTimeout(() => setSuccessMessage(''), 3000); 
   };
 
-  // Cierra el menú desplegable al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -106,7 +106,6 @@ export default function InventoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // MOTOR DE CARGA INTELIGENTE (Kardex Global)
   useEffect(() => {
     if (activeTab === 'kardex') {
       if (timeFilter === 'custom') {
@@ -142,11 +141,11 @@ export default function InventoryPage() {
     return styles[type] || { label: type, classes: 'text-gray-700 bg-gray-100 border-gray-200' };
   };
 
-  // 🔥 CÁLCULO DEL BALANCE NETO
   const netBalance = globalKpiSpent - globalKpiOut;
   const isBalancePositive = netBalance >= 0;
 
   return (
+    // PILAR 1: Flexbox estricto desde la raíz para evitar scroll del body
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
@@ -165,7 +164,7 @@ export default function InventoryPage() {
             </div>
           </div>
           
-          <div className="flex bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-1 rounded-2xl w-full md:w-auto">
+          <div className="flex bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-1 rounded-2xl w-full md:w-auto shrink-0">
             <button
               onClick={() => setActiveTab('catalog')}
               className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'catalog' ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 md:hover:text-gray-200'}`}
@@ -182,13 +181,15 @@ export default function InventoryPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar rounded-[2rem] flex flex-col gap-6 pb-20">
+      {/* 🔥 PILAR 1: ESTE CONTENEDOR NO HACE SCROLL, DELEGA EL SCROLL A LAS TABLAS */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         
         {/* VISTA 1: CATÁLOGO */}
         {activeTab === 'catalog' && (
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white dark:bg-gray-900">
-              <div className="relative w-full sm:w-80">
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="h-full flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden">
+            {/* Cabecera del panel fija */}
+            <div className="p-6 shrink-0 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white dark:bg-gray-900">
+              <div className="relative w-full sm:w-80 shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input 
                   type="text" 
@@ -201,21 +202,23 @@ export default function InventoryPage() {
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 md:hover:shadow-lg md:hover:-translate-y-0.5 text-white px-6 py-3 rounded-xl font-bold shadow-md shadow-blue-500/30 transition-all flex items-center justify-center space-x-2"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 md:hover:shadow-lg md:hover:-translate-y-0.5 text-white px-6 py-3 rounded-xl font-bold shadow-md shadow-blue-500/30 transition-all flex items-center justify-center space-x-2 shrink-0"
               >
                 <PackagePlus size={20} /> <span>Añadir Insumo</span>
               </motion.button>
             </div>
 
-            <div className="flex-1 overflow-x-auto custom-scrollbar">
+            {/* 🔥 CONTENEDOR CON SCROLL AISLADO PARA LA TABLA */}
+            <div className="flex-1 overflow-auto custom-scrollbar relative">
               <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/50 dark:bg-gray-950/50 border-b border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
-                    <th className="p-5">SKU / Nombre</th>
-                    <th className="p-5">Unidad</th>
-                    <th className="p-5">Stock Actual</th>
-                    <th className="p-5">Costo Promedio</th>
-                    <th className="p-5">Costo Total</th>
+                {/* 🔥 PILAR 4: ENCABEZADO STICKY CON EFECTO BLUR NEO-BENTO */}
+                <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-sm">
+                  <tr className="border-b border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
+                    <th className="p-5 text-left">SKU / Nombre</th>
+                    <th className="p-5 text-center">Unidad</th>
+                    <th className="p-5 text-right">Stock Actual</th>
+                    <th className="p-5 text-right">Costo Promedio</th>
+                    <th className="p-5 text-right">Costo Total</th>
                     <th className="p-5 text-center">Estado</th>
                   </tr>
                 </thead>
@@ -238,19 +241,21 @@ export default function InventoryPage() {
                               <div className="text-xs text-gray-400 font-mono mt-1">{item.sku || 'Sin SKU'}</div>
                             </td>
                             <td className="p-5">
-                              <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                                {item.unit}
-                              </span>
+                              <div className="flex justify-center">
+                                <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                  {item.unit}
+                                </span>
+                              </div>
                             </td>
-                            <td className="p-5 font-black text-lg text-gray-900 dark:text-white">
+                            <td className="p-5 font-black text-lg text-gray-900 dark:text-white text-right tabular-nums">
                               {Number(item.currentStock).toFixed(2)}
                             </td>
-                            <td className="p-5">
+                            <td className="p-5 text-right tabular-nums">
                               <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                                 ${Number(item.averageCost).toFixed(2)}
                               </span>
                             </td>
-                            <td className="p-5">
+                            <td className="p-5 text-right tabular-nums">
                               <span className="font-black text-gray-800 dark:text-gray-200">
                                 ${(Number(item.currentStock) * Number(item.averageCost)).toFixed(2)}
                               </span>
@@ -258,11 +263,11 @@ export default function InventoryPage() {
                             <td className="p-5 text-center">
                               <div className="flex justify-center">
                                 {isLowStock ? (
-                                  <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-100 dark:border-red-900/30">
-                                    <AlertCircle size={14} /> Bajo Stock
+                                  <div className="flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-xl text-xs font-bold border border-red-100 dark:border-red-900/30 w-full max-w-[120px]">
+                                    <AlertCircle size={14} /> Bajo
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-xl text-xs font-bold border border-emerald-100 dark:border-emerald-900/30">
+                                  <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-xl text-xs font-bold border border-emerald-100 dark:border-emerald-900/30 w-full max-w-[120px]">
                                     Óptimo
                                   </div>
                                 )}
@@ -281,12 +286,11 @@ export default function InventoryPage() {
 
         {/* VISTA 2: KARDEX GLOBAL */}
         {activeTab === 'kardex' && (
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 flex flex-col gap-6">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="h-full flex flex-col gap-4 lg:gap-6 overflow-hidden">
             
-            {/* Controles de Filtro con Menú Desplegable (SIEMPRE VISIBLES) */}
-            <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-4 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 flex flex-wrap gap-4 items-center">
-              
-              <div className="relative" ref={dropdownRef}>
+            {/* Controles de Filtro Fijos */}
+            <div className="shrink-0 bg-white dark:bg-gray-900 lya:bg-lya-surface p-4 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 flex flex-wrap gap-4 items-center">
+              <div className="relative shrink-0" ref={dropdownRef}>
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
@@ -325,7 +329,7 @@ export default function InventoryPage() {
               </div>
 
               {timeFilter === 'custom' && (
-                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2">
+                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex flex-wrap items-center gap-2 shrink-0">
                   <input type="date" value={customDates.start} onChange={e => setCustomDates({...customDates, start: e.target.value})} className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30" />
                   <span className="text-gray-400 font-bold">-</span>
                   <input type="date" value={customDates.end} onChange={e => setCustomDates({...customDates, end: e.target.value})} className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30" />
@@ -333,65 +337,63 @@ export default function InventoryPage() {
               )}
             </div>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 shrink-0">
+            {/* 🔥 TARJETAS KPI DESLIZABLES HORIZONTALMENTE EN MÓVILES */}
+            <div className="flex overflow-x-auto hide-scrollbar gap-4 md:gap-6 shrink-0 pb-2 snap-x">
               
-              {/* Tarjeta 1: Entradas y Ajustes */}
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white dark:to-gray-200 rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden text-white dark:text-gray-900 transition-all md:hover:-translate-y-1">
-                <div className="absolute top-0 right-0 p-8 opacity-10"><Wallet size={120} /></div>
+              <div className="min-w-[260px] md:min-w-[280px] flex-1 snap-start bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white dark:to-gray-200 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-xl relative overflow-hidden text-white dark:text-gray-900 transition-all md:hover:-translate-y-1">
+                <div className="absolute top-0 right-0 p-6 md:p-8 opacity-10"><Wallet size={100} /></div>
                 <div className="relative z-10">
                   <p className="text-gray-300 dark:text-gray-600 font-bold mb-2 uppercase tracking-wider text-[10px]">Valor Ingresado (Periodo)</p>
-                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black truncate">${globalKpiSpent.toFixed(2)}</h3>
+                  <h3 className="text-3xl xl:text-4xl font-black truncate">${globalKpiSpent.toFixed(2)}</h3>
                 </div>
               </div>
 
-              {/* Tarjeta 2: Mermas y Consumos */}
-              <div className="bg-gradient-to-br from-rose-500 to-red-600 rounded-[2.5rem] p-8 shadow-xl shadow-red-500/20 relative overflow-hidden text-white transition-all md:hover:-translate-y-1">
-                <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp size={120} className="rotate-180" /></div>
+              <div className="min-w-[260px] md:min-w-[280px] flex-1 snap-start bg-gradient-to-br from-rose-500 to-red-600 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-xl shadow-red-500/20 relative overflow-hidden text-white transition-all md:hover:-translate-y-1">
+                <div className="absolute top-0 right-0 p-6 md:p-8 opacity-10"><TrendingUp size={100} className="rotate-180" /></div>
                 <div className="relative z-10">
                   <p className="text-red-100 font-bold mb-2 uppercase tracking-wider text-[10px]">Costo Descontado (Periodo)</p>
-                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black truncate">${globalKpiOut.toFixed(2)}</h3>
+                  <h3 className="text-3xl xl:text-4xl font-black truncate">${globalKpiOut.toFixed(2)}</h3>
                 </div>
               </div>
 
-              {/* 🔥 Tarjeta 3: Balance Neto Dinámico */}
-              <div className={`rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden text-white transition-all md:hover:-translate-y-1 ${isBalancePositive ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20' : 'bg-gradient-to-br from-orange-500 to-red-600 shadow-red-500/20'}`}>
-                <div className="absolute top-0 right-0 p-8 opacity-10"><Activity size={120} /></div>
+              <div className={`min-w-[260px] md:min-w-[280px] flex-1 snap-start rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-xl relative overflow-hidden text-white transition-all md:hover:-translate-y-1 ${isBalancePositive ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20' : 'bg-gradient-to-br from-orange-500 to-red-600 shadow-red-500/20'}`}>
+                <div className="absolute top-0 right-0 p-6 md:p-8 opacity-10"><Activity size={100} /></div>
                 <div className="relative z-10">
                   <p className="text-white/80 font-bold mb-2 uppercase tracking-wider text-[10px]">Balance Neto (Periodo)</p>
-                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black truncate">{isBalancePositive ? '+' : '-'}${Math.abs(netBalance).toFixed(2)}</h3>
+                  <h3 className="text-3xl xl:text-4xl font-black truncate">{isBalancePositive ? '+' : '-'}${Math.abs(netBalance).toFixed(2)}</h3>
                 </div>
               </div>
 
-              {/* Tarjeta 4: Valor Total Almacén */}
-              <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all md:hover:-translate-y-1 md:hover:shadow-md">
-                <div className="absolute top-0 right-0 p-8 opacity-5"><Boxes size={120} className="text-blue-500" /></div>
+              <div className="min-w-[260px] md:min-w-[280px] flex-1 snap-start bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all md:hover:-translate-y-1 md:hover:shadow-md">
+                <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5"><Boxes size={100} className="text-blue-500" /></div>
                 <div className="relative z-10">
                   <p className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase tracking-wider text-[10px]">Valor Almacén (Actual)</p>
-                  <h3 className="text-4xl lg:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white truncate">${currentTotalWarehouseValue.toFixed(2)}</h3>
+                  <h3 className="text-3xl xl:text-4xl font-black text-gray-900 dark:text-white truncate">${currentTotalWarehouseValue.toFixed(2)}</h3>
                 </div>
               </div>
             </div>
 
-            {/* Tabla del Kardex */}
-            <div className="flex-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50 flex items-center gap-3">
+            {/* Panel de Tabla Fijo */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
+              <div className="p-6 shrink-0 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center gap-3">
                 <History className="text-gray-400" />
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">Movimientos Globales</h3>
               </div>
               
-              <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar relative">
+              {/* SCROLL INTERNO PARA EL KARDEX */}
+              <div className="flex-1 overflow-auto custom-scrollbar relative">
                 <table className="w-full text-left border-collapse min-w-[800px]">
-                  <thead className="sticky top-0 bg-white dark:bg-gray-900 z-10 shadow-sm">
+                  {/* HEADER STICKY */}
+                  <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-sm">
                     <tr className="border-b border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">
-                      <th className="p-5">Fecha / Hora</th>
-                      <th className="p-5">Insumo</th>
-                      <th className="p-5">Tipo</th>
-                      <th className="p-5">Cantidad</th>
-                      <th className="p-5">Costo Unit.</th>
-                      <th className="p-5">Costo Total</th>
-                      <th className="p-5">Usuario</th>
-                      <th className="p-5 max-w-[200px]">Notas</th>
+                      <th className="p-5 text-left">Fecha / Hora</th>
+                      <th className="p-5 text-left">Insumo</th>
+                      <th className="p-5 text-center">Tipo</th>
+                      <th className="p-5 text-right">Cantidad</th>
+                      <th className="p-5 text-right">Costo Unit.</th>
+                      <th className="p-5 text-right">Costo Total</th>
+                      <th className="p-5 text-center">Usuario</th>
+                      <th className="p-5 text-left max-w-[200px]">Notas</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -434,25 +436,25 @@ export default function InventoryPage() {
                               <div className="font-bold text-gray-800 dark:text-white line-clamp-2">{tx.item?.name || 'Desconocido'}</div>
                               <div className="text-xs text-gray-400 font-mono mt-0.5">{tx.item?.sku || ''}</div>
                             </td>
-                            <td className="p-5">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${style.classes}`}>
+                            <td className="p-5 text-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${style.classes} inline-block`}>
                                 {style.label}
                               </span>
                             </td>
-                            <td className="p-5 font-black text-gray-900 dark:text-white">
+                            <td className="p-5 font-black text-gray-900 dark:text-white text-right tabular-nums">
                               <span className={tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
                                 {tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? '+' : '-'}{Number(tx.quantity).toFixed(2)} {tx.item?.unit}
                               </span>
                             </td>
-                            <td className="p-5 text-gray-600 dark:text-gray-400">
+                            <td className="p-5 text-gray-600 dark:text-gray-400 text-right tabular-nums">
                               ${Number(tx.unitCost).toFixed(2)}
                             </td>
-                            <td className="p-5 font-bold">
+                            <td className="p-5 font-bold text-right tabular-nums">
                               <span className={tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
                                 {tx.type === 'IN' || tx.type === 'ADJUSTMENT' ? '+' : '-'}${Number(tx.totalCost).toFixed(2)}
                               </span>
                             </td>
-                            <td className="p-5">
+                            <td className="p-5 text-center">
                               <div className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-xl inline-block">
                                 {tx.user?.username || 'Sistema'}
                               </div>
@@ -474,7 +476,7 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* MODALES Y NOTIFICACIONES */}
+      {/* MODALES Y NOTIFICACIONES NATIVAS */}
       <AnimatePresence>
         {isModalOpen && (
           <NewItemModal 
