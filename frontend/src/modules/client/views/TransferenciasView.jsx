@@ -1,5 +1,5 @@
 // src/modules/client/views/TransferenciasView.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Landmark, Copy, Check, MessageCircle, AlertCircle, 
@@ -15,6 +15,68 @@ const SIZES = [
   { label: 'Grande', val: '20px' }
 ];
 
+const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassName, buttonClassName }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className={`relative ${containerClassName}`} ref={dropdownRef}>
+      <button 
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full transition-colors ${buttonClassName}`}
+      >
+        <div className="flex items-center truncate">
+          {Icon && <Icon size={16} className="text-gray-400 dark:text-gray-500 lya:text-lya-primary mr-2 shrink-0" />}
+          <span className="truncate">{selected?.label}</span>
+        </div>
+        <ChevronDown size={14} className={`text-gray-400 dark:text-gray-500 ml-2 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute z-50 top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl shadow-xl overflow-hidden py-1"
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
+                  value === opt.value 
+                    ? 'bg-red-50 dark:bg-gray-700 lya:bg-lya-primary/10 text-red-600 dark:text-white lya:text-lya-primary' 
+                    : 'text-gray-600 dark:text-gray-300 lya:text-lya-text hover:bg-gray-50 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg/50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export const TransferenciasView = () => {
   const [accounts, setAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -27,6 +89,15 @@ export const TransferenciasView = () => {
   const [themeIndex, setThemeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_theme') || '2'));
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // 🔥 NUEVO: Cambiar el título de la pestaña dinámicamente
+  useEffect(() => {
+    document.title = "Lya | Transferencias";
+    
+    // Opcional: Si quieres que al salir de la vista regrese al título original, 
+    // descomenta la siguiente línea:
+    // return () => { document.title = "Lya | Ecosistema"; };
+  }, []);
 
   // 🔥 EXTRACTOR INTELIGENTE UNIFICADO + TIEMPO REAL
   useEffect(() => {
@@ -134,37 +205,19 @@ export const TransferenciasView = () => {
     }
   };
 
-  // 🚀 GENERADOR INTELIGENTE DE MENSAJE DE WHATSAPP (Homologado con ClientOrderSuccess)
+  // 🚀 MENSAJE DE WHATSAPP SIMPLIFICADO PARA QR PÚBLICO
   const handleWhatsApp = () => {
     if (!whatsappNumber) return;
 
-    let clientName = 'Cliente';
-    let orderTypeStr = 'General';
-    let orderTotal = '0.00';
-
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.toLowerCase().includes('client') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('cart') || key.toLowerCase().includes('order'))) {
-          const val = localStorage.getItem(key);
-          if (val) {
-            const parsed = JSON.parse(val);
-            if (parsed.clientData?.name) {
-               clientName = parsed.clientData.name.split(' | ')[0].split(' - ')[0].trim();
-            }
-            if (parsed.type) {
-              orderTypeStr = parsed.type === 'mesa' ? `Mesa ${parsed.tableId || ''}` : 'Para Llevar';
-            }
-            if (parsed.total) orderTotal = Number(parsed.total).toFixed(2);
-            break;
-          }
-        }
-      }
-    } catch (e) {}
-
-    const text = encodeURIComponent(`¡Hola! Envío mi comprobante de pago por transferencia.\n\n💳 *Cliente:* ${clientName}\n🧾 *Orden:* ${orderTypeStr}\n💵 *Total Pagado:* $${orderTotal}\n\nAdjunto el comprobante:`);
+    // 🔥 FIX: Mensaje estático con placeholders en lugar de buscar en localStorage
+    const text = encodeURIComponent(
+      `¡Hola! Envío mi comprobante de pago por transferencia.\n\n` +
+      `💳 *Cliente:* [Escribe tu nombre]\n` +
+      `🧾 *Mesa / Orden:* [Ej. Mesa 4 o Para llevar]\n` +
+      `💵 *Total Pagado:* $[Escribe el monto]\n\n` +
+      `Adjunto el comprobante:`
+    );
     
-    // 🔥 FIX ARQUITECTÓNICO: Usar api.whatsapp.com fuerza a la App a recargar el texto SIEMPRE
     const waUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${text}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
