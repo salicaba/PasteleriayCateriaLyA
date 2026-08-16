@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, User, ShoppingBag, CheckCircle, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon } from 'lucide-react';
+import { Trash2, User, ShoppingBag, CheckCircle, CheckCircle2, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon } from 'lucide-react';
 import clsx from 'clsx';
 
 // 🔥 CEREBRO EXTRACTOR VISUAL
@@ -118,13 +118,16 @@ export const TicketCartGroup = ({
           getPrepStr(d) === getPrepStr(item)
       );
       
+      // 🔥 FIX: Preservamos todas las filas hijas en _groupedItems sin perder ninguna
+      const subItems = (item._groupedItems && item._groupedItems.length > 0) ? item._groupedItems : [item];
+
       if (existing) { 
           existing.qty += item.qty; 
           const newPreps = item.preparaciones ? item.preparaciones.filter(p => !p._isPromoMeta) : [];
           existing.preparaciones = [...existing.preparaciones, ...newPreps]; 
-          existing._groupedItems.push(item); 
+          existing._groupedItems.push(...subItems); 
       } else { 
-          displayItems.push({ ...item, _groupedItems: [item] }); 
+          displayItems.push({ ...item, _groupedItems: [...subItems] }); 
       }
   });
 
@@ -477,7 +480,29 @@ export const TicketCartGroup = ({
                       <motion.button 
                         whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
                         onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
-                            await handleToggleStatus(item);
+                            // 🔥 FIX: LÓGICA DE MODAL PARA ENTREGAS PARCIALES 🔥
+                            if (item.kitchenStatus === 'READY' && item.qty > 1) {
+                                openConfirmModal({
+                                    title: 'Entregar Producto',
+                                    message: `¿Cuántos "${item.nombre}" vas a entregar a la mesa ahora mismo? (Máx: ${item.qty})`,
+                                    icon: CheckCircle2, 
+                                    color: 'blue', 
+                                    confirmText: 'Confirmar Entrega',
+                                    requireInput: true, 
+                                    inputType: 'number', 
+                                    inputMax: item.qty, 
+                                    inputDefault: item.qty.toString(),
+                                    onConfirm: async (val) => { 
+                                        const qty = parseInt(val, 10); 
+                                        if (qty > 0 && qty <= item.qty) { 
+                                            await handleToggleStatus(item, qty); 
+                                        } 
+                                    }
+                                });
+                            } else {
+                                // Si es qty 1 o lo van a regresar a cocina, actúa normal
+                                await handleToggleStatus(item);
+                            }
                         })} 
                         disabled={isLocalProcessingToggle || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                         className={clsx(

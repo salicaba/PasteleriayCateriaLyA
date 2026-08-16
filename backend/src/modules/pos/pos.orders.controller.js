@@ -108,8 +108,6 @@ export const addItemsToOrder = async (req, res) => {
     const { items } = req.body; 
     let order = await Order.findByPk(orderId);
     
-    // 🔥 FIX AUTO-HEAL: Si la orden ya estaba cancelada o cerrada, creamos un ticket/folio NUEVO.
-    // Esto aísla los productos nuevos y evita que se mezclen con los zombies del pasado en la cocina.
     if (order && !['OPEN', 'PAID'].includes(order.status)) {
         order = await Order.create({
             orderType: order.orderType,
@@ -119,7 +117,7 @@ export const addItemsToOrder = async (req, res) => {
             status: 'OPEN',
             totalAmount: 0
         });
-        orderId = order.id; // Actualizamos al nuevo ID limpio
+        orderId = order.id; 
     } else if (!order) {
         return res.status(400).json({ message: 'La orden no existe.' });
     }
@@ -142,7 +140,7 @@ export const addItemsToOrder = async (req, res) => {
 
       return { 
         ...item, 
-        orderId, // Usará el ID curado
+        orderId, 
         cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
         kitchenStatus: 'PENDING',
         isTakeaway: item.isTakeaway || false,
@@ -190,7 +188,6 @@ export const addItemsToOrder = async (req, res) => {
     
     const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
     
-    // 🔥 Devolvemos el newOrderId para que el Frontend actualice su memoria
     res.status(201).json({ message: 'Productos enviados a cocina', orderItems: cleanItems, newOrderId: orderId });
   } catch (error) { 
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
@@ -447,6 +444,71 @@ export const deliverAllItems = async (req, res) => {
 };
 
 // ==========================================
+// 🍕🔥 DIVISIÓN DE ENTREGAS (Split Deliver) - ¡NUEVO!
+// ==========================================
+export const splitDeliverItem = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { qtyToDeliver } = req.body;
+    
+    const item = await OrderItem.findByPk(itemId);
+    if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
+    if (item.kitchenStatus === 'DELIVERED') return res.status(400).json({ message: 'El producto ya está entregado' });
+
+    // Si la cantidad a entregar es igual o mayor a la cantidad del producto, marcamos toda la fila como entregada
+    if (qtyToDeliver >= item.quantity) {
+      await item.update({ kitchenStatus: 'DELIVERED' });
+    } else {
+      // Si entrega menos, DIVIDIMOS matemáticamente la fila en 2
+      const unitPrice = Number(item.subtotal) / item.quantity;
+      
+      let moveNotes = [];
+      try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
+      if (!Array.isArray(moveNotes)) moveNotes = [moveNotes];
+      
+      let metaObj = null;
+      const metaIdx = moveNotes.findIndex(n => n && n._isPromoMeta);
+      if (metaIdx >= 0) { metaObj = moveNotes.splice(metaIdx, 1)[0]; }
+
+      // Las notas que se van a marcar como entregadas y las que se quedan pendientes
+      const deliveredNotes = moveNotes.slice(0, qtyToDeliver);
+      const remainingNotes = moveNotes.slice(qtyToDeliver);
+
+      if (metaObj) {
+          deliveredNotes.push(metaObj);
+          remainingNotes.push(metaObj);
+      }
+
+      // 1. Actualizamos la fila original con la cantidad restante (Se queda pendiente/lista)
+      await item.update({ 
+        quantity: item.quantity - qtyToDeliver, 
+        subtotal: unitPrice * (item.quantity - qtyToDeliver), 
+        notes: JSON.stringify(remainingNotes) 
+      });
+
+      // 2. Creamos una fila nueva exactamente igual, pero con el estado DELIVERED
+      await OrderItem.create({ 
+        orderId: item.orderId, 
+        productId: item.productId, 
+        quantity: qtyToDeliver, 
+        subtotal: unitPrice * qtyToDeliver, 
+        cuenta: item.cuenta, 
+        notes: JSON.stringify(deliveredNotes), 
+        kitchenStatus: 'DELIVERED', // ¡La fila hija nace ya entregada!
+        isTakeaway: item.isTakeaway, 
+        status: 'ACTIVE' 
+      });
+    }
+
+    getIO().emit('pos:update');
+    res.json({ message: 'Entrega parcial registrada con éxito' });
+  } catch (error) {
+    console.error("Error en splitDeliverItem:", error);
+    res.status(500).json({ message: 'Error al registrar entrega', error: error.message });
+  }
+};
+
+// ==========================================
 // 🔍 ESTADO EN VIVO PARA CLIENTES (QR Público)
 // ==========================================
 export const checkOrderStatus = async (req, res) => {
@@ -461,13 +523,11 @@ export const checkOrderStatus = async (req, res) => {
     }
     
     let accountStatus = order.status;
-    let clientItems = []; // 🔥 NUEVO: Array para mandar los items reales
+    let clientItems = []; 
     
-    // 🔥 FIX INTELIGENTE: Si es Llevar, la BD lo guarda en la cuenta 'General'
     const targetCuenta = order.orderType === 'LLEVAR' ? 'General' : cuenta;
     
     if (targetCuenta) {
-      // Incluimos el modelo Product para mandar imagen y nombre al celular
       const itemsCuenta = await OrderItem.findAll({ 
         where: { orderId, cuenta: targetCuenta },
         include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
@@ -492,7 +552,6 @@ export const checkOrderStatus = async (req, res) => {
          } else {
              accountStatus = 'OPEN';
              
-             // 🔥 ESPECISMO: Solo mandamos los items si la cuenta está abierta y activa
              const activeItems = itemsCuenta.filter(i => i.status === 'ACTIVE');
              clientItems = activeItems.map(extractPromoMeta).filter(i => !i._isReleased);
          }
@@ -501,7 +560,6 @@ export const checkOrderStatus = async (req, res) => {
       }
     }
     
-    // 🔥 Enviamos status, accountStatus Y LOS ITEMS REALES ACTUALIZADOS
     res.json({ status: order.status, accountStatus, items: clientItems });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });

@@ -11,7 +11,8 @@ import {
   moveItemAccount, 
   deliverAllItems,
   checkOrderStatus,
-  closeAccount // 🔥 IMPORTAMOS LA NUEVA FUNCIÓN AQUÍ
+  closeAccount,
+  splitDeliverItem // 🔥 IMPORTAMOS EL NUEVO CONTROLADOR DE ENTREGAS
 } from './pos.orders.controller.js';
 
 import { getTables, createTable, deleteTable, getPublicTables } from './pos.tables.controller.js';
@@ -54,7 +55,10 @@ router.post('/orders/:orderId/print', printOrderTicket);
 router.get('/tables', getTables);
 router.post('/tables', createTable);
 router.delete('/tables/:id', deleteTable);
+
 router.put('/orders/items/:itemId/move', moveItemAccount);
+// 🔥 NUEVA RUTA: Endpoint inteligente para entregas parciales y completas
+router.post('/orders/items/:itemId/split-deliver', splitDeliverItem);
 
 router.put('/orders/:id/deliver-all', deliverAllItems);
 router.put('/orders/:id/items/:itemId/cancel', cancelOrderItem);

@@ -65,7 +65,6 @@ export const usePosMutations = ({
       return; 
     }
     
-    // 🔥 BLOQUEO DE DOBLE CLIC
     if (lockRef.current) return;
     lockRef.current = true;
     setIsProcessing(true);
@@ -81,7 +80,6 @@ export const usePosMutations = ({
           ticketId: isLlevarMode ? mesaActual?.numero : null 
         });
         
-        // 🔥 FIX 1: Extracción extrema del ID (Abarca todos los formatos posibles de respuesta del backend)
         orderId = res.data?.order?.id || res.data?.id || res.data?.newOrderId;
         if (orderId) setActiveOrderId(orderId);
 
@@ -117,11 +115,7 @@ export const usePosMutations = ({
           const updatedNewItems = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
           setCart(prev => {
               const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
-              // 🔥 FIX 2: MEMORIA FOTOGRÁFICA
-              // Conservamos celosamente los items que YA estaban enviados desde antes y no vienen en este POST.
-              // ¡Esto evita que el primer producto desaparezca cuando agregas un segundo producto!
               const previouslySent = prev.filter(p => p.enviadoCocina && !allItemsFromDB.some(db => String(db.id) === String(p.backendItemId)));
-              
               return [...previouslySent, ...updatedNewItems, ...unsentLocal];
           });
       } else {
@@ -238,9 +232,27 @@ export const usePosMutations = ({
     }
   };
 
-  const toggleDeliveredStatus = async (groupedItem) => {
+  // 🔥 EXTRACTOR PLANO: Encuentra todas las filas de la base de datos sin importar cómo se agruparon
+  const flattenGroupedItems = (groupedItem) => {
+    let leaves = [];
+    const traverse = (node) => {
+      if (!node) return;
+      if (node._groupedItems && Array.isArray(node._groupedItems) && node._groupedItems.length > 0 && node._groupedItems[0] !== node) {
+        node._groupedItems.forEach(traverse);
+        return;
+      }
+      leaves.push(node);
+    };
+    traverse(groupedItem);
+    return leaves.length > 0 ? leaves : [groupedItem];
+  };
+
+  // 🔥 NUEVA LÓGICA DE ENTREGAS PARCIALES Y COMPLETAS (Soporte Total para Promos Multilínea)
+  const toggleDeliveredStatus = async (groupedItem, qtyToDeliver = null) => {
     if (!groupedItem) return;
-    const itemsToUpdate = groupedItem._groupedItems || [groupedItem];
+    
+    // Extraemos TODAS las filas reales de la base de datos que componen la tarjeta
+    const itemsToUpdate = flattenGroupedItems(groupedItem);
     if (itemsToUpdate.length === 0) return;
     
     const currentStatus = itemsToUpdate[0].kitchenStatus;
@@ -252,20 +264,52 @@ export const usePosMutations = ({
     setIsProcessing(true);
 
     try {
-        await Promise.all(itemsToUpdate.map(async (subItem) => { 
-          if (subItem.backendItemId) { 
-            await client.put(`/kitchen/tickets/${subItem.backendItemId}/status`, { status: newStatus }); 
-          } 
-        }));
+        const targetQty = qtyToDeliver ? parseInt(qtyToDeliver, 10) : itemsToUpdate.reduce((acc, curr) => acc + curr.qty, 0);
         
+        // 1. ACTUALIZACIÓN VISUAL INSTANTÁNEA
         setCart(prev => { 
-          const newCart = [...prev]; 
-          itemsToUpdate.forEach(subItem => { 
-            const idx = newCart.findIndex(p => String(p.backendItemId) === String(subItem.backendItemId)); 
-            if (idx !== -1) newCart[idx] = { ...newCart[idx], kitchenStatus: newStatus }; 
-          }); 
-          return newCart; 
+            const newCart = [...prev]; 
+            let remainingLocal = targetQty;
+
+            for (const subItem of itemsToUpdate) {
+                if (remainingLocal <= 0) break;
+                const qtyToAffect = Math.min(subItem.qty, remainingLocal);
+                const idx = newCart.findIndex(p => String(p.backendItemId) === String(subItem.backendItemId)); 
+                
+                if (idx !== -1) {
+                    if (qtyToAffect === subItem.qty) {
+                        newCart[idx] = { ...newCart[idx], kitchenStatus: newStatus }; 
+                    } else {
+                        newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - qtyToAffect };
+                        newCart.push({ ...newCart[idx], qty: qtyToAffect, kitchenStatus: newStatus });
+                    }
+                }
+                remainingLocal -= qtyToAffect;
+            }
+            return newCart; 
         });
+
+        // 2. EJECUCIÓN EN BACKEND A TODAS LAS FILAS HERMANAS
+        let remainingToDeliver = targetQty;
+        const peticiones = [];
+
+        for (const subItem of itemsToUpdate) {
+            if (remainingToDeliver <= 0) break;
+            
+            const qtyFromThisRow = Math.min(subItem.qty, remainingToDeliver);
+            
+            if (newStatus === 'DELIVERED') {
+                peticiones.push(client.post(`/pos/orders/items/${subItem.backendItemId}/split-deliver`, { qtyToDeliver: qtyFromThisRow }));
+            } else {
+                peticiones.push(client.put(`/kitchen/tickets/${subItem.backendItemId}/status`, { status: newStatus }));
+            }
+            
+            remainingToDeliver -= qtyFromThisRow;
+        }
+
+        // Disparamos a todas las filas de la promo al mismo tiempo
+        await Promise.all(peticiones);
+
     } catch (e) { 
       triggerNotification("No se pudo actualizar el estado de entrega.", "error");
       throw e;
@@ -295,8 +339,10 @@ export const usePosMutations = ({
             return;
         }
 
+        // 🔥 TAMBIÉN CORREGIMOS EL BOTÓN DE "ENTREGAR TODA LA MESA"
+        // Ahora usa el endpoint inteligente para que ningún producto se quede a la mitad.
         await Promise.all(itemsListos.map(item => 
-          client.put(`/kitchen/tickets/${item.backendItemId}/status`, { status: 'DELIVERED' })
+          client.post(`/pos/orders/items/${item.backendItemId}/split-deliver`, { qtyToDeliver: item.qty })
         ));
 
         setCart(prev => prev.map(item => 
@@ -316,9 +362,7 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 NUEVA LÓGICA INTELIGENTE: Cancelación Individual (Promos vs Normal)
   const cancelItem = async (item, cancelReason = 'Cancelación desde POS', cancelQty = item.qty) => {
-    // Si no ha ido a cocina, lo borramos en local directamente
     if (!item.enviadoCocina) { 
       setCart(prev => prev.filter(p => !(p === item))); 
       return; 
@@ -333,7 +377,6 @@ export const usePosMutations = ({
     try {
         const response = await client.put(`/pos/orders/${activeOrderId}/items/${item.backendItemId}/cancel`, { cancelReason, cancelQty });
         
-        // Si el backend nos devuelve el carrito actualizado, lo mapeamos
         if (response.data.orderItems) {
             const updatedCart = response.data.orderItems.map(dbItem => mapDBItemToLocal(dbItem));
             setCart(prev => { 
@@ -341,11 +384,9 @@ export const usePosMutations = ({
               return [...updatedCart, ...unsentLocal]; 
             });
         } else {
-            // Si no, matamos el producto en local marcándolo como CANCELLED
             setCart(prev => prev.map(p => String(p.backendItemId) === String(item.backendItemId) ? { ...p, status: 'CANCELLED' } : p));
         }
         
-        // Notificaciones diferenciadas según si era promo o producto normal cobrado
         if (item.isAutoPromo) {
             triggerNotification('Promoción eliminada correctamente.', 'success');
         } else if (response.data.wasRefunded) {
@@ -363,7 +404,6 @@ export const usePosMutations = ({
   };
 
   const cancelAccountItems = async (cuentaName, cancelReason = 'Cancelación de cuenta') => {
-    // 🔥 Aseguramos que atrape la cuenta General correctamente aunque sea undefined
     const itemsToCancel = cart.filter(item => (item.cuenta || 'General') === cuentaName && item.enviadoCocina && item.status !== 'CANCELLED');
     if (itemsToCancel.length === 0) return;
     

@@ -74,15 +74,11 @@ export const TicketSidebar = ({
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   
-  // 🔥 AUTO-OCULTAR FANTASMAS: Detectar cuentas que el backend ya liberó (pagadas y que se quedaron con 0 items)
   const cuentasLiberadasPorBackend = cuentasPagadasReales.filter(acc => {
-     return !activeCart.some(item => (item.cuenta || 'General') === acc);
+      return !activeCart.some(item => (item.cuenta || 'General') === acc);
   });
   
-  // 🔥 Combinamos las ocultas manualmente (animación rápida) con las que la BD ya liberó
   const cuentasOcultasEfectivas = Array.from(new Set([...cuentasOcultas, ...cuentasLiberadasPorBackend]));
-
-  // Las cuentas visibles para el Modal de Liberar ahora descartan a los fantasmas
   const cuentasPagadasVisibles = cuentasPagadasReales.filter(acc => !cuentasOcultasEfectivas.includes(acc));
 
   const handleAddCuenta = (e) => {
@@ -90,9 +86,7 @@ export const TicketSidebar = ({
     const name = newCuentaName.trim();
     
     if (name && addNewCuenta) {
-      // 🔥 ESCUDO ANTI-NOMBRES REPETIDOS
       const nameLower = name.toLowerCase();
-      // Revisamos si el nombre que escribió el cajero ya existe en la mesa
       const yaExiste = availableAccs.some(acc => {
           const accName = parseAccountName(acc).toLowerCase();
           return accName === nameLower;
@@ -100,10 +94,9 @@ export const TicketSidebar = ({
 
       if (yaExiste) {
           toast(`Ya hay una cuenta llamada "${name}". Agrégale una inicial o número (Ej. ${name} 2).`, 'warning');
-          return; // Detenemos la función aquí, no creamos la cuenta
+          return; 
       }
 
-      // Si no existe, la creamos normalmente
       addNewCuenta(name, newCuentaPhone);
       toast(`Cuenta "${parseAccountName(name)}" creada exitosamente`, 'success');
     }
@@ -153,7 +146,6 @@ export const TicketSidebar = ({
     return { cuentaName, items: displayItems };
   });
 
-  // 🔥 Aplicamos la limpieza para que las cajas vacías ya no se rendericen
   const visibleGroups = groupedCart.filter(g => {
       if (cuentasOcultasEfectivas.includes(g.cuentaName)) return false;
       if (g.items.length === 0 && g.cuentaName === 'General') {
@@ -185,12 +177,19 @@ export const TicketSidebar = ({
     if (config.requireInput) setModalInputValue(config.inputDefault || '');
   };
 
-  const handleToggleStatus = async (item) => {
+  // 🔥 FIX CRÍTICO: Recibimos qtyToDeliver y se lo pasamos intacto a la mutación
+  const handleToggleStatus = async (item, qtyToDeliver = null) => {
     const itemId = item.backendItemId || item.id;
     setProcessingItems(prev => ({ ...prev, [itemId]: true }));
     try {
-      if (toggleDeliveredStatus) await toggleDeliveredStatus(item);
-      toast('Estado actualizado a entregado', 'success');
+      if (toggleDeliveredStatus) await toggleDeliveredStatus(item, qtyToDeliver);
+      
+      // Ajustamos el mensaje de éxito para que sea más descriptivo si fue entrega parcial
+      if (qtyToDeliver && qtyToDeliver < item.qty) {
+        toast(`Entregados ${qtyToDeliver}x ${item.nombre}`, 'success');
+      } else {
+        toast('Estado actualizado a entregado', 'success');
+      }
     } catch (e) {
       toast('Error al actualizar el estado', 'error');
     } finally {
@@ -262,7 +261,6 @@ export const TicketSidebar = ({
     try {
       if (onCheckout) await onCheckout();
     } finally {
-      // 🔥 FIX: Eliminamos el setTimeout de 500ms. Liberación instantánea.
       setIsCheckingOut(false);
     }
   };
@@ -272,7 +270,6 @@ export const TicketSidebar = ({
     try {
       if (onSendToKitchen) await onSendToKitchen();
     } finally {
-      // 🔥 FIX: Eliminamos el retraso visual fantasma.
       setIsSendingToKitchen(false);
     }
   };
@@ -448,7 +445,6 @@ export const TicketSidebar = ({
     }
   }
 
-// 🔥 FIX: Filtramos las cuentas cancelables para excluir las que ya fueron liberadas/ocultas
   const cuentasCancelables = Array.from(
     new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General'))
   ).filter(cuenta => !cuentasOcultasEfectivas.includes(cuenta));
@@ -526,7 +522,7 @@ export const TicketSidebar = ({
         mesaTotal={mesaTotal} unsentTotal={unsentTotal} hasUnsentItems={hasUnsentItems}
         activeCart={activeCart} isVitrina={isVitrina} isLlevar={isLlevar} 
         paidAccounts={paidAccounts} 
-        cuentasOcultas={cuentasOcultasEfectivas} // 🔥 Pasamos las cuentas filtradas para que libere la barra inferior
+        cuentasOcultas={cuentasOcultasEfectivas}
         orderStatus={orderStatus} 
         cuentasPagadasReales={cuentasPagadasReales} 
         
@@ -608,16 +604,13 @@ export const TicketSidebar = ({
         cuentas={cuentasCancelables}
         onConfirmar={async (tipo, cuenta, motivo) => {
           try {
-            // 🔥 AUTO-DETECCIÓN: Verificamos si la cuenta seleccionada es la ÚLTIMA viva en la mesa
             const cuentasActivas = Array.from(new Set(activeCart.map(i => i.cuenta || 'General')));
             const esLaUltimaCuenta = cuentasActivas.length === 1 && cuentasActivas[0] === cuenta;
 
-            // Si eligen 'Toda la Mesa' O es la última cuenta disponible, destruimos toda la orden
             if (tipo === 'mesa' || esLaUltimaCuenta) {
                 if (onCancelFullOrder) await onCancelFullOrder(motivo);
                 toast(esLaUltimaCuenta ? 'Última cuenta cancelada. Mesa liberada.' : 'Orden completa cancelada', 'success');
             } else {
-                // Solo cancelamos la cuenta parcialmente si aún quedan más cuentas vivas en la mesa
                 if (onCancelAccount) await onCancelAccount(cuenta, motivo);
                 toast(`Cuenta ${parseAccountName(cuenta)} cancelada exitosamente`, 'success');
             }
