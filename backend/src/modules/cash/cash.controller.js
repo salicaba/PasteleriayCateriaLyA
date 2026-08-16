@@ -11,30 +11,26 @@ export const getTransactions = async (req, res) => {
     const { date, startDate, endDate, type, source } = req.query; 
     let whereClause = {};
 
+    // 🔥 FIX ZONA HORARIA: Eliminamos el desfase UTC para usar Fechas Locales exactas
     if (startDate && endDate) {
       const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
-      const start = new Date(Date.UTC(sYear, sMonth - 1, sDay, 6, 0, 0));
+      const start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
 
       const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
-      const end = new Date(Date.UTC(eYear, eMonth - 1, eDay + 1, 5, 59, 59));
+      const end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
       
       whereClause.createdAt = { [Op.between]: [start, end] };
     } 
     else if (date) {
       const [year, month, day] = date.split('-').map(Number);
-      const start = new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
-      const end = new Date(Date.UTC(year, month - 1, day + 1, 5, 59, 59));
+      const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
       
       whereClause.createdAt = { [Op.between]: [start, end] };
     } 
     else {
       const now = new Date();
-      const chiapasTime = new Date(now.getTime() - (6 * 60 * 60 * 1000));
-      const year = chiapasTime.getUTCFullYear();
-      const month = chiapasTime.getUTCMonth();
-      const day = chiapasTime.getUTCDate();
-
-      const start = new Date(Date.UTC(year, month, day, 6, 0, 0));
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       whereClause.createdAt = { [Op.gte]: start };
     }
 
@@ -69,11 +65,27 @@ export const registerManualTransaction = async (req, res) => {
     if (!amount || amount <= 0) return res.status(400).json({ message: 'El monto debe ser mayor a 0' });
     if (!description) return res.status(400).json({ message: 'La descripción es obligatoria' });
 
-    let createdAt = new Date();
-    if (expenseDate) {
-      const [year, month, day] = expenseDate.split('-').map(Number);
-      createdAt = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    // 🔥 MAGIA CONTABLE Y DE AUDITORÍA
+    const realExecutionDate = new Date(); 
+    let accountingDate = realExecutionDate; 
+    let isRetroactive = false;
+
+    const localYear = realExecutionDate.getFullYear();
+    const localMonth = String(realExecutionDate.getMonth() + 1).padStart(2, '0');
+    const localDay = String(realExecutionDate.getDate()).padStart(2, '0');
+    const todayLocalStr = `${localYear}-${localMonth}-${localDay}`;
+
+    // Si enviaste una fecha distinta a "hoy", es un Gasto Diferido
+    if (expenseDate && expenseDate !== todayLocalStr) {
+      isRetroactive = true;
+      const [y, m, d] = expenseDate.split('-').map(Number);
+      accountingDate = new Date(y, m - 1, d, 23, 59, 59, 999); 
     }
+
+    // Inyectamos la fecha real de captura en la descripción (oculta al cliente, visible para auditoría)
+    const finalDescription = isRetroactive 
+      ? `[Registrado el: ${realExecutionDate.toLocaleString()}] ${description}` 
+      : description;
 
     const newTx = await Transaction.create({
       folio: `EGR-${Date.now().toString().slice(-6)}`, 
@@ -81,8 +93,8 @@ export const registerManualTransaction = async (req, res) => {
       source: 'MANUAL', 
       expenseCategory: expenseCategory || 'OTHER',
       amount,
-      description,
-      createdAt,
+      description: finalDescription, // 🔥 Rastro de Auditoría
+      createdAt: accountingDate,     // 🔥 Fecha Contable
       createdBy: req.user.id
     });
 
@@ -100,7 +112,6 @@ export const cancelTransaction = async (req, res) => {
     }
 
     const { id } = req.params;
-    // 🔥 Extraemos el motivo opcional del Frontend
     const { reason } = req.body;
 
     const tx = await Transaction.findByPk(id);
@@ -132,7 +143,6 @@ export const cancelTransaction = async (req, res) => {
     tx.cancelledBy = req.user.id;
     tx.cancelledAt = new Date();
     
-    // 🔥 Guardamos el registro del motivo de cancelación con total seguridad
     if (reason && reason.trim() !== '') {
       tx.description = `${tx.description} (Motivo Anulación: ${reason})`;
     }
@@ -200,23 +210,19 @@ export const restoreTransaction = async (req, res) => {
 export const getFinancialSummary = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
     let start, end;
 
+    // 🔥 FIX ZONA HORARIA PARA FILTROS GLOBALES DE REPORTES
     if (startDate && endDate) {
       const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
-      start = new Date(Date.UTC(sYear, sMonth - 1, sDay, 6, 0, 0));
+      start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
 
       const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
-      end = new Date(Date.UTC(eYear, eMonth - 1, eDay + 1, 5, 59, 59));
+      end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
     } else {
       const now = new Date();
-      const chiapasTime = new Date(now.getTime() - (6 * 60 * 60 * 1000));
-      const year = chiapasTime.getUTCFullYear();
-      const month = chiapasTime.getUTCMonth();
-      
-      start = new Date(Date.UTC(year, month, 1, 6, 0, 0));
-      end = new Date(Date.UTC(year, month + 1, 1, 5, 59, 59));
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     }
 
     const incomes = await Transaction.sum('amount', {

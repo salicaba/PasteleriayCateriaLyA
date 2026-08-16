@@ -98,7 +98,6 @@ export const ExpensesPage = () => {
   
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
-    // Cambia el 1 final por un 0
     return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
   });
 
@@ -106,7 +105,9 @@ export const ExpensesPage = () => {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('PAYROLL');
-  const [expenseDate, setExpenseDate] = useState(formatLocalDate(new Date())); 
+  
+  // 🔥 Reinicio de Fecha a "Hoy" cada vez que se carga el componente
+  const [expenseDate, setExpenseDate] = useState(() => formatLocalDate(new Date())); 
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null); 
@@ -124,14 +125,11 @@ export const ExpensesPage = () => {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🔥 MEJORA ANTI-PARPADEO APLICADA AQUÍ
   useEffect(() => {
     const loadData = async () => {
-      const minLoadTime = new Promise(resolve => setTimeout(resolve, 600)); // Retardo de 600ms
-      
+      const minLoadTime = new Promise(resolve => setTimeout(resolve, 600)); 
       await fetchExpenses(startDate, endDate);
-      await minLoadTime; // Esperamos el tiempo mínimo
-      
+      await minLoadTime; 
       setIsFullScreenLoader(false);
     };
     loadData();
@@ -139,15 +137,9 @@ export const ExpensesPage = () => {
 
   const handleRangeChange = (val) => {
     setTimeRange(val);
-    
-    // 🔥 CORRECCIÓN DEL LIMBO: Si es personalizado, no activamos la pantalla de carga aún.
-    if (val === 'custom') {
-      return; 
-    }
+    if (val === 'custom') return; 
 
-    // Solo activamos la carga para los rangos predefinidos
     setIsFullScreenLoader(true);
-    
     const now = new Date();
     let start, end;
 
@@ -170,7 +162,6 @@ export const ExpensesPage = () => {
         break;
       case 'this_month':
         start = new Date(now.getFullYear(), now.getMonth(), 1);
-        // Cambia el 1 final por un 0
         end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         break;
       case 'last_month':
@@ -186,7 +177,7 @@ export const ExpensesPage = () => {
   };
 
   const handleCustomDateChange = (val, type) => {
-    setIsFullScreenLoader(true); // Aquí sí activamos la carga porque ya escogió una fecha
+    setIsFullScreenLoader(true); 
     setTimeRange('custom');
     if (type === 'start') setStartDate(val);
     if (type === 'end') setEndDate(val);
@@ -384,18 +375,30 @@ export const ExpensesPage = () => {
                   <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white lya:text-lya-text border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors">Registrar Nuevo Gasto</h2>
                   <form onSubmit={handleSubmit} className="space-y-5">
                     
+                    {/* Selector de Fecha con Bloqueo y Botón Hoy */}
                     <div>
                       <label className="block text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/50 tracking-widest mb-2 transition-colors">Fecha del Gasto</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-primary" size={18} />
-                        <input 
-                          type="date"
-                          required
-                          value={expenseDate}
-                          onChange={(e) => setExpenseDate(e.target.value)}
-                          style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                          className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text font-bold outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 transition-all cursor-pointer"
-                        />
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-primary" size={18} />
+                          <input 
+                            type="date"
+                            required
+                            max={formatLocalDate(new Date())} // Evitar fechas futuras
+                            value={expenseDate}
+                            onChange={(e) => setExpenseDate(e.target.value)}
+                            style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text font-bold outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 transition-all cursor-pointer"
+                          />
+                        </div>
+                        <motion.button 
+                          type="button"
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setExpenseDate(formatLocalDate(new Date()))}
+                          className="px-4 py-3.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors font-bold shadow-sm text-sm shrink-0"
+                        >
+                          Hoy
+                        </motion.button>
                       </div>
                     </div>
 
@@ -448,7 +451,7 @@ export const ExpensesPage = () => {
                         placeholder="Ej. Pago de recibo CFE Mayo" 
                         value={description} 
                         onChange={(e) => setDescription(e.target.value)}
-                        className="w-full p-4 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40 outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 text-sm font-medium resize-none transition-all"
+                        className="w-full p-4 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40 outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 text-sm font-medium resize-none transition-all text-justify"
                       ></textarea>
                     </div>
 
@@ -470,11 +473,11 @@ export const ExpensesPage = () => {
                       <p className="text-red-500 dark:text-red-400 lya:text-lya-secondary font-black text-[11px] uppercase tracking-widest mb-1.5 transition-colors">
                         {timeRange === 'today' || timeRange === 'yesterday' ? 'Total Gastado este día' : 'Total Gastado en el periodo'}
                       </p>
-                      <h2 className="text-4xl md:text-5xl font-black text-red-600 dark:text-red-500 lya:text-lya-secondary transition-colors">
+                      <h2 className="text-4xl md:text-5xl font-black text-red-600 dark:text-red-500 lya:text-lya-secondary transition-colors truncate max-w-[200px] sm:max-w-xs md:max-w-md">
                         ${totalGastos.toFixed(2)}
                       </h2>
                     </div>
-                    <div className="h-16 w-16 bg-red-100 dark:bg-red-800/30 lya:bg-lya-secondary/20 rounded-2xl flex items-center justify-center text-red-500 dark:text-red-400 lya:text-lya-secondary rotate-12 shadow-sm transition-colors">
+                    <div className="h-16 w-16 bg-red-100 dark:bg-red-800/30 lya:bg-lya-secondary/20 rounded-2xl flex items-center justify-center text-red-500 dark:text-red-400 lya:text-lya-secondary rotate-12 shadow-sm transition-colors shrink-0">
                       <AlertTriangle size={32} />
                     </div>
                   </div>
@@ -515,6 +518,11 @@ export const ExpensesPage = () => {
                           const formattedDate = dateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
                           const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
 
+                          // 🔥 EXTRACCIÓN DE LA NOTA DE AUDITORÍA
+                          const auditMatch = ex.description?.match(/\[Registrado el: (.*?)\]/);
+                          const realAuditDateTime = auditMatch ? auditMatch[1] : null;
+                          const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
+
                           return (
                             <motion.div 
                               key={ex.id} 
@@ -529,15 +537,40 @@ export const ExpensesPage = () => {
                                   <Icon size={20} className="sm:w-6 sm:h-6" />
                                 </div>
                                 <div className="flex flex-col min-w-0 flex-1 pt-0.5">
-                                  <p className="font-bold text-sm sm:text-base text-gray-800 dark:text-white lya:text-lya-text truncate w-full">
-                                    {ex.description}
+                                  <p className="font-bold text-sm sm:text-base text-gray-800 dark:text-white lya:text-lya-text line-clamp-2 w-full text-justify">
+                                    {displayDesc}
                                   </p>
-                                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">
-                                    <span className="capitalize whitespace-nowrap">{formattedDate}</span>
-                                    <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
-                                    <span className="whitespace-nowrap">{formattedTime}</span>
+                                  <div className="flex flex-col mt-1 gap-1">
+                                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">
+                                      <span className="capitalize whitespace-nowrap">{formattedDate}</span>
+                                      
+                                      {/* Si NO es diferido, mostramos la hora contable */}
+                                      {!realAuditDateTime && (
+                                        <>
+                                          <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
+                                          <span className="whitespace-nowrap">{formattedTime}</span>
+                                        </>
+                                      )}
+
+                                      {/* 🔥 ETIQUETA RETROACTIVA DE AUDITORÍA */}
+                                      {realAuditDateTime && (
+                                        <>
+                                          <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
+                                          <span className="text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                            Diferido
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                    
+                                    {/* 🔥 MOSTRAR FECHA Y HORA REAL DE TECLADO */}
+                                    {realAuditDateTime && (
+                                      <span className="text-[10px] sm:text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                                        Teclado: {realAuditDateTime}
+                                      </span>
+                                    )}
                                   </div>
-                                  <span className="uppercase tracking-widest text-[9px] sm:text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 truncate w-full mt-1">
+                                  <span className="uppercase tracking-widest text-[9px] sm:text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 truncate w-full mt-1.5">
                                     {catConfig.label}
                                   </span>
                                 </div>
@@ -691,6 +724,11 @@ export const ExpensesPage = () => {
                       const dateObj = new Date(ex.cancelledAt || ex.createdAt);
                       const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
 
+                      // 🔥 EXTRACCIÓN DE AUDITORÍA PARA ELEMENTOS CANCELADOS
+                      const auditMatch = ex.description?.match(/\[Registrado el: (.*?)\]/);
+                      const realAuditDateTime = auditMatch ? auditMatch[1] : null;
+                      const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
+
                       return (
                         <div key={ex.id} className="flex flex-row items-start justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 hover:opacity-100 transition-opacity gap-4">
                           
@@ -699,11 +737,29 @@ export const ExpensesPage = () => {
                               <Icon size={20} />
                             </div>
                             <div className="min-w-0 flex-1 pt-0.5">
-                              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 lya:text-lya-text truncate w-full">{ex.description}</h4>
-                              <div className="flex flex-wrap items-center gap-x-1 mt-0.5">
-                                <span className="text-xs font-medium text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
-                                  Anulado: {formattedTime}
-                                </span>
+                              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 lya:text-lya-text truncate w-full">{displayDesc}</h4>
+                              
+                              <div className="flex flex-col mt-1 gap-1">
+                                <div className="flex flex-wrap items-center gap-x-1">
+                                  <span className="text-xs font-medium text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
+                                    Anulado: {formattedTime}
+                                  </span>
+                                  {/* 🔥 ETIQUETA RETROACTIVA DE AUDITORÍA */}
+                                  {realAuditDateTime && (
+                                    <span 
+                                      className="ml-1 text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0"
+                                      title={`Teclado en sistema: ${realAuditDateTime}`}
+                                    >
+                                      Diferido
+                                    </span>
+                                  )}
+                                </div>
+                                {/* 🔥 MOSTRAR FECHA Y HORA REAL DE TECLADO EN PAPELERA */}
+                                {realAuditDateTime && (
+                                  <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                                    Teclado: {realAuditDateTime}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
