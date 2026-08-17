@@ -2,14 +2,58 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- 1. Favicon enrutado a la carpeta public -->
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" id="dynamic-favicon" href="/favicon.png" />
+    <!-- Icono para iOS (Apple) que cambiaremos dinámicamente -->
+    <link rel="apple-touch-icon" id="dynamic-apple-icon" href="/logo.jpeg" />
     
-    <!-- 2. Prevención Poka-Yoke Anti-Ghost Scroll y Zoom en móviles -->
+    <!-- Prevención Poka-Yoke Anti-Ghost Scroll y Zoom en móviles -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    
-    <!-- 3. Título Fallback (será sobrescrito por nuestro Hook) -->
     <title>Lya | Ecosistema</title>
+
+    <!-- 🔥 SCRIPT DE MANIFIESTO DINÁMICO (Crea 2 apps nativas desde 1 solo código) -->
+    <script>
+      (function() {
+        const path = window.location.pathname;
+        
+        // 1. Detectamos si el usuario es un Cliente
+        const isClient = path.includes('/m/') || path.includes('/llevar');
+
+        // 2. Definimos nombres e íconos según el tipo de usuario
+        const appName = isClient ? 'Cliente Lya' : 'Sistema Lya';
+        const appShortName = isClient ? 'Menú Lya' : 'POS Lya';
+        const iconFile = isClient ? 'logo.jpeg' : 'logo-pos.jpeg';
+
+        // 3. Cambiamos el ícono de instalación de Apple al vuelo
+        document.getElementById('dynamic-apple-icon').href = '/' + iconFile;
+        
+        // 4. Construimos el Manifiesto Json con la configuración exacta
+        const manifest = {
+          "name": appName,
+          "short_name": appShortName,
+          "description": "Ecosistema Inteligente LyA",
+          "theme_color": "#ffffff",
+          "background_color": "#ffffff",
+          "display": "standalone",
+          "orientation": "portrait",
+          // 🔥 TRUCO MAESTRO: Si es cliente, la app inicia en su mesa específica
+          "start_url": isClient ? window.location.pathname + window.location.search : "/",
+          "scope": "/",
+          "icons": [
+            { "src": "/" + iconFile, "sizes": "192x192", "type": "image/jpeg", "purpose": "any maskable" },
+            { "src": "/" + iconFile, "sizes": "512x512", "type": "image/jpeg", "purpose": "any maskable" }
+          ]
+        };
+
+        // 5. Convertimos el Json a Base64 e inyectamos el enlace para el navegador
+        const manifestStr = JSON.stringify(manifest);
+        const manifestUrl = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(manifestStr);
+
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+      })();
+    </script>
   </head>
   <body class="overflow-hidden bg-gray-50 text-gray-900">
     <!-- Pilar 1: Bloqueo de overflow en el body nativo -->
