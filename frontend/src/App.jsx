@@ -122,6 +122,7 @@ function App() {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768); // 🔥 NUEVO ESTADO PARA DETECTAR CELULAR
   const [currentTime, setCurrentTime] = useState(new Date());
   const [uiSize, setUiSize] = useState('large'); 
   
@@ -130,13 +131,16 @@ function App() {
   
   const { theme } = useTheme();
 
-  // 🔥 Manejador de resize para resetear el menú en pantallas grandes
+  // 🔥 Manejador Inteligente de Pantallas (Evita que se esconda en PC)
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsSidebarOpen(false);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setIsSidebarOpen(false); // Cerramos el menú flotante si regresamos a vista de PC
       }
     };
+    handleResize(); // Evaluar al cargar la página
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -494,14 +498,14 @@ function App() {
       ) : (
         <div className="h-[100dvh] w-full flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300">
           
-          {/* 🔥 MODIFICACIÓN CLAVE: El sidebar ahora es estático en Desktop (md:relative md:flex) y flotante en Mobile (absolute -left-64) */}
+          {/* 🔥 MODIFICACIÓN CLAVE: El sidebar respeta si es Celular o PC para animarse */}
           <motion.aside
             initial={false}
             animate={{ 
-              x: isSidebarOpen ? 0 : '-100%' 
+              x: isMobile ? (isSidebarOpen ? 0 : '-100%') : 0 
             }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className={`fixed top-0 bottom-0 left-0 w-[240px] md:w-[240px] md:relative md:translate-x-0 h-full bg-white dark:bg-gray-800 lya:bg-lya-surface md:border-r border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-2xl md:shadow-none z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col`}
+            className="fixed top-0 bottom-0 left-0 w-[240px] md:relative h-full bg-white dark:bg-gray-800 lya:bg-lya-surface md:border-r border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-2xl md:shadow-none z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
           >
             <div className="w-[240px] flex flex-col h-full">
               <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
@@ -596,7 +600,6 @@ function App() {
             </div>
           </motion.aside>
 
-          {/* 🔥 MODIFICACIÓN CLAVE: Ya no se comprime, el contenedor principal siempre toma el espacio restante o total */}
           <div className={`flex flex-col relative w-full flex-1 md:w-auto md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full flex-1 overflow-hidden'}`}>
             
             <AnimatePresence>
@@ -613,7 +616,6 @@ function App() {
 
             <header className={`h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors duration-300 relative ${globalScroll ? 'z-10' : 'z-10 sticky top-0'}`}>
               <div className="flex items-center gap-2 sm:gap-4">
-                 {/* Botón de Menú solo visible en Mobile */}
                  <motion.button
                    whileTap={{ scale: 0.95 }}
                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
