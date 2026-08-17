@@ -8,7 +8,8 @@ export const useTheme = () => {
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
-    return 'light';
+    // Si no está en modo oscuro, en vez de 'light', forzamos 'lya'
+    return 'lya'; 
   });
 
   useEffect(() => {

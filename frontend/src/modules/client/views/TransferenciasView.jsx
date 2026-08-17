@@ -86,7 +86,13 @@ export const TransferenciasView = () => {
 
   // 🔥 ESTADOS DE CONFIGURACIÓN (Settings)
   const [showSettings, setShowSettings] = useState(false);
-  const [themeIndex, setThemeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_theme') || '2'));
+  const [themeIndex, setThemeIndex] = useState(() => {
+    const saved = localStorage.getItem('lya_client_theme');
+    if (saved !== null) return parseInt(saved);
+    // Si su cel está en modo oscuro, le damos oscuro (1). Si no, le damos Lya (2).
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 1;
+    return 2; 
+  });
   const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
   const [isFullscreen, setIsFullscreen] = useState(false);
 
