@@ -285,8 +285,8 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
               </div>
               
               <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-1.5">
-                  Correo Electrónico
+                <label className="text-[11px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 block ml-2 mb-1.5 flex items-center gap-1">
+                  Correo Electrónico <span className="normal-case font-bold text-gray-400 lya:text-lya-text/40">(Opcional)</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -296,7 +296,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     type="email" 
                     value={userForm.email} 
                     onChange={e => setUserForm({...userForm, email: e.target.value})} 
-                    placeholder="empleado@correo.com"
+                    placeholder="Ej. juan@correo.com (Opcional)"
                     className="w-full pl-12 pr-5 py-4 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-primary outline-none transition-all dark:text-white lya:text-lya-text text-sm" 
                   />
                 </div>

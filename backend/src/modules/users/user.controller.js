@@ -79,15 +79,19 @@ export const createUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // 🔥 FIX: Convertimos string vacío a null para que la Base de Datos no exija formato de correo
+    const parsedEmail = email && email.trim() !== '' ? email.trim() : null;
+
     const newUser = await User.create({
       fullName,
       username,
-      email,
+      email: parsedEmail,
       password: hashedPassword,
       role: role || 'Empleado'
     });
 
-    if (email) {
+    // 🔥 Solo intentamos mandar correo SI realmente escribió uno
+    if (parsedEmail) {
       const htmlTemplate = `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
           <h2 style="color: #ea580c; text-align: center;">¡Hola, ${fullName}!</h2>
@@ -104,11 +108,13 @@ export const createUser = async (req, res) => {
           </p>
         </div>
       `;
-      sendEmailViaHTTP(email, '¡Bienvenido al equipo de 𝓛𝔂𝓪! - Tus credenciales de acceso', htmlTemplate);
+      sendEmailViaHTTP(parsedEmail, '¡Bienvenido al equipo de 𝓛𝔂𝓪! - Tus credenciales de acceso', htmlTemplate);
     }
 
     res.status(201).json({
-      message: 'Usuario creado exitosamente. Se enviaron las credenciales por correo.',
+      message: parsedEmail 
+        ? 'Usuario creado exitosamente. Se enviaron las credenciales por correo.'
+        : 'Usuario creado exitosamente.', // Mensaje limpio si no hubo correo
       user: {
         id: newUser.id,
         fullName: newUser.fullName,
@@ -137,11 +143,12 @@ export const updateUser = async (req, res) => {
     let passwordChanged = false;
     let changesMade = false;
 
-    const parsedEmail = email === '' ? null : email;
+    // 🔥 FIX: Si lo borran en la actualización, lo volvemos null de forma segura
+    const parsedEmail = email && email.trim() !== '' ? email.trim() : null;
 
     if (fullName && fullName !== user.fullName) { user.fullName = fullName; changesMade = true; }
     if (username && username !== user.username) { user.username = username; changesMade = true; }
-    if (parsedEmail !== undefined && parsedEmail !== user.email) { user.email = parsedEmail; changesMade = true; }
+    if (parsedEmail !== user.email) { user.email = parsedEmail; changesMade = true; }
     if (role && role !== user.role) { user.role = role; changesMade = true; }
     if (isActive !== undefined && isActive !== user.isActive) { user.isActive = isActive; changesMade = true; }
 
@@ -179,6 +186,7 @@ export const updateUser = async (req, res) => {
 
     const targetEmail = parsedEmail || user.email; 
     
+    // Solo enviamos correo si se guardó uno válido
     if (changesMade && targetEmail) {
       const htmlTemplate = `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
@@ -202,7 +210,7 @@ export const updateUser = async (req, res) => {
 
     res.json({
       changed: true,
-      message: 'Usuario actualizado exitosamente. Se notificó al empleado.',
+      message: 'Usuario actualizado exitosamente.',
       user: { id: user.id, fullName: user.fullName, username: user.username, email: user.email, role: user.role, isActive: user.isActive }
     });
   } catch (error) {
