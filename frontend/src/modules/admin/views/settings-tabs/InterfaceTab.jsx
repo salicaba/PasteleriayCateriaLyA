@@ -37,6 +37,11 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
 
   const handleSaveInterface = () => {
     setLoading(true);
+    
+    // 🔥 Blindamos el guardado forzando la escritura en la memoria local
+    localStorage.setItem('lya_ui_size', uiSize);
+    localStorage.setItem('lya_global_scroll', JSON.stringify(globalScroll));
+
     setTimeout(() => {
       setLoading(false);
       showNotification('success', "¡Configuración de interfaz guardada exitosamente!");

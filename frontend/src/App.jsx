@@ -122,9 +122,13 @@ function App() {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768); // 🔥 NUEVO ESTADO PARA DETECTAR CELULAR
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768); 
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [uiSize, setUiSize] = useState('large'); 
+  
+  // 🔥 Le enseñamos a leer la memoria al iniciar
+  const [uiSize, setUiSize] = useState(() => {
+    return localStorage.getItem('lya_ui_size') || 'large';
+  });
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -165,6 +169,9 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // 🔥 Guardamos el tamaño en memoria cada vez que cambia
+    localStorage.setItem('lya_ui_size', uiSize);
+    
     const root = document.documentElement;
     if (uiSize === 'large') root.style.fontSize = '16px'; 
     if (uiSize === 'medium') root.style.fontSize = '14px'; 
