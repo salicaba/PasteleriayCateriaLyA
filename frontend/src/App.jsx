@@ -134,15 +134,22 @@ function App() {
   
   const { theme } = useTheme();
 
-  // 🔥 Manejador Inteligente de Pantallas (Evita que se esconda en PC)
+  // 🔥 Manejador Inteligente de Pantallas (Fuerza tamaño y scroll en móviles)
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (!mobile) {
-        setIsSidebarOpen(false); // Cerramos el menú flotante si regresamos a vista de PC
+      
+      if (mobile) {
+        // 🔥 Si es celular, forzamos automáticamente el tamaño a 'small' y el scroll a 'true'
+        setUiSize('small');
+        setGlobalScroll(true);
+      } else {
+        // Si es PC, solo cerramos el menú lateral flotante por si se quedó abierto
+        setIsSidebarOpen(false); 
       }
     };
+    
     handleResize(); // Evaluar al cargar la página
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
