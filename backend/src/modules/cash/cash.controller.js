@@ -236,9 +236,14 @@ export const getFinancialSummary = async (req, res) => {
     const opex = await Transaction.sum('amount', {
       where: { type: 'EXPENSE', source: 'MANUAL', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
-
+    
+    // 🔥 FIX: Sumar CONSUMOS y MERMAS (Ignorando anulados) para cuadrar con el Kardex
     const cogs = await InventoryTransaction.sum('totalCost', {
-      where: { type: 'CONSUMPTION', createdAt: { [Op.between]: [start, end] } }
+      where: { 
+        type: { [Op.in]: ['CONSUMPTION', 'WASTE'] }, 
+        status: 'ACTIVE', 
+        createdAt: { [Op.between]: [start, end] } 
+      }
     });
 
     const totalIncome = parseFloat(incomes || 0) - parseFloat(refunds || 0);

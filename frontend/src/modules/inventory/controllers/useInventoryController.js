@@ -212,6 +212,43 @@ export const useInventoryController = () => {
     }
   }, []);
 
+  // 8. ANULAR MOVIMIENTO
+  const cancelKardexTransaction = async (txId, reason = '') => {
+    try {
+      const response = await fetch(`${API_URL}/inventory/transaction/${txId}/cancel`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al anular');
+      
+      // Refrescar datos
+      await fetchInventory(true);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // 9. RESTAURAR MOVIMIENTO
+  const restoreKardexTransaction = async (txId) => {
+    try {
+      const response = await fetch(`${API_URL}/inventory/transaction/${txId}/restore`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al restaurar');
+      
+      // Refrescar datos
+      await fetchInventory(true);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   return { 
     inventory, 
     isLoading, 
@@ -224,8 +261,10 @@ export const useInventoryController = () => {
     processReconciliation,
     globalKardex,
     globalKpiSpent,
-    globalKpiOut, // 🔥 LO EXPORTAMOS
+    globalKpiOut,
     isKardexLoading,
-    fetchGlobalKardex
+    fetchGlobalKardex,
+    cancelKardexTransaction,
+    restoreKardexTransaction
   };
 };

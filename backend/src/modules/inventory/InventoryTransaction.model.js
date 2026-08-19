@@ -30,6 +30,23 @@ const InventoryTransaction = sequelize.define('InventoryTransaction', {
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,
+  },
+  // 🔥 NUEVOS CAMPOS DE ANULACIÓN
+  status: {
+    type: DataTypes.ENUM('ACTIVE', 'CANCELLED'),
+    defaultValue: 'ACTIVE',
+  },
+  cancelReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  cancelledAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  cancelledBy: {
+    type: DataTypes.UUID,
+    allowNull: true,
   }
 }, {
   tableName: 'inventory_transactions',

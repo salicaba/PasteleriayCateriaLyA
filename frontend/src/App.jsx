@@ -125,7 +125,6 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768); 
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // 🔥 Le enseñamos a leer la memoria al iniciar
   const [uiSize, setUiSize] = useState(() => {
     return localStorage.getItem('lya_ui_size') || 'large';
   });
@@ -169,7 +168,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // 🔥 Guardamos el tamaño en memoria cada vez que cambia
     localStorage.setItem('lya_ui_size', uiSize);
     
     const root = document.documentElement;
@@ -193,7 +191,6 @@ function App() {
     localStorage.setItem('lya_active_tab', 'caja');
   };
 
-  // 🔥 CLEAN DISCONNECT: Centralizamos la lógica de expulsión y evitamos doble notificación
   const performCleanLogout = (message, isKickout = false) => {
     const hasToken = localStorage.getItem('lya_token');
     if (!hasToken) return; // Si ya no hay token, alguien más ya disparó el evento (Evita doble toast)
@@ -208,7 +205,6 @@ function App() {
     setExpandedGroups([]); 
     setShowLogoutModal(false); 
 
-    // Notificación Pilar 5 Estricto
     if (isKickout) {
       toast(message || "Tu acceso ha sido revocado por el Administrador.", {
         icon: <div className="bg-red-100 dark:bg-red-900/30 p-1 rounded-full"><AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" /></div>,
@@ -241,14 +237,12 @@ function App() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // 🔥 INTERCEPTOR EVENT: Maneja 401s y Kickouts (403 + flag) de Axios
   useEffect(() => {
     const handleAuthError = (e) => {
       const detail = e.detail || {};
       performCleanLogout(detail.message, detail.isKickout);
     };
     
-    // RBAC: Solo mostramos advertencia si intenta entrar a algo prohibido pero no lo botamos
     const handleRbacError = (e) => {
       toast(e.detail?.message || "Acción denegada por seguridad", {
         icon: <div className="bg-amber-100 dark:bg-amber-900/30 p-1 rounded-full"><Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>,
@@ -264,11 +258,9 @@ function App() {
     };
   }, []);
 
-  // 🔥 ESCUDO ANTI-TOPOS (KILL-SWITCH): Escucha en tiempo real si el admin revoca el acceso
   useEffect(() => {
     if (!user) return; 
 
-    // Unimos al usuario a su sala privada
     socket.emit('join_user_room', user.id);
 
     const handleKickout = (data) => {
@@ -391,18 +383,14 @@ function App() {
     document.title = currentTitle;
   }, [activeTab, user]);
 
-  // 🔥 VALIDACIÓN DE SEGURIDAD PARA OCULTAR GRUPOS
   const visibleMenuConfig = menuConfig.filter(group => {
-    // Bloqueamos Finanzas, Personal, Inventario y Reportes para el Empleado
     if (['finanzas_group', 'personal_group', 'inventario_group', 'reportes'].includes(group.id) && user?.role === 'Empleado') {
       return false;
     }
     return true;
   });
 
-  // 🔥 VALIDACIÓN DE SEGURIDAD PARA REDIRECCIONAR RUTAS
   useEffect(() => {
-    // Añadimos reportes, inventario y arqueo a la lista blindada
     const adminOnlyTabs = [
       'usuarios', 
       'cuentas', 
@@ -503,16 +491,29 @@ function App() {
       {!user ? (
         <LoginScreen onLogin={handleLogin} />
       ) : (
-        <div className="h-[100dvh] w-full flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300">
+        <div className="h-[100dvh] w-full flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300 relative">
           
-          {/* 🔥 MODIFICACIÓN CLAVE: El sidebar respeta si es Celular o PC para animarse */}
+          {/* 🔥 ESCUDO OPACO GLOBAL PARA MÓVILES (Z-Index War Fix) */}
+          <AnimatePresence>
+            {isSidebarOpen && isMobile && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSidebarOpen(false)}
+                className="fixed inset-0 bg-black/50 dark:bg-black/70 lya:bg-lya-dark/60 z-[40] md:hidden cursor-pointer backdrop-blur-[2px]"
+              />
+            )}
+          </AnimatePresence>
+
+          {/* 🔥 SIDEBAR AHORA TIENE Z-[50] EN MÓVILES */}
           <motion.aside
             initial={false}
             animate={{ 
               x: isMobile ? (isSidebarOpen ? 0 : '-100%') : 0 
             }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 bottom-0 left-0 w-[240px] md:relative h-full bg-white dark:bg-gray-800 lya:bg-lya-surface md:border-r border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-2xl md:shadow-none z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
+            className="fixed top-0 bottom-0 left-0 w-[240px] md:relative h-full bg-white dark:bg-gray-800 lya:bg-lya-surface md:border-r border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-2xl md:shadow-none z-[50] md:z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
           >
             <div className="w-[240px] flex flex-col h-full">
               <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
@@ -609,18 +610,6 @@ function App() {
 
           <div className={`flex flex-col relative w-full flex-1 md:w-auto md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full flex-1 overflow-hidden'}`}>
             
-            <AnimatePresence>
-              {isSidebarOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="absolute inset-0 bg-black/40 dark:bg-black/60 lya:bg-black/40 z-20 md:hidden cursor-pointer backdrop-blur-[2px]"
-                />
-              )}
-            </AnimatePresence>
-
             <header className={`h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors duration-300 relative ${globalScroll ? 'z-10' : 'z-10 sticky top-0'}`}>
               <div className="flex items-center gap-2 sm:gap-4">
                  <motion.button
@@ -710,7 +699,7 @@ function App() {
               {activeTab === 'reportes' && <ReportsPage />}
             </main>
 
-            {/* 🔥 PILARES 4 Y 5: MODAL DE ACTUALIZACIÓN DE SISTEMA (NEO-BENTO) */}
+            {/* MODAL DE ACTUALIZACIÓN DE SISTEMA */}
             <AnimatePresence>
               {needRefresh && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

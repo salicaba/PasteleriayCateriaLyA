@@ -3,9 +3,8 @@ import Transaction from '../cash/Transaction.model.js';
 import Order from '../pos/Order.model.js';
 import OrderItem from '../pos/OrderItem.model.js';
 import Product from '../menu/Product.model.js';
-import InventoryReconciliationDetail from '../inventory/InventoryReconciliationDetail.model.js';
-import InventoryReconciliation from '../inventory/InventoryReconciliation.model.js';
 import PasteleriaOrder from '../pasteleria/PasteleriaOrder.model.js';
+import InventoryTransaction from '../inventory/InventoryTransaction.model.js'; // 🔥 IMPORTACIÓN AÑADIDA
 
 export const getDashboardData = async (req, res) => {
   try {
@@ -107,21 +106,23 @@ export const getDashboardData = async (req, res) => {
       ingreso: parseFloat(item.ingreso || 0)
     })).sort((a, b) => b.cantidad - a.cantidad);
 
-    // 5. Mermas y Ajustes de Inventario (Actual)
-    const inventoryStats = await InventoryReconciliationDetail.findAll({
-      where: { createdAt: { [Op.between]: [start, end] } },
-      include: [{ 
-        model: InventoryReconciliation, 
-        as: 'reconciliation',
-        attributes: [], 
-        where: { status: 'COMPLETED' } 
-      }],
-      attributes: [
-        [fn('SUM', literal('CASE WHEN "difference" < 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalMermas'],
-        [fn('SUM', literal('CASE WHEN "difference" > 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalSobrantes']
-      ],
+    // 🔥 5. Mermas y Ajustes de Inventario (SINCRONIZADO CON EL KARDEX GLOBAL)
+    const mermasActual = await InventoryTransaction.findOne({
+      where: { ...dateFilter, type: { [Op.in]: ['CONSUMPTION', 'WASTE'] }, status: 'ACTIVE' },
+      attributes: [[fn('SUM', col('totalCost')), 'total']],
       raw: true
     });
+    
+    const sobrantesActual = await InventoryTransaction.findOne({
+      where: { ...dateFilter, type: 'ADJUSTMENT', status: 'ACTIVE' },
+      attributes: [[fn('SUM', col('totalCost')), 'total']],
+      raw: true
+    });
+
+    const inventoryStats = {
+      totalMermas: parseFloat(mermasActual?.total || 0),
+      totalSobrantes: parseFloat(sobrantesActual?.total || 0)
+    };
 
     // 6. Métodos de Pago
     const paymentMethods = await Transaction.findAll({
@@ -154,16 +155,13 @@ export const getDashboardData = async (req, res) => {
     });
     const prevTotalOpex = parseFloat(prevOpexTransactions[0]?.total || 0);
 
-    const prevInventoryStats = await InventoryReconciliationDetail.findAll({
-      where: { createdAt: { [Op.between]: [prevStart, prevEnd] } },
-      include: [{ 
-        model: InventoryReconciliation, as: 'reconciliation', attributes: [], 
-        where: { status: 'COMPLETED' } 
-      }],
-      attributes: [[fn('SUM', literal('CASE WHEN "difference" < 0 THEN "totalDifferenceCost" ELSE 0 END')), 'totalMermas']],
+    // 🔥 Tendencias de Mermas (Sincronizado con Kardex)
+    const prevMermas = await InventoryTransaction.findOne({
+      where: { ...prevDateFilter, type: { [Op.in]: ['CONSUMPTION', 'WASTE'] }, status: 'ACTIVE' },
+      attributes: [[fn('SUM', col('totalCost')), 'total']],
       raw: true
     });
-    const prevTotalMermas = Math.abs(parseFloat(prevInventoryStats[0]?.totalMermas || 0));
+    const prevTotalMermas = parseFloat(prevMermas?.total || 0);
 
     res.json({
       success: true,
@@ -172,7 +170,7 @@ export const getDashboardData = async (req, res) => {
         opexTransactions,
         productSales,
         pasteleriaSales,
-        inventoryStats: inventoryStats[0] || { totalMermas: 0, totalSobrantes: 0 },
+        inventoryStats: inventoryStats, // 🔥 FIX: Ya no es un arreglo
         paymentMethods,
         previousKpis: {
           totalIncome: prevTotalIncome,
@@ -188,11 +186,13 @@ export const getDashboardData = async (req, res) => {
   }
 };
 
-// 🔥 NUEVO ENDPOINT: Analíticas específicas por Producto
+// ==========================================================
+// Analíticas específicas por Producto
+// ==========================================================
 export const getProductStats = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { period } = req.query; // 'today', 'yesterday', 'week', 'month', 'all'
+    const { period } = req.query; 
 
     let dateFilter = {};
     if (period && period !== 'all') {

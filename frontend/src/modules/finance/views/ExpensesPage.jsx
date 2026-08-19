@@ -36,7 +36,8 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
 
   return (
     <div className={`relative ${containerClassName}`} ref={dropdownRef}>
-      <button 
+      <motion.button 
+        whileTap={{ scale: 0.95 }}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center text-sm font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text outline-none cursor-pointer w-full transition-colors ${buttonClassName}`}
@@ -46,7 +47,7 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
           <span className="truncate">{selected?.label}</span>
         </div>
         <ChevronDown size={14} className={`text-gray-400 dark:text-gray-500 ml-2 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+      </motion.button>
 
       <AnimatePresence>
         {isOpen && (
@@ -58,7 +59,8 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
             className="absolute z-50 top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl shadow-xl overflow-hidden py-1"
           >
             {options.map((opt) => (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 key={opt.value}
                 onClick={() => {
                   onChange(opt.value);
@@ -67,11 +69,11 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
                 className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
                   value === opt.value 
                     ? 'bg-red-50 dark:bg-gray-700 lya:bg-lya-primary/10 text-red-600 dark:text-white lya:text-lya-primary' 
-                    : 'text-gray-600 dark:text-gray-300 lya:text-lya-text hover:bg-gray-50 dark:hover:bg-gray-700/50 lya:hover:bg-lya-bg/50'
+                    : 'text-gray-600 dark:text-gray-300 lya:text-lya-text md:hover:bg-gray-50 dark:md:hover:bg-gray-700/50 lya:md:hover:bg-lya-bg/50'
                 }`}
               >
                 {opt.label}
-              </button>
+              </motion.button>
             ))}
           </motion.div>
         )}
@@ -91,22 +93,13 @@ export const ExpensesPage = () => {
     return `${year}-${month}-${day}`;
   };
 
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return formatLocalDate(new Date(d.getFullYear(), d.getMonth(), 1)); 
-  });
-  
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-  });
+  const [startDate, setStartDate] = useState(() => formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [endDate, setEndDate] = useState(() => formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)));
 
   const [timeRange, setTimeRange] = useState('this_month');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('PAYROLL');
-  
-  // 🔥 Reinicio de Fecha a "Hoy" cada vez que se carga el componente
   const [expenseDate, setExpenseDate] = useState(() => formatLocalDate(new Date())); 
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -114,7 +107,6 @@ export const ExpensesPage = () => {
   const [notification, setNotification] = useState(null);
   const [isFullScreenLoader, setIsFullScreenLoader] = useState(true);
 
-  // Modales
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [cancelModal, setCancelModal] = useState({ isOpen: false, expenseId: null, reason: '' });
   
@@ -126,50 +118,35 @@ export const ExpensesPage = () => {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      const minLoadTime = new Promise(resolve => setTimeout(resolve, 600)); 
-      await fetchExpenses(startDate, endDate);
-      await minLoadTime; 
-      setIsFullScreenLoader(false);
-    };
-    loadData();
+    if (!isLoading) {
+      const minLoadTime = new Promise(resolve => setTimeout(resolve, 600));
+      minLoadTime.then(() => setIsFullScreenLoader(false));
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    fetchExpenses(startDate, endDate);
   }, [startDate, endDate, fetchExpenses]);
 
   const handleRangeChange = (val) => {
     setTimeRange(val);
     if (val === 'custom') return; 
 
-    setIsFullScreenLoader(true);
     const now = new Date();
     let start, end;
 
     switch(val) {
       case 'today':
-        start = new Date(now);
-        end = new Date(now);
-        break;
+        start = new Date(now); end = new Date(now); break;
       case 'yesterday':
-        start = new Date(now);
-        start.setDate(start.getDate() - 1);
-        end = new Date(start);
-        break;
+        start = new Date(now); start.setDate(start.getDate() - 1); end = new Date(start); break;
       case 'this_week':
-        start = new Date(now);
-        const firstDay = start.getDate() - start.getDay();
-        start.setDate(firstDay);
-        end = new Date(start);
-        end.setDate(firstDay + 6);
-        break;
+        start = new Date(now); const firstDay = start.getDate() - start.getDay(); start.setDate(firstDay); end = new Date(start); end.setDate(firstDay + 6); break;
       case 'this_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
+        start = new Date(now.getFullYear(), now.getMonth(), 1); end = new Date(now.getFullYear(), now.getMonth() + 1, 0); break;
       case 'last_month':
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      default:
-        return;
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1); end = new Date(now.getFullYear(), now.getMonth(), 0); break;
+      default: return;
     }
 
     setStartDate(formatLocalDate(start));
@@ -177,7 +154,6 @@ export const ExpensesPage = () => {
   };
 
   const handleCustomDateChange = (val, type) => {
-    setIsFullScreenLoader(true); 
     setTimeRange('custom');
     if (type === 'start') setStartDate(val);
     if (type === 'end') setEndDate(val);
@@ -188,63 +164,71 @@ export const ExpensesPage = () => {
     if (!amount || !description || !expenseDate) return showNotification('Completa los campos obligatorios', 'error');
     
     setIsSubmitting(true);
-    const res = await registerExpense({ 
-      amount: parseFloat(amount), 
-      description, 
-      expenseCategory: category,
-      expenseDate 
-    });
-    
-    if (res.success) {
-      showNotification('Gasto registrado exitosamente', 'success');
-      setAmount('');
-      setDescription('');
-      setExpenseDate(formatLocalDate(new Date())); 
-      fetchExpenses(startDate, endDate);
-    } else {
-      showNotification(res.error || 'Error al registrar el gasto', 'error');
+    try {
+      const res = await registerExpense({ 
+        amount: parseFloat(amount), 
+        description, 
+        expenseCategory: category,
+        expenseDate 
+      });
+      
+      if (res.success) {
+        showNotification('Gasto registrado exitosamente', 'success');
+        setAmount('');
+        setDescription('');
+        setExpenseDate(formatLocalDate(new Date())); 
+        await fetchExpenses(startDate, endDate);
+      } else {
+        showNotification(res.error || 'Error al registrar el gasto', 'error');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleConfirmCancel = async () => {
-    setActionLoadingId(cancelModal.expenseId);
-    const res = await cancelExpense(cancelModal.expenseId, cancelModal.reason);
-    if (res.success) {
-      showNotification('Gasto anulado. El dinero ha vuelto a caja.', 'success');
-      setCancelModal({ isOpen: false, expenseId: null, reason: '' });
-      fetchExpenses(startDate, endDate);
-    } else {
-      showNotification(res.error || 'No se pudo anular el gasto', 'error');
+    try {
+      setActionLoadingId(cancelModal.expenseId);
+      const res = await cancelExpense(cancelModal.expenseId, cancelModal.reason);
+      if (res.success) {
+        showNotification('Gasto anulado. El dinero ha vuelto a caja.', 'success');
+        setCancelModal({ isOpen: false, expenseId: null, reason: '' });
+        await fetchExpenses(startDate, endDate);
+      } else {
+        showNotification(res.error || 'No se pudo anular el gasto', 'error');
+      }
+    } finally {
+      setActionLoadingId(null);
     }
-    setActionLoadingId(null);
   };
 
   const handleRestore = async (id) => {
-    setActionLoadingId(id);
-    const res = await restoreExpense(id);
-    if (res.success) {
-      showNotification('Gasto restaurado correctamente.', 'success');
-      fetchExpenses(startDate, endDate);
-    } else {
-      showNotification(res.error || 'No se pudo restaurar el gasto', 'error');
+    try {
+      setActionLoadingId(id);
+      const res = await restoreExpense(id);
+      if (res.success) {
+        showNotification('Gasto restaurado correctamente.', 'success');
+        await fetchExpenses(startDate, endDate);
+      } else {
+        showNotification(res.error || 'No se pudo restaurar el gasto', 'error');
+      }
+    } finally {
+      setActionLoadingId(null);
     }
-    setActionLoadingId(null);
   };
 
   const todayStr = new Date().toLocaleDateString('es-MX');
-
   const activeExpenses = (expenses || []).filter(ex => ex.status === 'ACTIVE');
   const cancelledExpenses = (expenses || []).filter(ex => {
     if (ex.status !== 'CANCELLED') return false;
     const cancelDate = ex.cancelledAt ? new Date(ex.cancelledAt) : new Date(ex.createdAt);
     return cancelDate.toLocaleDateString('es-MX') === todayStr;
   });
-
   const totalGastos = activeExpenses.reduce((sum, ex) => sum + parseFloat(ex.amount), 0);
 
   return (
     <>
+      {/* NOTIFICACIÓN TIPO CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -252,6 +236,7 @@ export const ExpensesPage = () => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
                 notification.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
@@ -261,11 +246,7 @@ export const ExpensesPage = () => {
                   ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
                   : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary'
               }`}>
-                {notification.type === 'error' ? (
-                  <AlertCircle size={20} />
-                ) : (
-                  <CheckCircle2 size={20} />
-                )}
+                {notification.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
               </div>
               <div className="flex flex-col">
                   <span className="text-sm text-center">{notification.message}</span>
@@ -303,10 +284,10 @@ export const ExpensesPage = () => {
             key="main-content"
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
           >
-            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-[50] relative transition-colors">
+            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
               <div className="flex items-center space-x-4">
                 <div className="bg-red-500 dark:bg-red-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-red-500/20 dark:shadow-red-900/30 lya:shadow-lya-primary/20">
                   <Briefcase size={28} />
@@ -375,7 +356,6 @@ export const ExpensesPage = () => {
                   <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white lya:text-lya-text border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors">Registrar Nuevo Gasto</h2>
                   <form onSubmit={handleSubmit} className="space-y-5">
                     
-                    {/* Selector de Fecha con Bloqueo y Botón Hoy */}
                     <div>
                       <label className="block text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/50 tracking-widest mb-2 transition-colors">Fecha del Gasto</label>
                       <div className="flex items-center gap-2">
@@ -384,7 +364,7 @@ export const ExpensesPage = () => {
                           <input 
                             type="date"
                             required
-                            max={formatLocalDate(new Date())} // Evitar fechas futuras
+                            max={formatLocalDate(new Date())}
                             value={expenseDate}
                             onChange={(e) => setExpenseDate(e.target.value)}
                             style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
@@ -395,7 +375,7 @@ export const ExpensesPage = () => {
                           type="button"
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setExpenseDate(formatLocalDate(new Date()))}
-                          className="px-4 py-3.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors font-bold shadow-sm text-sm shrink-0"
+                          className="px-4 py-3.5 bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors font-bold shadow-sm text-sm shrink-0"
                         >
                           Hoy
                         </motion.button>
@@ -409,21 +389,22 @@ export const ExpensesPage = () => {
                           const Icon = cat.icon;
                           const isSelected = category === cat.id;
                           return (
-                            <button
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
                               type="button"
                               key={cat.id}
                               onClick={() => setCategory(cat.id)}
                               className={`p-3 rounded-2xl flex flex-col items-center gap-2 transition-all border-2 ${
                                 isSelected 
                                   ? `border-red-500 dark:border-red-500/70 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 lya:border-lya-primary lya:bg-lya-primary/10 lya:text-lya-primary shadow-sm` 
-                                  : 'border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 lya:border-lya-border/30 lya:text-lya-text/60 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-transparent'
+                                  : 'border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 md:hover:border-gray-300 dark:md:hover:border-gray-600 lya:border-lya-border/30 lya:text-lya-text/60 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-transparent'
                               }`}
                             >
                               <div className={`p-2.5 rounded-xl transition-colors ${isSelected ? cat.color : 'bg-white dark:bg-gray-700 lya:bg-lya-surface'}`}>
                                 <Icon size={20} />
                               </div>
                               <span className="text-[11px] font-bold text-center leading-tight">{cat.label}</span>
-                            </button>
+                            </motion.button>
                           );
                         })}
                       </div>
@@ -455,14 +436,15 @@ export const ExpensesPage = () => {
                       ></textarea>
                     </div>
 
-                    <button 
+                    <motion.button 
+                      whileTap={{ scale: 0.95 }}
                       type="submit" 
                       disabled={isSubmitting} 
-                      className="w-full py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500 lya:bg-lya-secondary lya:hover:bg-lya-secondary/90 text-white lya:text-lya-surface rounded-xl font-bold shadow-lg shadow-red-500/30 dark:shadow-red-900/30 lya:shadow-lya-secondary/30 flex justify-center items-center gap-2 transition-all transform hover:-translate-y-0.5 disabled:opacity-75 disabled:cursor-not-allowed disabled:transform-none"
+                      className="w-full py-4 bg-red-500 md:hover:bg-red-600 dark:bg-red-600 dark:md:hover:bg-red-500 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90 text-white lya:text-lya-surface rounded-xl font-bold shadow-lg shadow-red-500/30 dark:shadow-red-900/30 lya:shadow-lya-secondary/30 flex justify-center items-center gap-2 transition-all transform md:hover:-translate-y-0.5 disabled:opacity-75 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
                       {isSubmitting ? 'Procesando...' : 'Aplicar Gasto'}
-                    </button>
+                    </motion.button>
                   </form>
                 </div>
 
@@ -482,116 +464,118 @@ export const ExpensesPage = () => {
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex-1 p-6 transition-colors relative overflow-hidden">
+                  <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex-1 p-6 transition-colors relative overflow-hidden flex flex-col">
+                    
+                    {/* Carga Local del Componente (Sin Pantallazo Completo) */}
                     {isLoading && !isFullScreenLoader && (
-                       <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-sm z-20">
+                       <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-sm z-20 rounded-[2.5rem]">
                          <Loader2 className="animate-spin text-red-500 lya:text-lya-primary" size={32} />
                        </div>
                     )}
 
-                    <div className="flex justify-between items-center mb-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors">
-                      <h3 className="font-bold text-gray-800 dark:text-white lya:text-lya-text">Historial de Gastos</h3>
-                      <button 
+                    <div className="flex justify-between items-center mb-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 pb-3 transition-colors shrink-0">
+                      <h3 className="font-bold text-gray-800 dark:text-white lya:text-lya-text truncate">Historial de Gastos</h3>
+                      <motion.button 
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setIsTrashOpen(true)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-xs transition-all active:scale-95 ${
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shrink-0 ${
                           isTrashOpen 
                             ? 'bg-red-500 text-white shadow-md lya:bg-lya-primary lya:text-lya-surface' 
-                            : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 lya:bg-lya-primary/10 lya:text-lya-primary'
+                            : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 lya:bg-lya-primary/10 lya:text-lya-primary lya:md:hover:bg-lya-primary/20'
                         }`}
                       >
                         <Trash2 size={16} />
                         Papelera ({cancelledExpenses.length})
-                      </button>
+                      </motion.button>
                     </div>
                     
-                    {!isLoading && activeExpenses.length === 0 ? (
-                      <div className="text-center py-16 text-gray-400 dark:text-gray-500 lya:text-lya-text/50">
-                        <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
-                        <p className="font-bold text-lg">No hay gastos activos registrados.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {activeExpenses.map((ex, idx) => {
-                          const catConfig = CATEGORIES.find(c => c.id === ex.expenseCategory) || CATEGORIES[5];
-                          const Icon = catConfig.icon;
-                          const dateObj = new Date(ex.createdAt);
-                          const formattedDate = dateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
-                          const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+                    <div className="flex-1 overflow-y-auto custom-scrollbar relative pr-2">
+                      {!isLoading && activeExpenses.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 dark:text-gray-500 lya:text-lya-text/50">
+                          <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
+                          <p className="font-bold text-lg text-center">No hay gastos activos registrados.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {activeExpenses.map((ex, idx) => {
+                            const catConfig = CATEGORIES.find(c => c.id === ex.expenseCategory) || CATEGORIES[5];
+                            const Icon = catConfig.icon;
+                            const dateObj = new Date(ex.createdAt);
+                            const formattedDate = dateObj.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+                            const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
 
-                          // 🔥 EXTRACCIÓN DE LA NOTA DE AUDITORÍA
-                          const auditMatch = ex.description?.match(/\[Registrado el: (.*?)\]/);
-                          const realAuditDateTime = auditMatch ? auditMatch[1] : null;
-                          const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
+                            const auditMatch = ex.description?.match(/\[Registrado el: (.*?)\]/);
+                            const realAuditDateTime = auditMatch ? auditMatch[1] : null;
+                            const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
 
-                          return (
-                            <motion.div 
-                              key={ex.id} 
-                              initial={{ opacity: 0, y: 15 }} 
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ type: "spring", stiffness: 300, damping: 24, delay: idx * 0.04 }}
-                              className="flex flex-row items-start justify-between p-4 sm:p-5 rounded-[1.5rem] border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/50 shadow-sm transition-all gap-4"
-                            >
-                              <div className="flex flex-row items-start gap-3 sm:gap-4 min-w-0 flex-1">
-                                <div className={`p-3 sm:p-3.5 rounded-xl shrink-0 transition-colors ${catConfig.color}`}>
-                                  <Icon size={20} className="sm:w-6 sm:h-6" />
-                                </div>
-                                <div className="flex flex-col min-w-0 flex-1 pt-0.5">
-                                  <p className="font-bold text-sm sm:text-base text-gray-800 dark:text-white lya:text-lya-text line-clamp-2 w-full text-justify">
-                                    {displayDesc}
-                                  </p>
-                                  <div className="flex flex-col mt-1 gap-1">
-                                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">
-                                      <span className="capitalize whitespace-nowrap">{formattedDate}</span>
+                            return (
+                              <motion.div 
+                                key={ex.id} 
+                                initial={{ opacity: 0, y: 15 }} 
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 24, delay: Math.min(idx * 0.04, 0.2) }}
+                                className="flex flex-row items-start justify-between p-4 sm:p-5 rounded-[1.5rem] border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 md:hover:border-gray-300 dark:md:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/50 shadow-sm transition-all gap-4"
+                              >
+                                <div className="flex flex-row items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                                  <div className={`p-3 sm:p-3.5 rounded-xl shrink-0 transition-colors ${catConfig.color}`}>
+                                    <Icon size={20} className="sm:w-6 sm:h-6" />
+                                  </div>
+                                  <div className="flex flex-col min-w-0 flex-1 pt-0.5">
+                                    <p className="font-bold text-sm sm:text-base text-gray-800 dark:text-white lya:text-lya-text line-clamp-2 w-full text-justify">
+                                      {displayDesc}
+                                    </p>
+                                    <div className="flex flex-col mt-1 gap-1">
+                                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">
+                                        <span className="capitalize whitespace-nowrap">{formattedDate}</span>
+                                        
+                                        {!realAuditDateTime && (
+                                          <>
+                                            <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
+                                            <span className="whitespace-nowrap">{formattedTime}</span>
+                                          </>
+                                        )}
+
+                                        {realAuditDateTime && (
+                                          <>
+                                            <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
+                                            <span className="text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                              Diferido
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
                                       
-                                      {/* Si NO es diferido, mostramos la hora contable */}
-                                      {!realAuditDateTime && (
-                                        <>
-                                          <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
-                                          <span className="whitespace-nowrap">{formattedTime}</span>
-                                        </>
-                                      )}
-
-                                      {/* 🔥 ETIQUETA RETROACTIVA DE AUDITORÍA */}
                                       {realAuditDateTime && (
-                                        <>
-                                          <span className="text-gray-300 dark:text-gray-600 lya:text-lya-border shrink-0">•</span>
-                                          <span className="text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                                            Diferido
-                                          </span>
-                                        </>
+                                        <span className="text-[10px] sm:text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                                          Teclado: {realAuditDateTime}
+                                        </span>
                                       )}
                                     </div>
-                                    
-                                    {/* 🔥 MOSTRAR FECHA Y HORA REAL DE TECLADO */}
-                                    {realAuditDateTime && (
-                                      <span className="text-[10px] sm:text-[11px] font-medium text-gray-400 dark:text-gray-500">
-                                        Teclado: {realAuditDateTime}
-                                      </span>
-                                    )}
+                                    <span className="uppercase tracking-widest text-[9px] sm:text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 truncate w-full mt-1.5">
+                                      {catConfig.label}
+                                    </span>
                                   </div>
-                                  <span className="uppercase tracking-widest text-[9px] sm:text-[10px] font-black text-gray-400 dark:text-gray-500 lya:text-lya-text/50 truncate w-full mt-1.5">
-                                    {catConfig.label}
-                                  </span>
                                 </div>
-                              </div>
-                              
-                              <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
-                                <p className="font-black text-lg sm:text-xl text-red-600 dark:text-red-400 lya:text-red-500 transition-colors">
-                                  -${parseFloat(ex.amount).toFixed(2)}
-                                </p>
-                                <button
-                                  onClick={() => setCancelModal({ isOpen: true, expenseId: ex.id, reason: '' })}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 lya:bg-lya-bg text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors text-[10px] font-bold uppercase tracking-wider active:scale-95"
-                                >
-                                  <Trash2 size={14} /> Anular
-                                </button>
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    )}
+                                
+                                <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
+                                  <p className="font-black text-lg sm:text-xl text-red-600 dark:text-red-400 lya:text-red-500 transition-colors">
+                                    -${parseFloat(ex.amount).toFixed(2)}
+                                  </p>
+                                  <motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => setCancelModal({ isOpen: true, expenseId: ex.id, reason: '' })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 lya:bg-lya-bg text-gray-400 md:hover:bg-red-50 dark:md:hover:bg-red-900/30 md:hover:text-red-500 transition-colors text-[10px] font-bold uppercase tracking-wider"
+                                  >
+                                    <Trash2 size={14} /> Anular
+                                  </motion.button>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -600,7 +584,7 @@ export const ExpensesPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE CONFIRMACIÓN DE ANULACIÓN */}
+      {/* MODAL DE CONFIRMACIÓN DE ANULACIÓN (TEMATIZADO) */}
       <AnimatePresence>
         {cancelModal.isOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -614,10 +598,10 @@ export const ExpensesPage = () => {
               className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
             />
             <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              initial={{ scale: 0.95, opacity: 0, y: 10 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
             >
               <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
@@ -644,17 +628,19 @@ export const ExpensesPage = () => {
               </div>
 
               <div className="flex gap-3 w-full">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setCancelModal({ isOpen: false, expenseId: null, reason: '' })}
                   disabled={actionLoadingId === cancelModal.expenseId}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
-                </button>
-                <button 
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleConfirmCancel} 
                   disabled={actionLoadingId === cancelModal.expenseId}
-                  className="flex-[1.5] py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 active:scale-95 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500"
+                  className="flex-[1.5] py-4 bg-red-500 md:hover:bg-red-600 dark:bg-red-600 dark:md:hover:bg-red-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-75"
                 >
                   {actionLoadingId === cancelModal.expenseId ? (
                     <>
@@ -667,14 +653,14 @@ export const ExpensesPage = () => {
                       <span>Sí, Anular</span>
                     </>
                   )}
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* MODAL DE PAPELERA DE RECICLAJE */}
+      {/* MODAL DE PAPELERA DE RECICLAJE (TEMATIZADO) */}
       <AnimatePresence>
         {isTrashOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -687,31 +673,32 @@ export const ExpensesPage = () => {
               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-3xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors overflow-hidden"
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-red-100 dark:bg-red-900/30 lya:bg-red-500/10 rounded-2xl text-red-500 lya:text-red-500 shadow-sm border border-red-200 dark:border-red-800/50 lya:border-red-500/20">
                     <Trash2 size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text tracking-tight">Papelera de Gastos</h3>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Los gastos eliminados hoy desaparecerán a medianoche</p>
+                    <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text tracking-tight truncate">Papelera de Gastos</h3>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 line-clamp-1">Los gastos eliminados hoy desaparecerán a medianoche</p>
                   </div>
                 </div>
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
                   onClick={() => setIsTrashOpen(false)} 
-                  className="p-2.5 text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:hover:text-lya-text lya:hover:bg-lya-border/30 rounded-xl transition-all active:scale-90"
+                  className="p-2.5 text-gray-400 md:hover:text-gray-700 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 dark:md:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:md:hover:text-lya-text lya:md:hover:bg-lya-border/30 rounded-xl transition-all"
                 >
                   <X size={20} strokeWidth={2.5} />
-                </button>
+                </motion.button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30 transition-colors">
                 {cancelledExpenses.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4">
+                    <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4 transition-colors">
                       <Trash2 size={40} className="text-gray-400 dark:text-gray-600 lya:text-lya-text/30" strokeWidth={1.5} />
                     </div>
                     <p className="text-gray-500 dark:text-gray-400 font-bold lya:text-lya-text/60 text-lg text-center">No hay gastos anulados el día de hoy.</p>
@@ -724,13 +711,12 @@ export const ExpensesPage = () => {
                       const dateObj = new Date(ex.cancelledAt || ex.createdAt);
                       const formattedTime = dateObj.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
 
-                      // 🔥 EXTRACCIÓN DE AUDITORÍA PARA ELEMENTOS CANCELADOS
                       const auditMatch = ex.description?.match(/\[Registrado el: (.*?)\]/);
                       const realAuditDateTime = auditMatch ? auditMatch[1] : null;
                       const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
 
                       return (
-                        <div key={ex.id} className="flex flex-row items-start justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 hover:opacity-100 transition-opacity gap-4">
+                        <div key={ex.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4 sm:gap-0">
                           
                           <div className="flex flex-row items-start gap-3 flex-1 min-w-0 pr-2">
                             <div className={`h-12 w-12 flex-shrink-0 rounded-[1.25rem] ${catConfig.color} flex items-center justify-center border border-gray-100 dark:border-gray-700 lya:border-transparent`}>
@@ -744,7 +730,6 @@ export const ExpensesPage = () => {
                                   <span className="text-xs font-medium text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
                                     Anulado: {formattedTime}
                                   </span>
-                                  {/* 🔥 ETIQUETA RETROACTIVA DE AUDITORÍA */}
                                   {realAuditDateTime && (
                                     <span 
                                       className="ml-1 text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0"
@@ -754,7 +739,6 @@ export const ExpensesPage = () => {
                                     </span>
                                   )}
                                 </div>
-                                {/* 🔥 MOSTRAR FECHA Y HORA REAL DE TECLADO EN PAPELERA */}
                                 {realAuditDateTime && (
                                   <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">
                                     Teclado: {realAuditDateTime}
@@ -764,20 +748,21 @@ export const ExpensesPage = () => {
                             </div>
                           </div>
                           
-                          <div className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
-                            <span className="font-black text-base text-red-500 lya:text-red-400">
+                          <div className="flex flex-col items-end sm:items-center sm:flex-row gap-4 shrink-0 w-full sm:w-auto">
+                            <span className="font-black text-base text-red-500 lya:text-red-400 hidden sm:block">
                               ${parseFloat(ex.amount).toFixed(2)}
                             </span>
-                            <button 
+                            <motion.button 
+                              whileTap={{ scale: 0.95 }}
                               onClick={() => handleRestore(ex.id)}
                               disabled={actionLoadingId === ex.id}
-                              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50"
+                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 disabled:opacity-50 shrink-0"
                             >
                               {actionLoadingId === ex.id ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
                               <span className="hidden sm:inline">
                                 {actionLoadingId === ex.id ? 'Restaurando' : 'Restaurar'}
                               </span>
-                            </button>
+                            </motion.button>
                           </div>
                         </div>
                       )
@@ -789,6 +774,7 @@ export const ExpensesPage = () => {
           </div>
         )}
       </AnimatePresence>
+
     </>
   );
 };

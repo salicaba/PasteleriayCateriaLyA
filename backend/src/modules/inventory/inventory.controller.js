@@ -286,26 +286,131 @@ export const processReconciliation = async (req, res) => {
 };
 
 // =========================================================================
-// KARDEX GLOBAL CON FILTROS
+// MOTOR DE ANULACIÓN Y PAPELERA (NUEVO)
 // =========================================================================
+
+export const cancelTransaction = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    const tx = await InventoryTransaction.findByPk(id, { 
+      include: [{ model: InventoryItem, as: 'item' }],
+      transaction: t 
+    });
+
+    if (!tx) throw new Error('Movimiento no encontrado.');
+    if (tx.status === 'CANCELLED') throw new Error('Este movimiento ya está anulado.');
+
+    const item = tx.item;
+    let newStock = parseFloat(item.currentStock);
+    let currentAvgCost = parseFloat(item.averageCost);
+    let newAvgCost = currentAvgCost;
+    
+    const txQty = parseFloat(tx.quantity);
+    const txTotalCost = parseFloat(tx.totalCost);
+
+    // MATEMÁTICA INVERSA
+    if (['IN', 'ADJUSTMENT'].includes(tx.type)) {
+      newStock -= txQty; // Revertir entrada: Quitamos stock
+      if (newStock < 0) throw new Error('No se puede anular: El stock del insumo quedaría en negativo.');
+      
+      if (newStock === 0) {
+        newAvgCost = 0;
+      } else {
+        const currentTotalValue = (parseFloat(item.currentStock) * currentAvgCost);
+        const revertedTotalValue = currentTotalValue - txTotalCost;
+        newAvgCost = revertedTotalValue > 0 ? revertedTotalValue / newStock : 0;
+      }
+    } else {
+      // Revertir salida (MERMA, CONSUMO, OUT): Devolvemos el stock a la normalidad
+      newStock += txQty;
+      // El costo promedio histórico no suele recalcularse al devolver mermas, solo recuperamos el stock.
+    }
+
+    await item.update({ currentStock: newStock, averageCost: newAvgCost }, { transaction: t });
+    
+    await tx.update({ 
+      status: 'CANCELLED', 
+      cancelledAt: new Date(), 
+      cancelledBy: req.user?.id || null, 
+      cancelReason: reason 
+    }, { transaction: t });
+
+    await t.commit();
+    getIO().emit('stock:update', [{ id: item.id, stock: newStock }]);
+
+    res.json({ success: true, message: 'Movimiento anulado y stock devuelto.' });
+  } catch (error) {
+    await t.rollback();
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const restoreTransaction = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const tx = await InventoryTransaction.findByPk(id, { 
+      include: [{ model: InventoryItem, as: 'item' }],
+      transaction: t 
+    });
+
+    if (!tx) throw new Error('Movimiento no encontrado.');
+    if (tx.status === 'ACTIVE') throw new Error('Este movimiento ya está activo.');
+
+    const item = tx.item;
+    let newStock = parseFloat(item.currentStock);
+    let currentAvgCost = parseFloat(item.averageCost);
+    let newAvgCost = currentAvgCost;
+    
+    const txQty = parseFloat(tx.quantity);
+    const txTotalCost = parseFloat(tx.totalCost);
+
+    // REAPLICAR MATEMÁTICA
+    if (['IN', 'ADJUSTMENT'].includes(tx.type)) {
+      const currentTotalValue = newStock * currentAvgCost;
+      newStock += txQty; // Volvemos a meter el stock
+      if (newStock > 0) {
+        newAvgCost = (currentTotalValue + txTotalCost) / newStock;
+      }
+    } else {
+      newStock -= txQty; // Volvemos a sacar el stock
+      if (newStock < 0) throw new Error('No se puede restaurar: El stock actual no soporta esta salida de nuevo.');
+    }
+
+    await item.update({ currentStock: newStock, averageCost: newAvgCost }, { transaction: t });
+    
+    await tx.update({ 
+      status: 'ACTIVE', 
+      cancelledAt: null, 
+      cancelledBy: null, 
+      cancelReason: null 
+    }, { transaction: t });
+
+    await t.commit();
+    getIO().emit('stock:update', [{ id: item.id, stock: newStock }]);
+
+    res.json({ success: true, message: 'Movimiento restaurado con éxito.' });
+  } catch (error) {
+    await t.rollback();
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// 🔥 REEMPLAZA EL getGlobalHistory EXISTENTE POR ESTE (Filtra los KPIs para evitar descuadres):
 export const getGlobalHistory = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     let dateFilter = {};
     
-    // 🔥 FIX ZONA HORARIA PARA FILTROS
     if (startDate && endDate) {
       const [sy, sm, sd] = startDate.split('-');
-      const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0); // Inicio del día en hora local
-      
+      const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0); 
       const [ey, em, ed] = endDate.split('-');
-      const end = new Date(ey, em - 1, ed, 23, 59, 59, 999); // Fin del día en hora local
-      
-      dateFilter = {
-        createdAt: {
-          [Op.between]: [start, end]
-        }
-      };
+      const end = new Date(ey, em - 1, ed, 23, 59, 59, 999); 
+      dateFilter = { createdAt: { [Op.between]: [start, end] } };
     }
 
     const transactions = await InventoryTransaction.findAll({
@@ -317,12 +422,13 @@ export const getGlobalHistory = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    // 🔥 KPIs PROTEGIDOS: Solo suman si el status es ACTIVE
     const totalSpent = transactions
-      .filter(t => ['IN', 'ADJUSTMENT'].includes(t.type))
+      .filter(t => ['IN', 'ADJUSTMENT'].includes(t.type) && t.status === 'ACTIVE')
       .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);
 
     const totalOut = transactions
-      .filter(t => ['WASTE', 'CONSUMPTION'].includes(t.type))
+      .filter(t => ['WASTE', 'CONSUMPTION'].includes(t.type) && t.status === 'ACTIVE')
       .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);
 
     res.status(200).json({ transactions, totalSpent, totalOut });
