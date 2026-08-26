@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, User, ShoppingBag, CheckCircle, CheckCircle2, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon } from 'lucide-react';
+import { Trash2, User, ShoppingBag, CheckCircle, CheckCircle2, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 
 // 🔥 CEREBRO EXTRACTOR VISUAL
@@ -118,7 +118,6 @@ export const TicketCartGroup = ({
           getPrepStr(d) === getPrepStr(item)
       );
       
-      // 🔥 FIX: Preservamos todas las filas hijas en _groupedItems sin perder ninguna
       const subItems = (item._groupedItems && item._groupedItems.length > 0) ? item._groupedItems : [item];
 
       if (existing) { 
@@ -135,28 +134,24 @@ export const TicketCartGroup = ({
   const sortedDisplayItems = [...displayItems].sort((a, b) => {
     const getPriority = (item) => {
       const status = (item.kitchenStatus || '').toUpperCase();
-      if (!item.enviadoCocina) return 0; // 1. Arriba: Por enviar
-      if (status === 'READY' || status === 'DELIVERED') return 2; // 3. Abajo: Listos y Entregados (JUNTOS)
-      return 1; // 2. En medio: En cocina / Proceso
+      if (!item.enviadoCocina) return 0;
+      if (status === 'READY' || status === 'DELIVERED') return 2;
+      return 1;
     };
 
     const priorityA = getPriority(a);
     const priorityB = getPriority(b);
 
-    // 1. Separamos por el bloque de prioridad
     if (priorityA !== priorityB) {
       return priorityA - priorityB;
     }
 
-    // 2. Si tienen el mismo estado, ordenamos alfabéticamente
     const nameA = (a.nombre || '').toLowerCase();
     const nameB = (b.nombre || '').toLowerCase();
     if (nameA !== nameB) {
       return nameA.localeCompare(nameB);
     }
 
-    // 3. ANCLA ABSOLUTA: Si tienen la misma prioridad y nombre (ej. un frappé listo y otro entregado), 
-    // usamos el ID para que nunca cambien de posición al actualizar la base de datos.
     const idA = a.id || a.cartItemId || a.backendItemId || '';
     const idB = b.id || b.cartItemId || b.backendItemId || '';
     return String(idA).localeCompare(String(idB));
@@ -164,6 +159,15 @@ export const TicketCartGroup = ({
 
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
   const isOcultarProcessing = actionLocks[`${cuentaName}-ocultar`];
+
+  // 🔥 CREACIÓN DE FLAG SEGURO PARA ELIMINACIÓN DE PROMOS
+  const createBreakFlag = (item, qty) => {
+      return {
+          ...item,
+          _breakPromoQty: qty,
+          cartItemId: item.cartItemId ? `${item.cartItemId}::BREAK::${qty}` : undefined
+      };
+  };
 
   return (
     <motion.div 
@@ -179,7 +183,7 @@ export const TicketCartGroup = ({
         handleDropOnCuenta(cuentaName);
       }}
       className={clsx(
-        "rounded-[1.5rem] transition-all duration-300 overflow-hidden shadow-sm", // Neo-Bento Radius
+        "rounded-[1.5rem] transition-all duration-300 overflow-hidden shadow-sm",
         isCuentaPagada ? "border border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-900/10 lya:bg-lya-primary/5 opacity-80"
         : isDragTarget ? "border border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 lya:border-lya-secondary lya:bg-lya-secondary/10 shadow-inner scale-[1.02]" 
         : isActive ? "border-2 border-transparent bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-md" 
@@ -307,6 +311,7 @@ export const TicketCartGroup = ({
           const isGhostPromo = item.isAutoPromo && isCero;
           
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
+          // 🔥 LÓGICA DE BLOQUEO: Solo bloqueamos fantasmas (GRATIS) o Nth (Rebajado). Las OFERTAS directas mantienen sus botones +/-
           const isLockedPromo = isGhostPromo || isNthPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
@@ -352,12 +357,12 @@ export const TicketCartGroup = ({
           let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
           
           if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
-             containerClasses += "cursor-grab active:cursor-grabbing ";
+              containerClasses += "cursor-grab active:cursor-grabbing ";
           }
           if (draggedItem?.item === item) {
-             containerClasses += "opacity-40 scale-95 ";
+              containerClasses += "opacity-40 scale-95 ";
           } else {
-             containerClasses += "opacity-100 ";
+              containerClasses += "opacity-100 ";
           }
 
           if (isAnyPromo) {
@@ -480,7 +485,6 @@ export const TicketCartGroup = ({
                       <motion.button 
                         whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
                         onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
-                            // 🔥 FIX: LÓGICA DE MODAL PARA ENTREGAS PARCIALES 🔥
                             if (item.kitchenStatus === 'READY' && item.qty > 1) {
                                 openConfirmModal({
                                     title: 'Entregar Producto',
@@ -500,7 +504,6 @@ export const TicketCartGroup = ({
                                     }
                                 });
                             } else {
-                                // Si es qty 1 o lo van a regresar a cocina, actúa normal
                                 await handleToggleStatus(item);
                             }
                         })} 
@@ -553,57 +556,93 @@ export const TicketCartGroup = ({
                 {!item.enviadoCocina && !isCuentaPagada && (
                   <div className={clsx(
                     "flex items-center gap-1 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-xl p-1 shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40",
-                    isVitrina ? "w-full justify-between" : "shrink-0"
+                    (isVitrina || isLockedPromo) ? "w-full justify-between" : "shrink-0"
                   )}>
-                        <motion.button 
-                            whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
-                            disabled={isRemovingLocal}
-                            onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
-                            className={clsx(
-                                "rounded-lg transition-colors outline-none", 
-                                isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
-                                isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
-                            )}
-                        >
-                            {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
-                        </motion.button>
-                        
-                        <motion.button 
-                          whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
-                          disabled={isAddingLocal}
-                          onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
-                            if (isLimitReached) {
-                              if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
-                              return; 
-                            }
-                            onAdd(item, cuentaName);
-                          })} 
-                          className={clsx(
-                            "rounded-lg transition-colors flex items-center justify-center outline-none", 
-                            isVitrina ? "flex-1 py-2" : "p-1.5",
-                            isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
-                            isLimitReached 
-                              ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
-                              : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
-                          )}
-                          title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
-                        >
-                          {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
-                        </motion.button>
+                        {!isLockedPromo && (
+                            <>
+                                <motion.button 
+                                    whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
+                                    disabled={isRemovingLocal}
+                                    onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
+                                    className={clsx(
+                                        "rounded-lg transition-colors outline-none", 
+                                        isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
+                                        isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
+                                    )}
+                                >
+                                    {isRemovingLocal ? <Loader2 size={16} className="animate-spin" /> : <Minus size={16} />}
+                                </motion.button>
+                                
+                                <motion.button 
+                                  whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
+                                  disabled={isAddingLocal}
+                                  onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
+                                    if (isLimitReached) {
+                                      if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
+                                      return; 
+                                    }
+                                    onAdd(item, cuentaName);
+                                  })} 
+                                  className={clsx(
+                                    "rounded-lg transition-colors flex items-center justify-center outline-none", 
+                                    isVitrina ? "flex-1 py-2" : "p-1.5",
+                                    isAddingLocal ? "opacity-50 cursor-wait text-gray-400" :
+                                    isLimitReached 
+                                      ? "text-amber-500 md:hover:bg-amber-50 dark:md:hover:bg-amber-900/20" 
+                                      : "text-orange-500 dark:text-orange-400 lya:text-lya-primary md:hover:bg-orange-50 dark:md:hover:bg-orange-900/20 lya:md:hover:bg-lya-primary/10" 
+                                  )}
+                                  title={isLimitReached ? `Límite de stock alcanzado (${item.stock})` : "Añadir otro"}
+                                >
+                                  {isAddingLocal ? <Loader2 size={16} className="animate-spin" /> : isLimitReached ? <Lock size={16} /> : <Plus size={16} />}
+                                </motion.button>
 
-                        <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
+                                <div className={clsx("bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-1", isVitrina ? "w-px h-6" : "w-px h-4")} />
+                            </>
+                        )}
                         
                         <motion.button 
                             whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                             disabled={isDeletingLocal}
-                            onClick={(e) => executeWithLock(e, lockKeyDelete, () => handleDeleteUnsent(item))} 
+                            onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
+                                if (isLockedPromo) {
+                                    if (item.qty > 1) {
+                                        openConfirmModal({
+                                            title: 'Romper Promoción',
+                                            message: `Vas a cancelar la promoción de "${item.nombre}". Se restarán los productos que la activan. ¿Cuántas promociones deseas eliminar?`,
+                                            icon: AlertTriangle,
+                                            color: 'red',
+                                            confirmText: 'Confirmar',
+                                            requireInput: true,
+                                            inputType: 'number',
+                                            inputMax: item.qty,
+                                            inputDefault: item.qty.toString(),
+                                            onConfirm: (val) => {
+                                                const qty = parseInt(val, 10);
+                                                if (qty > 0) handleDeleteUnsent(createBreakFlag(item, qty));
+                                            }
+                                        });
+                                    } else {
+                                        openConfirmModal({
+                                            title: 'Romper Promoción',
+                                            message: `Vas a cancelar la promoción de "${item.nombre}". Se restarán los productos que la activan. ¿Confirmas?`,
+                                            icon: AlertTriangle,
+                                            color: 'red',
+                                            confirmText: 'Confirmar',
+                                            onConfirm: () => handleDeleteUnsent(createBreakFlag(item, 1))
+                                        });
+                                    }
+                                } else {
+                                    handleDeleteUnsent(item);
+                                }
+                            })} 
                             className={clsx(
                                 "rounded-lg transition-colors outline-none", 
                                 isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
-                                isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
+                                (isVitrina || isLockedPromo) ? "flex-1 py-2 flex justify-center text-red-500 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/50" : "p-1.5"
                             )}
                         >
-                            {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : 
+                             isLockedPromo ? <div className="flex items-center gap-2 font-black tracking-wide"><Trash2 size={16} /> ELIMINAR PROMO</div> : <Trash2 size={16} />}
                         </motion.button>
                   </div>
                 )}

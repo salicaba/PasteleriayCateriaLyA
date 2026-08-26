@@ -1,4 +1,4 @@
-// frontend/src/modules/client/controllers/useClientCart.js
+// src/modules/client/controllers/useClientCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { socket } from '../../../api/socket.js';
 import api from '../../../api/client.js';
@@ -427,7 +427,6 @@ export const useClientCart = (triggerNotification) => {
       let needsWarning = false;
       let ruptureProductName = '';
 
-      // Modificado para evaluar Ruptura a nivel Global
       const getGlobalNormalQtys = (cartState) => {
         const qtys = {};
         const confirmedItems = getConfirmedItems();
@@ -538,11 +537,74 @@ export const useClientCart = (triggerNotification) => {
     }
   };
 
-  const removeFromCart = (cartItemId) => {
+  // 🔥 MOTOR ANTI-ZOMBIE PARA EL CLIENTE
+  const breakPromoItems = (prevCart, cartItemIdBase, qtyToRemove) => {
+      let newCart = [...prevCart];
+      const itemToRemove = prevCart.find(i => i.cartItemId === cartItemIdBase);
+      if (!itemToRemove) return prevCart;
+
+      const productId = itemToRemove.id;
+      const sampleItem = prevCart.find(p => String(p.id) === String(productId));
+      const activePromo = getActivePromo(productId, sampleItem?.stock, sampleItem?.controlarStock, promotions);
+
+      if (activePromo && activePromo.type === 'NxM') {
+          const payQty = Number(activePromo.payQty || 1);
+          const buyQty = Number(activePromo.buyQty || 2);
+          const ghostsPerPromo = buyQty - payQty;
+          const promosToBreak = Math.ceil(qtyToRemove / ghostsPerPromo);
+          let parentsToRemove = promosToBreak * payQty;
+
+          for (let i = newCart.length - 1; i >= 0; i--) {
+              if (parentsToRemove <= 0) break;
+              const item = newCart[i];
+              if (String(item.id) === String(productId) && !item.isAutoPromo && !item.enviadoCocina) {
+                  if (item.qty <= parentsToRemove) {
+                      parentsToRemove -= item.qty;
+                      newCart.splice(i, 1);
+                  } else {
+                      newCart[i] = { ...item, qty: item.qty - parentsToRemove };
+                      parentsToRemove = 0;
+                  }
+              }
+          }
+      } else {
+          let toRemove = qtyToRemove;
+          for (let i = newCart.length - 1; i >= 0; i--) {
+              if (toRemove <= 0) break;
+              const item = newCart[i];
+              if (item.cartItemId === cartItemIdBase && item.isAutoPromo && !item.enviadoCocina) {
+                  if (item.qty <= toRemove) {
+                      toRemove -= item.qty;
+                      newCart.splice(i, 1);
+                  } else {
+                      newCart[i] = { ...item, qty: item.qty - toRemove };
+                      toRemove = 0;
+                  }
+              }
+          }
+      }
+      return newCart;
+  };
+
+  const removeFromCart = (cartItemIdOrObj) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
     try {
+      let cartItemId = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj.cartItemId : cartItemIdOrObj;
+      let breakQty = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj._breakPromoQty : null;
+
+      if (typeof cartItemId === 'string' && cartItemId.includes('::BREAK::')) {
+          const parts = cartItemId.split('::BREAK::');
+          cartItemId = parts[0];
+          breakQty = parseInt(parts[1], 10);
+      }
+
+      if (breakQty) {
+          setCart(prev => breakPromoItems(prev, cartItemId, breakQty));
+          return;
+      }
+
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
@@ -555,11 +617,25 @@ export const useClientCart = (triggerNotification) => {
     }
   };
 
-  const deleteLine = (cartItemId) => {
+  const deleteLine = (cartItemIdOrObj) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
     try {
+      let cartItemId = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj.cartItemId : cartItemIdOrObj;
+      let breakQty = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj._breakPromoQty : null;
+
+      if (typeof cartItemId === 'string' && cartItemId.includes('::BREAK::')) {
+          const parts = cartItemId.split('::BREAK::');
+          cartItemId = parts[0];
+          breakQty = parseInt(parts[1], 10);
+      }
+
+      if (breakQty) {
+          setCart(prev => breakPromoItems(prev, cartItemId, breakQty));
+          return;
+      }
+
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
