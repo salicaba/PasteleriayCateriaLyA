@@ -6,31 +6,34 @@ import PasteleriaOrder from '../pasteleria/PasteleriaOrder.model.js';
 import User from '../users/User.model.js';
 import { Op } from 'sequelize';
 
+// =========================================================================
+// 🌐 UTILIDAD: FECHA LOCAL ESTRICTA (CHIAPAS / CDMX)
+// =========================================================================
+const getLocalNow = () => {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+};
+
 export const getTransactions = async (req, res) => {
   try {
     const { date, startDate, endDate, type, source } = req.query; 
     let whereClause = {};
 
-    // 🔥 FIX ZONA HORARIA: Eliminamos el desfase UTC para usar Fechas Locales exactas
+    // 🔥 BLINDAJE ZONA HORARIA: Forzamos el límite a las 00:00 y 23:59:59 pero con el offset -06:00
     if (startDate && endDate) {
-      const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
-      const start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
-
-      const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
-      const end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
-      
+      const start = new Date(`${startDate}T00:00:00.000-06:00`);
+      const end = new Date(`${endDate}T23:59:59.999-06:00`);
       whereClause.createdAt = { [Op.between]: [start, end] };
     } 
     else if (date) {
-      const [year, month, day] = date.split('-').map(Number);
-      const start = new Date(year, month - 1, day, 0, 0, 0, 0);
-      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-      
+      const start = new Date(`${date}T00:00:00.000-06:00`);
+      const end = new Date(`${date}T23:59:59.999-06:00`);
       whereClause.createdAt = { [Op.between]: [start, end] };
     } 
     else {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      // Si no hay filtro, obtenemos las del día "actual" en Chiapas
+      const localNow = getLocalNow();
+      const todayStr = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+      const start = new Date(`${todayStr}T00:00:00.000-06:00`);
       whereClause.createdAt = { [Op.gte]: start };
     }
 
@@ -65,8 +68,8 @@ export const registerManualTransaction = async (req, res) => {
     if (!amount || amount <= 0) return res.status(400).json({ message: 'El monto debe ser mayor a 0' });
     if (!description) return res.status(400).json({ message: 'La descripción es obligatoria' });
 
-    // 🔥 MAGIA CONTABLE Y DE AUDITORÍA
-    const realExecutionDate = new Date(); 
+    // 🔥 BLINDAJE ZONA HORARIA
+    const realExecutionDate = getLocalNow(); 
     let accountingDate = realExecutionDate; 
     let isRetroactive = false;
 
@@ -78,13 +81,13 @@ export const registerManualTransaction = async (req, res) => {
     // Si enviaste una fecha distinta a "hoy", es un Gasto Diferido
     if (expenseDate && expenseDate !== todayLocalStr) {
       isRetroactive = true;
-      const [y, m, d] = expenseDate.split('-').map(Number);
-      accountingDate = new Date(y, m - 1, d, 23, 59, 59, 999); 
+      // Rompemos el YYYY-MM-DD para forzar la inserción al final de ese día en horario local
+      accountingDate = new Date(`${expenseDate}T23:59:59.999-06:00`); 
     }
 
     // Inyectamos la fecha real de captura en la descripción (oculta al cliente, visible para auditoría)
     const finalDescription = isRetroactive 
-      ? `[Registrado el: ${realExecutionDate.toLocaleString()}] ${description}` 
+      ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] ${description}` 
       : description;
 
     const newTx = await Transaction.create({
@@ -93,8 +96,8 @@ export const registerManualTransaction = async (req, res) => {
       source: 'MANUAL', 
       expenseCategory: expenseCategory || 'OTHER',
       amount,
-      description: finalDescription, // 🔥 Rastro de Auditoría
-      createdAt: accountingDate,     // 🔥 Fecha Contable
+      description: finalDescription, 
+      createdAt: accountingDate,     // 🔥 Fecha Contable Local
       createdBy: req.user.id
     });
 
@@ -141,7 +144,8 @@ export const cancelTransaction = async (req, res) => {
 
     tx.status = 'CANCELLED';
     tx.cancelledBy = req.user.id;
-    tx.cancelledAt = new Date();
+    // 🔥 FECHA LOCAL DE CHIAPAS PARA LA CANCELACIÓN
+    tx.cancelledAt = getLocalNow();
     
     if (reason && reason.trim() !== '') {
       tx.description = `${tx.description} (Motivo Anulación: ${reason})`;
@@ -212,17 +216,21 @@ export const getFinancialSummary = async (req, res) => {
     const { startDate, endDate } = req.query;
     let start, end;
 
-    // 🔥 FIX ZONA HORARIA PARA FILTROS GLOBALES DE REPORTES
+    // 🔥 BLINDAJE DE ZONA HORARIA
     if (startDate && endDate) {
-      const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
-      start = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
-
-      const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
-      end = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+      start = new Date(`${startDate}T00:00:00.000-06:00`);
+      end = new Date(`${endDate}T23:59:59.999-06:00`);
     } else {
-      const now = new Date();
-      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      const localNow = getLocalNow();
+      // Inicio de Mes en Chiapas
+      start = new Date(localNow.getFullYear(), localNow.getMonth(), 1); 
+      const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
+      start = new Date(`${startStr}T00:00:00.000-06:00`);
+
+      // Fin de mes en Chiapas
+      const endOfM = new Date(localNow.getFullYear(), localNow.getMonth() + 1, 0); 
+      const endStr = `${endOfM.getFullYear()}-${String(endOfM.getMonth() + 1).padStart(2, '0')}-${String(endOfM.getDate()).padStart(2, '0')}`;
+      end = new Date(`${endStr}T23:59:59.999-06:00`);
     }
 
     const incomes = await Transaction.sum('amount', {
@@ -237,7 +245,6 @@ export const getFinancialSummary = async (req, res) => {
       where: { type: 'EXPENSE', source: 'MANUAL', status: 'ACTIVE', createdAt: { [Op.between]: [start, end] } }
     });
     
-    // 🔥 FIX: Sumar CONSUMOS y MERMAS (Ignorando anulados) para cuadrar con el Kardex
     const cogs = await InventoryTransaction.sum('totalCost', {
       where: { 
         type: { [Op.in]: ['CONSUMPTION', 'WASTE'] }, 

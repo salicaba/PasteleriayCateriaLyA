@@ -1,21 +1,21 @@
+// backend/src/modules/reports/reports.controller.js
 import { Op, fn, col, literal } from 'sequelize';
 import Transaction from '../cash/Transaction.model.js';
 import Order from '../pos/Order.model.js';
 import OrderItem from '../pos/OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import PasteleriaOrder from '../pasteleria/PasteleriaOrder.model.js';
-import InventoryTransaction from '../inventory/InventoryTransaction.model.js'; // 🔥 IMPORTACIÓN AÑADIDA
+import InventoryTransaction from '../inventory/InventoryTransaction.model.js';
 
 export const getDashboardData = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    // Configurar rango de fechas actual
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(1));
+    // 🔥 SEGURO DE ZONA HORARIA
+    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    // --- CÁLCULO DE PERIODO ANTERIOR (TENDENCIAS) ---
     const duration = end.getTime() - start.getTime();
     const prevStart = new Date(start.getTime() - duration - 1); 
     const prevEnd = new Date(start.getTime() - 1);
@@ -24,15 +24,27 @@ export const getDashboardData = async (req, res) => {
     const prevDateFilter = { createdAt: { [Op.between]: [prevStart, prevEnd] } };
 
     // 1. Tendencia de Ventas Diarias e Ingresos por Origen (Actual)
-    const incomeTransactions = await Transaction.findAll({
+    const rawIncomes = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
-      attributes: [
-        [fn('DATE', col('createdAt')), 'date'],
-        'source',
-        [fn('SUM', col('amount')), 'total']
-      ],
-      group: [fn('DATE', col('createdAt')), 'source'],
+      attributes: ['createdAt', 'source', 'amount'],
       raw: true
+    });
+
+    const dailyMap = {};
+    rawIncomes.forEach(t => {
+      const dateStr = new Date(t.createdAt).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+      
+      const key = `${dateStr}_${t.source}`;
+      if (!dailyMap[key]) {
+        dailyMap[key] = { date: dateStr, source: t.source, total: 0 };
+      }
+      dailyMap[key].total += parseFloat(t.amount);
+    });
+    
+    const incomeTransactions = Object.values(dailyMap);
+
+    const totalTransactionsCount = await Transaction.count({
+      where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' }
     });
 
     // 2. Gastos Operativos (OPEX) (Actual)
@@ -46,7 +58,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 3. Ventas de Cafetería (TODOS los productos)
+    // 3. Ventas de Cafetería
     const allProducts = await Product.findAll({
       attributes: ['id', 'name', 'departamento'],
       raw: true
@@ -55,14 +67,14 @@ export const getDashboardData = async (req, res) => {
     const soldItems = await OrderItem.findAll({
       where: { 
         createdAt: { [Op.between]: [start, end] },
-        status: 'ACTIVE' // Excluir productos cancelados parcialmente
+        status: 'ACTIVE'
       },
       include: [{
         model: Order,
         as: 'order',
         attributes: [],
         where: { 
-          status: { [Op.in]: ['PAID', 'CLOSED'] } // Excluye órdenes abiertas o canceladas totalmente
+          status: { [Op.in]: ['PAID', 'CLOSED'] } 
         }
       }],
       attributes: [
@@ -87,7 +99,8 @@ export const getDashboardData = async (req, res) => {
     // 4. Ventas/Rendimiento de Pastelería (Pedidos Entregados)
     const pasteleriaSalesRaw = await PasteleriaOrder.findAll({
       where: { 
-        createdAt: { [Op.between]: [start, end] },
+        // 🔥 CORRECCIÓN: Ahora usa updatedAt para que tome en cuenta el día en que se marcó como "entregado"
+        updatedAt: { [Op.between]: [start, end] },
         estado: 'entregado'
       },
       attributes: [
@@ -99,14 +112,18 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    const pasteleriaSales = pasteleriaSalesRaw.map(item => ({
-      name: item.name || 'Personalizado',
-      departamento: 'PASTELERÍA',
-      cantidad: parseInt(item.cantidad || 0, 10),
-      ingreso: parseFloat(item.ingreso || 0)
-    })).sort((a, b) => b.cantidad - a.cantidad);
+    const pasteleriaSales = pasteleriaSalesRaw.map(item => {
+      // 🔥 CORRECCIÓN: Expresión regular para limpiar los corchetes y comillas del nombre
+      let cleanName = item.name ? item.name.replace(/[\[\]"']/g, '') : 'Personalizado';
+      return {
+        name: cleanName,
+        departamento: 'PASTELERÍA',
+        cantidad: parseInt(item.cantidad || 0, 10),
+        ingreso: parseFloat(item.ingreso || 0)
+      };
+    }).sort((a, b) => b.cantidad - a.cantidad);
 
-    // 🔥 5. Mermas y Ajustes de Inventario (SINCRONIZADO CON EL KARDEX GLOBAL)
+    // 5. Mermas y Ajustes
     const mermasActual = await InventoryTransaction.findOne({
       where: { ...dateFilter, type: { [Op.in]: ['CONSUMPTION', 'WASTE'] }, status: 'ACTIVE' },
       attributes: [[fn('SUM', col('totalCost')), 'total']],
@@ -131,6 +148,7 @@ export const getDashboardData = async (req, res) => {
         [literal(`
           CASE 
             WHEN description LIKE '%Transferencia%' THEN 'Transferencia'
+            WHEN description LIKE '%Tarjeta%' THEN 'Tarjeta'
             ELSE 'Efectivo' 
           END
         `), 'metodo'],
@@ -140,7 +158,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // --- CONSULTAS DEL PERIODO ANTERIOR (Tendencias) ---
+    // --- TENDENCIAS ---
     const prevIncomeTransactions = await Transaction.findAll({
       where: { ...prevDateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [[fn('SUM', col('amount')), 'total']],
@@ -155,7 +173,6 @@ export const getDashboardData = async (req, res) => {
     });
     const prevTotalOpex = parseFloat(prevOpexTransactions[0]?.total || 0);
 
-    // 🔥 Tendencias de Mermas (Sincronizado con Kardex)
     const prevMermas = await InventoryTransaction.findOne({
       where: { ...prevDateFilter, type: { [Op.in]: ['CONSUMPTION', 'WASTE'] }, status: 'ACTIVE' },
       attributes: [[fn('SUM', col('totalCost')), 'total']],
@@ -167,10 +184,11 @@ export const getDashboardData = async (req, res) => {
       success: true,
       data: {
         incomeTransactions,
+        totalTransactions: totalTransactionsCount,
         opexTransactions,
         productSales,
         pasteleriaSales,
-        inventoryStats: inventoryStats, // 🔥 FIX: Ya no es un arreglo
+        inventoryStats: inventoryStats, 
         paymentMethods,
         previousKpis: {
           totalIncome: prevTotalIncome,
@@ -186,9 +204,6 @@ export const getDashboardData = async (req, res) => {
   }
 };
 
-// ==========================================================
-// Analíticas específicas por Producto
-// ==========================================================
 export const getProductStats = async (req, res) => {
   try {
     const { productId } = req.params;
@@ -196,7 +211,9 @@ export const getProductStats = async (req, res) => {
 
     let dateFilter = {};
     if (period && period !== 'all') {
-      const now = new Date();
+      const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+      const now = new Date(nowStr);
+      
       let start, end;
       
       if (period === 'today') {

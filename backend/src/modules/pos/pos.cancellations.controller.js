@@ -20,7 +20,6 @@ const getCleanAccountName = (str) => {
       clean = parts.slice(0, -1).join(' ');
   }
   
-  // Eliminamos cualquier número de teléfono pegado al texto para que haga match exacto en Caja
   clean = clean.replace(/\d+/g, '').trim();
   
   return clean || 'General';
@@ -29,7 +28,7 @@ const getCleanAccountName = (str) => {
 // =====================================================================
 // 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Precisión Láser por Cuenta)
 // =====================================================================
-const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null) => {
+const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, localNow) => {
   let whereClause = { referenceId: orderId, type: 'INCOME' };
   
   let txs = await Transaction.findAll({
@@ -69,17 +68,16 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
           tx.description += ` | 📈 +$${appliedAmount.toFixed(2)} (Restaurado: ${detalle})`;
       }
 
-      // Evitamos decimales residuales
       if (nuevoMonto <= 0.01) nuevoMonto = 0;
 
       let newStatus = tx.status;
       let cancelledAt = tx.cancelledAt;
       let cancelledBy = tx.cancelledBy;
 
-      // LA MAGIA: Si llega a 0, la pasamos a ANULADO automáticamente.
       if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
           newStatus = 'CANCELLED';
-          cancelledAt = new Date();
+          // 🔥 Asignamos la fecha local de Chiapas enviada por el helper
+          cancelledAt = localNow; 
           cancelledBy = userId;
       } else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
           newStatus = 'ACTIVE';
@@ -99,7 +97,7 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 };
 
 // ==========================================
-// 📌 2. CANCELAR UN PRODUCTO INDIVIDUAL (Transparencia Total 1 a 1)
+// 📌 CANCELAR UN PRODUCTO INDIVIDUAL
 // ==========================================
 export const cancelOrderItem = async (req, res) => {
   try {
@@ -121,17 +119,18 @@ export const cancelOrderItem = async (req, res) => {
     const qtyToCancel = (cancelQty && cancelQty < item.quantity) ? parseInt(cancelQty, 10) : item.quantity;
     const isPartial = qtyToCancel < item.quantity;
 
-    // 🔥 CÁLCULO 1 A 1: Lo que vale el producto es lo que se reembolsa.
     let unitPrice = Number(item.subtotal) / item.quantity;
     let refundAmount = unitPrice * qtyToCancel;
-
     if (refundAmount < 0) refundAmount = 0;
 
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
+    // 🔥 FECHA LOCAL (CHIAPAS)
+    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta);
+      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta, localNow);
     }
 
     let notesArray = [];
@@ -152,7 +151,7 @@ export const cancelOrderItem = async (req, res) => {
             notes: JSON.stringify(cancelledNotes),
             kitchenStatus: item.kitchenStatus,
             status: 'CANCELLED',
-            cancelledAt: new Date(),
+            cancelledAt: localNow, // Fecha local
             cancelReason: cancelReason || `Cancelación parcial desde POS`,
             cancelledBy: userId
         });
@@ -165,13 +164,12 @@ export const cancelOrderItem = async (req, res) => {
     } else {
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: new Date(),
+          cancelledAt: localNow, // Fecha local
           cancelReason: cancelReason || `Cancelado desde POS`,
           cancelledBy: userId
         });
     }
 
-    // 🔥 MAGIA WEBSOCKET: Avisamos al cliente (QR) SIEMPRE
     getIO().emit('orderItemCancelled', { 
         orderId: id, 
         itemId: item.id, 
@@ -195,7 +193,7 @@ export const cancelOrderItem = async (req, res) => {
       await order.update({ 
         status: 'CANCELLED', 
         totalAmount: 0, 
-        cancelledAt: new Date(), 
+        cancelledAt: localNow, // Fecha local
         cancelReason: motivoMecanismoSeguridad, 
         cancelledBy: userId 
       });
@@ -226,7 +224,7 @@ export const cancelOrderItem = async (req, res) => {
 };
 
 // ==========================================
-// 📌 3. CANCELAR TODA LA ORDEN (MESA COMPLETA)
+// 📌 CANCELAR TODA LA ORDEN (MESA COMPLETA)
 // ==========================================
 export const cancelOrder = async (req, res) => {
   try {
@@ -261,6 +259,7 @@ export const cancelOrder = async (req, res) => {
     const motivoFinal = cancelReason ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` : `Cancelación de ${textoPapelera}`;
 
     let totalRefundByAccount = {};
+    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
 
     for (const item of order.items) {
       if (item.status === 'ACTIVE') {
@@ -271,7 +270,7 @@ export const cancelOrder = async (req, res) => {
 
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: new Date(),
+          cancelledAt: localNow, // Fecha local
           cancelReason: motivoFinal, 
           cancelledBy: userId
         });
@@ -282,14 +281,14 @@ export const cancelOrder = async (req, res) => {
 
     for (const [cuentaName, amount] of Object.entries(totalRefundByAccount)) {
        if (amount > 0) {
-          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName);
+          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName, localNow);
        }
     }
 
     await order.update({
       status: 'CANCELLED',
       totalAmount: 0,
-      cancelledAt: new Date(),
+      cancelledAt: localNow, // Fecha local
       cancelReason: motivoFinal, 
       cancelledBy: userId
     });
@@ -316,10 +315,14 @@ export const cancelOrder = async (req, res) => {
 // ==========================================
 export const getDailySummary = async (req, res) => {
   try {
-    const startOfDay = new Date();
+    // 🔥 FECHA LOCAL (CHIAPAS)
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
+
+    const startOfDay = new Date(localNow);
     startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date();
+    const endOfDay = new Date(localNow);
     endOfDay.setHours(23, 59, 59, 999);
 
     const dateFilter = { [Op.between]: [startOfDay, endOfDay] };
@@ -374,7 +377,7 @@ export const getDailySummary = async (req, res) => {
 };
 
 // ==========================================
-// ♻️ RESTAURAR PRODUCTO CANCELADO (Transparencia Total 1 a 1)
+// ♻️ RESTAURAR PRODUCTO CANCELADO
 // ==========================================
 export const restoreOrderItem = async (req, res) => {
   try {
@@ -403,9 +406,11 @@ export const restoreOrderItem = async (req, res) => {
       cancelledBy: null
     });
 
+    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
     if (wasPaid && amountToRestore > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta);
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta, localNow);
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
@@ -415,7 +420,6 @@ export const restoreOrderItem = async (req, res) => {
       totalAmount: newTotal,
     });
 
-    // 🔥 FIX RESTAURAR: Enviamos el objeto completo para que el cliente lo reconstruya en su pantalla
     const fullItemToEmit = await OrderItem.findOne({
       where: { id: item.id },
       include: [{ model: Product, as: 'product' }]
@@ -492,12 +496,13 @@ export const restoreOrder = async (req, res) => {
       }
     }
 
-    // 🔥 FIX RESTAURAR: Le avisamos al cliente para que recargue y recupere su mesa completa
     getIO().emit('orderRestored', { orderId: id, tableId: order.tableId });
+
+    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
 
     for (const [cuentaName, amount] of Object.entries(totalRestoredByAccount)) {
         if (amount > 0) {
-           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName);
+           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName, localNow);
         }
     }
 

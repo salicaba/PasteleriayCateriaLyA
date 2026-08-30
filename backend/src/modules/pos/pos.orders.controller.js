@@ -35,7 +35,7 @@ const extractPromoMeta = (item) => {
 };
 
 // ==========================================
-// 🛒 CREAR O RECUPERAR ORDEN (Folios Seguros)
+// 🛒 CREAR O RECUPERAR ORDEN (Folios y Fecha Segura)
 // ==========================================
 export const createOrder = async (req, res) => {
   try {
@@ -76,13 +76,17 @@ export const createOrder = async (req, res) => {
       }
     }
 
+    // 🔥 FECHA LOCAL DE CHIAPAS
+    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
     const newOrder = await Order.create({ 
       orderType: finalOrderType, 
       ticketId: finalTicketId, 
       tableId: finalTableId, 
       createdBy: employeeId, 
       status: 'OPEN', 
-      totalAmount: 0 
+      totalAmount: 0,
+      createdAt: localNow // Obliga a la orden a registrarse con la fecha de hoy
     });
 
     getIO().emit('pos:update');

@@ -1,3 +1,4 @@
+// frontend/src/modules/reports/views/ReportsPage.jsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -69,7 +70,8 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute z-50 top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden py-1"
+            // 🔥 Aumentado el z-index a z-[100]
+            className="absolute z-[100] top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden py-1"
           >
             {options.map((opt) => (
               <button
@@ -166,9 +168,10 @@ export const ReportsPage = () => {
 
   const handleRangeChange = (val) => {
     setTimeRange(val);
-    const now = new Date();
-    let start = new Date();
-    let end = new Date();
+    const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const now = new Date(nowStr);
+    let start = new Date(nowStr);
+    let end = new Date(nowStr);
 
     switch(val) {
       case 'today':
@@ -181,11 +184,11 @@ export const ReportsPage = () => {
         start.setDate(firstDay); start.setHours(0, 0, 0, 0);
         end.setDate(firstDay + 6); end.setHours(0, 0, 0, 0); break;
       case 'this_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0); break; // 🔥 El truco del 0 sin horas
+        start = new Date(now.getFullYear(), now.getMonth(), 1, 0,0,0,0);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23,59,59,999); break; 
       case 'last_month':
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0); break;
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0,0,0,0);
+        end = new Date(now.getFullYear(), now.getMonth(), 0, 23,59,59,999); break;
       case 'custom':
         return; 
       default: break;
@@ -473,13 +476,14 @@ export const ReportsPage = () => {
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }} 
           transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.45 }}
-          className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden transition-colors duration-300 relative"
+          // 🔥 FIX: Eliminado el overflow-hidden de este contenedor para permitir que el dropdown no se corte
+          className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300 relative"
         >
           {/* Elemento Decorativo Neo-Bento */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 dark:bg-orange-500/10 lya:bg-lya-primary/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-colors"></div>
 
           {/* Header Rendimiento con Segmented Control */}
-          <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 transition-colors flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-[60]">
             <div className="flex-1">
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text flex items-center gap-3 transition-colors">
                 <div className="p-2 bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 rounded-xl transition-colors">
@@ -542,9 +546,10 @@ export const ReportsPage = () => {
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="overflow-hidden border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 bg-gray-50/50 dark:bg-gray-950/30 lya:bg-lya-bg/30 relative z-20"
+                // 🔥 Aseguramos que este contenedor permita el desbordamiento de su hijo ThemedDropdown
+                className="border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 bg-gray-50/50 dark:bg-gray-950/30 lya:bg-lya-bg/30 relative z-[50]"
               >
-                <div className="p-6 flex flex-wrap gap-4 relative z-10">
+                <div className="p-6 flex flex-wrap gap-4 relative z-[50]">
                   {/* Buscador de Texto */}
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-2 uppercase tracking-wider">
@@ -579,7 +584,7 @@ export const ReportsPage = () => {
                         { value: 'SOLD', label: 'Solo elementos con ventas' },
                         { value: 'ALL', label: 'Todo el catálogo histórico' }
                       ]}
-                      containerClassName="w-full relative z-30"
+                      containerClassName="w-full relative z-[60]"
                       buttonClassName="w-full justify-between bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-xl px-4 py-2.5 focus:border-orange-500 dark:focus:border-orange-400 lya:focus:border-lya-primary focus:ring-1 focus:ring-orange-500 lya:focus:ring-lya-primary shadow-sm"
                     />
                   </div>

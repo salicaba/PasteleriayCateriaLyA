@@ -1,3 +1,4 @@
+// frontend/src/modules/reports/controllers/useReportsController.js
 import { useState, useEffect, useMemo } from 'react';
 import api from '../../../api/client';
 import { format, parseISO } from 'date-fns';
@@ -11,16 +12,29 @@ export const useReportsController = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   
-  // 🔥 CORRECCIÓN: Ajustamos a las 00:00:00 para evitar que la zona horaria brinque de día
+  // 🔥 SEGURO DE FECHAS: Desde el día 1 a las 00:00:00 hasta el último día a las 23:59:59
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
     return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      start: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
     };
   });
   
   const [productFilter, setProductFilter] = useState('5');
+
+  // 🔥 DETECCIÓN AUTOMÁTICA DE MES COMPLETO
+  const isFullMonth = useMemo(() => {
+    const start = dateRange.start;
+    const end = dateRange.end;
+    
+    const isFirstDay = start.getDate() === 1;
+    const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+    const isLastDay = end.getDate() === lastDayOfMonth;
+    const isSameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+    
+    return isFirstDay && isLastDay && isSameMonth;
+  }, [dateRange]);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -50,16 +64,32 @@ export const useReportsController = () => {
     if (!data) return {};
 
     const dailyMap = {};
+    let sumCafeteria = 0;
+    let sumPasteleria = 0;
+    let sumGlobal = 0;
+
+    // 🔥 AGRUPACIÓN DE INGRESOS DIARIOS
     data.incomeTransactions.forEach(t => {
-      const date = format(parseISO(t.date), 'dd MMM', { locale: es });
-      if (!dailyMap[date]) dailyMap[date] = { name: date, Cafetería: 0, Pastelería: 0, Total: 0 };
+      // Forzamos el string a fecha local para evitar brincos de zona horaria
+      const dateObj = new Date(t.date + 'T00:00:00'); 
+      const dateFormatted = format(dateObj, 'dd MMM yyyy', { locale: es });
+      
+      if (!dailyMap[t.date]) dailyMap[t.date] = { dateRaw: t.date, name: dateFormatted, Cafetería: 0, Pastelería: 0, Total: 0 };
       
       const val = parseFloat(t.total);
-      if (t.source === 'CAFETERIA') dailyMap[date].Cafetería += val;
-      if (t.source === 'PASTELERIA') dailyMap[date].Pastelería += val;
-      dailyMap[date].Total += val;
+      if (t.source === 'CAFETERIA') {
+        dailyMap[t.date].Cafetería += val;
+        sumCafeteria += val;
+      }
+      if (t.source === 'PASTELERIA') {
+        dailyMap[t.date].Pastelería += val;
+        sumPasteleria += val;
+      }
+      dailyMap[t.date].Total += val;
+      sumGlobal += val;
     });
-    const dailySales = Object.values(dailyMap);
+
+    const dailySales = Object.values(dailyMap).sort((a, b) => a.dateRaw.localeCompare(b.dateRaw));
 
     const incomeSource = [
       { name: 'Cafetería', value: data.incomeTransactions.filter(t => t.source === 'CAFETERIA').reduce((acc, curr) => acc + parseFloat(curr.total), 0) },
@@ -81,6 +111,10 @@ export const useReportsController = () => {
     const totalMermas = Math.abs(parseFloat(data.inventoryStats.totalMermas || 0)); 
     const netProfit = totalIncome - totalOpex - totalMermas;
 
+    // 🔥 TICKET PROMEDIO
+    const totalOrders = data.totalTransactions > 0 ? data.totalTransactions : 1;
+    const ticketPromedio = totalIncome / totalOrders;
+
     const prevIncome = parseFloat(data.previousKpis?.totalIncome || 0);
     const prevOpex = parseFloat(data.previousKpis?.totalOpex || 0);
     const prevMermas = parseFloat(data.previousKpis?.totalMermas || 0);
@@ -99,10 +133,12 @@ export const useReportsController = () => {
     };
 
     return {
-      dailySales, incomeSource, opexData, paymentMethods, 
+      dailySales, 
+      dailyTotals: { cafeteria: sumCafeteria, pasteleria: sumPasteleria, global: sumGlobal },
+      incomeSource, opexData, paymentMethods, 
       productSales: data.productSales,
       pasteleriaSales: data.pasteleriaSales,
-      kpis: { totalIncome, totalOpex, totalMermas, netProfit },
+      kpis: { totalIncome, totalOpex, totalMermas, netProfit, ticketPromedio },
       trends
     };
   }, [data]);
@@ -155,17 +191,54 @@ export const useReportsController = () => {
         return colWidths.map(w => ({ wch: w + 5 }));
       };
 
+      // 1. HOJA DE RESUMEN
       const resumenData = [
+        ['Rango de Fechas', `${format(dateRange.start, 'dd MMM yyyy')} al ${format(dateRange.end, 'dd MMM yyyy')}`],
+        [],
         ['Métrica', 'Monto ($)'],
         ['Ingresos Totales', chartData.kpis.totalIncome],
-        ['Utilidad Neta Aprox', chartData.kpis.netProfit],
-        ['Gastos Operativos (OPEX)', chartData.kpis.totalOpex],
-        ['Mermas (Kardex)', chartData.kpis.totalMermas]
+        ['Ticket Promedio', chartData.kpis.ticketPromedio]
       ];
+
+      if (isFullMonth) {
+        resumenData.push(
+          ['Gastos Operativos (OPEX)', chartData.kpis.totalOpex],
+          ['Mermas (Kardex)', chartData.kpis.totalMermas],
+          ['Utilidad Neta Aprox', chartData.kpis.netProfit]
+        );
+      }
+      
       const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
       wsResumen['!cols'] = getAutoWidths(resumenData);
       XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen KPIs');
 
+      // 2. HOJA DE INGRESOS DIARIOS
+      const diariosData = chartData.dailySales.map(d => ({
+        'Fecha': d.name,
+        'Cafetería ($)': d.Cafetería,
+        'Pastelería ($)': d.Pastelería,
+        'Total del Día ($)': d.Total
+      }));
+      diariosData.push({
+        'Fecha': 'TOTAL PERIODO',
+        'Cafetería ($)': chartData.dailyTotals.cafeteria,
+        'Pastelería ($)': chartData.dailyTotals.pasteleria,
+        'Total del Día ($)': chartData.dailyTotals.global
+      });
+      const wsDiario = XLSX.utils.json_to_sheet(diariosData);
+      wsDiario['!cols'] = getAutoWidths(diariosData, Object.keys(diariosData[0]));
+      XLSX.utils.book_append_sheet(wb, wsDiario, 'Ingresos Diarios');
+
+      // 3. HOJA DE MÉTODOS DE PAGO
+      const pagosData = chartData.paymentMethods.map(p => ({
+        'Método de Pago': p.name,
+        'Ingreso ($)': p.value
+      }));
+      const wsPagos = XLSX.utils.json_to_sheet(pagosData);
+      wsPagos['!cols'] = getAutoWidths(pagosData, Object.keys(pagosData[0]));
+      XLSX.utils.book_append_sheet(wb, wsPagos, 'Métodos de Pago');
+
+      // 4. RENDIMIENTO DE PRODUCTOS
       const productosData = processedProducts.map(p => ({
         Producto: p.name,
         Departamento: p.departamento,
@@ -173,9 +246,7 @@ export const useReportsController = () => {
         'Ingreso Bruto ($)': p.ingreso
       }));
       const wsProductos = XLSX.utils.json_to_sheet(productosData);
-      if (productosData.length > 0) {
-        wsProductos['!cols'] = getAutoWidths(productosData, Object.keys(productosData[0]));
-      }
+      if (productosData.length > 0) wsProductos['!cols'] = getAutoWidths(productosData, Object.keys(productosData[0]));
       XLSX.utils.book_append_sheet(wb, wsProductos, 'Rendimiento Cafetería');
 
       const pasteleriaData = processedPasteleriaProducts.map(p => ({
@@ -185,22 +256,21 @@ export const useReportsController = () => {
         'Ingreso Bruto ($)': p.ingreso
       }));
       const wsPasteleria = XLSX.utils.json_to_sheet(pasteleriaData);
-      if (pasteleriaData.length > 0) {
-        wsPasteleria['!cols'] = getAutoWidths(pasteleriaData, Object.keys(pasteleriaData[0]));
-      }
+      if (pasteleriaData.length > 0) wsPasteleria['!cols'] = getAutoWidths(pasteleriaData, Object.keys(pasteleriaData[0]));
       XLSX.utils.book_append_sheet(wb, wsPasteleria, 'Rendimiento Pastelería');
 
-      const gastosData = chartData.opexData.map(g => ({
-        Categoría: g.name,
-        'Monto ($)': g.value
-      }));
-      const wsGastos = XLSX.utils.json_to_sheet(gastosData);
-      if (gastosData.length > 0) {
-        wsGastos['!cols'] = getAutoWidths(gastosData, Object.keys(gastosData[0]));
+      // 5. GASTOS (Solo si es mes completo)
+      if (isFullMonth) {
+        const gastosData = chartData.opexData.map(g => ({
+          Categoría: g.name,
+          'Monto ($)': g.value
+        }));
+        const wsGastos = XLSX.utils.json_to_sheet(gastosData);
+        if (gastosData.length > 0) wsGastos['!cols'] = getAutoWidths(gastosData, Object.keys(gastosData[0]));
+        XLSX.utils.book_append_sheet(wb, wsGastos, 'Gastos Operativos');
       }
-      XLSX.utils.book_append_sheet(wb, wsGastos, 'Gastos Operativos');
 
-      XLSX.writeFile(wb, `Inteligencia_Negocios_LyA_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      XLSX.writeFile(wb, `Reporte_LyA_${format(dateRange.start, 'dd-MMM')}__al__${format(dateRange.end, 'dd-MMM-yyyy')}.xlsx`);
       toast.success('Reporte Excel exportado correctamente');
     } catch (error) {
       console.error(error);
@@ -221,32 +291,93 @@ export const useReportsController = () => {
       doc.setTextColor(100);
       doc.text(`Periodo evaluado: ${format(dateRange.start, 'dd MMM yyyy', {locale: es})} al ${format(dateRange.end, 'dd MMM yyyy', {locale: es})}`, 14, 30);
 
+      // --- TABLA 1: KPIs FINANCIEROS ---
+      const kpiBody = [
+        ['Ingresos Totales', `$${chartData.kpis.totalIncome.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`],
+        ['Ticket Promedio', `$${chartData.kpis.ticketPromedio.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`]
+      ];
+
+      if (isFullMonth) {
+        kpiBody.push(
+          ['Gastos Operativos (OPEX)', `$${chartData.kpis.totalOpex.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`],
+          ['Mermas de Inventario', `$${chartData.kpis.totalMermas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`],
+          ['Utilidad Neta (Aprox)', `$${chartData.kpis.netProfit.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`]
+        );
+      }
+
       autoTable(doc, {
         startY: 40,
         head: [['Métrica Financiera', 'Monto ($)']],
-        body: [
-          ['Ingresos Totales', `$${chartData.kpis.totalIncome.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`],
-          ['Utilidad Neta (Aprox)', `$${chartData.kpis.netProfit.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`],
-          ['Gastos Operativos (OPEX)', `$${chartData.kpis.totalOpex.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`],
-          ['Mermas de Inventario', `$${chartData.kpis.totalMermas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`]
-        ],
+        body: kpiBody,
         theme: 'grid',
         headStyles: { fillColor: [249, 115, 22] } 
       });
 
+      let finalY = doc.lastAutoTable.finalY + 15;
+
+      // --- TABLA 2: INGRESOS DIARIOS ---
+      doc.setFontSize(14);
+      doc.setTextColor(74, 43, 41);
+      doc.text('Desglose Diario de Ingresos', 14, finalY);
+
+      const dailyBody = chartData.dailySales.map(d => [
+        d.name, 
+        `$${d.Cafetería.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+        `$${d.Pastelería.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+        `$${d.Total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+      ]);
+
+      dailyBody.push([
+        'TOTAL PERIODO', 
+        `$${chartData.dailyTotals.cafeteria.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+        `$${chartData.dailyTotals.pasteleria.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+        `$${chartData.dailyTotals.global.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+      ]);
+
+      autoTable(doc, {
+        startY: finalY + 5,
+        head: [['Fecha', 'Cafetería', 'Pastelería', 'Total del Día']],
+        body: dailyBody,
+        theme: 'striped',
+        headStyles: { fillColor: [16, 185, 129] },
+        footStyles: { fillColor: [200, 200, 200], textColor: [0,0,0], fontStyle: 'bold' },
+        showFoot: 'lastPage'
+      });
+
+      finalY = doc.lastAutoTable.finalY + 15;
+
+      // --- TABLA 3: MÉTODOS DE PAGO ---
+      if (finalY > 250) { doc.addPage(); finalY = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(74, 43, 41);
+      doc.text('Ingresos por Método de Pago', 14, finalY);
+
+      autoTable(doc, {
+        startY: finalY + 5,
+        head: [['Método de Pago', 'Total Recaudado']],
+        body: chartData.paymentMethods.map(p => [
+          p.name, `$${p.value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246] }
+      });
+
+      finalY = doc.lastAutoTable.finalY + 15;
+
+      // --- TABLA 4: PRODUCTOS CAFETERÍA ---
       if (processedProducts.length > 0) {
+        if (finalY > 240) { doc.addPage(); finalY = 20; }
         doc.setFontSize(14);
         doc.setTextColor(74, 43, 41);
         
-        let finalY = doc.lastAutoTable.finalY;
         const tituloTabla = productFilter === 'SOLD' ? 'Cafetería: Productos Vendidos' : 
                             productFilter === 'ALL' ? 'Cafetería: Catálogo Completo' : 
                             `Cafetería: Top ${productFilter} Vendidos`;
 
-        doc.text(tituloTabla, 14, finalY + 15);
+        doc.text(tituloTabla, 14, finalY);
         
         autoTable(doc, {
-          startY: finalY + 20,
+          startY: finalY + 5,
           head: [['Producto', 'Depto', 'Unidades', 'Ingreso']],
           body: processedProducts.map(p => [
             p.name, 
@@ -257,20 +388,17 @@ export const useReportsController = () => {
           theme: 'striped',
           headStyles: { fillColor: [74, 43, 41] } 
         });
+        finalY = doc.lastAutoTable.finalY + 15;
       }
 
+      // --- TABLA 5: PRODUCTOS PASTELERÍA ---
       if (processedPasteleriaProducts.length > 0) {
-        let finalY = doc.lastAutoTable.finalY + 15;
-        if (finalY > 250) {
-            doc.addPage();
-            finalY = 20;
-        }
-
+        if (finalY > 240) { doc.addPage(); finalY = 20; }
         doc.setFontSize(14);
         doc.setTextColor(74, 43, 41);
         
-        const tituloPasteleria = productFilter === 'SOLD' ? 'Pastelería: Productos Entregados' : 
-                            productFilter === 'ALL' ? 'Pastelería: Histórico Completo' : 
+        const tituloPasteleria = productFilter === 'SOLD' ? 'Pastelería: Entregados' : 
+                            productFilter === 'ALL' ? 'Pastelería: Histórico' : 
                             `Pastelería: Top ${productFilter} Entregados`;
 
         doc.text(tituloPasteleria, 14, finalY);
@@ -289,7 +417,7 @@ export const useReportsController = () => {
         });
       }
 
-      doc.save(`Inteligencia_Negocios_LyA_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      doc.save(`Reporte_LyA_${format(dateRange.start, 'dd-MMM')}__al__${format(dateRange.end, 'dd-MMM-yyyy')}.pdf`);
       toast.success('Reporte PDF exportado correctamente');
     } catch (error) {
       console.error(error);
@@ -305,6 +433,7 @@ export const useReportsController = () => {
     exportToExcel,
     exportToPDF,
     productFilter, 
-    setProductFilter
+    setProductFilter,
+    isFullMonth // Lo retornamos por si en la vista ReportsPage.jsx quieres ocultar las gráficas de utilidades si no es mes completo
   };
 };

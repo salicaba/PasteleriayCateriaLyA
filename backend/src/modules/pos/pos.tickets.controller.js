@@ -8,7 +8,13 @@ import Transaction from '../cash/Transaction.model.js';
 import User from '../users/User.model.js'; 
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 
-// 🔥 CEREBRO EXTRACTOR VISUAL
+// =========================================================================
+// 🌐 UTILIDAD: FECHA LOCAL ESTRICTA (CHIAPAS / CDMX)
+// =========================================================================
+const getLocalNow = () => {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+};
+
 const parseAccountName = (str) => {
   if (!str) return 'General';
   const s = String(str);
@@ -54,11 +60,16 @@ export const getTickets = async (req, res) => {
 // ==========================================
 export const getTodayTickets = async (req, res) => {
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    // 🔥 ZONA HORARIA LOCAL PARA VENTAS DE HOY
+    const localNow = getLocalNow();
+    
+    const localYear = localNow.getFullYear();
+    const localMonth = String(localNow.getMonth() + 1).padStart(2, '0');
+    const localDay = String(localNow.getDate()).padStart(2, '0');
+    
+    const todayStr = `${localYear}-${localMonth}-${localDay}`;
+    const startOfDay = new Date(`${todayStr}T00:00:00.000-06:00`);
+    const endOfDay = new Date(`${todayStr}T23:59:59.999-06:00`);
 
     const tickets = await Order.findAll({
       where: {
@@ -101,7 +112,7 @@ export const printOrderTicket = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] // 🔥 Se agregó departamento
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'departamento'] }] 
         }
       ]
     });
@@ -171,11 +182,12 @@ export const printOrderTicket = async (req, res) => {
     printer.setTextNormal();
     printer.drawLine();
     
-    const d = new Date();
-    const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
+    // 🔥 FECHA LOCAL EN EL TICKET IMPRESO
+    const d = getLocalNow();
+    const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long', timeZone: 'America/Mexico_City' });
     const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
-    const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Mexico_City' });
+    const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' });
     const currentDateTimeStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
     const fechaImpresion = currentDateTimeStr.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -258,7 +270,7 @@ export const printOrderTicket = async (req, res) => {
         ]);
 
         if (item.quantity > 1) {
-          printer.println(`  Unitario: $${item.unitPrice.toFixed(2)}`);
+          printer.println(` Unitario: $${item.unitPrice.toFixed(2)}`);
         }
 
         let preps = [];
@@ -314,7 +326,7 @@ export const printOrderTicket = async (req, res) => {
 };
 
 // ==========================================
-// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE (NUEVA LIBRERÍA)
+// 📱 GENERAR VISTA DEL TICKET DIGITAL PARA EL CLIENTE
 // ==========================================
 export const shareOrderTicket = async (req, res) => {
   try {
@@ -376,11 +388,15 @@ export const shareOrderTicket = async (req, res) => {
     
     const nombreCliente = parseAccountName(order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General'));
     
-    const d = new Date(order.createdAt);
-    const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long' });
+    // 🔥 FECHA LOCAL EN EL TICKET DIGITAL
+    // Transformamos el UTC de la DB al horario de Chiapas para mostrárselo al cliente
+    const rawDate = new Date(order.createdAt);
+    const d = new Date(rawDate.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
+    const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long', timeZone: 'America/Mexico_City' });
     const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
-    const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Mexico_City' });
+    const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' });
     const dateStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
 
     const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
@@ -422,7 +438,6 @@ export const shareOrderTicket = async (req, res) => {
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <!-- 🔥 ADIÓS HTML2PDF, HOLA JSPDF Y HTML2CANVAS 🔥 -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
       <style>
@@ -602,7 +617,6 @@ export const shareOrderTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 FIX SUPREMO: PDF DINÁMICO TAMAÑO TICKET 🔥
         async function descargarPDF() {
           const btn = document.getElementById('btn-descargar');
           const originalText = btn.innerHTML;
@@ -613,7 +627,9 @@ export const shareOrderTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
 
           try {
-            // 1. Tomamos una captura de alta calidad del ticket sin que el Flexbox interfiera
+            window.scrollTo(0, 0);
+            await document.fonts.ready;
+
             const canvas = await html2canvas(element, { 
               scale: 3, 
               useCORS: true, 
@@ -621,20 +637,16 @@ export const shareOrderTicket = async (req, res) => {
             });
 
             const imgData = canvas.toDataURL('image/png');
+            const pdfWidth = 80; 
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
 
-            // 2. En lugar de una hoja A4, creamos un PDF con formato de "Ticket de Caja"
-            const pdfWidth = 80; // Ancho estándar de un ticket en mm
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; // Calculamos el alto perfecto
-
-            // 3. Inicializamos jsPDF nativo
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({
               orientation: 'portrait',
               unit: 'mm',
-              format: [pdfWidth, pdfHeight] // 🔥 ¡MAGIA! El PDF tiene el tamaño exacto del ticket
+              format: [pdfWidth, pdfHeight] 
             });
 
-            // 4. Pegamos la imagen cubriendo el 100% del PDF y descargamos
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
             pdf.save('Ticket_Lya_${ticketFolioFile}.pdf');
 

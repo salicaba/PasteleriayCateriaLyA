@@ -91,7 +91,10 @@ export const useClientCart = (triggerNotification) => {
       if (currentStock < requiredQty) return null;
     }
 
-    const today = new Date().getDay();
+    // 🔥 BLINDAJE DE ZONA HORARIA PARA PROMOCIONES EN CLIENTE
+    const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const today = new Date(nowInChiapasStr).getDay();
+
     const daysRaw = promo.validDays || promo.valid_days;
     const validDaysAsNumbers = parseValidDays(daysRaw);
 

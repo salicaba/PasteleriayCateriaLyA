@@ -1,3 +1,4 @@
+// backend/src/modules/inventory/inventory.controller.js
 import { Op } from 'sequelize';
 import InventoryItem from './InventoryItem.model.js';
 import InventoryTransaction from './InventoryTransaction.model.js';
@@ -6,6 +7,13 @@ import InventoryReconciliationDetail from './InventoryReconciliationDetail.model
 import sequelize from '../../config/database.js';
 import User from '../users/User.model.js';
 import { getIO } from '../../config/socket.js';
+
+// =========================================================================
+// 🌐 UTILIDAD: FECHA LOCAL ESTRICTA (CHIAPAS / CDMX)
+// =========================================================================
+const getLocalNow = () => {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+};
 
 // 1. Obtener todo el inventario activo
 export const getInventory = async (req, res) => {
@@ -83,6 +91,9 @@ export const registerTransaction = async (req, res) => {
       throw new Error('Tipo de transacción no soportada desde este endpoint');
     }
 
+    // 🔥 BLINDAJE DE ZONA HORARIA
+    const localNow = getLocalNow();
+
     await InventoryTransaction.create({
       inventoryItemId,
       userId: userId || null, 
@@ -91,12 +102,14 @@ export const registerTransaction = async (req, res) => {
       unitCost: actualUnitCost,
       totalCost: transactionTotalCost,
       reference: reference || null,
-      notes: notes || null
+      notes: notes || null,
+      createdAt: localNow // Estampado exacto de Chiapas
     }, { transaction: t });
 
     await item.update({
       currentStock: newStock,
-      averageCost: newAvgCost
+      averageCost: newAvgCost,
+      updatedAt: localNow
     }, { transaction: t });
 
     await t.commit(); 
@@ -146,7 +159,7 @@ export const deleteItem = async (req, res) => {
     
     if (!item) return res.status(404).json({ message: 'Insumo no encontrado' });
 
-    await item.update({ isActive: false });
+    await item.update({ isActive: false, updatedAt: getLocalNow() });
     res.status(200).json({ message: 'Insumo eliminado correctamente' });
   } catch (error) {
     console.error('Error deleting item:', error);
@@ -167,11 +180,11 @@ export const processReconciliation = async (req, res) => {
       throw new Error('No se enviaron insumos para el arqueo.');
     }
 
-    const realExecutionDate = new Date(); 
+    // 🔥 BLINDAJE DE ZONA HORARIA
+    const realExecutionDate = getLocalNow(); 
     let accountingDate = realExecutionDate; 
     let isRetroactive = false;
 
-    // 🔥 FIX ZONA HORARIA: Obtenemos la fecha local estricta sin usar .toISOString()
     const localYear = realExecutionDate.getFullYear();
     const localMonth = String(realExecutionDate.getMonth() + 1).padStart(2, '0');
     const localDay = String(realExecutionDate.getDate()).padStart(2, '0');
@@ -179,15 +192,14 @@ export const processReconciliation = async (req, res) => {
 
     if (date && date !== todayLocalStr) {
       isRetroactive = true;
-      // Rompemos el string YYYY-MM-DD para armar la fecha en horario local evitando el UTC Shift
       const [y, m, d] = date.split('-');
-      // Meses en JavaScript van de 0 a 11 (por eso m - 1)
-      accountingDate = new Date(y, m - 1, d, 23, 59, 59, 999); 
+      // Creamos la fecha diferida forzando las últimas milésimas del día de corte, pero usando el string local de Chiapas
+      accountingDate = new Date(`${y}-${m}-${d}T23:59:59.999-06:00`); 
     }
 
     const baseNote = notes || 'Arqueo periódico';
     const finalNote = isRetroactive 
-      ? `[Registrado el: ${realExecutionDate.toLocaleString()}] ${baseNote}` 
+      ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] ${baseNote}` 
       : baseNote;
 
     const reconciliation = await InventoryReconciliation.create({
@@ -238,7 +250,7 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: consumedCost,
           reference: `Arqueo #${reconciliation.id}`,
-          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString()}] Ajuste negativo diferido` : (notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'),
+          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] Ajuste negativo diferido` : (notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'),
           createdAt: accountingDate 
         }, { transaction: t });
 
@@ -251,12 +263,12 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: Math.abs(differenceCost),
           reference: `Arqueo #${reconciliation.id}`,
-          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString()}] Ajuste positivo diferido` : (notes ? `Ajuste: ${notes}` : 'Ajuste positivo por arqueo'),
+          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] Ajuste positivo diferido` : (notes ? `Ajuste: ${notes}` : 'Ajuste positivo por arqueo'),
           createdAt: accountingDate 
         }, { transaction: t });
       }
 
-      await item.update({ currentStock: parsedPhysical }, { transaction: t });
+      await item.update({ currentStock: parsedPhysical, updatedAt: realExecutionDate }, { transaction: t });
 
       stockUpdates.push({
         id: item.id,
@@ -286,7 +298,7 @@ export const processReconciliation = async (req, res) => {
 };
 
 // =========================================================================
-// MOTOR DE ANULACIÓN Y PAPELERA (NUEVO)
+// MOTOR DE ANULACIÓN Y PAPELERA
 // =========================================================================
 
 export const cancelTransaction = async (req, res) => {
@@ -311,9 +323,8 @@ export const cancelTransaction = async (req, res) => {
     const txQty = parseFloat(tx.quantity);
     const txTotalCost = parseFloat(tx.totalCost);
 
-    // MATEMÁTICA INVERSA
     if (['IN', 'ADJUSTMENT'].includes(tx.type)) {
-      newStock -= txQty; // Revertir entrada: Quitamos stock
+      newStock -= txQty; 
       if (newStock < 0) throw new Error('No se puede anular: El stock del insumo quedaría en negativo.');
       
       if (newStock === 0) {
@@ -324,16 +335,17 @@ export const cancelTransaction = async (req, res) => {
         newAvgCost = revertedTotalValue > 0 ? revertedTotalValue / newStock : 0;
       }
     } else {
-      // Revertir salida (MERMA, CONSUMO, OUT): Devolvemos el stock a la normalidad
       newStock += txQty;
-      // El costo promedio histórico no suele recalcularse al devolver mermas, solo recuperamos el stock.
     }
 
-    await item.update({ currentStock: newStock, averageCost: newAvgCost }, { transaction: t });
+    // 🔥 BLINDAJE HORARIO: La cancelación debe quedar con la hora actual en México
+    const localNow = getLocalNow();
+
+    await item.update({ currentStock: newStock, averageCost: newAvgCost, updatedAt: localNow }, { transaction: t });
     
     await tx.update({ 
       status: 'CANCELLED', 
-      cancelledAt: new Date(), 
+      cancelledAt: localNow, 
       cancelledBy: req.user?.id || null, 
       cancelReason: reason 
     }, { transaction: t });
@@ -368,19 +380,21 @@ export const restoreTransaction = async (req, res) => {
     const txQty = parseFloat(tx.quantity);
     const txTotalCost = parseFloat(tx.totalCost);
 
-    // REAPLICAR MATEMÁTICA
     if (['IN', 'ADJUSTMENT'].includes(tx.type)) {
       const currentTotalValue = newStock * currentAvgCost;
-      newStock += txQty; // Volvemos a meter el stock
+      newStock += txQty; 
       if (newStock > 0) {
         newAvgCost = (currentTotalValue + txTotalCost) / newStock;
       }
     } else {
-      newStock -= txQty; // Volvemos a sacar el stock
+      newStock -= txQty; 
       if (newStock < 0) throw new Error('No se puede restaurar: El stock actual no soporta esta salida de nuevo.');
     }
 
-    await item.update({ currentStock: newStock, averageCost: newAvgCost }, { transaction: t });
+    // 🔥 BLINDAJE DE ZONA HORARIA PARA RESTAURAR
+    const localNow = getLocalNow();
+
+    await item.update({ currentStock: newStock, averageCost: newAvgCost, updatedAt: localNow }, { transaction: t });
     
     await tx.update({ 
       status: 'ACTIVE', 
@@ -399,17 +413,20 @@ export const restoreTransaction = async (req, res) => {
   }
 };
 
-// 🔥 REEMPLAZA EL getGlobalHistory EXISTENTE POR ESTE (Filtra los KPIs para evitar descuadres):
+// =========================================================================
+// HISTORIAL GLOBAL PROTEGIDO CONTRA UTC
+// =========================================================================
 export const getGlobalHistory = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     let dateFilter = {};
     
     if (startDate && endDate) {
+      // Reconstruimos la fecha enviada del Frontend en zona horaria de México
       const [sy, sm, sd] = startDate.split('-');
-      const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0); 
+      const start = new Date(`${sy}-${sm}-${sd}T00:00:00.000-06:00`); 
       const [ey, em, ed] = endDate.split('-');
-      const end = new Date(ey, em - 1, ed, 23, 59, 59, 999); 
+      const end = new Date(`${ey}-${em}-${ed}T23:59:59.999-06:00`); 
       dateFilter = { createdAt: { [Op.between]: [start, end] } };
     }
 
@@ -422,7 +439,6 @@ export const getGlobalHistory = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // 🔥 KPIs PROTEGIDOS: Solo suman si el status es ACTIVE
     const totalSpent = transactions
       .filter(t => ['IN', 'ADJUSTMENT'].includes(t.type) && t.status === 'ACTIVE')
       .reduce((sum, t) => sum + parseFloat(t.totalCost), 0);

@@ -5,7 +5,7 @@ import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
 import Product from '../menu/Product.model.js';
 
-// 🔥 CEREBRO EXTRACTOR VISUAL (Para limpiar el nombre en la Caja)
+// 🔥 CEREBRO EXTRACTOR VISUAL
 const parseAccountName = (str) => {
   if (!str) return 'General';
   const s = String(str);
@@ -67,7 +67,6 @@ export const payOrder = async (req, res) => {
     let amountCafeteria = 0;
     let amountPasteleria = 0;
 
-    // 🔥 LÓGICA DE SPLIT: Separar ingresos por departamento
     if (itemsToPay.length > 0) {
       const productIds = itemsToPay.map(i => i.productId);
       const products = await Product.findAll({ where: { id: productIds } });
@@ -84,7 +83,6 @@ export const payOrder = async (req, res) => {
       });
     }
 
-    // Actualizar cuentas pagadas
     if (!isFullPayment && cuentaName && !paidAccounts.includes(cuentaName)) {
       paidAccounts.push(cuentaName);
     }
@@ -97,7 +95,6 @@ export const payOrder = async (req, res) => {
     const isMixed = amountCafeteria > 0 && amountPasteleria > 0;
     let descBase = `Pago de Consumo (${identificador})`;
     
-    // 🔥 APLICAMOS EL FILTRO AL NOMBRE DE LA CUENTA
     if (!isFullPayment && cuentaName) {
       descBase += ` Cuenta: ${parseAccountName(cuentaName)}`;
     }
@@ -105,18 +102,20 @@ export const payOrder = async (req, res) => {
     const mixTag = isMixed ? ' | 🔗 Ticket Mixto' : '';
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
-    // Crear transacciones separadas si hay montos
+    // 🔥 BLINDAJE DE ZONA HORARIA
+    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
     if (amountCafeteria > 0) {
       const folioCaf = `CAF-${baseFolio}`;
       await Transaction.create({
         folio: folioCaf, 
         source: 'CAFETERIA',
         amount: amountCafeteria,
-        // 🔥 EL FIX: Ponemos el folio ANTES del mixTag para que el frontend no lo oculte
         description: `${descBase} ${folioCaf}${mixTag}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
-        createdBy: userId 
+        createdBy: userId,
+        createdAt: localNow // Obligamos a la fecha local
       });
     }
 
@@ -126,17 +125,15 @@ export const payOrder = async (req, res) => {
         folio: folioPas, 
         source: 'PASTELERIA',
         amount: amountPasteleria,
-        // 🔥 EL FIX: Ponemos el folio ANTES del mixTag para que el frontend no lo oculte
         description: `${descBase} ${folioPas}${mixTag}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
-        createdBy: userId 
+        createdBy: userId,
+        createdAt: localNow // Obligamos a la fecha local
       });
     }
 
-    // 🔥 EMITIR ACTUALIZACIÓN AL ECOSISTEMA
     getIO().emit('pos:update');
-    // 👇 NUEVO EVENTO: Le avisa directamente a la PWA cliente que su nota fue pagada
     getIO().emit('orderPaid', { 
       orderId: order.id, 
       tableId: order.tableId, 

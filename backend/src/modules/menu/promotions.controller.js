@@ -1,16 +1,23 @@
+// backend/src/modules/menu/promotions.controller.js
 import Promotion from './Promotion.model.js';
 import Product from './Product.model.js';
 import { getIO } from '../../config/socket.js';
 import { Op } from 'sequelize';
 
-// Helper ultra-robusto para detectar colisiones de días (Soporta Arrays nativos o JSON parseable)
+// =========================================================================
+// 🌐 UTILIDAD: FECHA LOCAL ESTRICTA (CHIAPAS / CDMX)
+// =========================================================================
+const getLocalNow = () => {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+};
+
+// Helper ultra-robusto para detectar colisiones de días 
 const hasDayOverlap = (existingPromotions, newDays) => {
   const incomingDays = Array.isArray(newDays) ? newDays : JSON.parse(newDays || '[]');
   
   for (const promo of existingPromotions) {
     if (!promo.isActive) continue; 
     
-    // Blindaje táctico: Aseguramos que los días guardados se lean como Array
     const savedDays = Array.isArray(promo.validDays) ? promo.validDays : JSON.parse(promo.validDays || '[]');
     
     const overlap = savedDays.some(day => incomingDays.includes(day));
@@ -41,6 +48,8 @@ export const setupPromotion = async (req, res) => {
       }
     }
 
+    const localNow = getLocalNow();
+
     const newPromotion = await Promotion.create({ 
       productId, 
       validDays, 
@@ -48,15 +57,15 @@ export const setupPromotion = async (req, res) => {
       type, 
       buyQty, 
       payQty, 
-      discountValue 
+      discountValue,
+      createdAt: localNow,
+      updatedAt: localNow
     });
 
-    // 🔥 FIX: Tu usePosCart.js exige "promotion: newPromotion" para actualizarse
     getIO().emit('menu:promotions_updated', { productId, promotion: newPromotion });
     
     return res.status(201).json({ success: true, data: newPromotion });
   } catch (error) {
-    // 🔥 AHORA SÍ: El error real saldrá en tu terminal de Node
     console.error("🔥 Error CRÍTICO al guardar promoción:", error);
     return res.status(500).json({ success: false, message: "Error interno", details: error.message });
   }
@@ -80,6 +89,8 @@ export const togglePromotionStatus = async (req, res) => {
     }
 
     promotion.isActive = nextStatus;
+    // 🔥 Forzamos la actualización de la hora local
+    promotion.updatedAt = getLocalNow(); 
     await promotion.save();
     
     getIO().emit('menu:promotions_updated', { productId: promotion.productId, promotion });
@@ -108,7 +119,10 @@ export const updatePromotion = async (req, res) => {
       }
     }
 
-    await promotion.update({ type, buyQty, payQty, discountValue, validDays, isActive });
+    await promotion.update({ 
+        type, buyQty, payQty, discountValue, validDays, isActive, 
+        updatedAt: getLocalNow() // 🔥 Blindaje local 
+    });
     
     getIO().emit('menu:promotions_updated', { productId: promotion.productId, promotion });
     

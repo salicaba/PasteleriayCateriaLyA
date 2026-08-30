@@ -1,9 +1,17 @@
+// backend/src/modules/kitchen/kitchen.controller.js
 import { getIO } from '../../config/socket.js';
-import { Op } from 'sequelize'; // <-- 🔥 IMPORTANTE: Necesario para los filtros
+import { Op } from 'sequelize'; 
 import OrderItem from '../pos/OrderItem.model.js';
 import Order from '../pos/Order.model.js';
 import Product from '../menu/Product.model.js';
 import Table from '../pos/Table.model.js';
+
+// =========================================================================
+// 🌐 UTILIDAD: FECHA LOCAL ESTRICTA (CHIAPAS / CDMX)
+// =========================================================================
+const getLocalNow = () => {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+};
 
 // ==========================================
 // 🍳 OBTENER TICKETS DE COCINA (KDS)
@@ -19,7 +27,7 @@ export const getKitchenTickets = async (req, res) => {
         {
           model: Order,
           as: 'order',
-          attributes: ['id', 'orderType', 'ticketId', 'tableId', 'createdAt', 'status'], // 🔥 Se agregó status
+          attributes: ['id', 'orderType', 'ticketId', 'tableId', 'createdAt', 'status'], 
           where: { 
             // 🔥 LA MAGIA: Permitimos que lleguen las órdenes Canceladas a la cocina para avisarles
             status: { [Op.in]: ['OPEN', 'PAID', 'CANCELLED'] } 
@@ -59,7 +67,14 @@ export const updateKitchenStatus = async (req, res) => {
     const item = await OrderItem.findByPk(itemId);
     if (!item) return res.status(404).json({ message: 'Platillo no encontrado.' });
 
+    // 🔥 BLINDAJE DE ZONA HORARIA
+    // Forzamos el reloj de Chiapas al momento de tocar el estado.
+    // Esto es crucial para medir los "Tiempos de Preparación" de los cocineros.
+    const localNow = getLocalNow();
+
     item.kitchenStatus = status;
+    item.updatedAt = localNow; // Obliga al KDS a medir el tiempo real
+    
     await item.save();
 
     getIO().emit('pos:update');

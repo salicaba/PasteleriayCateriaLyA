@@ -60,8 +60,9 @@ export default function PasteleriaCalendar() {
     setFechaBusqueda(dateVal); 
     if (!dateVal) return;
     
+    // 🔥 FIX CALENDARIO: Forzamos la fecha a 12:00 PM para evitar problemas de desfase
     const [year, month, day] = dateVal.split('-');
-    const newDate = new Date(year, month - 1, day);
+    const newDate = new Date(year, month - 1, day, 12, 0, 0);
     
     setCurrentMonth(newDate);
     setSelectedDate(newDate);
@@ -79,18 +80,25 @@ export default function PasteleriaCalendar() {
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
+  // 🔥 FIX DE PINTADO DE CALENDARIO
   const getPedidosForDate = (date) => {
+    // Convertimos la fecha que estamos pintando en formato YYYY-MM-DD local
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const targetDateStr = `${y}-${m}-${d}`;
+
     return pedidos.filter(p => {
-      const pDate = new Date(p.fechaEntrega);
-      return pDate.getDate() === date.getDate() && pDate.getMonth() === date.getMonth() && pDate.getFullYear() === date.getFullYear();
+      // Extraemos solo el YYYY-MM-DD de la fecha guardada en el backend
+      const pDateStr = p.fechaEntrega ? p.fechaEntrega.split('T')[0] : '';
+      return pDateStr === targetDateStr;
     });
   };
 
   const pedidosSeleccionados = getPedidosForDate(selectedDate);
 
-  // Cálculos precisos de fechas
   const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0); // Normalizamos "Hoy" a las 00:00:00
+  hoy.setHours(0, 0, 0, 0); 
   
   const fechaSeleccionadaLimpia = new Date(selectedDate);
   fechaSeleccionadaLimpia.setHours(0, 0, 0, 0);
@@ -102,7 +110,6 @@ export default function PasteleriaCalendar() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      // PILAR 1: Flexbox y Overflow estricto
       className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
     >
       {/* HEADER */}
@@ -260,7 +267,14 @@ export default function PasteleriaCalendar() {
               ) : (
                 pedidosSeleccionados.map(pedido => {
                   const finanzas = calcularFinanzas(pedido);
-                  const hora = new Date(pedido.fechaEntrega).toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+                  
+                  // 🔥 FIX HORAS: Convertimos el ISO del backend a hora local
+                  let horaStr = '--:--';
+                  if (pedido.fechaEntrega) {
+                    const rawD = new Date(pedido.fechaEntrega);
+                    const localD = new Date(rawD.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+                    horaStr = localD.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+                  }
 
                   return (
                     <motion.div
@@ -270,8 +284,8 @@ export default function PasteleriaCalendar() {
                       exit={{ opacity: 0, scale: 0.95, x: -20 }}
                       transition={{ type: "spring", stiffness: 200, damping: 20 }}
                       key={pedido.id}
-                      onClick={() => abrirDetalles(pedido)} // 🔥 FIX: TODA LA TARJETA ABRE LOS DETALLES
-                      whileTap={{ scale: 0.98 }} // 🔥 FIX: BLINDAJE TÁCTIL (PILAR 2)
+                      onClick={() => abrirDetalles(pedido)} 
+                      whileTap={{ scale: 0.98 }} 
                       className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5 md:hover:border-rose-400' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-300 lya:md:hover:border-lya-primary/50'}
                       `}
@@ -282,7 +296,7 @@ export default function PasteleriaCalendar() {
                           <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text transition-colors">{pedido.cliente}</h4>
                         </div>
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
-                          <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {hora}
+                          <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {horaStr}
                         </div>
                       </div>
 
@@ -330,14 +344,13 @@ export default function PasteleriaCalendar() {
                         )}
                         
                         <div className="flex gap-2">
-                          {/* El botón de Ver Detalles se mantiene visualmente, pero la acción ya la hereda la tarjeta completa */}
                           <div className="p-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-xl" title="Ver Detalles">
                             <Eye size={16}/>
                           </div>
                           <motion.button 
                             whileTap={{ scale: 0.9 }} 
                             onClick={(e) => { 
-                              e.stopPropagation(); // 🔥 EVITA QUE EL CLICK SE FILTRE A LA TARJETA Y ABRA LOS DETALLES
+                              e.stopPropagation(); 
                               abrirTicket(pedido); 
                             }} 
                             className="p-2 bg-blue-50 md:hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-xl transition-colors" 
@@ -368,7 +381,6 @@ export default function PasteleriaCalendar() {
         </div>
       </div>
 
-      {/* NOTIFICACIÓN FLOTANTE DE ÉXITO NEO-BENTO (PILAR 5) */}
       <AnimatePresence>
         {successScreen?.isOpen && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -391,7 +403,6 @@ export default function PasteleriaCalendar() {
         )}
       </AnimatePresence>
 
-      {/* MODALES DEL MÓDULO */}
       <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} isSubmitting={isSubmitting} />
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
       <DetallePedidoModal isOpen={detalleModal.isOpen} onClose={cerrarDetalles} pedido={detalleModal.pedido} onEdit={iniciarEdicion} calcularFinanzas={calcularFinanzas} />

@@ -62,7 +62,8 @@ export const VentasHoyModal = ({ isOpen, onClose, ingresosTotales }) => {
                             {esReembolso ? 'Cancelación' : (tx.paymentMethod === 'CASH' ? 'Efectivo' : tx.paymentMethod === 'CARD' ? 'Tarjeta' : 'Transferencia')}
                           </span>
                           <span className="text-[9px] text-gray-400 font-bold">
-                            {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            {/* 🔥 FECHA LOCAL ESTRICTA AL MOSTRAR EL COBRO */}
+                            {new Date(tx.createdAt).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute:'2-digit' })}
                           </span>
                         </div>
                       </div>

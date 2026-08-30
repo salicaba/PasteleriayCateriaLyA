@@ -53,6 +53,10 @@ export const createPedido = async (req, res) => {
 
     let abonosParaGuardar = [];
 
+    // 🔥 FECHA LOCAL EXTREMA PARA LA CAJA (CHIAPAS)
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
+
     // 🔥 1. Registramos el anticipo inicial en la Caja (El dinero ya no se esfuma)
     const montoAnticipo = parseFloat(anticipo);
     if (montoAnticipo > 0) {
@@ -66,12 +70,13 @@ export const createPedido = async (req, res) => {
         amount: montoAnticipo,
         description: `Anticipo Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
         referenceId: newId,
-        createdBy: userId
+        createdBy: userId,
+        createdAt: localNow // Obligamos a la caja a registrar el dinero HOY
       });
       
       abonosParaGuardar.push({
         id: tx.id,
-        fecha: new Date().toISOString(),
+        fecha: localNow.toISOString(),
         monto: montoAnticipo,
         metodo: metodoPagoAnticipo || 'efectivo' 
       });
@@ -92,12 +97,13 @@ export const createPedido = async (req, res) => {
             amount: montoAbono,
             description: `Abono Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
             referenceId: newId,
-            createdBy: userId
+            createdBy: userId,
+            createdAt: localNow
           });
           
           abonosParaGuardar.push({
             id: tx.id,
-            fecha: abono.fecha || new Date().toISOString(),
+            fecha: abono.fecha || localNow.toISOString(),
             monto: montoAbono,
             metodo: abono.metodo || 'efectivo' 
           });
@@ -148,6 +154,10 @@ export const updatePedido = async (req, res) => {
         updateData.imagenesReferencia = imagenesReferencia;
     }
 
+    // 🔥 FECHA LOCAL EXTREMA
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
+
     // 🔥 LÓGICA DE REEMBOLSO AUTOMÁTICO 🔥
     const nuevoCosto = parseFloat(updateData.costoTotal);
     const costoAnterior = parseFloat(pedido.costoTotal);
@@ -160,20 +170,21 @@ export const updatePedido = async (req, res) => {
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
-        // 1. Crear transacción de SALIDA en la caja
+        // 1. Crear transacción de SALIDA en la caja (Con fecha de hoy)
         const tx = await Transaction.create({
           source: 'PASTELERIA',
           paymentMethod: 'CASH', 
           amount: -Math.abs(devolucion), 
           description: `Devolución de saldo a favor por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
-          createdBy: userId
+          createdBy: userId,
+          createdAt: localNow
         }, { transaction: t });
 
         // 2. Registrar el reembolso en el historial de abonos del pedido
         const abonoReembolso = {
           id: tx.id,
-          fecha: new Date().toISOString(),
+          fecha: localNow.toISOString(),
           monto: -Math.abs(devolucion), 
           metodo: 'efectivo',
           nota: 'Devolución automática'
@@ -221,18 +232,23 @@ export const addAbono = async (req, res) => {
     const isLiquidacion = totalPagado >= costoTotal;
     const tipoMovimiento = isLiquidacion ? 'Liquidación' : 'Abono';
 
+    // 🔥 FECHA LOCAL EXTREMA PARA EL ABONO
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
+
     const tx = await Transaction.create({
       source: 'PASTELERIA',
       paymentMethod: dbMethod, 
       amount: parseFloat(monto),
       description: `${tipoMovimiento} Pedido: ${pedido.cliente} ${pedido.id}`,
       referenceId: pedido.id,
-      createdBy: userId
+      createdBy: userId,
+      createdAt: localNow // Obliga a la caja a meter el abono HOY, no el día que se creó el pedido
     });
 
     const nuevoAbono = {
       id: tx.id, 
-      fecha: new Date().toISOString(),
+      fecha: localNow.toISOString(),
       monto: parseFloat(monto),
       metodo: metodo || 'efectivo'
     };
@@ -265,9 +281,12 @@ export const updateEstado = async (req, res) => {
     pedido.estado = estado;
     await pedido.save();
 
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
+
     if (estado === 'cancelado') {
       await Transaction.update(
-        { status: 'CANCELLED', cancelledBy: userId, cancelledAt: new Date() },
+        { status: 'CANCELLED', cancelledBy: userId, cancelledAt: localNow },
         { where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'ACTIVE' } }
       );
     } else if (estado === 'pendiente') {
@@ -292,6 +311,9 @@ export const entregarPedido = async (req, res) => {
     if (!pedido) return res.status(404).json({ message: 'Pedido no encontrado' });
 
     pedido.estado = 'entregado';
+    // Al hacer save(), Sequelize actualiza automáticamente el 'updatedAt'. 
+    // Como los reportes de rendimiento de Pastelería ahora leen el 'updatedAt' en lugar del 'createdAt',
+    // los pasteles entregados hoy aparecerán en el mes/semana/día actual.
     await pedido.save();
 
     res.json({ message: 'Pedido entregado correctamente', data: pedido });
@@ -316,8 +338,11 @@ export const cancelarPedido = async (req, res) => {
     pedido.estado = 'cancelado';
     await pedido.save({ transaction: t });
 
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
+
     await Transaction.update(
-      { status: 'CANCELLED', cancelledBy: userId, cancelledAt: new Date() },
+      { status: 'CANCELLED', cancelledBy: userId, cancelledAt: localNow },
       { 
         where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'ACTIVE' },
         transaction: t 
@@ -406,7 +431,6 @@ export const printPedidoTicket = async (req, res) => {
     console.log(`Atendido:   Caja Pastelería`);
     console.log(`Cliente:    ${pedido.cliente || 'Público General'}`);
     console.log(`Servicio:   ${tipoEntregaStr.toUpperCase()}`);
-    // 🔥 FIX: Mostrar dirección si es a domicilio
     if (pedido.tipoEntrega === 'domicilio' && pedido.direccion) {
       console.log(`Dirección:  ${pedido.direccion}`);
     }
@@ -465,7 +489,6 @@ export const sharePedidoTicket = async (req, res) => {
     const deuda = costoTotal - totalPagado;
     const estadoLiquidacion = deuda <= 0 ? 'LIQUIDADO' : 'PENDIENTE';
 
-    // Generación de fechas en formato Homologado
     const dExp = new Date(pedido.createdAt || new Date());
     const diaExp = dExp.toLocaleDateString('es-MX', { weekday: 'long' });
     const expedicionStr = `${diaExp.charAt(0).toUpperCase() + diaExp.slice(1)}, ${dExp.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${dExp.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
