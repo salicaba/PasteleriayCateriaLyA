@@ -47,7 +47,9 @@ export const getDashboardData = async (req, res) => {
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' }
     });
 
-    // 2. Gastos Operativos (OPEX) (Actual)
+    // backend/src/modules/reports/reports.controller.js
+
+    // 2. Gastos Operativos (OPEX) (Actual - Agrupado para KPIs)
     const opexTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'EXPENSE', status: 'ACTIVE' },
       attributes: [
@@ -55,6 +57,14 @@ export const getDashboardData = async (req, res) => {
         [fn('SUM', col('amount')), 'total']
       ],
       group: ['expenseCategory'],
+      raw: true
+    });
+
+    // 🔥 2.5 LISTA DETALLADA DE GASTOS (Para el Excel con descripción y concepto exacto)
+    const expenseTransactions = await Transaction.findAll({
+      where: { ...dateFilter, type: 'EXPENSE', status: 'ACTIVE' },
+      attributes: ['id', 'folio', 'expenseCategory', 'description', 'amount', 'createdAt', 'paymentMethod'],
+      order: [['createdAt', 'DESC']],
       raw: true
     });
 
@@ -186,6 +196,7 @@ export const getDashboardData = async (req, res) => {
         incomeTransactions,
         totalTransactions: totalTransactionsCount,
         opexTransactions,
+        expenseTransactions, // 🔥 NUEVO: Enviado para el detalle del Excel
         productSales,
         pasteleriaSales,
         inventoryStats: inventoryStats, 

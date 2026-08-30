@@ -23,17 +23,20 @@ export const useReportsController = () => {
   
   const [productFilter, setProductFilter] = useState('5');
 
-  // 🔥 DETECCIÓN AUTOMÁTICA DE MES COMPLETO
+  // 🔥 DETECCIÓN AUTOMÁTICA DE PERIODOS COMPLETOS (Mensual, Trimestral, Anual)
   const isFullMonth = useMemo(() => {
     const start = dateRange.start;
     const end = dateRange.end;
     
+    // ¿Inicia el día 1?
     const isFirstDay = start.getDate() === 1;
-    const lastDayOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-    const isLastDay = end.getDate() === lastDayOfMonth;
-    const isSameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
     
-    return isFirstDay && isLastDay && isSameMonth;
+    // ¿Termina el último día del mes en el que cae?
+    const lastDayOfEndMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+    const isLastDay = end.getDate() === lastDayOfEndMonth;
+    
+    // Retorna true si abarca meses completos (1 mes, 3 meses, 1 año, etc.)
+    return isFirstDay && isLastDay;
   }, [dateRange]);
 
   const fetchReports = async () => {
@@ -70,7 +73,6 @@ export const useReportsController = () => {
 
     // 🔥 AGRUPACIÓN DE INGRESOS DIARIOS
     data.incomeTransactions.forEach(t => {
-      // Forzamos el string a fecha local para evitar brincos de zona horaria
       const dateObj = new Date(t.date + 'T00:00:00'); 
       const dateFormatted = format(dateObj, 'dd MMM yyyy', { locale: es });
       
@@ -101,6 +103,19 @@ export const useReportsController = () => {
       value: parseFloat(t.total)
     }));
 
+    // 🔥 MAPEO DE GASTOS DETALLADOS PARA EL EXCEL (CON CONCEPTO/DESCRIPCIÓN)
+    const expenseTransactions = (data.expenseTransactions || []).map(t => {
+      const dateObj = new Date(t.createdAt);
+      return {
+        id: t.id,
+        folio: t.folio || 'N/A',
+        category: t.expenseCategory,
+        description: t.description || 'Sin descripción',
+        amount: parseFloat(t.amount || 0),
+        date: format(dateObj, 'dd MMM yyyy', { locale: es })
+      };
+    });
+
     const paymentMethods = data.paymentMethods.map(t => ({
       name: t.metodo,
       value: parseFloat(t.total)
@@ -111,7 +126,6 @@ export const useReportsController = () => {
     const totalMermas = Math.abs(parseFloat(data.inventoryStats.totalMermas || 0)); 
     const netProfit = totalIncome - totalOpex - totalMermas;
 
-    // 🔥 TICKET PROMEDIO
     const totalOrders = data.totalTransactions > 0 ? data.totalTransactions : 1;
     const ticketPromedio = totalIncome / totalOrders;
 
@@ -135,7 +149,7 @@ export const useReportsController = () => {
     return {
       dailySales, 
       dailyTotals: { cafeteria: sumCafeteria, pasteleria: sumPasteleria, global: sumGlobal },
-      incomeSource, opexData, paymentMethods, 
+      incomeSource, opexData, expenseTransactions, paymentMethods, 
       productSales: data.productSales,
       pasteleriaSales: data.pasteleriaSales,
       kpis: { totalIncome, totalOpex, totalMermas, netProfit, ticketPromedio },
@@ -259,12 +273,37 @@ export const useReportsController = () => {
       if (pasteleriaData.length > 0) wsPasteleria['!cols'] = getAutoWidths(pasteleriaData, Object.keys(pasteleriaData[0]));
       XLSX.utils.book_append_sheet(wb, wsPasteleria, 'Rendimiento Pastelería');
 
-      // 5. GASTOS (Solo si es mes completo)
+      // 5. GASTOS OPERATIVOS DETALLADOS (Sin Folio, con Fecha, Categoría, Descripción y Monto)
       if (isFullMonth) {
-        const gastosData = chartData.opexData.map(g => ({
-          Categoría: g.name,
-          'Monto ($)': g.value
-        }));
+        const OPEX_TRANSLATIONS = {
+          'PAYROLL': 'Nómina / Sueldos',
+          'UTILITIES': 'Servicios (Luz, Agua, Gas)',
+          'MAINTENANCE': 'Mantenimiento',
+          'SUPPLIES': 'Artículos de Limpieza',
+          'MARKETING': 'Publicidad',
+          'OTHER': 'Otros Gastos',
+          'REFUND': 'Reembolsos / Devoluciones',
+          'NONE': 'Sin Categoría'
+        };
+
+        const gastosData = (chartData.expenseTransactions || []).map(g => {
+          const safeName = g.category ? g.category.toUpperCase() : 'NONE';
+          return {
+            'Fecha': g.date,
+            'Categoría': OPEX_TRANSLATIONS[safeName] || g.category,
+            'Concepto / Descripción': g.description,
+            'Monto ($)': g.amount
+          };
+        });
+
+        const totalOpexSum = (chartData.expenseTransactions || []).reduce((acc, curr) => acc + curr.amount, 0);
+        gastosData.push({
+          'Fecha': 'TOTAL GASTOS',
+          'Categoría': '',
+          'Concepto / Descripción': '',
+          'Monto ($)': totalOpexSum
+        });
+
         const wsGastos = XLSX.utils.json_to_sheet(gastosData);
         if (gastosData.length > 0) wsGastos['!cols'] = getAutoWidths(gastosData, Object.keys(gastosData[0]));
         XLSX.utils.book_append_sheet(wb, wsGastos, 'Gastos Operativos');
@@ -434,6 +473,6 @@ export const useReportsController = () => {
     exportToPDF,
     productFilter, 
     setProductFilter,
-    isFullMonth // Lo retornamos por si en la vista ReportsPage.jsx quieres ocultar las gráficas de utilidades si no es mes completo
+    isFullMonth
   };
 };
