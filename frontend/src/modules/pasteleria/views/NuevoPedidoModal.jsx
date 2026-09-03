@@ -378,30 +378,54 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                   <div className="flex gap-4">
                     <div className="relative flex-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-widest mb-1.5 block">Fecha de Entrega</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 lya:text-lya-primary" size={20} />
+                      {/* 🔥 FIX: Contenedor y CSS para bloqueo táctil en Fecha */}
+                      <div 
+                        className="relative cursor-pointer"
+                        onClick={() => document.getElementById('nuevo-pedido-date').showPicker()}
+                      >
+                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 lya:text-lya-primary pointer-events-none z-20" size={20} />
                         <input 
+                          id="nuevo-pedido-date"
                           type="date" 
                           required 
                           min={minDateString} 
                           value={datePart} 
                           onChange={handleDateChange} 
+                          onClick={(e) => e.stopPropagation()}
                           disabled={isSubmitting || isCompressing} 
-                          className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 cursor-pointer font-medium" 
+                          className="w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 cursor-pointer font-medium relative z-10
+                            [&::-webkit-calendar-picker-indicator]:opacity-0 
+                            [&::-webkit-calendar-picker-indicator]:absolute 
+                            [&::-webkit-calendar-picker-indicator]:inset-0 
+                            [&::-webkit-calendar-picker-indicator]:w-full 
+                            [&::-webkit-calendar-picker-indicator]:h-full 
+                            [&::-webkit-calendar-picker-indicator]:cursor-pointer" 
                         />
                       </div>
                     </div>
                     <div className="relative flex-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 tracking-widest mb-1.5 block">Hora de Entrega</label>
-                      <div className="relative">
-                        <Clock className={`absolute left-4 top-1/2 -translate-y-1/2 ${isTimeInvalid ? 'text-red-500' : 'text-emerald-500 lya:text-lya-primary'}`} size={20} />
+                      {/* 🔥 FIX: Contenedor y CSS para bloqueo táctil en Hora */}
+                      <div 
+                        className="relative cursor-pointer"
+                        onClick={() => document.getElementById('nuevo-pedido-time').showPicker()}
+                      >
+                        <Clock className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-20 ${isTimeInvalid ? 'text-red-500' : 'text-emerald-500 lya:text-lya-primary'}`} size={20} />
                         <input 
+                          id="nuevo-pedido-time"
                           type="time" 
                           required 
                           value={timePart} 
                           onChange={handleTimeChange} 
+                          onClick={(e) => e.stopPropagation()}
                           disabled={isSubmitting || isCompressing} 
-                          className={`w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 disabled:opacity-50 cursor-pointer font-medium transition-all ${isTimeInvalid ? 'border-red-500 ring-2 ring-red-500/30' : 'border-gray-200 dark:border-gray-800 focus:ring-emerald-500/50'}`} 
+                          className={`w-full bg-gray-50 dark:bg-black/50 lya:bg-lya-surface border rounded-xl pl-12 pr-4 py-3 text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 disabled:opacity-50 cursor-pointer font-medium transition-all relative z-10 ${isTimeInvalid ? 'border-red-500 ring-2 ring-red-500/30' : 'border-gray-200 dark:border-gray-800 focus:ring-emerald-500/50'}
+                            [&::-webkit-calendar-picker-indicator]:opacity-0 
+                            [&::-webkit-calendar-picker-indicator]:absolute 
+                            [&::-webkit-calendar-picker-indicator]:inset-0 
+                            [&::-webkit-calendar-picker-indicator]:w-full 
+                            [&::-webkit-calendar-picker-indicator]:h-full 
+                            [&::-webkit-calendar-picker-indicator]:cursor-pointer`} 
                         />
                       </div>
                     </div>
