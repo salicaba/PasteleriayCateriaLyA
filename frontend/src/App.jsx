@@ -639,8 +639,9 @@ function App() {
                  <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-700 lya:bg-lya-border/40 mx-1"></div>
 
                  <h2 className="text-lg font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 capitalize hidden sm:block">
+                   {/* 🔥 FIX: Ahora busca exhaustivamente en todos los grupos, no solo en el primero */}
                    {menuConfig.find(g => g.id === activeTab)?.label || 
-                    menuConfig.find(g => g.isGroup)?.children.find(c => c.id === activeTab)?.label ||
+                    menuConfig.reduce((encontrado, grupo) => encontrado || grupo.children?.find(c => c.id === activeTab), null)?.label ||
                     'Sistema'}
                  </h2>
               </div>
