@@ -1,26 +1,22 @@
+// frontend/src/modules/admin/views/settings-tabs/InterfaceTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Palette, Monitor, Maximize, Minimize, Layout, Save, Loader2, Pin, ArrowUpDown } from 'lucide-react';
+import { Palette, Monitor, Maximize, Minimize, Layout, Pin, ArrowUpDown } from 'lucide-react';
 import { ThemeSelector } from '../../../../components/ThemeSelector';
-import { usePWA } from '../../../../hooks/usePWA'; // 🔥 Importamos el cerebro de la PWA
+import { usePWA } from '../../../../hooks/usePWA'; 
 
 export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll, showNotification }) => {
-  const { isStandalone } = usePWA(); // 🔥 Instanciamos el detector de entorno PWA
+  const { isStandalone } = usePWA(); 
   
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setFetching(false), 500);
-    
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     
     return () => {
-      clearTimeout(timer);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
@@ -34,39 +30,6 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
       if (document.exitFullscreen) document.exitFullscreen();
     }
   };
-
-  const handleSaveInterface = () => {
-    setLoading(true);
-    
-    // 🔥 Blindamos el guardado forzando la escritura en la memoria local
-    localStorage.setItem('lya_ui_size', uiSize);
-    localStorage.setItem('lya_global_scroll', JSON.stringify(globalScroll));
-
-    setTimeout(() => {
-      setLoading(false);
-      showNotification('success', "¡Configuración de interfaz guardada exitosamente!");
-    }, 800);
-  };
-
-  if (fetching) {
-    return (
-      <div className="h-full w-full flex-1 flex flex-col items-center justify-center">
-        <motion.div
-          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
-          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          className="w-24 h-24 bg-white dark:bg-gray-800 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40"
-        >
-          <Palette size={40} className="text-purple-500 lya:text-lya-primary" />
-        </motion.div>
-        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight text-center">
-          Cargando Interfaz
-        </h2>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2 text-center">
-          <Loader2 size={16} className="animate-spin text-purple-500 lya:text-lya-primary" /> Sincronizando preferencias...
-        </p>
-      </div>
-    );
-  }
 
   return (
     <motion.div 
@@ -86,7 +49,7 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
             Interfaz y Pantalla
           </h1>
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-2 text-justify sm:text-left">
-            Personaliza el aspecto, colores, tamaño visual y comportamiento de navegación de <strong>𝓛𝔂𝓪</strong>.
+            Personaliza el aspecto, tamaño visual y comportamiento de <strong>𝓛𝔂𝓪</strong> en este dispositivo. Los cambios se guardan automáticamente.
           </p>
         </div>
       </div>
@@ -103,7 +66,7 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
               <h2 className="font-bold text-xl text-gray-900 dark:text-white lya:text-lya-text">Apariencia</h2>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 flex-1 text-justify">
-              Personaliza los colores del sistema POS para adaptarlos al entorno visual que prefieras durante la operación y reducir la fatiga visual.
+              Selecciona los colores del sistema POS. El modo oscuro ayuda a reducir la fatiga visual en turnos nocturnos.
             </p>
             
             <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 h-[64px] w-full [&>div]:w-full [&>div]:h-full [&>div]:bg-transparent [&>div]:border-none [&>div]:p-0 [&>div]:flex [&>div]:gap-0 [&_button]:flex-1 [&_button]:h-full [&_button]:rounded-[1rem] [&_button]:text-sm [&_button]:font-bold [&_button]:flex [&_button]:items-center [&_button]:justify-center">
@@ -119,7 +82,7 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
               <h2 className="font-bold text-xl text-gray-900 dark:text-white lya:text-lya-text">Tamaño Visual</h2>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 flex-1 text-justify">
-              Ajusta la escala visual y el tamaño de los elementos del sistema para mejorar la precisión y comodidad en pantallas táctiles o monitores pequeños.
+              Ajusta la escala general para mejorar la precisión en pantallas táctiles de gran tamaño o monitores pequeños.
             </p>
             
             <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 h-[64px] w-full">
@@ -149,11 +112,10 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
             
             <div className="space-y-8 flex-1">
               
-              {/* 🔥 BOTÓN Y TEXTO DE PANTALLA COMPLETA PROTEGIDOS */}
               {!isStandalone && (
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
-                    Expande el sistema a Pantalla Completa para obtener una experiencia inmersiva libre de distracciones del navegador.
+                    Expande el sistema a Pantalla Completa para obtener una experiencia inmersiva libre de distracciones.
                   </p>
                   <button 
                     onClick={toggleFullscreen} 
@@ -167,7 +129,7 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
 
               <div className={`pt-6 border-t border-gray-50 dark:border-gray-700 lya:border-lya-border/20 ${!isStandalone ? '' : 'border-t-0 pt-0'}`}>
                 <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3 text-justify">
-                  Libera el scroll global para ocultar encabezados al bajar. Recomendado para maximizar el área de visión en móviles.
+                  Libera el scroll global para ocultar encabezados al bajar. Recomendado para pantallas de altura reducida.
                 </p>
                 <div className="flex bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-2xl p-1.5 border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 h-[64px] w-full">
                   <button 
@@ -196,21 +158,6 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
           </section>
 
         </div>
-        
-        <div className="flex justify-end mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 shrink-0">
-          <button 
-            onClick={handleSaveInterface} 
-            disabled={loading} 
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-gray-900 hover:bg-black dark:bg-purple-500 dark:hover:bg-purple-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white rounded-2xl text-sm font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-          >
-            {loading ? (
-              <><Loader2 className="animate-spin" size={20} /> Guardando...</>
-            ) : (
-              <><Save size={20} /> Guardar Cambios</>
-            )}
-          </button>
-        </div>
-
       </div>
     </motion.div>
   );
