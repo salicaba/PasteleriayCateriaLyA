@@ -70,7 +70,6 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            // 🔥 Aumentado el z-index a z-[100]
             className="absolute z-[100] top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden py-1"
           >
             {options.map((opt) => (
@@ -102,7 +101,7 @@ const KPICard = ({ title, amount, trend, icon: Icon, type, delay }) => {
   
   const isTrendGood = (type === 'income' || type === 'profit') ? trend >= 0 : trend <= 0;
   const TrendIcon = trend >= 0 ? TrendingUp : TrendingDown;
-  
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 15 }}
@@ -153,12 +152,9 @@ export const ReportsPage = () => {
   const { theme } = useTheme();
   const { loading, dateRange, setDateRange, chartData, exportToExcel, exportToPDF, productFilter, setProductFilter } = useReportsController();
   
-  // Neo-Bento UI States
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [timeRange, setTimeRange] = useState('this_month');
-  
-  // Segmented Control State (Cafeteria vs Pasteleria)
   const [activeTab, setActiveTab] = useState('CAFETERIA');
 
   const gridColor = theme === 'dark' ? '#374151' : theme === 'lya' ? '#E6CCB2' : '#e5e7eb';
@@ -190,7 +186,10 @@ export const ReportsPage = () => {
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0,0,0,0);
         end = new Date(now.getFullYear(), now.getMonth(), 0, 23,59,59,999); break;
       case 'custom':
-        return; 
+        // 🔥 FIX: Del 1er día del mes actual, hasta el día de HOY (evita el futuro)
+        start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        break; 
       default: break;
     }
     setDateRange({ start, end });
@@ -198,23 +197,35 @@ export const ReportsPage = () => {
 
   const handleDateChange = (e, type) => {
     setTimeRange('custom');
+    const val = e.target.value;
+    
+    if (!val) {
+      setDateRange(prev => ({ ...prev, [type]: null }));
+      return;
+    }
+
+    const [y, m, d] = val.split('-');
+    let newDate;
+    
+    if (type === 'start') {
+      newDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+    } else {
+      newDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+    }
+
     setDateRange(prev => ({
       ...prev,
-      [type]: new Date(e.target.value)
+      [type]: newDate
     }));
   };
 
-  // Memoizado y Aislado: Lógica para Filtros de Cafetería
   const processedCafeteriaView = useMemo(() => {
     if (!chartData?.productSales) return [];
     let list = [...chartData.productSales];
-    
     if (searchTerm) {
       list = list.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
-    
     list.sort((a, b) => b.cantidad - a.cantidad);
-    
     if (productFilter === 'SOLD') {
       list = list.filter(p => p.cantidad > 0);
     } else if (productFilter !== 'ALL') {
@@ -223,17 +234,13 @@ export const ReportsPage = () => {
     return list;
   }, [chartData?.productSales, productFilter, searchTerm]);
 
-  // Memoizado y Aislado: Lógica para Filtros de Pastelería
   const processedPasteleriaView = useMemo(() => {
     if (!chartData?.pasteleriaSales) return [];
     let list = [...chartData.pasteleriaSales];
-    
     if (searchTerm) {
       list = list.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
-    
     list.sort((a, b) => b.cantidad - a.cantidad);
-    
     if (productFilter === 'SOLD') {
       list = list.filter(p => p.cantidad > 0);
     } else if (productFilter !== 'ALL') {
@@ -242,7 +249,6 @@ export const ReportsPage = () => {
     return list;
   }, [chartData?.pasteleriaSales, productFilter, searchTerm]);
 
-  // Renderizado Condicional del Segmented Control
   const currentViewProducts = activeTab === 'CAFETERIA' ? processedCafeteriaView : processedPasteleriaView;
   const currentChartProducts = [...currentViewProducts].reverse();
 
@@ -275,6 +281,18 @@ export const ReportsPage = () => {
 
   const kpis = chartData?.kpis || { totalIncome: 0, netProfit: 0, totalOpex: 0, totalMermas: 0 };
   const trends = chartData?.trends || {};
+
+  // 🔥 CONSTANTES Y FORMATEADORES ADENTRO DEL COMPONENTE PRINCIPAL
+  const todayForLimit = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+  const maxDateLimit = `${todayForLimit.getFullYear()}-${String(todayForLimit.getMonth() + 1).padStart(2, '0')}-${String(todayForLimit.getDate()).padStart(2, '0')}`;
+
+  const formatLocalInputDate = (dateObj) => {
+    if (!dateObj || isNaN(dateObj)) return '';
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
 
   return (
     <motion.div 
@@ -340,24 +358,51 @@ export const ReportsPage = () => {
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
-                  className="flex items-center overflow-hidden whitespace-nowrap mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0"
+                  className="flex flex-col sm:flex-row items-center overflow-hidden mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0 gap-2 sm:gap-0"
                 >
                   <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
-                  <input 
-                    type="date" 
-                    value={dateRange.start.toISOString().split('T')[0]} 
-                    onChange={(e) => handleDateChange(e, 'start')}
-                    style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
-                  />
-                  <span className="text-gray-300 dark:text-gray-600 mx-1">-</span>
-                  <input 
-                    type="date" 
-                    value={dateRange.end.toISOString().split('T')[0]} 
-                    onChange={(e) => handleDateChange(e, 'end')}
-                    style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
-                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
-                  />
+                  
+                  {/* 🔥 Fecha de Inicio Clickeable */}
+                  <div className="flex items-center w-full sm:w-auto bg-white dark:bg-gray-700 lya:bg-lya-surface border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 px-2 py-1.5 rounded-lg relative">
+                    <input 
+                      id="report-start-date"
+                      type="date" 
+                      value={formatLocalInputDate(dateRange.start)} 
+                      max={maxDateLimit}
+                      onChange={(e) => handleDateChange(e, 'start')}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+                      className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]
+                        [&::-webkit-calendar-picker-indicator]:opacity-0 
+                        [&::-webkit-calendar-picker-indicator]:absolute 
+                        [&::-webkit-calendar-picker-indicator]:inset-0 
+                        [&::-webkit-calendar-picker-indicator]:w-full 
+                        [&::-webkit-calendar-picker-indicator]:h-full 
+                        [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
+                    />
+                  </div>
+
+                  <span className="text-gray-300 dark:text-gray-600 mx-2 hidden sm:block">-</span>
+
+                  {/* 🔥 Fecha Final Clickeable */}
+                  <div className="flex items-center w-full sm:w-auto bg-white dark:bg-gray-700 lya:bg-lya-surface border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 px-2 py-1.5 rounded-lg relative">
+                    <input 
+                      id="report-end-date"
+                      type="date" 
+                      value={formatLocalInputDate(dateRange.end)} 
+                      max={maxDateLimit}
+                      onChange={(e) => handleDateChange(e, 'end')}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ colorScheme: theme === 'dark' ? 'dark' : 'light' }}
+                      className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]
+                        [&::-webkit-calendar-picker-indicator]:opacity-0 
+                        [&::-webkit-calendar-picker-indicator]:absolute 
+                        [&::-webkit-calendar-picker-indicator]:inset-0 
+                        [&::-webkit-calendar-picker-indicator]:w-full 
+                        [&::-webkit-calendar-picker-indicator]:h-full 
+                        [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
+                    />
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -476,7 +521,6 @@ export const ReportsPage = () => {
           initial={{ opacity: 0, y: 15 }} 
           animate={{ opacity: 1, y: 0 }} 
           transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.45 }}
-          // 🔥 FIX: Eliminado el overflow-hidden de este contenedor para permitir que el dropdown no se corte
           className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors duration-300 relative"
         >
           {/* Elemento Decorativo Neo-Bento */}
@@ -546,7 +590,6 @@ export const ReportsPage = () => {
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
-                // 🔥 Aseguramos que este contenedor permita el desbordamiento de su hijo ThemedDropdown
                 className="border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/20 bg-gray-50/50 dark:bg-gray-950/30 lya:bg-lya-bg/30 relative z-[50]"
               >
                 <div className="p-6 flex flex-wrap gap-4 relative z-[50]">

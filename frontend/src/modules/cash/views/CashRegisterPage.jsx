@@ -113,6 +113,19 @@ export const CashRegisterPage = ({ user }) => {
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
+  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
+  const todayForLimit = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+  const maxDateLimit = `${todayForLimit.getFullYear()}-${String(todayForLimit.getMonth() + 1).padStart(2, '0')}-${String(todayForLimit.getDate()).padStart(2, '0')}`;
+
+  // 🔥 FIX: Formateador para evitar que el UTC sume 1 día en los inputs
+  const formatLocalInputDate = (dateObj) => {
+    if (!dateObj || isNaN(dateObj)) return '';
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   return (
     // PILAR 1: Contenedor Raíz bloqueado
     <motion.div 
@@ -144,14 +157,25 @@ export const CashRegisterPage = ({ user }) => {
             Hoy
           </motion.button>
 
-          <div className="flex w-full sm:w-auto items-center bg-gray-50 dark:bg-gray-800 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner lya:bg-lya-bg lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-orange-500 lya:focus-within:ring-lya-primary transition-all">
-            <CalendarIcon size={20} className="text-gray-400 lya:text-lya-text/50 mx-2" />
+          {/* 🔥 FIX: Cuadro de fecha 100% clickeable (como Agenda Pastelería) */}
+          {/* 🔥 FIX: Calendario estrictamente clickeable (Bloquea escritura) */}
+          <div className="flex w-full sm:w-auto items-center bg-gray-50 dark:bg-gray-800 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner lya:bg-lya-bg lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-orange-500 lya:focus-within:ring-lya-primary transition-all relative">
+            <CalendarIcon size={20} className="text-gray-400 lya:text-lya-text/50 mx-2 shrink-0 pointer-events-none" />
             <input 
+              id="cash-date-picker"
               type="date" 
               value={selectedDate}
+              max={maxDateLimit} // 🔥 AQUÍ ESTÁ EL SEGURO ANTI-FUTURO
               onChange={(e) => setSelectedDate(e.target.value)}
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-transparent border-none text-gray-700 dark:text-white lya:text-lya-text font-bold outline-none cursor-pointer w-full
+                [&::-webkit-calendar-picker-indicator]:opacity-0 
+                [&::-webkit-calendar-picker-indicator]:absolute 
+                [&::-webkit-calendar-picker-indicator]:inset-0 
+                [&::-webkit-calendar-picker-indicator]:w-full 
+                [&::-webkit-calendar-picker-indicator]:h-full 
+                [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
               style={{ colorScheme: 'dark' }}
-              className="bg-transparent border-none text-gray-700 dark:text-white lya:text-lya-text font-bold outline-none cursor-pointer w-full"
             />
           </div>
         </div>

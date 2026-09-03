@@ -1,7 +1,6 @@
 // src/modules/admin/views/settings-tabs/UsersTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-// Agregada la importación de "Check"
 import { Users, Shield, Mail, Eye, EyeOff, Loader2, Save, Edit2, UserX, UserCheck, Info, List, ArchiveRestore, X, Check } from 'lucide-react';
 import client from '../../../../api/client';
 
@@ -43,6 +42,7 @@ const RequirementItem = ({ isValid, text }) => (
 
 export const UsersTab = ({ showNotification, globalScroll }) => {
   const [systemUsers, setSystemUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null); // 🔥 ESTADO PARA SABER QUIÉN SOY YO
   const [userForm, setUserForm] = useState({ id: '', fullName: '', username: '', email: '', password: '', role: 'Empleado', isActive: true });
   const [editingUserId, setEditingUserId] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -58,6 +58,13 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
 
   useEffect(() => {
+    // 🔥 Leemos la sesión para saber qué usuario está conectado actualmente
+    const session = localStorage.getItem('lya_pos_session');
+    if (session) {
+      try {
+        setCurrentUser(JSON.parse(session).userData);
+      } catch (e) {}
+    }
     fetchUsers(true);
   }, []);
 
@@ -323,7 +330,6 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                   </button>
                 </div>
 
-                {/* MODAL NEO-BENTO DE CHECKLIST INTERACTIVO */}
                 <AnimatePresence>
                   {(!editingUserId || userForm.password.length > 0) && (
                     <motion.div
@@ -423,81 +429,103 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold">No hay usuarios activos. Crea uno en el formulario.</p>
                   </div>
                 ) : (
-                  activeUsers.map((usr, index) => (
-                    <motion.div 
-                      key={usr.id}
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                      className="p-6 rounded-[2rem] border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between md:hover:shadow-md border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-blue-200 lya:md:hover:border-lya-primary/30"
-                    >
-                      <div className="flex items-start justify-between mb-5">
-                        
-                        <div className="flex items-center gap-3.5 pr-2 flex-1 min-w-0">
-                          <div className={`w-12 h-12 rounded-[1.2rem] flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
-                            usr.role === 'Administrador' 
-                              ? 'bg-purple-600 dark:bg-purple-500'
-                              : 'bg-blue-600 lya:bg-lya-primary'
-                          }`}>
-                            {getInitials(usr.fullName)}
+                  activeUsers.map((usr, index) => {
+                    // 🔥 FIX: Identificador Inteligente de Sesión Propia
+                    const isMe = currentUser?.id === usr.id;
+
+                    return (
+                      <motion.div 
+                        key={usr.id}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className={`p-6 rounded-[2rem] border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between md:hover:shadow-md border-gray-100 dark:border-gray-700 lya:border-lya-border/40 ${isMe ? 'ring-2 ring-blue-500/50 lya:ring-lya-primary/50' : 'md:hover:border-blue-200 lya:md:hover:border-lya-primary/30'}`}
+                      >
+                        <div className="flex items-start justify-between mb-5">
+                          
+                          <div className="flex items-center gap-3.5 pr-2 flex-1 min-w-0">
+                            <div className={`w-12 h-12 rounded-[1.2rem] flex items-center justify-center text-sm font-black text-white shadow-sm shrink-0 ${
+                              usr.role === 'Administrador' 
+                                ? 'bg-purple-600 dark:bg-purple-500'
+                                : 'bg-blue-600 lya:bg-lya-primary'
+                            }`}>
+                              {getInitials(usr.fullName)}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white lya:text-lya-text leading-tight truncate">
+                                  {usr.fullName}
+                                </h4>
+                                {/* 🔥 ETIQUETA DORADA PARA EL USUARIO ACTUAL */}
+                                {isMe && (
+                                  <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 lya:bg-lya-primary/20 lya:text-lya-primary px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-wider shrink-0">
+                                    (Tú)
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium mt-0.5 truncate">
+                                @{usr.username}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex flex-col min-w-0">
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-white lya:text-lya-text leading-tight truncate">
-                              {usr.fullName}
-                            </h4>
-                            <span className="text-[11px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium mt-0.5 truncate">
-                              @{usr.username}
+
+                          <div className="flex flex-col gap-1.5 shrink-0 ml-2">
+                            {/* 🔥 BLOQUEO DE BOTONES PARA EL USUARIO ACTUAL */}
+                            <motion.button 
+                              whileTap={!isMe ? { scale: 0.9 } : {}}
+                              onClick={() => !isMe && editUser(usr)} 
+                              disabled={actionLoadingId === usr.id || isMe}
+                              className={`p-2.5 rounded-xl transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 ${
+                                isMe 
+                                  ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                  : 'bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg text-blue-500 lya:text-lya-primary disabled:opacity-50'
+                              }`} 
+                              title={isMe ? "No puedes editar tu propio perfil aquí" : "Editar usuario"}
+                            >
+                              <Edit2 size={16} />
+                            </motion.button>
+                            <motion.button 
+                              whileTap={!isMe ? { scale: 0.9 } : {}}
+                              onClick={() => !isMe && toggleUserStatus(usr.id, usr.isActive)} 
+                              disabled={actionLoadingId === usr.id || isMe}
+                              className={`p-2.5 rounded-xl transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 flex items-center justify-center ${
+                                isMe 
+                                  ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                  : 'bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-red-500 md:hover:bg-red-50 dark:md:hover:bg-gray-600 disabled:opacity-50'
+                              }`} 
+                              title={isMe ? "Por seguridad, no puedes suspender tu propia cuenta" : "Desactivar Acceso"}
+                            >
+                              {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin text-gray-500" /> : <UserX size={16} />}
+                            </motion.button>
+                          </div>
+                        </div>
+
+                        {usr.email && (
+                          <div className="mb-4 text-[11px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 flex items-center gap-2 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl px-3 py-2 border border-gray-100 dark:border-gray-700 lya:border-lya-border/20">
+                            <Mail size={14} className="shrink-0" /> <span className="truncate">{usr.email}</span>
+                          </div>
+                        )}
+
+                        <div className="pt-4 border-t border-gray-100 dark:border-gray-700/80 lya:border-lya-border/20 flex items-center justify-between">
+                          <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl border ${
+                            usr.role === 'Administrador' 
+                              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50' 
+                              : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-lya-primary/10 lya:text-lya-primary lya:border-lya-primary/30'
+                          }`}>
+                            {usr.role}
+                          </span>
+                          <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800/50 lya:border-emerald-500/20 px-3 py-1.5 rounded-xl">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[10px] font-black tracking-wide text-emerald-600 dark:text-emerald-400">
+                              ACTIVO
                             </span>
                           </div>
                         </div>
-
-                        <div className="flex flex-col gap-1.5 shrink-0 ml-2">
-                          <motion.button 
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => editUser(usr)} 
-                            disabled={actionLoadingId === usr.id}
-                            className="p-2.5 bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg rounded-xl text-blue-500 lya:text-lya-primary transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 disabled:opacity-50" 
-                            title="Editar usuario"
-                          >
-                            <Edit2 size={16} />
-                          </motion.button>
-                          <motion.button 
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => toggleUserStatus(usr.id, usr.isActive)} 
-                            disabled={actionLoadingId === usr.id}
-                            className="p-2.5 rounded-xl transition-all border bg-gray-50 dark:bg-gray-700 lya:bg-lya-bg text-red-500 md:hover:bg-red-50 dark:md:hover:bg-gray-600 border-gray-100 dark:border-gray-600 lya:border-lya-border/40 disabled:opacity-50 flex items-center justify-center" 
-                            title="Desactivar Acceso"
-                          >
-                            {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin text-gray-500" /> : <UserX size={16} />}
-                          </motion.button>
-                        </div>
-                      </div>
-
-                      {usr.email && (
-                        <div className="mb-4 text-[11px] font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/70 flex items-center gap-2 bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg rounded-xl px-3 py-2 border border-gray-100 dark:border-gray-700 lya:border-lya-border/20">
-                          <Mail size={14} className="shrink-0" /> <span className="truncate">{usr.email}</span>
-                        </div>
-                      )}
-
-                      <div className="pt-4 border-t border-gray-100 dark:border-gray-700/80 lya:border-lya-border/20 flex items-center justify-between">
-                        <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl border ${
-                          usr.role === 'Administrador' 
-                            ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50' 
-                            : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-lya-primary/10 lya:text-lya-primary lya:border-lya-primary/30'
-                        }`}>
-                          {usr.role}
-                        </span>
-                        <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800/50 lya:border-emerald-500/20 px-3 py-1.5 rounded-xl">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-[10px] font-black tracking-wide text-emerald-600 dark:text-emerald-400">
-                            ACTIVO
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))
+                      </motion.div>
+                    );
+                  })
                 )}
               </AnimatePresence>
             </div>
@@ -543,46 +571,66 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {inactiveUsers.map((usr) => (
-                      <div key={usr.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 opacity-80 md:hover:opacity-100 transition-opacity">
-                        
-                        <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                          <div className="h-12 w-12 flex-shrink-0 rounded-[1rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
-                            {getInitials(usr.fullName)}
+                    {inactiveUsers.map((usr) => {
+                      const isMe = currentUser?.id === usr.id;
+                      return (
+                        <div key={usr.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 opacity-80 md:hover:opacity-100 transition-opacity">
+                          
+                          <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
+                            <div className="h-12 w-12 flex-shrink-0 rounded-[1rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
+                              {getInitials(usr.fullName)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">{usr.fullName}</h4>
+                                {isMe && (
+                                  <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 lya:bg-lya-primary/20 lya:text-lya-primary px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-wider shrink-0">
+                                    (Tú)
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5 truncate">@{usr.username} • {usr.role}</p>
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">{usr.fullName}</h4>
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">@{usr.username} • {usr.role}</p>
+                          
+                          <div className="flex gap-2 shrink-0 ml-2">
+                             <motion.button 
+                              whileTap={!isMe ? { scale: 0.9 } : {}}
+                              onClick={() => {
+                                if (!isMe) {
+                                  editUser(usr);
+                                  setIsTrashModalOpen(false);
+                                }
+                              }} 
+                              disabled={actionLoadingId === usr.id || isMe}
+                              className={`p-2.5 rounded-xl transition-all ${
+                                isMe 
+                                  ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                  : 'bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg text-blue-500 disabled:opacity-50'
+                              }`} 
+                              title={isMe ? "No puedes editar tu propio perfil aquí" : "Editar usuario"}
+                            >
+                              <Edit2 size={16} />
+                            </motion.button>
+                            <motion.button 
+                              whileTap={!isMe ? { scale: 0.9 } : {}}
+                              onClick={() => !isMe && toggleUserStatus(usr.id, usr.isActive)}
+                              disabled={actionLoadingId === usr.id || isMe}
+                              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                                isMe 
+                                  ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                  : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50'
+                              }`}
+                            >
+                              {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
+                              <span className="hidden sm:inline">
+                                {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
+                              </span>
+                            </motion.button>
                           </div>
                         </div>
-                        
-                        <div className="flex gap-2 shrink-0 ml-2">
-                           <motion.button 
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => {
-                              editUser(usr);
-                              setIsTrashModalOpen(false);
-                            }} 
-                            disabled={actionLoadingId === usr.id}
-                            className="p-2.5 bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg rounded-xl text-blue-500 transition-all disabled:opacity-50" 
-                            title="Editar usuario"
-                          >
-                            <Edit2 size={16} />
-                          </motion.button>
-                          <motion.button 
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => toggleUserStatus(usr.id, usr.isActive)}
-                            disabled={actionLoadingId === usr.id}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50"
-                          >
-                            {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
-                            <span className="hidden sm:inline">
-                              {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
-                            </span>
-                          </motion.button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

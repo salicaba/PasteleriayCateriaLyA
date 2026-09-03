@@ -4,9 +4,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useFinanceController } from '../controllers/useFinanceController';
 import { TrendingUp, TrendingDown, DollarSign, Wallet, AlertCircle, Calendar, ChevronDown, Loader2 } from 'lucide-react';
 
-/* ==========================================
-   COMPONENTE SELECTOR 100% TEMATIZADO (Finanzas)
-   ========================================== */
+// 🔥 FIX: Formateador y Timezone para evitar brincos UTC
+const getMexicoCityDate = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
+const formatLocalInputDate = (dateObj) => {
+  if (!dateObj || isNaN(dateObj)) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassName, buttonClassName }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -72,21 +80,19 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
 export const NetProfitDashboard = () => {
   const { summary, isSummaryLoading, fetchFinancialSummary } = useFinanceController();
   
-  const formatLocalDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
+  const todayForLimit = getMexicoCityDate();
+  const maxDateLimit = formatLocalInputDate(todayForLimit);
 
   const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return formatLocalDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    const d = getMexicoCityDate();
+    return formatLocalInputDate(new Date(d.getFullYear(), d.getMonth(), 1));
   });
   
   const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    const d = getMexicoCityDate();
+    // 🔥 FIX: Inicializamos hasta HOY, no al final del mes
+    return formatLocalInputDate(d);
   });
 
   const [timeRange, setTimeRange] = useState('this_month');
@@ -97,7 +103,7 @@ export const NetProfitDashboard = () => {
 
   const handleRangeChange = (val) => {
     setTimeRange(val);
-    const now = new Date();
+    const now = getMexicoCityDate();
     let start, end;
 
     switch(val) {
@@ -118,21 +124,21 @@ export const NetProfitDashboard = () => {
         end.setDate(firstDay + 6);
         break;
       case 'this_month':
+      case 'custom':
+        // 🔥 FIX: Del 1er día del mes actual, hasta el día de HOY
         start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        end = new Date(now);
         break;
       case 'last_month':
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         end = new Date(now.getFullYear(), now.getMonth(), 0);
         break;
-      case 'custom':
-        return; 
       default:
         return;
     }
 
-    setStartDate(formatLocalDate(start));
-    setEndDate(formatLocalDate(end));
+    setStartDate(formatLocalInputDate(start));
+    setEndDate(formatLocalInputDate(end));
   };
 
   const handleCustomDateChange = (val, type) => {
@@ -160,9 +166,6 @@ export const NetProfitDashboard = () => {
 
   const isDarkMode = document.documentElement.classList.contains('dark');
 
-  // ==========================================
-  // PANTALLA DE CARGA ANIMADA NEO-BENTO
-  // ==========================================
   const isPageLoading = isSummaryLoading || !summary;
 
   if (isPageLoading) {
@@ -192,7 +195,8 @@ export const NetProfitDashboard = () => {
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
-      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-8 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
+      {/* 🔥 FIX: Aumentamos a z-[60] para que el dropdown flote por encima de todo */}
+      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-8 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-[60] relative transition-colors">
         <div className="flex items-center space-x-4">
           <div className="bg-emerald-500 dark:bg-emerald-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-emerald-500/20 dark:shadow-emerald-900/30 lya:shadow-lya-primary/20">
             <DollarSign size={28} />
@@ -231,21 +235,49 @@ export const NetProfitDashboard = () => {
                   className="flex items-center overflow-hidden whitespace-nowrap mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0"
                 >
                   <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
-                  <input 
-                    type="date" 
-                    value={startDate} 
-                    onChange={(e) => handleCustomDateChange(e.target.value, 'start')}
-                    style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
-                  />
+                  
+                  {/* 🔥 FIX: Clickeable y Límite anti-futuro */}
+                  <div className="flex items-center w-full sm:w-auto bg-white dark:bg-gray-700 lya:bg-lya-surface border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 px-2 py-1.5 rounded-lg relative cursor-pointer"
+                       onClick={() => document.getElementById('profit-start').showPicker()} >
+                    <input 
+                      id="profit-start"
+                      type="date" 
+                      max={maxDateLimit}
+                      value={startDate} 
+                      onChange={(e) => handleCustomDateChange(e.target.value, 'start')}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                      className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px] transition-colors
+                        [&::-webkit-calendar-picker-indicator]:opacity-0 
+                        [&::-webkit-calendar-picker-indicator]:absolute 
+                        [&::-webkit-calendar-picker-indicator]:inset-0 
+                        [&::-webkit-calendar-picker-indicator]:w-full 
+                        [&::-webkit-calendar-picker-indicator]:h-full 
+                        [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
+                    />
+                  </div>
+
                   <span className="text-gray-300 dark:text-gray-600 mx-1">-</span>
-                  <input 
-                    type="date" 
-                    value={endDate} 
-                    onChange={(e) => handleCustomDateChange(e.target.value, 'end')}
-                    style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                    className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
-                  />
+
+                  <div className="flex items-center w-full sm:w-auto bg-white dark:bg-gray-700 lya:bg-lya-surface border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 px-2 py-1.5 rounded-lg relative cursor-pointer"
+                       onClick={() => document.getElementById('profit-end').showPicker()} >
+                    <input 
+                      id="profit-end"
+                      type="date" 
+                      max={maxDateLimit}
+                      value={endDate} 
+                      onChange={(e) => handleCustomDateChange(e.target.value, 'end')}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                      className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px] transition-colors
+                        [&::-webkit-calendar-picker-indicator]:opacity-0 
+                        [&::-webkit-calendar-picker-indicator]:absolute 
+                        [&::-webkit-calendar-picker-indicator]:inset-0 
+                        [&::-webkit-calendar-picker-indicator]:w-full 
+                        [&::-webkit-calendar-picker-indicator]:h-full 
+                        [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
+                    />
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

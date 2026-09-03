@@ -9,6 +9,17 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../../hooks/useTheme';
 
+// 🔥 FIX: Formateador y Timezone para evitar brincos UTC
+const getMexicoCityDate = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
+const formatLocalInputDate = (dateObj) => {
+  if (!dateObj || isNaN(dateObj)) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const CATEGORIES = [
   { id: 'PAYROLL', label: 'Nómina / Sueldos', icon: Briefcase, color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10 lya:bg-blue-500/10' },
   { id: 'UTILITIES', label: 'Servicios (Luz, Agua, Gas)', icon: Zap, color: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 lya:bg-yellow-500/10' },
@@ -86,21 +97,22 @@ export const ExpensesPage = () => {
   const { theme } = useTheme();
   const { expenses, isLoading, fetchExpenses, registerExpense, cancelExpense, restoreExpense } = useFinanceController();
   
-  const formatLocalDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
+  const todayForLimit = getMexicoCityDate();
+  const maxDateLimit = formatLocalInputDate(todayForLimit);
 
-  const [startDate, setStartDate] = useState(() => formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
-  const [endDate, setEndDate] = useState(() => formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)));
+  // Inicializamos en el mes actual hasta HOY
+  const [startDate, setStartDate] = useState(() => {
+    const d = getMexicoCityDate();
+    return formatLocalInputDate(new Date(d.getFullYear(), d.getMonth(), 1));
+  });
+  const [endDate, setEndDate] = useState(() => formatLocalInputDate(getMexicoCityDate()));
 
   const [timeRange, setTimeRange] = useState('this_month');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('PAYROLL');
-  const [expenseDate, setExpenseDate] = useState(() => formatLocalDate(new Date())); 
+  const [expenseDate, setExpenseDate] = useState(() => formatLocalInputDate(getMexicoCityDate())); 
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null); 
@@ -130,9 +142,7 @@ export const ExpensesPage = () => {
 
   const handleRangeChange = (val) => {
     setTimeRange(val);
-    if (val === 'custom') return; 
-
-    const now = new Date();
+    const now = getMexicoCityDate();
     let start, end;
 
     switch(val) {
@@ -143,14 +153,18 @@ export const ExpensesPage = () => {
       case 'this_week':
         start = new Date(now); const firstDay = start.getDate() - start.getDay(); start.setDate(firstDay); end = new Date(start); end.setDate(firstDay + 6); break;
       case 'this_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1); end = new Date(now.getFullYear(), now.getMonth() + 1, 0); break;
+      case 'custom':
+        // 🔥 FIX: Del 1er día del mes actual, hasta el día de HOY
+        start = new Date(now.getFullYear(), now.getMonth(), 1); 
+        end = new Date(now); 
+        break;
       case 'last_month':
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1); end = new Date(now.getFullYear(), now.getMonth(), 0); break;
       default: return;
     }
 
-    setStartDate(formatLocalDate(start));
-    setEndDate(formatLocalDate(end));
+    setStartDate(formatLocalInputDate(start));
+    setEndDate(formatLocalInputDate(end));
   };
 
   const handleCustomDateChange = (val, type) => {
@@ -176,7 +190,7 @@ export const ExpensesPage = () => {
         showNotification('Gasto registrado exitosamente', 'success');
         setAmount('');
         setDescription('');
-        setExpenseDate(formatLocalDate(new Date())); 
+        setExpenseDate(formatLocalInputDate(getMexicoCityDate())); 
         await fetchExpenses(startDate, endDate);
       } else {
         showNotification(res.error || 'Error al registrar el gasto', 'error');
@@ -228,7 +242,6 @@ export const ExpensesPage = () => {
 
   return (
     <>
-      {/* NOTIFICACIÓN TIPO CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {notification && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -287,7 +300,8 @@ export const ExpensesPage = () => {
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
           >
-            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
+{/* 🔥 FIX: Aumentamos a z-[60] para que el dropdown flote por encima de todo */}
+            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-[60] relative transition-colors">
               <div className="flex items-center space-x-4">
                 <div className="bg-red-500 dark:bg-red-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-red-500/20 dark:shadow-red-900/30 lya:shadow-lya-primary/20">
                   <Briefcase size={28} />
@@ -323,24 +337,50 @@ export const ExpensesPage = () => {
                         initial={{ opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: 'auto' }}
                         exit={{ opacity: 0, width: 0 }}
-                        className="flex items-center overflow-hidden whitespace-nowrap mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0"
+                        className="flex flex-col sm:flex-row items-center overflow-hidden mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0 gap-2 sm:gap-0"
                       >
                         <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
-                        <input 
-                          type="date" 
-                          value={startDate} 
-                          onChange={(e) => handleCustomDateChange(e.target.value, 'start')}
-                          style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                          className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
-                        />
-                        <span className="text-gray-300 dark:text-gray-600 mx-1">-</span>
-                        <input 
-                          type="date" 
-                          value={endDate} 
-                          onChange={(e) => handleCustomDateChange(e.target.value, 'end')}
-                          style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                          className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]"
-                        />
+                        
+                        {/* 🔥 FIX: Fechas Clickeables y con Límite anti-futuro */}
+                        <div className="flex items-center w-full sm:w-auto bg-white dark:bg-gray-700 lya:bg-lya-surface border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 px-2 py-1.5 rounded-lg relative cursor-pointer"
+                             onClick={() => document.getElementById('expense-filter-start').showPicker()} >
+                          <input 
+                            id="expense-filter-start"
+                            type="date" 
+                            max={maxDateLimit}
+                            value={startDate} 
+                            onChange={(e) => handleCustomDateChange(e.target.value, 'start')}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                            className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]
+                              [&::-webkit-calendar-picker-indicator]:opacity-0 
+                              [&::-webkit-calendar-picker-indicator]:absolute 
+                              [&::-webkit-calendar-picker-indicator]:inset-0 
+                              [&::-webkit-calendar-picker-indicator]:w-full 
+                              [&::-webkit-calendar-picker-indicator]:h-full 
+                              [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
+                          />
+                        </div>
+                        <span className="text-gray-300 dark:text-gray-600 mx-2 hidden sm:block">-</span>
+                        <div className="flex items-center w-full sm:w-auto bg-white dark:bg-gray-700 lya:bg-lya-surface border border-gray-200 dark:border-gray-600 lya:border-lya-border/40 px-2 py-1.5 rounded-lg relative cursor-pointer"
+                             onClick={() => document.getElementById('expense-filter-end').showPicker()} >
+                          <input 
+                            id="expense-filter-end"
+                            type="date" 
+                            max={maxDateLimit}
+                            value={endDate} 
+                            onChange={(e) => handleCustomDateChange(e.target.value, 'end')}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                            className="bg-transparent text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 outline-none cursor-pointer w-[110px]
+                              [&::-webkit-calendar-picker-indicator]:opacity-0 
+                              [&::-webkit-calendar-picker-indicator]:absolute 
+                              [&::-webkit-calendar-picker-indicator]:inset-0 
+                              [&::-webkit-calendar-picker-indicator]:w-full 
+                              [&::-webkit-calendar-picker-indicator]:h-full 
+                              [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10"
+                          />
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -359,22 +399,31 @@ export const ExpensesPage = () => {
                     <div>
                       <label className="block text-[10px] font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/50 tracking-widest mb-2 transition-colors">Fecha del Gasto</label>
                       <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-primary" size={18} />
+                        {/* 🔥 FIX: Clickeable y Límite anti-futuro en Formulario */}
+                        <div className="relative flex-1 cursor-pointer" onClick={() => document.getElementById('new-expense-date').showPicker()}>
+                          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-primary pointer-events-none z-20" size={18} />
                           <input 
+                            id="new-expense-date"
                             type="date"
                             required
-                            max={formatLocalDate(new Date())}
+                            max={maxDateLimit}
                             value={expenseDate}
                             onChange={(e) => setExpenseDate(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
                             style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text font-bold outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 transition-all cursor-pointer"
+                            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-800 dark:text-white lya:text-lya-text font-bold outline-none focus:ring-2 focus:ring-red-500/50 dark:focus:ring-red-500/40 lya:focus:ring-lya-primary/50 transition-all cursor-pointer relative z-10
+                              [&::-webkit-calendar-picker-indicator]:opacity-0 
+                              [&::-webkit-calendar-picker-indicator]:absolute 
+                              [&::-webkit-calendar-picker-indicator]:inset-0 
+                              [&::-webkit-calendar-picker-indicator]:w-full 
+                              [&::-webkit-calendar-picker-indicator]:h-full 
+                              [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                           />
                         </div>
                         <motion.button 
                           type="button"
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => setExpenseDate(formatLocalDate(new Date()))}
+                          onClick={() => setExpenseDate(formatLocalInputDate(getMexicoCityDate()))}
                           className="px-4 py-3.5 bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors font-bold shadow-sm text-sm shrink-0"
                         >
                           Hoy
@@ -584,7 +633,6 @@ export const ExpensesPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE CONFIRMACIÓN DE ANULACIÓN (TEMATIZADO) */}
       <AnimatePresence>
         {cancelModal.isOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -660,7 +708,6 @@ export const ExpensesPage = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE PAPELERA DE RECICLAJE (TEMATIZADO) */}
       <AnimatePresence>
         {isTrashOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">

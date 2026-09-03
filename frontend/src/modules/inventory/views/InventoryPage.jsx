@@ -6,8 +6,19 @@ import { useInventoryController } from '../controllers/useInventoryController';
 import NewItemModal from './NewItemModal';
 import ItemDetailsModal from './ItemDetailsModal';
 
+// 🔥 FIX: Formateador y Timezone para evitar brincos UTC
+const getMexicoCityDate = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
+const formatLocalInputDate = (dateObj) => {
+  if (!dateObj || isNaN(dateObj)) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const getDates = (filter) => {
-  const now = new Date();
+  const now = getMexicoCityDate();
   let start = new Date(now);
   let end = new Date(now);
 
@@ -22,11 +33,11 @@ const getDates = (filter) => {
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1);
       start = new Date(now.setDate(diff));
-      end = new Date(); 
+      end = new Date(now); 
       break;
     case 'month':
       start = new Date(now.getFullYear(), now.getMonth(), 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      end = new Date(now); // 🔥 FIX: Hasta el día de hoy, no al final del mes vacío
       break;
     case 'lastMonth':
       start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -36,8 +47,8 @@ const getDates = (filter) => {
       break;
   }
   return {
-    startDate: start.toISOString().split('T')[0],
-    endDate: end.toISOString().split('T')[0]
+    startDate: formatLocalInputDate(start),
+    endDate: formatLocalInputDate(end)
   };
 };
 
@@ -69,7 +80,6 @@ export default function InventoryPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   
-  // 🔥 ESTADOS PARA MODALES, NOTIFICACIONES Y CARGAS
   const [isFullScreenLoader, setIsFullScreenLoader] = useState(true);
   const [notification, setNotification] = useState(null);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
@@ -78,12 +88,15 @@ export default function InventoryPage() {
   
   const dropdownRef = useRef(null);
 
+  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
+  const todayForLimit = getMexicoCityDate();
+  const maxDateLimit = formatLocalInputDate(todayForLimit);
+
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // 🔥 PILAR 5: DESACTIVAR PANTALLAZO DESPUÉS DE LA PRIMERA CARGA
   useEffect(() => {
     if (!isLoading) {
       const minLoadTime = new Promise(resolve => setTimeout(resolve, 600));
@@ -114,7 +127,6 @@ export default function InventoryPage() {
     }
   }, [activeTab, timeFilter, customDates.start, customDates.end, fetchGlobalKardex]);
 
-  // 🔥 PILAR 3: ACCIONES PROTEGIDAS CON BLOQUEO Y SIN PANTALLAZO
   const handleConfirmCancel = async () => {
     try {
       setActionLoadingId(cancelModal.txId);
@@ -181,7 +193,6 @@ export default function InventoryPage() {
 
   return (
     <>
-      {/* 🔥 PILAR 5: NOTIFICACIÓN TIPO CÁPSULA NEO-BENTO */}
       <AnimatePresence>
         {(notification || successScreen?.isOpen) && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -209,7 +220,6 @@ export default function InventoryPage() {
         )}
       </AnimatePresence>
 
-      {/* CONTENIDO PRINCIPAL: LOADER O PANTALLA */}
       <AnimatePresence mode="wait">
         {isFullScreenLoader ? (
           <motion.div
@@ -270,14 +280,12 @@ export default function InventoryPage() {
               </div>
             </header>
 
-            {/* CONTENEDOR FLEX DE VISTAS (Delega scroll a las tablas) */}
             <div className="flex-1 flex flex-col overflow-hidden relative">
               
               {/* ================== VISTA 1: CATÁLOGO ================== */}
               {activeTab === 'catalog' && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="h-full flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden relative transition-colors">
                   
-                  {/* OVERLAY DE CARGA LOCAL PARA CATÁLOGO (Protección táctil) */}
                   {isLoading && !isFullScreenLoader && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-sm z-30 rounded-[2rem]">
                       <Loader2 className="animate-spin text-blue-500 dark:text-blue-400 lya:text-lya-secondary" size={32} />
@@ -304,7 +312,6 @@ export default function InventoryPage() {
                     </motion.button>
                   </div>
 
-                  {/* PILAR 1: SCROLL INTERNO PARA TABLA DE CATÁLOGO */}
                   <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                     <table className="w-full text-left border-collapse">
                       <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-md shadow-sm transition-colors">
@@ -425,9 +432,44 @@ export default function InventoryPage() {
 
                     {timeFilter === 'custom' && (
                       <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex flex-wrap items-center gap-2 shrink-0">
-                        <input type="date" value={customDates.start} onChange={e => setCustomDates({...customDates, start: e.target.value})} className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-blue-500/30 lya:focus:ring-lya-secondary/50 transition-colors" />
+                        {/* 🔥 FIX: Clickeable, límite y zona horaria en kardex */}
+                        <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl px-2 py-1.5 relative cursor-pointer"
+                             onClick={() => document.getElementById('kardex-start').showPicker()} >
+                          <input 
+                            id="kardex-start"
+                            type="date" 
+                            max={maxDateLimit}
+                            value={customDates.start} 
+                            onChange={e => setCustomDates({...customDates, start: e.target.value})} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-transparent text-sm font-medium text-gray-800 dark:text-white lya:text-lya-text outline-none cursor-pointer w-[120px] transition-colors
+                               [&::-webkit-calendar-picker-indicator]:opacity-0 
+                               [&::-webkit-calendar-picker-indicator]:absolute 
+                               [&::-webkit-calendar-picker-indicator]:inset-0 
+                               [&::-webkit-calendar-picker-indicator]:w-full 
+                               [&::-webkit-calendar-picker-indicator]:h-full 
+                               [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10" 
+                          />
+                        </div>
                         <span className="text-gray-400 font-bold">-</span>
-                        <input type="date" value={customDates.end} onChange={e => setCustomDates({...customDates, end: e.target.value})} className="bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-white lya:text-lya-text outline-none focus:ring-2 focus:ring-blue-500/30 lya:focus:ring-lya-secondary/50 transition-colors" />
+                        <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 rounded-xl px-2 py-1.5 relative cursor-pointer"
+                             onClick={() => document.getElementById('kardex-end').showPicker()} >
+                          <input 
+                            id="kardex-end"
+                            type="date" 
+                            max={maxDateLimit}
+                            value={customDates.end} 
+                            onChange={e => setCustomDates({...customDates, end: e.target.value})} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-transparent text-sm font-medium text-gray-800 dark:text-white lya:text-lya-text outline-none cursor-pointer w-[120px] transition-colors
+                               [&::-webkit-calendar-picker-indicator]:opacity-0 
+                               [&::-webkit-calendar-picker-indicator]:absolute 
+                               [&::-webkit-calendar-picker-indicator]:inset-0 
+                               [&::-webkit-calendar-picker-indicator]:w-full 
+                               [&::-webkit-calendar-picker-indicator]:h-full 
+                               [&::-webkit-calendar-picker-indicator]:cursor-pointer z-10" 
+                          />
+                        </div>
                       </motion.div>
                     )}
                   </div>
@@ -470,7 +512,6 @@ export default function InventoryPage() {
                   {/* Panel Kardex Table */}
                   <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 relative transition-colors">
                     
-                    {/* OVERLAY DE CARGA LOCAL PARA KARDEX */}
                     {isKardexLoading && !isFullScreenLoader && (
                       <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-sm z-30 rounded-[2.5rem]">
                         <Loader2 className="animate-spin text-blue-500 dark:text-blue-400 lya:text-lya-secondary" size={32} />
@@ -495,7 +536,6 @@ export default function InventoryPage() {
                       </motion.button>
                     </div>
                     
-                    {/* PILAR 1: SCROLL INTERNO */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                       <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-md shadow-sm transition-colors">
@@ -573,7 +613,6 @@ export default function InventoryPage() {
                                     </div>
                                   </td>
                                   <td className="p-5 max-w-[200px]">
-                                    {/* PILAR 4: Textos largos en justificado */}
                                     <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify line-clamp-3">
                                       {displayNotes || tx.reference || '-'}
                                     </p>
@@ -603,7 +642,6 @@ export default function InventoryPage() {
         )}
       </AnimatePresence>
 
-      {/* MODALES ADICIONALES */}
       <AnimatePresence>
         {isModalOpen && (
           <NewItemModal 
@@ -627,7 +665,6 @@ export default function InventoryPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE CONFIRMACIÓN DE ANULACIÓN (TEMATIZADO LYA ESTRICTO) */}
       <AnimatePresence>
         {cancelModal.isOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -649,7 +686,6 @@ export default function InventoryPage() {
               <div className="flex gap-3 w-full">
                 <motion.button whileTap={{ scale: 0.95 }} onClick={() => setCancelModal({ isOpen: false, txId: null, reason: '' })} disabled={actionLoadingId === cancelModal.txId} className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-200 dark:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</motion.button>
                 
-                {/* PILAR 3: BLOQUEO ASÍNCRONO */}
                 <motion.button whileTap={{ scale: 0.95 }} onClick={handleConfirmCancel} disabled={actionLoadingId === cancelModal.txId} className="flex-[1.5] py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500">
                   {actionLoadingId === cancelModal.txId ? (
                     <>
@@ -669,7 +705,6 @@ export default function InventoryPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE PAPELERA DE KARDEX (TEMATIZADO LYA ESTRICTO) */}
       <AnimatePresence>
         {isTrashOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -709,7 +744,6 @@ export default function InventoryPage() {
                           </div>
                         </div>
                         
-                        {/* PILAR 3: BLOQUEO ASÍNCRONO Y SPINNER DE ESTILO */}
                         <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleRestore(tx.id)} disabled={actionLoadingId === tx.id} className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:hover:bg-emerald-500/20 transition-colors disabled:opacity-50 shrink-0">
                           {actionLoadingId === tx.id ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />} 
                           <span className="hidden sm:inline">{actionLoadingId === tx.id ? 'Restaurando' : 'Restaurar'}</span>

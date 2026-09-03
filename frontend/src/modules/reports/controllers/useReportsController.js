@@ -28,18 +28,22 @@ export const useReportsController = () => {
     const start = dateRange.start;
     const end = dateRange.end;
     
-    // ¿Inicia el día 1?
-    const isFirstDay = start.getDate() === 1;
+    // 🔥 FIX: Escudo anti-nulos cuando se escoge "Personalizado"
+    if (!start || !end || isNaN(start) || isNaN(end)) return false;
     
-    // ¿Termina el último día del mes en el que cae?
+    const isFirstDay = start.getDate() === 1;
     const lastDayOfEndMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
     const isLastDay = end.getDate() === lastDayOfEndMonth;
     
-    // Retorna true si abarca meses completos (1 mes, 3 meses, 1 año, etc.)
     return isFirstDay && isLastDay;
   }, [dateRange]);
 
   const fetchReports = async () => {
+    // 🔥 FIX: No intentar consultar la base de datos si las fechas están vacías
+    if (!dateRange.start || !dateRange.end || isNaN(dateRange.start) || isNaN(dateRange.end)) {
+      return; 
+    }
+
     setLoading(true);
     try {
       const response = await api.get('/reports/dashboard', {

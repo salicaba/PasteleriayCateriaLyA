@@ -4,6 +4,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useInventoryController } from '../controllers/useInventoryController';
 import { ClipboardCheck, Search, AlertCircle, CheckCircle2, Calculator, Loader2, CalendarDays } from 'lucide-react';
 
+// 🔥 FIX: Formateador y Timezone para evitar brincos UTC
+const getMexicoCityDate = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+
+const formatLocalInputDate = (dateObj) => {
+  if (!dateObj || isNaN(dateObj)) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const ReconciliationLoader = () => (
   <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
@@ -30,7 +41,13 @@ export const InventoryReconciliationPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notes, setNotes] = useState('');
-  const [reconciliationDate, setReconciliationDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
+  const todayForLimit = getMexicoCityDate();
+  const maxDateLimit = formatLocalInputDate(todayForLimit);
+
+  // 🔥 Inicializa en el máximo local
+  const [reconciliationDate, setReconciliationDate] = useState(maxDateLimit);
 
   const [toastContent, setToastContent] = useState(null);
   const [toastType, setToastType] = useState('success');
@@ -99,8 +116,8 @@ export const InventoryReconciliationPage = () => {
     if (itemsToProcess.length === 0) return;
     try {
       setIsProcessing(true);
-      const todayStr = new Date().toISOString().split('T')[0];
-      const isRetroactive = reconciliationDate !== todayStr;
+      // Evaluamos con la misma zona horaria
+      const isRetroactive = reconciliationDate !== maxDateLimit;
       const dateToSend = isRetroactive ? reconciliationDate : null;
 
       await processReconciliation(itemsToProcess, notes, dateToSend);
@@ -139,7 +156,6 @@ export const InventoryReconciliationPage = () => {
   };
 
   return (
-    // PILAR 1: Raíz estricta overflow-hidden
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
@@ -170,19 +186,31 @@ export const InventoryReconciliationPage = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-grow sm:flex-none">
-            <div className="relative flex-1 sm:w-40 min-w-[140px]">
-              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none" size={18} />
+            {/* 🔥 FIX: Clickeable, límite y zona horaria */}
+            <div 
+              className="relative flex-1 sm:w-40 min-w-[140px] cursor-pointer"
+              onClick={() => document.getElementById('reconciliation-date').showPicker()}
+            >
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none z-20" size={18} />
               <input 
+                id="reconciliation-date"
                 type="date" 
-                max={new Date().toISOString().split('T')[0]}
+                max={maxDateLimit}
                 value={reconciliationDate}
                 onChange={(e) => setReconciliationDate(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text [&::-webkit-calendar-picker-indicator]:opacity-50 dark:[&::-webkit-calendar-picker-indicator]:invert"
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-xl pl-10 pr-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/40 lya:focus:ring-lya-secondary/30 transition-all text-gray-800 dark:text-white lya:text-lya-text cursor-pointer relative z-10
+                  [&::-webkit-calendar-picker-indicator]:opacity-0 
+                  [&::-webkit-calendar-picker-indicator]:absolute 
+                  [&::-webkit-calendar-picker-indicator]:inset-0 
+                  [&::-webkit-calendar-picker-indicator]:w-full 
+                  [&::-webkit-calendar-picker-indicator]:h-full 
+                  [&::-webkit-calendar-picker-indicator]:cursor-pointer"
               />
             </div>
             <motion.button 
               whileTap={{ scale: 0.95 }}
-              onClick={() => setReconciliationDate(new Date().toISOString().split('T')[0])}
+              onClick={() => setReconciliationDate(maxDateLimit)}
               className="px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-border/20 lya:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-xl transition-colors font-bold shadow-sm text-sm shrink-0"
             >
               Hoy
@@ -204,7 +232,6 @@ export const InventoryReconciliationPage = () => {
         </div>
       </header>
 
-      {/* 🔥 PILAR 1: CONTENEDOR CON SCROLL AISLADO SÓLO PARA LA TABLA */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors">
         <div className="flex-1 overflow-auto hide-scrollbar relative">
           <table className="w-full text-left border-collapse">
@@ -359,7 +386,6 @@ export const InventoryReconciliationPage = () => {
         )}
       </AnimatePresence>
 
-      {/* NOTIFICACIÓN FLOTANTE PERSONALIZADA (TOAST CENTRADO ARRIBA) */}
       <AnimatePresence>
         {toastContent && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
