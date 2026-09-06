@@ -6,6 +6,65 @@ import sequelize from '../../config/database.js';
 import GlobalOption from './GlobalOption.model.js';
 import { getIO } from '../../config/socket.js'; // 🔥 IMPORTAMOS LOS WEBSOCKETS
 
+// 🔥 1. IMPORTAMOS SUPABASE PARA EL STORAGE
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// ==========================================
+// 🛠️ HELPER: INTERCEPTOR DE IMAGEN INDIVIDUAL A BUCKET
+// ==========================================
+const uploadSingleImageToStorage = async (imgStr, productId) => {
+  // Validaciones de seguridad para evitar cuelgues si no hay imagen
+  if (!imgStr || typeof imgStr !== 'string') return imgStr;
+
+  // Si la imagen ya es un link de Supabase (modo edición sin cambios), la conservamos
+  if (imgStr.startsWith('http')) return imgStr;
+
+  // Si es Base64 crudo del Frontend, lo transformamos y lo subimos a la nube
+  if (imgStr.startsWith('data:image')) {
+    try {
+      const partes = imgStr.split(',');
+      if (partes.length !== 2) return imgStr;
+
+      const mimeType = partes[0].split(';')[0].split(':')[1] || 'image/jpeg';
+      const base64Data = partes[1];
+      
+      const buffer = Buffer.from(base64Data, 'base64');
+      const extension = mimeType.split('/')[1] || 'jpg';
+      const fileName = `PROD-${productId}_${Date.now()}.${extension}`;
+
+      // Subimos al bucket físico "productos"
+      const { error } = await supabase.storage
+        .from('productos')
+        .upload(fileName, buffer, {
+          contentType: mimeType,
+          upsert: true
+        });
+
+      if (error) {
+        console.error(`Error subiendo imagen del producto al Bucket:`, error.message);
+        return imgStr; // Si falla, que al menos guarde el base64 como respaldo
+      }
+
+      // Recuperamos la URL pública
+      const { data: publicUrlData } = supabase.storage
+        .from('productos')
+        .getPublicUrl(fileName);
+
+      if (publicUrlData && publicUrlData.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    } catch (err) {
+      console.error("Error decodificando imagen Base64 del menú:", err);
+    }
+  }
+
+  return imgStr;
+};
+
 // ==========================================
 // 📁 GESTIÓN DE CATEGORÍAS (Drag & Drop)
 // ==========================================
@@ -126,8 +185,11 @@ export const createProduct = async (req, res) => {
       isAgotado 
     } = req.body;
     
+    // 🔥 MAGIA: Interceptamos la imagen del producto
+    const finalImageUrl = await uploadSingleImageToStorage(imageUrl, `NEW_${Date.now()}`);
+
     const newProduct = await Product.create({
-      name, description, basePrice, imageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
+      name, description, basePrice, imageUrl: finalImageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
       isActive: isActive !== undefined ? isActive : true,
       isAgotado: isAgotado || false
     });
@@ -158,11 +220,14 @@ export const updateProduct = async (req, res) => {
     const product = await Product.findByPk(id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
 
+    // 🔥 MAGIA: Si suben una nueva imagen en la edición, la intercepta
+    const finalImageUrl = await uploadSingleImageToStorage(imageUrl, id);
+
     const estadoFinal = isActive !== undefined ? isActive : (disponible !== undefined ? disponible : product.isActive);
     const agotadoFinal = isAgotado !== undefined ? isAgotado : product.isAgotado;
 
     await product.update({
-      name, description, basePrice, imageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
+      name, description, basePrice, imageUrl: finalImageUrl, controlarStock, stockQuantity, categoryId, opciones, departamento, requiereCocina,
       isActive: estadoFinal,
       isAgotado: agotadoFinal 
     });
