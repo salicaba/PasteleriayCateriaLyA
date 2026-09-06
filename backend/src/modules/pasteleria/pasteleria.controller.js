@@ -47,12 +47,12 @@ export const getPedidoById = async (req, res) => {
 };
 
 // ==========================================
-// 🛠️ HELPER: INTERCEPTOR DE IMÁGENES A BUCKET
+// 🛠️ HELPER: INTERCEPTOR DE IMÁGENES A BUCKET (VERSIÓN DEFINITIVA)
 // ==========================================
 const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
   let imagenes = imagenesEntrantes;
 
-  // 🔥 FIX PARA BARTOLOMEO: Si el frontend manda un String JSON, lo convertimos a Array
+  // 1. Decodificar si el frontend mandó el Array como un String (JSON)
   if (typeof imagenes === 'string') {
     try {
       imagenes = JSON.parse(imagenes);
@@ -62,7 +62,7 @@ const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
     }
   }
 
-  // Si después de todo no es un Array o está vacío, salimos
+  // 2. Validar que sea un arreglo válido y con contenido
   if (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0) return [];
 
   const urlsFinales = [];
@@ -71,19 +71,23 @@ const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
     const img = imagenes[i];
 
     // Si la imagen ya es un link de Supabase (modo edición), la conservamos
-    if (img.startsWith('http')) {
+    if (typeof img === 'string' && img.startsWith('http')) {
       urlsFinales.push(img);
       continue;
     }
 
     // Si es Base64 crudo del Frontend, lo transformamos y lo subimos a la nube
-    if (img.startsWith('data:image')) {
+    if (typeof img === 'string' && img.startsWith('data:image')) {
       try {
-        const matches = img.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        if (!matches || matches.length !== 3) continue;
+        // 🔥 FIX: Extracción simplificada y a prueba de errores para el Base64
+        const partes = img.split(',');
+        if (partes.length !== 2) continue; // Si no tiene coma, no es un Base64 válido
 
-        const mimeType = matches[1]; // ej: image/jpeg
-        const base64Data = matches[2];
+        // Extraer el MimeType (ej: "data:image/png;base64" -> "image/png")
+        const mimeType = partes[0].split(';')[0].split(':')[1] || 'image/jpeg';
+        const base64Data = partes[1];
+        
+        // Convertir a buffer físico
         const buffer = Buffer.from(base64Data, 'base64');
         const extension = mimeType.split('/')[1] || 'jpg';
         const fileName = `${pedidoId}_${Date.now()}_${i}.${extension}`;
@@ -110,7 +114,7 @@ const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
           urlsFinales.push(publicUrlData.publicUrl);
         }
       } catch (err) {
-        console.error("Error decodificando imagen Base64:", err);
+        console.error("Error decodificando imagen Base64 en el servidor:", err);
       }
     }
   }
