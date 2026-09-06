@@ -49,7 +49,20 @@ export const getPedidoById = async (req, res) => {
 // ==========================================
 // 🛠️ HELPER: INTERCEPTOR DE IMÁGENES A BUCKET
 // ==========================================
-const uploadImagesToStorage = async (imagenes, pedidoId) => {
+const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
+  let imagenes = imagenesEntrantes;
+
+  // 🔥 FIX PARA BARTOLOMEO: Si el frontend manda un String JSON, lo convertimos a Array
+  if (typeof imagenes === 'string') {
+    try {
+      imagenes = JSON.parse(imagenes);
+    } catch (e) {
+      console.error("El frontend mandó un string que no es JSON válido en imágenes:", e);
+      return [];
+    }
+  }
+
+  // Si después de todo no es un Array o está vacío, salimos
   if (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0) return [];
 
   const urlsFinales = [];
