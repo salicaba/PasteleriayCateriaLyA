@@ -1,5 +1,6 @@
+// frontend/src/modules/client/views/components/ClientCheckoutModal.js
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion'; // 🔥 Importamos AnimatePresence
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -12,9 +13,9 @@ export default function ClientCheckoutModal({
   removeFromCart,
   incrementInCart,
   deleteLine,
-  promoWarning,          // 🔥 1. Recibimos prop
-  confirmPromoRupture,   // 🔥 2. Recibimos prop
-  cancelPromoRupture     // 🔥 3. Recibimos prop
+  promoWarning,          // Recibimos estado de advertencia de promoción
+  confirmPromoRupture,   // Recibimos función para confirmar ruptura
+  cancelPromoRupture     // Recibimos función para cancelar ruptura
 }) {
   const [actionLoading, setActionLoading] = useState(null);
   
@@ -27,7 +28,7 @@ export default function ClientCheckoutModal({
     };
   }, []);
 
-  const handleAction = async (e, cartItemId, actionType) => {
+  const handleAction = async (e, cartItemId, actionType, item = null) => {
     try {
       e.preventDefault();
       e.stopPropagation();
@@ -42,7 +43,16 @@ export default function ClientCheckoutModal({
       } else if (actionType === 'decrement') {
         removeFromCart(cartItemId);
       } else if (actionType === 'delete') {
-        deleteLine(cartItemId);
+        // 🔥 MOTOR ANTI-ZOMBIE: Inyectamos el flag de ruptura para que el controlador lo detecte
+        if (item && item.isAutoPromo && item.promoLabel !== 'OFERTA') {
+            // Pasamos un objeto simulado con el flag de ruptura
+            deleteLine({
+                cartItemId: cartItemId,
+                _breakPromoQty: item.qty // Queremos eliminar toda la promoción
+            });
+        } else {
+            deleteLine(cartItemId);
+        }
       }
 
       setTimeout(() => {
@@ -61,7 +71,7 @@ export default function ClientCheckoutModal({
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex flex-col justify-end p-4">
-      <div className="absolute inset-0" onClick={() => !isSubmitting && !actionLoading && onClose()} />
+      <div className="absolute inset-0" onClick={() => !isSubmitting && !actionLoading && !promoWarning?.isOpen && onClose()} />
       <motion.div initial={{ y: '100%', scale: 0.95, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: '100%', scale: 0.95, opacity: 0 }} transition={{ type: 'spring', damping: 26, stiffness: 220 }} className="relative bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] rounded-[2.5rem] p-6 pb-8 space-y-5 shadow-2xl max-w-md mx-auto w-full border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex flex-col max-h-[85vh] overflow-hidden">
         
         <div className="flex items-center justify-between shrink-0">
@@ -84,8 +94,10 @@ export default function ClientCheckoutModal({
             const qty = item.qty || 0;
             const precioTotalItem = precioUnitario * qty;
             
+            // 🔥 DETERMINAMOS SI LA PROMOCIÓN ESTÁ BLOQUEADA
             const isGhost = item.isAutoPromo && precioUnitario === 0; 
-            const isLockedPromo = item.isAutoPromo && item.promoLabel !== 'OFERTA'; 
+            const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
+            const isLockedPromo = isGhost || isNthPromo;
 
             const currentTotalQty = cart.filter(i => i.id === item.id && !i.isAutoPromo).reduce((acc, i) => acc + i.qty, 0);
             const isLimitReached = item.controlarStock && currentTotalQty >= item.stock && item.stock > 0;
@@ -140,17 +152,30 @@ export default function ClientCheckoutModal({
                   </div>
                 </div>
                 
+                {/* 🔥 LÓGICA DE VISUALIZACIÓN: Si es Promo Bloqueada, mostramos Botón Único de Eliminación */}
                 {isLockedPromo ? (
-                   <div className="flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-900/20 rounded-[1.25rem] px-3.5 py-1.5 shrink-0 border border-rose-100 dark:border-rose-800/30">
-                     <Tag size={16} className="text-rose-500 mb-0.5" strokeWidth={2.5} />
-                     <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 tracking-wider">x{qty}</span>
-                   </div>
-                ) : (
-                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-[1.25rem] p-1.5 shrink-0">
-                    
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleAction(e, item.cartItemId, 'delete')} 
+                      onClick={(e) => handleAction(e, item.cartItemId, 'delete', item)} 
+                      className="flex flex-col items-center justify-center rounded-[1rem] bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 md:hover:bg-rose-100 shadow-sm font-bold border border-rose-100 dark:border-rose-800/30 outline-none select-none touch-manipulation transition-colors relative overflow-hidden px-4 py-2 shrink-0 h-[48px]"
+                    >
+                      {isThisItemLoading && actionLoading?.action === 'delete' ? (
+                        <Loader2 size={16} className="animate-spin text-rose-500 absolute" />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center">
+                            <div className="flex items-center gap-1">
+                                <Trash2 size={12} strokeWidth={3} />
+                                <span className="text-[9px] font-black uppercase tracking-widest">Eliminar</span>
+                            </div>
+                            <span className="text-[8px] font-bold opacity-80 mt-0.5">Promo (x{qty})</span>
+                        </div>
+                      )}
+                    </motion.button>
+                ) : (
+                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] rounded-[1.25rem] p-1.5 shrink-0">
+                    <motion.button 
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => handleAction(e, item.cartItemId, 'delete', item)} 
                       className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 md:hover:bg-red-100 shadow-sm font-bold border border-red-100 dark:border-red-900/30 outline-none select-none touch-manipulation transition-colors relative overflow-hidden"
                     >
                       {isThisItemLoading && actionLoading?.action === 'delete' ? (
@@ -250,7 +275,7 @@ export default function ClientCheckoutModal({
         </motion.button>
       </motion.div>
 
-      {/* 🔥 MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN (100% PILARES APLICADOS) */}
+      {/* 🔥 MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN (CLIENTE) */}
       <AnimatePresence>
         {promoWarning?.isOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
@@ -262,18 +287,15 @@ export default function ClientCheckoutModal({
                 <AlertTriangle size={32} />
               </div>
               
-              {/* PILAR 4: Textos en Modales SIEMPRE centrados */}
               <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-2 tracking-tight text-center">
                 ¿Perder Promoción?
               </h3>
               
-              {/* PILAR 4: Textos descriptivos largos SIEMPRE justificados */}
               <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium mb-8 leading-relaxed px-2 text-justify">
                 {promoWarning.message}
               </p>
               
               <div className="flex gap-3 w-full">
-                {/* PILAR 2: Retroalimentación táctil ESTRICTA con Framer Motion */}
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={cancelPromoRupture} 
