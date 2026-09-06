@@ -1,9 +1,18 @@
 // backend/src/modules/pasteleria/pasteleria.controller.js
+// backend/src/modules/pasteleria/pasteleria.controller.js
 import { Op } from 'sequelize';
 import sequelize from '../../config/database.js'; 
 import PasteleriaOrder from './PasteleriaOrder.model.js';
 import BusinessConfig from '../settings/BusinessConfig.model.js';
 import Transaction from '../cash/Transaction.model.js'; 
+
+// 🔥 1. IMPORTAMOS SUPABASE PARA EL STORAGE
+import { createClient } from '@supabase/supabase-js';
+
+// Inicializamos el cliente apuntando a tu proyecto
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ==========================================
 // 🎂 OBTENCIÓN DE PEDIDOS
@@ -38,6 +47,65 @@ export const getPedidoById = async (req, res) => {
 };
 
 // ==========================================
+// 🛠️ HELPER: INTERCEPTOR DE IMÁGENES A BUCKET
+// ==========================================
+const uploadImagesToStorage = async (imagenes, pedidoId) => {
+  if (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0) return [];
+
+  const urlsFinales = [];
+
+  for (let i = 0; i < imagenes.length; i++) {
+    const img = imagenes[i];
+
+    // Si la imagen ya es un link de Supabase (modo edición), la conservamos
+    if (img.startsWith('http')) {
+      urlsFinales.push(img);
+      continue;
+    }
+
+    // Si es Base64 crudo del Frontend, lo transformamos y lo subimos a la nube
+    if (img.startsWith('data:image')) {
+      try {
+        const matches = img.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) continue;
+
+        const mimeType = matches[1]; // ej: image/jpeg
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+        const extension = mimeType.split('/')[1] || 'jpg';
+        const fileName = `${pedidoId}_${Date.now()}_${i}.${extension}`;
+
+        // Subimos al bucket físico "pedidos"
+        const { error } = await supabase.storage
+          .from('pedidos')
+          .upload(fileName, buffer, {
+            contentType: mimeType,
+            upsert: true
+          });
+
+        if (error) {
+          console.error(`Error subiendo imagen ${i} al Bucket:`, error.message);
+          continue;
+        }
+
+        // Recuperamos la URL pública
+        const { data: publicUrlData } = supabase.storage
+          .from('pedidos')
+          .getPublicUrl(fileName);
+
+        if (publicUrlData && publicUrlData.publicUrl) {
+          urlsFinales.push(publicUrlData.publicUrl);
+        }
+      } catch (err) {
+        console.error("Error decodificando imagen Base64:", err);
+      }
+    }
+  }
+
+  return urlsFinales;
+};
+
+// ==========================================
 // 📝 CREACIÓN Y MODIFICACIÓN
 // ==========================================
 
@@ -45,19 +113,19 @@ export const createPedido = async (req, res) => {
   try {
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
     
-    // 🛡️ FIX MASIVO: Extraemos el anticipo que viene desde el modal del frontend
-    const { abonos, anticipo, metodoPagoAnticipo, ...pedidoData } = req.body;
+    // 🔥 Extraemos 'imagenesReferencia' crudas del body
+    const { abonos, anticipo, metodoPagoAnticipo, imagenesReferencia, ...pedidoData } = req.body;
 
     const randomNum = Math.floor(100 + Math.random() * 900);
     const newId = `PED-${Date.now().toString().slice(-6)}${randomNum}`;
 
     let abonosParaGuardar = [];
 
-    // 🔥 FECHA LOCAL EXTREMA PARA LA CAJA (CHIAPAS)
+    // FECHA LOCAL EXTREMA
     const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const localNow = new Date(nowLocalStr);
 
-    // 🔥 1. Registramos el anticipo inicial en la Caja (El dinero ya no se esfuma)
+    // 1. Registramos el anticipo inicial en la Caja
     const montoAnticipo = parseFloat(anticipo);
     if (montoAnticipo > 0) {
       let dbMethod = 'CASH';
@@ -71,7 +139,7 @@ export const createPedido = async (req, res) => {
         description: `Anticipo Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
         referenceId: newId,
         createdBy: userId,
-        createdAt: localNow // Obligamos a la caja a registrar el dinero HOY
+        createdAt: localNow 
       });
       
       abonosParaGuardar.push({
@@ -111,9 +179,13 @@ export const createPedido = async (req, res) => {
       }
     }
 
+    // 🔥 3. MAGIA: Interceptamos las imágenes, las subimos a la nube y devolvemos los Links
+    const imagenesFinales = await uploadImagesToStorage(imagenesReferencia, newId);
+
     const nuevoPedido = await PasteleriaOrder.create({
       id: newId,
       ...pedidoData,
+      imagenesReferencia: imagenesFinales, // Guardamos Links Ultraligeros, cero lag
       abonos: abonosParaGuardar 
     });
 
@@ -149,16 +221,18 @@ export const updatePedido = async (req, res) => {
         ...updateData 
     } = req.body;
 
-    // 🛡️ BLINDAJE 2: Protección de Fotos
+    // 🔥 2. MAGIA: Procesamos si el cliente borró o agregó fotos nuevas en la Edición
     if (imagenesReferencia && imagenesReferencia.length > 0) {
-        updateData.imagenesReferencia = imagenesReferencia;
+        updateData.imagenesReferencia = await uploadImagesToStorage(imagenesReferencia, pedido.id);
+    } else {
+        updateData.imagenesReferencia = [];
     }
 
-    // 🔥 FECHA LOCAL EXTREMA
+    // FECHA LOCAL EXTREMA
     const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const localNow = new Date(nowLocalStr);
 
-    // 🔥 LÓGICA DE REEMBOLSO AUTOMÁTICO 🔥
+    // LÓGICA DE REEMBOLSO AUTOMÁTICO
     const nuevoCosto = parseFloat(updateData.costoTotal);
     const costoAnterior = parseFloat(pedido.costoTotal);
     
@@ -166,11 +240,9 @@ export const updatePedido = async (req, res) => {
       const abonosActuales = pedido.abonos || [];
       const totalPagado = abonosActuales.reduce((sum, ab) => sum + parseFloat(ab.monto), 0);
       
-      // Si el cliente ya había pagado MÁS del nuevo costo, hay saldo a favor
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
-        // 1. Crear transacción de SALIDA en la caja (Con fecha de hoy)
         const tx = await Transaction.create({
           source: 'PASTELERIA',
           paymentMethod: 'CASH', 
@@ -181,7 +253,6 @@ export const updatePedido = async (req, res) => {
           createdAt: localNow
         }, { transaction: t });
 
-        // 2. Registrar el reembolso en el historial de abonos del pedido
         const abonoReembolso = {
           id: tx.id,
           fecha: localNow.toISOString(),
@@ -193,7 +264,6 @@ export const updatePedido = async (req, res) => {
         updateData.abonos = [...abonosActuales, abonoReembolso];
       }
     }
-    // 🔥 FIN DE LÓGICA DE REEMBOLSO 🔥
 
     await pedido.update(updateData, { transaction: t });
     
