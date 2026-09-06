@@ -147,25 +147,12 @@ export const useMenuManagerController = ({ showToast }) => {
   };
 
   const saveProduct = async (data) => {
-    showToast('Procesando producto y subiendo imagen...', 'warning');
+    showToast('Guardando producto...', 'warning');
     try {
-      let finalImageUrl = data.imageUrl;
-      if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
-        const formData = new FormData();
-        formData.append('file', finalImageUrl);
-        formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET); 
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        
-        const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-          method: 'POST', body: formData
-        });
-
-        const cloudData = await cloudRes.json();
-        if (!cloudRes.ok) throw new Error(cloudData.error?.message || 'Error al subir imagen');
-        finalImageUrl = cloudData.secure_url;
-      }
-
-      const payload = { ...data, imageUrl: finalImageUrl };
+      // 🔥 MAGIA PURA: Ya no procesamos imágenes aquí. 
+      // Si data.imageUrl trae un Base64 ('data:image...'), se va crudo al backend 
+      // y nuestro interceptor en Supabase se encarga de todo.
+      const payload = { ...data };
 
       if (editingProduct) {
         await adminMenuModel.updateProduct(editingProduct.id, payload);
@@ -177,6 +164,7 @@ export const useMenuManagerController = ({ showToast }) => {
       await loadData(false); 
       showToast('Producto guardado con éxito', 'success');
     } catch (error) {
+      console.error("Error al guardar producto:", error);
       showToast('Ocurrió un error al guardar el producto', 'error');
     }
   };
