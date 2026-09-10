@@ -90,7 +90,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       return;
     }
     
-    // Solo usamos el candado, sin declararlo con useRef aquí adentro
     if (lockWhatsAppRef.current) return;
     lockWhatsAppRef.current = true;
     
@@ -119,19 +118,27 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
     
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido a nombre de *${nombreCliente}*:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
     
-    const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, 'whatsapp_window'); // 🔥 Pestaña única
+    const appUrl = `whatsapp://send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
+    const webUrl = `https://web.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
 
-    setPaymentSuccessData({
-      title: '¡Enlace Creado!',
-      message: 'El ticket digital ha sido preparado para WhatsApp.'
-    });
-    
+    window.location.href = appUrl;
+
     setTimeout(() => {
-      setPaymentSuccessData(null);
-      lockWhatsAppRef.current = false; // Liberamos el candado al final
-      onClose();
-    }, 1800); 
+      if (!document.hidden) {
+        window.open(webUrl, 'whatsapp_window');
+      }
+      
+      setPaymentSuccessData({
+        title: '¡Enlace Creado!',
+        message: 'El ticket digital ha sido preparado para WhatsApp.'
+      });
+      
+      setTimeout(() => {
+        setPaymentSuccessData(null);
+        lockWhatsAppRef.current = false;
+        onClose();
+      }, 1500); 
+    }, 600);
   };
 
   const handlePrint = async () => {

@@ -176,7 +176,6 @@ export const PosModal = ({
   };
 
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
-    // 🔥 BLOQUEO INMEDIATO (React useState es muy lento para clics rápidos)
     if (lockWhatsAppRef.current) return;
     lockWhatsAppRef.current = true;
     setIsProcessingAction(true);
@@ -214,17 +213,27 @@ export const PosModal = ({
 
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total a pagar:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
-    const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    
-    // 🔥 MAGIA: Obligamos al navegador a usar siempre la misma pestaña
-    window.open(urlApiWhatsApp, 'whatsapp_window');
-    showToast('Redirigiendo a WhatsApp...', 'success');
+    // 🔥 DEEP LINK (Abre la app en Tablet/PC sin crear pestañas)
+    const appUrl = `whatsapp://send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
+    // 🔥 ENLACE WEB DIRECTO (Se salta la landing page de Meta)
+    const webUrl = `https://web.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
 
-    // Liberamos los candados
+    // 1. Intentamos abrir la aplicación nativa
+    window.location.href = appUrl;
+
+    // 2. Sensor Inteligente: Si el navegador no perdió el foco en 600ms, significa que no hay app instalada.
     setTimeout(() => {
-      lockWhatsAppRef.current = false;
-      setIsProcessingAction(false);
-    }, 2000);
+      if (!document.hidden) {
+        window.open(webUrl, 'whatsapp_window');
+        showToast('Abriendo WhatsApp Web...', 'success');
+      }
+      
+      // Liberamos los candados
+      setTimeout(() => {
+        lockWhatsAppRef.current = false;
+        setIsProcessingAction(false);
+      }, 500);
+    }, 600);
   };
 
   const handleConfirmOption = (productWithOptions) => { 
