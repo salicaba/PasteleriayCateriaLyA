@@ -57,13 +57,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓪 operando correctamente' });
 });
 
-// 🔥 RUTA TRAMPA PARA PROBAR EL ESCUDO
-app.get('/api/boom', (req, res, next) => {
-  // Aquí simulamos que el servidor colapsó o la BD falló
-  next(new Error('¡Simulacro de caída de la base de datos!'));
-});
-
-// 🔥 EL ESCUDO VA AQUÍ...
+// 🔥 EL ESCUDO VA AQUÍ: Intercepta cualquier fallo de las rutas anteriores
 app.use(globalErrorHandler);
 
 export default app;
