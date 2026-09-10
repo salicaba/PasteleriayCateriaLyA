@@ -11,23 +11,23 @@ import settingsRoutes from './modules/settings/settings.routes.js';
 import cashRoutes from './modules/cash/cash.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js'; 
 import reportsRoutes from './modules/reports/reports.routes.js'; 
-// 🔥 1. AGREGAMOS EL IMPORT DE PROMOCIONES
 import promotionsRoutes from './modules/menu/promotions.routes.js'; 
+
+// 🔥 Importamos nuestro nuevo escudo de errores
+import { globalErrorHandler } from './middlewares/error.middleware.js';
 
 const app = express();
 
-// --- NUEVA CONFIGURACIÓN CORS PARA PRODUCCIÓN ---
 const allowedOrigins = [
   process.env.FRONTEND_URL, 
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:4173',
-  'https://pasteleriay-cateria-ly-a-q2rr.vercel.app' // 🔥 Agregamos la nueva PWA Cliente
+  'https://pasteleriay-cateria-ly-a-q2rr.vercel.app' 
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // 🔥 Permitir si no hay origen, si está en la lista exacta, o si es CUALQUIER subdominio de Vercel
     if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
       callback(null, true);
     } else {
@@ -36,7 +36,6 @@ app.use(cors({
   },
   credentials: true, 
 }));
-// ------------------------------------------------
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -52,11 +51,13 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/cash', cashRoutes);
 app.use('/api/inventory', inventoryRoutes); 
 app.use('/api/reports', reportsRoutes); 
-// 🔥 2. MONTAMOS LA RUTA EN LA API
 app.use('/api/promotions', promotionsRoutes); 
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Sistema 𝓛𝔂𝓪 operando correctamente' });
 });
+
+// 🔥 EL ESCUDO VA AQUÍ: Intercepta cualquier fallo de las rutas anteriores
+app.use(globalErrorHandler);
 
 export default app;
