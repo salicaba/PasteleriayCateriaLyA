@@ -38,7 +38,7 @@ export const MesasHeader = ({
   setShowPapelera 
 }) => {
   return (
-    <div className="shrink-0 p-4 md:p-6 pb-4 space-y-6 md:space-y-8 z-10 relative">
+    <div className="shrink-0 p-4 md:p-6 pb-4 space-y-6 md:space-y-8 z-0 relative">
       
       {/* TARJETA PRINCIPAL Y BOTONES NAVEGACIÓN */}
       <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 rounded-[2.5rem] p-6 md:p-8 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6 transition-colors duration-300">
