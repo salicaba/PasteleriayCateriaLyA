@@ -174,6 +174,10 @@ export const PosModal = ({
   };
 
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
+    // 🔥 BLOQUEO ANTI-SPAM DE PESTAÑAS
+    if (isProcessingAction) return;
+    setIsProcessingAction(true);
+
     const orderId = mesa?.orderId || mesa?.id;
 
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
@@ -190,12 +194,10 @@ export const PosModal = ({
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
-    // 🔥 LÓGICA DINÁMICA PARA EL CONTEXTO DEL TICKET
     let textoCuenta = '';
     if (isVitrina) {
       textoCuenta = ' de *Mostrador*';
     } else if (isLlevar) {
-      // 🔥 Usamos parseAccountName para limpiar el teléfono (si lo tiene) y dejar solo el nombre
       const nombreCliente = parseAccountName(nombreParaSidebar || numeroReal);
       textoCuenta = ` a nombre de *${nombreCliente}*`;
     } else {
@@ -210,8 +212,13 @@ export const PosModal = ({
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total a pagar:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, 'whatsapp_window'); // 🔥 Ahora reutilizará la misma pestaña
+    window.open(urlApiWhatsApp, '_blank');
     showToast('Redirigiendo a WhatsApp...', 'success');
+
+    // Liberamos el botón después de 2 segundos para dar tiempo al navegador
+    setTimeout(() => {
+      setIsProcessingAction(false);
+    }, 2000);
   };
 
   const handleConfirmOption = (productWithOptions) => { 

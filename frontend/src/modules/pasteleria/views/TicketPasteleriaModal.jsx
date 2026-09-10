@@ -81,11 +81,17 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
   const costoTotalNum = parseFloat(pedido.costoTotal) || 0;
 
+  // 🔥 CANDADO ANTI-SPAM DE PESTAÑAS
+  const lockWhatsAppRef = useRef(false);
+
   const handleWhatsAppClick = () => {
     if (phoneNumber.trim().length < 10) {
       toast.error('Por favor, ingresa un número de celular válido a 10 dígitos.');
       return;
     }
+    
+    if (lockWhatsAppRef.current) return;
+    lockWhatsAppRef.current = true;
     
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
     if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
@@ -108,10 +114,13 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
-    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
+    // 🔥 INYECCIÓN DEL NOMBRE DEL CLIENTE
+    const nombreCliente = pedido.cliente && pedido.cliente.trim() !== '' ? pedido.cliente.trim() : 'nuestro cliente preferido';
+    
+    const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido a nombre de *${nombreCliente}*:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
     
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, 'whatsapp_window'); // 🔥 Reutiliza la misma pestaña
+    window.open(urlApiWhatsApp, '_blank');
 
     setPaymentSuccessData({
       title: '¡Enlace Creado!',
@@ -120,6 +129,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
     
     setTimeout(() => {
       setPaymentSuccessData(null);
+      lockWhatsAppRef.current = false; // Liberamos el candado
       onClose();
     }, 1800); 
   };
