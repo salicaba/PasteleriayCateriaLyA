@@ -1,5 +1,5 @@
 // src/modules/cafeteria/controllers/useMesasController.js
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import client from '../../../api/client.js';
 import { socket } from '../../../api/socket.js'; 
 
