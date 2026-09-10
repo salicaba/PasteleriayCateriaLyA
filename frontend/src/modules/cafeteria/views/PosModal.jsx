@@ -70,6 +70,8 @@ export const PosModal = ({
 
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  const lockWhatsAppRef = useRef(false);
   
   const [localToast, setLocalToast] = useState(null);
 
@@ -174,8 +176,9 @@ export const PosModal = ({
   };
 
   const handleSendWhatsAppTicket = (phone, itemsToPrint, totalToPrint, cuentaName) => {
-    // 🔥 BLOQUEO ANTI-SPAM DE PESTAÑAS
-    if (isProcessingAction) return;
+    // 🔥 BLOQUEO INMEDIATO (React useState es muy lento para clics rápidos)
+    if (lockWhatsAppRef.current) return;
+    lockWhatsAppRef.current = true;
     setIsProcessingAction(true);
 
     const orderId = mesa?.orderId || mesa?.id;
@@ -212,11 +215,14 @@ export const PosModal = ({
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total a pagar:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, '_blank');
+    
+    // 🔥 MAGIA: Obligamos al navegador a usar siempre la misma pestaña
+    window.open(urlApiWhatsApp, 'whatsapp_window');
     showToast('Redirigiendo a WhatsApp...', 'success');
 
-    // Liberamos el botón después de 2 segundos para dar tiempo al navegador
+    // Liberamos los candados
     setTimeout(() => {
+      lockWhatsAppRef.current = false;
       setIsProcessingAction(false);
     }, 2000);
   };
