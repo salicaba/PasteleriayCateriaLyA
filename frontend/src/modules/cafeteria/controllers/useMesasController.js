@@ -13,6 +13,9 @@ export const useMesasController = () => {
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
   });
 
+  // 🔥 NUEVO: Candado de concurrencia para evitar creación múltiple de tickets
+  const isProcessingRef = useRef(false);
+
   const zonas = [ 
     { id: 'salon', label: 'Salón' }, 
     { id: 'llevar', label: 'Para Llevar' },
@@ -125,6 +128,9 @@ export const useMesasController = () => {
   }, [mesas]);
 
   const nuevoPedidoVitrina = async () => {
+    if (isProcessingRef.current) return null;
+    isProcessingRef.current = true;
+
     try {
       const ordenActiva = mesas.find(m => m.zona === 'vitrina' && m.estado === 'ocupada');
       if (ordenActiva) return ordenActiva;
@@ -150,10 +156,15 @@ export const useMesasController = () => {
     } catch (error) { 
         console.error('Error al abrir mostrador:', error);
         return null; 
+    } finally {
+        isProcessingRef.current = false;
     }
   };
 
   const nuevoPedidoLlevar = async (nombreCliente, telefono) => {
+    if (isProcessingRef.current) return null;
+    isProcessingRef.current = true;
+
     try {
       const resOrders = await client.get('/pos/orders/active');
       const currentOrders = resOrders.data || [];
@@ -188,36 +199,50 @@ export const useMesasController = () => {
     } catch (error) { 
         console.error("Error creando pedido para llevar:", error);
         return null; 
+    } finally {
+        isProcessingRef.current = false;
     }
   };
 
   const handleCancelOrder = async (orderId, reason = 'Cancelado desde vista general') => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
     try {
       await client.put(`/pos/orders/${orderId}/cancel`, { cancelReason: reason });
       loadMesas();
     } catch (error) {
       console.error('Error al eliminar el pedido:', error);
       throw error; 
+    } finally {
+      isProcessingRef.current = false;
     }
   };
 
   const handleRestoreOrder = async (orderId) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
     try {
       await client.put(`/pos/orders/${orderId}/restore`);
       loadMesas();
     } catch (error) {
       console.error('Error al restaurar la cuenta:', error);
       throw error;
+    } finally {
+      isProcessingRef.current = false;
     }
   };
 
   const handleRestoreItem = async (orderId, itemId) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
     try {
       await client.put(`/pos/orders/${orderId}/items/${itemId}/restore`);
       loadMesas();
     } catch (error) {
       console.error('Error al restaurar producto:', error);
       throw error;
+    } finally {
+      isProcessingRef.current = false;
     }
   };
 
