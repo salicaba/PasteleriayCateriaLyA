@@ -8,6 +8,9 @@ import { SuccessScreen } from '../../cafeteria/views/SuccessScreen';
 
 export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcularFinanzas }) {
   const ticketRef = useRef(null);
+  // 🔥 EL CANDADO VA AQUÍ ARRIBA (Fuera de las funciones)
+  const lockWhatsAppRef = useRef(false); 
+  
   const [transferInfo, setTransferInfo] = useState(null); 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
@@ -81,15 +84,13 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
   const costoTotalNum = parseFloat(pedido.costoTotal) || 0;
 
-  // 🔥 CANDADO ANTI-SPAM DE PESTAÑAS
-  const lockWhatsAppRef = useRef(false);
-
   const handleWhatsAppClick = () => {
     if (phoneNumber.trim().length < 10) {
       toast.error('Por favor, ingresa un número de celular válido a 10 dígitos.');
       return;
     }
     
+    // Solo usamos el candado, sin declararlo con useRef aquí adentro
     if (lockWhatsAppRef.current) return;
     lockWhatsAppRef.current = true;
     
@@ -114,7 +115,6 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
-    // 🔥 INYECCIÓN DEL NOMBRE DEL CLIENTE
     const nombreCliente = pedido.cliente && pedido.cliente.trim() !== '' ? pedido.cliente.trim() : 'nuestro cliente preferido';
     
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido a nombre de *${nombreCliente}*:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
@@ -129,7 +129,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
     
     setTimeout(() => {
       setPaymentSuccessData(null);
-      lockWhatsAppRef.current = false; // Liberamos el candado
+      lockWhatsAppRef.current = false; // Liberamos el candado al final
       onClose();
     }, 1800); 
   };
