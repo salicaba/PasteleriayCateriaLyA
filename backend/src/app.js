@@ -27,10 +27,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // 🔥 Permitir si no hay origen, si está en la lista exacta, o si es CUALQUIER subdominio de Vercel
+    if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Bloqueado por la política de CORS'));
+      callback(new Error('Bloqueado por la política de CORS HTTP'));
     }
   },
   credentials: true, 
