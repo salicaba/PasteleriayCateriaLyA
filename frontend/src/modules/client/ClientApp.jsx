@@ -310,15 +310,22 @@ export default function ClientApp({ type }) {
               return; 
             }
           } catch (error) {
-            console.error("Fallo al validar sesión con backend, procediendo a purga.", error);
-          }
-        }
-        
-        handleClientLogout();
-        setIsGuarding(false);
-        setIsSessionChecked(true);
-        return; 
-      }
+            console.error("Fallo al validar sesión con backend.", error);
+            // 🔥 FIX: No purgamos la sesión si es una caída de red o el servidor está inalcanzable
+            if (!navigator.onLine || !error.response || error.response.status >= 500) {
+              setGuardMessage("Conexión inestable. Reintentando...");
+              setTimeout(() => window.location.reload(), 3000);
+              return; // Cortamos la ejecución para salvar la sesión
+            }
+          }
+        }
+        
+        // Si no hubo error de red, entonces sí es un cierre legítimo o una cuenta ajena
+        handleClientLogout();
+        setIsGuarding(false);
+        setIsSessionChecked(true);
+        return; 
+      }
 
       if (!isCollision && sessionType === 'mesa' && urlTableId !== sessionTableId) {
         navigate(`/m/${sessionTableId}`, { replace: true });
