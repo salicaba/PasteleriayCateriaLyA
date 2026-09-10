@@ -128,7 +128,7 @@ export const MesaCard = ({ mesa, onClick, onCancel, isQrPaused }) => {
     >
       {/* 🔥 ETIQUETA QR APAGADO (TOP-LEFT) */}
       {isQrPaused && (
-        <div className="absolute -top-3 -left-2 bg-amber-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-amber-500/30 border border-amber-400 z-50 pointer-events-none">
+        <div className="absolute -top-3 -left-2 bg-amber-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-amber-500/30 border border-amber-400 z-20 pointer-events-none">
           <WifiOff size={12} strokeWidth={2.5} />
           QR APAGADO
         </div>
@@ -136,7 +136,7 @@ export const MesaCard = ({ mesa, onClick, onCancel, isQrPaused }) => {
 
       {/* ETIQUETA FLOTANTE DE NOTIFICACIÓN MULTI-TEMA (TOP-RIGHT) */}
       {hasReadyItems && (
-        <div className="absolute -top-3 -right-2 bg-blue-600 dark:bg-blue-500 lya:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 dark:shadow-blue-900/60 lya:shadow-blue-600/30 animate-bounce z-50 pointer-events-none">
+        <div className="absolute -top-3 -right-2 bg-blue-600 dark:bg-blue-500 lya:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-blue-500/40 dark:shadow-blue-900/60 lya:shadow-blue-600/30 animate-bounce z-20 pointer-events-none">
           <BellRing size={12} className="animate-pulse" />
           ¡LISTO PARA ENTREGAR!
         </div>
