@@ -266,9 +266,16 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) return; 
+    if (!user) return;
 
-    socket.emit('join_user_room', user.id);
+    // Encapsulamos la emisión para poder reutilizarla
+    const joinRoom = () => socket.emit('join_user_room', user.id);
+    
+    // 1. Unir inmediatamente al tener el usuario
+    joinRoom();
+    
+    // 2. Re-unir automáticamente si el socket pierde señal y se reconecta en segundo plano
+    socket.on('connect', joinRoom);
 
     const handleKickout = (data) => {
       if (data.userId === user.id) {
@@ -279,6 +286,7 @@ function App() {
     socket.on('auth:kickout', handleKickout);
 
     return () => {
+      socket.off('connect', joinRoom);
       socket.off('auth:kickout', handleKickout);
     };
   }, [user]);

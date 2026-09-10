@@ -13,7 +13,14 @@ export const initSocket = (server) => {
 
   io = new Server(server, {
     cors: {
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        // Permitir si no hay origen (ej. Postman local), si está en la lista exacta, o si es CUALQUIER subdominio de Vercel
+        if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('No permitido por CORS'));
+        }
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true
     },
