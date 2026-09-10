@@ -210,7 +210,7 @@ export const PosModal = ({
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total a pagar:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, '_blank');
+    window.open(urlApiWhatsApp, 'whatsapp_window'); // 🔥 Ahora reutilizará la misma pestaña
     showToast('Redirigiendo a WhatsApp...', 'success');
   };
 

@@ -111,7 +111,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital de pedido:\n\n🔗 ${shareLink}\n\n*Total de la cuenta:* $${costoTotalNum.toFixed(2)}\n*Abonado:* $${finanzas.totalPagado.toFixed(2)}\n*Resta por pagar:* $${finanzas.deuda.toFixed(2)}${cuentasTexto}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
     
     const urlApiWhatsApp = `https://api.whatsapp.com/send?phone=52${phoneNumber}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    window.open(urlApiWhatsApp, '_blank');
+    window.open(urlApiWhatsApp, 'whatsapp_window'); // 🔥 Reutiliza la misma pestaña
 
     setPaymentSuccessData({
       title: '¡Enlace Creado!',
