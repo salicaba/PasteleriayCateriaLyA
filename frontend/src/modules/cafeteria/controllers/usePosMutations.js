@@ -477,6 +477,8 @@ export const usePosMutations = ({
       });
       if (onComplete) onComplete();
     } catch (error) { 
+      // 🔥 AHORA EL ERROR SE MUESTRA EN PANTALLA
+      if (triggerNotification) triggerNotification(error?.response?.data?.message || "Error al cobrar la cuenta", "error");
       throw error; 
     } finally {
       lockRef.current = false;
@@ -490,16 +492,15 @@ export const usePosMutations = ({
     setIsProcessing(true);
 
     try {
-      // 🔥 SOLUCIÓN DEL DEADLOCK: Liberar candado temporalmente para auto-enviar a cocina
       if (cart.some(p => !p.enviadoCocina)) {
-        lockRef.current = false; // 🔓 Quitamos el candado para que simulateKitchenSend pueda entrar
+        lockRef.current = false; 
         
         await new Promise((resolve, reject) => {
             simulateKitchenSend(resolve).catch(reject);
         });
         
-        lockRef.current = true;  // 🔒 Volvemos a poner el candado para proteger el cobro
-        setIsProcessing(true);   // 🔄 Reactivamos la pantalla de carga (porque la cocina la apaga al terminar)
+        lockRef.current = true;  
+        setIsProcessing(true);   
       }
       
       const method = paymentDetails?.method || 'efectivo';
@@ -516,6 +517,8 @@ export const usePosMutations = ({
       });
       if (onComplete) onComplete();
     } catch (error) { 
+      // 🔥 AHORA EL ERROR SE MUESTRA EN PANTALLA Y DEJA DE CARGAR
+      if (triggerNotification) triggerNotification(error?.response?.data?.message || "Error al procesar el pago en caja", "error");
       throw error; 
     } finally {
       lockRef.current = false;

@@ -26,8 +26,9 @@ export const payOrder = async (req, res) => {
     const { orderId } = req.params;
     const { cuentaName, isFullPayment, paymentMethod } = req.body;
     
+    // 🔥 BLINDAJE 1: Incluimos ambos posibles alias para los items
     const order = await Order.findByPk(orderId, { 
-      include: ['items', { model: Table, as: 'table' }] 
+      include: ['items', 'OrderItems', { model: Table, as: 'table' }] 
     });
     
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
@@ -58,7 +59,9 @@ export const payOrder = async (req, res) => {
     if (paymentMethod === 'transferencia' || paymentMethod === 'TRANSFER') dbMethod = 'TRANSFER';
     else if (paymentMethod === 'tarjeta' || paymentMethod === 'CARD') dbMethod = 'CARD';
 
-    const activeItems = order.items.filter(i => i.status === 'ACTIVE');
+    // 🔥 BLINDAJE 2: Extraemos los items de forma segura para que el .filter() no crashee
+    const orderItems = order.items || order.OrderItems || [];
+    const activeItems = orderItems.filter(i => i.status === 'ACTIVE' || !i.status);
     
     const itemsToPay = isFullPayment
       ? activeItems.filter(i => !paidAccounts.includes(i.cuenta))
@@ -102,34 +105,32 @@ export const payOrder = async (req, res) => {
     const mixTag = isMixed ? ' | 🔗 Ticket Mixto' : '';
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
-    // 🔥 BLINDAJE DE ZONA HORARIA
-    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-
+    // 🔥 BLINDAJE 3: Agregamos "type: 'INCOME'" y dejamos que la DB maneje el createdAt
     if (amountCafeteria > 0) {
       const folioCaf = `CAF-${baseFolio}`;
       await Transaction.create({
+        type: 'INCOME', // Obligatorio para definir que es un ingreso a caja
         folio: folioCaf, 
         source: 'CAFETERIA',
         amount: amountCafeteria,
         description: `${descBase} ${folioCaf}${mixTag}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
-        createdBy: userId,
-        createdAt: localNow // Obligamos a la fecha local
+        createdBy: userId
       });
     }
 
     if (amountPasteleria > 0) {
       const folioPas = `PAS-${baseFolio}`;
       await Transaction.create({
+        type: 'INCOME', // Obligatorio
         folio: folioPas, 
         source: 'PASTELERIA',
         amount: amountPasteleria,
         description: `${descBase} ${folioPas}${mixTag}`,
         paymentMethod: dbMethod, 
         referenceId: order.id,
-        createdBy: userId,
-        createdAt: localNow // Obligamos a la fecha local
+        createdBy: userId
       });
     }
 
