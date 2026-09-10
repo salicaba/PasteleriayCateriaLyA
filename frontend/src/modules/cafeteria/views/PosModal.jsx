@@ -195,7 +195,8 @@ export const PosModal = ({
     if (isVitrina) {
       textoCuenta = ' de *Mostrador*';
     } else if (isLlevar) {
-      const nombreCliente = nombreParaSidebar || numeroReal;
+      // 🔥 Usamos parseAccountName para limpiar el teléfono (si lo tiene) y dejar solo el nombre
+      const nombreCliente = parseAccountName(nombreParaSidebar || numeroReal);
       textoCuenta = ` a nombre de *${nombreCliente}*`;
     } else {
       const cleanName = parseAccountName(cuentaName);
