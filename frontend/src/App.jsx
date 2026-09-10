@@ -185,11 +185,12 @@ function App() {
 
   const handleLogin = (userData) => {
     const now = new Date();
-    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+    // Expiración exacta de 24 horas (sincronizado con el backend de Node.js)
+    const expiresAt = now.getTime() + (24 * 60 * 60 * 1000);
     
     localStorage.setItem('lya_pos_session', JSON.stringify({
       userData,
-      expiresAt: nextMidnight.getTime()
+      expiresAt: expiresAt
     }));
     
     setUser(userData);
@@ -234,8 +235,9 @@ function App() {
       const savedSession = localStorage.getItem('lya_pos_session');
       if (savedSession) {
         const { expiresAt } = JSON.parse(savedSession);
+        // Expulsa solo si pasaron las 24 horas reales
         if (new Date().getTime() >= expiresAt) {
-          performCleanLogout("El turno ha finalizado (12:00 AM). Inicia sesión para el nuevo día.", false);
+          performCleanLogout("Tu sesión de 24 horas ha expirado por seguridad. Vuelve a ingresar.", false);
         }
       } else {
         performCleanLogout("Sesión no encontrada", false);
