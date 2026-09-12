@@ -594,10 +594,13 @@ export const sharePedidoTicket = async (req, res) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Ticket de Pedido #${pedido.id} - 𝓛𝔂𝓪</title>
+
+      <!-- 🔥 ICONO PARA LA PESTAÑA DEL NAVEGADOR (FAVICON) 🔥 -->
+      <link rel="icon" type="image/png" href="https://menu-lya.vercel.app/logo.jpeg" />
       <!-- 🔥 ETIQUETAS OPEN GRAPH PARA WHATSAPP (LOGO) 🔥 -->
       <meta property="og:title" content="Ticket de Pedido - 𝓛𝔂𝓪" />
       <meta property="og:description" content="¡Gracias por tu preferencia! Aquí tienes tu comprobante de pastelería." />
-      <meta property="og:image" content="https://menu-lya.vercel.app/logo.png" />
+      <meta property="og:image" content="https://menu-lya.vercel.app/logo.jpeg" />
       <meta property="og:type" content="website" />
 
       <script src="https://cdn.tailwindcss.com"></script>
