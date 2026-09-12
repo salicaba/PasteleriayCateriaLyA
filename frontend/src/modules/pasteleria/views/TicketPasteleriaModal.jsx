@@ -98,7 +98,7 @@ export default function TicketPasteleriaModal({ isOpen, onClose, pedido, calcula
       baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
     }
     
-    const shareLink = `${baseApiUrl}/pasteleria/ticket/${pedido.id}`;
+    const shareLink = `https://pascaf-lya.vercel.app/api/pasteleria/ticket/${pedido.id}`;
 
     let cuentasTexto = '';
     if (finanzas.deuda > 0 && transferInfo?.bank_accounts?.length > 0) {

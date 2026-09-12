@@ -188,7 +188,7 @@ export const PosModal = ({
     }
     
     const shortId = orderId.split('-')[0];
-    let shareLink = `${baseApiUrl}/pos/ticket/${shortId}`;
+    let shareLink = `https://pascaf-lya.vercel.app/api/pos/ticket/${shortId}`;
     
     if (cuentaName && cuentaName !== 'Todas') {
       shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
