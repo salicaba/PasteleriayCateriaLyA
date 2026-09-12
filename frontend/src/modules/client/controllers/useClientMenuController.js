@@ -366,7 +366,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       ? '' 
       : `?cuenta=${encodeURIComponent(clientData?.name || '')}`;
       
-    const url = `${baseApiUrl}/pos/ticket/${shortId}${queryParam}`;
+    const url = `https://pascaf-lya.vercel.app/api/pos/ticket/${shortId}${queryParam}`;
     window.open(url, '_blank');
   };
 
