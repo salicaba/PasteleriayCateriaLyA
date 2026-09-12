@@ -1,5 +1,4 @@
 // backend/src/modules/pasteleria/pasteleria.controller.js
-// backend/src/modules/pasteleria/pasteleria.controller.js
 import { Op } from 'sequelize';
 import sequelize from '../../config/database.js'; 
 import PasteleriaOrder from './PasteleriaOrder.model.js';
@@ -138,9 +137,8 @@ export const createPedido = async (req, res) => {
 
     let abonosParaGuardar = [];
 
-    // FECHA LOCAL EXTREMA
-    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-    const localNow = new Date(nowLocalStr);
+    // FECHA CORRECTA (El navegador y la BD ajustan la zona automáticamente)
+    const localNow = new Date();
 
     // 1. Registramos el anticipo inicial en la Caja
     const montoAnticipo = parseFloat(anticipo);
@@ -167,34 +165,8 @@ export const createPedido = async (req, res) => {
       });
     }
 
-    // 2. Procesamos cualquier otro abono extra
-    if (abonos && Array.isArray(abonos) && abonos.length > 0) {
-      for (const abono of abonos) {
-        const montoAbono = parseFloat(abono.monto);
-        if (montoAbono > 0) {
-          let dbMethod = 'CASH';
-          if (abono.metodo === 'transferencia') dbMethod = 'TRANSFER';
-          else if (abono.metodo === 'tarjeta') dbMethod = 'CARD'; 
-
-          const tx = await Transaction.create({
-            source: 'PASTELERIA',
-            paymentMethod: dbMethod, 
-            amount: montoAbono,
-            description: `Abono Pedido: ${pedidoData.cliente || 'Público General'} ${newId}`,
-            referenceId: newId,
-            createdBy: userId,
-            createdAt: localNow
-          });
-          
-          abonosParaGuardar.push({
-            id: tx.id,
-            fecha: abono.fecha || localNow.toISOString(),
-            monto: montoAbono,
-            metodo: abono.metodo || 'efectivo' 
-          });
-        }
-      }
-    }
+    // ELIMINAMOS EL "PASO 2" COMPLETO PARA EVITAR DUPLICADOS.
+    // Un pedido nuevo solo debe registrar su anticipo inicial. Los abonos futuros se manejan en otra función.
 
     // 🔥 3. MAGIA: Interceptamos las imágenes, las subimos a la nube y devolvemos los Links
     const imagenesFinales = await uploadImagesToStorage(imagenesReferencia, newId);
@@ -245,9 +217,8 @@ export const updatePedido = async (req, res) => {
         updateData.imagenesReferencia = [];
     }
 
-    // FECHA LOCAL EXTREMA
-    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-    const localNow = new Date(nowLocalStr);
+    // FECHA CORRECTA (El navegador y la BD ajustan la zona automáticamente)
+    const localNow = new Date();
 
     // LÓGICA DE REEMBOLSO AUTOMÁTICO
     const nuevoCosto = parseFloat(updateData.costoTotal);
@@ -319,9 +290,8 @@ export const addAbono = async (req, res) => {
     const isLiquidacion = totalPagado >= costoTotal;
     const tipoMovimiento = isLiquidacion ? 'Liquidación' : 'Abono';
 
-    // 🔥 FECHA LOCAL EXTREMA PARA EL ABONO
-    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-    const localNow = new Date(nowLocalStr);
+    // 🔥 FECHA CORRECTA PARA EL ABONO
+    const localNow = new Date();
 
     const tx = await Transaction.create({
       source: 'PASTELERIA',
@@ -368,8 +338,7 @@ export const updateEstado = async (req, res) => {
     pedido.estado = estado;
     await pedido.save();
 
-    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-    const localNow = new Date(nowLocalStr);
+    const localNow = new Date();
 
     if (estado === 'cancelado') {
       await Transaction.update(
@@ -425,8 +394,7 @@ export const cancelarPedido = async (req, res) => {
     pedido.estado = 'cancelado';
     await pedido.save({ transaction: t });
 
-    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-    const localNow = new Date(nowLocalStr);
+    const localNow = new Date();
 
     await Transaction.update(
       { status: 'CANCELLED', cancelledBy: userId, cancelledAt: localNow },
