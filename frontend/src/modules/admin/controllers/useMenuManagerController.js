@@ -198,12 +198,16 @@ export const useMenuManagerController = ({ showToast }) => {
     const newState = !currentState;
 
     try {
-      setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isActive: newState, disponible: newState } : p));
+      // 🔥 FIX: Eliminamos el "setProducts" optimista de aquí.
+      // Al no actualizar la UI de inmediato, el producto se queda en la papelera
+      // mostrando el botón de "Restaurando..." y el spinner hasta que termine.
+
       await adminMenuModel.updateProduct(id, { ...product, isActive: newState, disponible: newState });
       showToast(`Producto marcado como ${newState ? 'Activo' : 'Inactivo'}`, 'success');
-      loadData(false); 
+      
+      // Esperamos a que el catálogo se recargue para que ahora sí desaparezca
+      await loadData(false); 
     } catch (error) {
-      setProducts(prevProducts => prevProducts.map(p => p.id === id ? { ...p, isActive: currentState, disponible: currentState } : p));
       showToast('Error al actualizar disponibilidad', 'error');
     } finally {
       setProcessingActions(prev => { const next = { ...prev }; delete next[id]; return next; });

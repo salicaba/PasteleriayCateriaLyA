@@ -537,8 +537,14 @@ export const MenuManagerPage = () => {
                   // 🔥 FIX 3: Grid de 1 columna para que las tarjetas no se amontonen
                   <div className="grid grid-cols-1 gap-4">
                     {hiddenProducts.map((product) => {
+                      // PILAR 3: Estado de bloqueo asíncrono
                       const isProcessingAvailability = processingActions?.[product.id] === 'availability';
                       
+                      // Cruzamos la categoría para evitar "SIN CATEGORÍA"
+                      const categoriaReal = categories.find(c => c.id === product.categoryId)?.name 
+                                            || product.categoria 
+                                            || 'Sin categoría';
+
                       return (
                         <div key={product.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
                           
@@ -551,26 +557,30 @@ export const MenuManagerPage = () => {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              {/* Texto libre de cortes */}
+                              {/* PILAR 4: Textos con line-clamp para no romper el layout */}
                               <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text w-full line-clamp-2">{product.nombre || product.name}</h4>
-                              <p className="text-xs font-bold text-gray-500 lya:text-lya-text/60 mt-1 uppercase tracking-wider">{product.categoria || 'Sin categoría'}</p>
+                              <p className="text-xs font-bold text-gray-500 lya:text-lya-text/60 mt-1 uppercase tracking-wider">
+                                {categoriaReal}
+                              </p>
                             </div>
                           </div>
                           
-                          {/* 🔥 FIX 4: Botón de restaurar más grande y estandarizado */}
                           <div className="flex w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
-                            <button 
+                            {/* PILAR 2 y 3: motion.button, whileTap y opacidad reducida en carga */}
+                            <motion.button 
+                              whileTap={!isProcessingAvailability ? { scale: 0.95 } : {}}
                               onClick={() => !isProcessingAvailability && toggleAvailability(product.id)}
                               disabled={isProcessingAvailability}
                               className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 outline-none ${
                                 isProcessingAvailability 
-                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-wait'
-                                  : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 active:scale-95'
+                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-50 cursor-wait'
+                                  : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20'
                               }`}
                             >
+                              {/* PILAR 3: Loader en lugar del ícono cuando está procesando */}
                               {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />}
-                              <span>{isProcessingAvailability ? 'Restaurando' : 'Restaurar'}</span>
-                            </button>
+                              <span>{isProcessingAvailability ? 'Restaurando...' : 'Restaurar'}</span>
+                            </motion.button>
                           </div>
 
                         </div>
