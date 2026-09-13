@@ -26,11 +26,12 @@ const getCleanAccountName = (str) => {
 };
 
 // =====================================================================
-// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Precisión Láser por Cuenta)
+// 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Precisión Láser Corregida)
 // =====================================================================
-const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, localNow) => {
+const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, localNow, sourceToMatch = null) => {
   let whereClause = { referenceId: orderId, type: 'INCOME' };
   
+  // 1. Buscamos todas las transacciones de ingresos de esta orden (tanto anuladas como activas)
   let txs = await Transaction.findAll({
       where: whereClause,
       order: [['createdAt', 'DESC']]
@@ -38,7 +39,15 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 
   let targetTxs = txs;
   
-  if (cuentaName) {
+  // 2. FILTRO DE ORO: Intentamos filtrar por origen si nos lo proveen (Cafetería vs Pastelería)
+  if (sourceToMatch) {
+      const sourceFiltered = txs.filter(tx => tx.source === sourceToMatch);
+      if (sourceFiltered.length > 0) {
+          targetTxs = sourceFiltered;
+      }
+  } 
+  // 3. PLAN B: Si no hay origen, intentamos el viejo filtro por nombre de cuenta en Mesas
+  else if (cuentaName) {
     const cleanTarget = getCleanAccountName(cuentaName);
     const filteredTxs = txs.filter(tx => 
       tx.description && tx.description.includes(`Cuenta: ${cleanTarget}`)
@@ -57,11 +66,13 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
       let appliedAmount = 0;
 
       if (tipoOperacion === 'restar') {
+          // Si estamos anulando, le quitamos dinero hasta llegar a 0
           appliedAmount = Math.min(nuevoMonto, remainingMonto);
           nuevoMonto -= appliedAmount;
           remainingMonto -= appliedAmount;
           tx.description += ` | 📉 -$${appliedAmount.toFixed(2)} (Anulado: ${detalle})`;
       } else if (tipoOperacion === 'sumar') {
+          // Si estamos restaurando, le devolvemos el dinero sin límite
           appliedAmount = remainingMonto;
           nuevoMonto += appliedAmount;
           remainingMonto -= appliedAmount;
@@ -76,7 +87,6 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 
       if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
           newStatus = 'CANCELLED';
-          // 🔥 Asignamos la fecha local de Chiapas enviada por el helper
           cancelledAt = localNow; 
           cancelledBy = userId;
       } else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
@@ -489,7 +499,10 @@ export const restoreOrder = async (req, res) => {
       if (item.status === 'CANCELLED') {
         let wasPaid = wasGloballyPaid || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) {
-            totalRestoredByAccount[item.cuenta] = (totalRestoredByAccount[item.cuenta] || 0) + Number(item.subtotal);
+            // 🔥 AHORA agrupamos por cuenta y también por origen del producto (departamento)
+            const origen = item.product?.departamento?.toUpperCase() === 'PASTELERÍA' ? 'PASTELERIA' : 'CAFETERIA';
+            const key = `${item.cuenta}||${origen}`;
+            totalRestoredByAccount[key] = (totalRestoredByAccount[key] || 0) + Number(item.subtotal);
         }
 
         await item.update({ status: 'ACTIVE', cancelledAt: null, cancelReason: null, cancelledBy: null });
@@ -500,9 +513,11 @@ export const restoreOrder = async (req, res) => {
 
     const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
 
-    for (const [cuentaName, amount] of Object.entries(totalRestoredByAccount)) {
+    // 🔥 Iteramos sobre las cuentas agrupadas con su origen
+    for (const [key, amount] of Object.entries(totalRestoredByAccount)) {
         if (amount > 0) {
-           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName, localNow);
+           const [cuentaName, origen] = key.split('||');
+           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName, localNow, origen);
         }
     }
 
