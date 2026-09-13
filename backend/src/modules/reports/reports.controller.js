@@ -7,14 +7,32 @@ import Product from '../menu/Product.model.js';
 import PasteleriaOrder from '../pasteleria/PasteleriaOrder.model.js';
 import InventoryTransaction from '../inventory/InventoryTransaction.model.js';
 
+// =========================================================================
+// 🌐 UTILIDAD: FECHA LOCAL ESTRICTA (CHIAPAS / CDMX)
+// =========================================================================
+const getLocalNow = () => {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+};
+
 export const getDashboardData = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    // 🔥 SEGURO DE ZONA HORARIA
-    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const end = endDate ? new Date(endDate) : new Date();
-    end.setHours(23, 59, 59, 999);
+    // 🔥 BLINDAJE DE ZONA HORARIA (Igual que en Caja)
+    let start, end;
+    if (startDate && endDate) {
+      start = new Date(`${startDate}T00:00:00.000-06:00`);
+      end = new Date(`${endDate}T23:59:59.999-06:00`);
+    } else {
+      const localNow = getLocalNow();
+      // Por defecto toma el mes actual en hora local
+      const startOfM = new Date(localNow.getFullYear(), localNow.getMonth(), 1);
+      const startStr = `${startOfM.getFullYear()}-${String(startOfM.getMonth() + 1).padStart(2, '0')}-01`;
+      start = new Date(`${startStr}T00:00:00.000-06:00`);
+
+      const endStr = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+      end = new Date(`${endStr}T23:59:59.999-06:00`);
+    }
 
     const duration = end.getTime() - start.getTime();
     const prevStart = new Date(start.getTime() - duration - 1); 
@@ -47,8 +65,6 @@ export const getDashboardData = async (req, res) => {
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' }
     });
 
-    // backend/src/modules/reports/reports.controller.js
-
     // 2. Gastos Operativos (OPEX) (Actual - Agrupado para KPIs)
     const opexTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'EXPENSE', status: 'ACTIVE' },
@@ -60,7 +76,7 @@ export const getDashboardData = async (req, res) => {
       raw: true
     });
 
-    // 🔥 2.5 LISTA DETALLADA DE GASTOS (Para el Excel con descripción y concepto exacto)
+    // 2.5 LISTA DETALLADA DE GASTOS (Para el Excel)
     const expenseTransactions = await Transaction.findAll({
       where: { ...dateFilter, type: 'EXPENSE', status: 'ACTIVE' },
       attributes: ['id', 'folio', 'expenseCategory', 'description', 'amount', 'createdAt', 'paymentMethod'],
@@ -109,7 +125,6 @@ export const getDashboardData = async (req, res) => {
     // 4. Ventas/Rendimiento de Pastelería (Pedidos Entregados)
     const pasteleriaSalesRaw = await PasteleriaOrder.findAll({
       where: { 
-        // 🔥 CORRECCIÓN: Ahora usa updatedAt para que tome en cuenta el día en que se marcó como "entregado"
         updatedAt: { [Op.between]: [start, end] },
         estado: 'entregado'
       },
@@ -123,7 +138,6 @@ export const getDashboardData = async (req, res) => {
     });
 
     const pasteleriaSales = pasteleriaSalesRaw.map(item => {
-      // 🔥 CORRECCIÓN: Expresión regular para limpiar los corchetes y comillas del nombre
       let cleanName = item.name ? item.name.replace(/[\[\]"']/g, '') : 'Personalizado';
       return {
         name: cleanName,
@@ -196,7 +210,7 @@ export const getDashboardData = async (req, res) => {
         incomeTransactions,
         totalTransactions: totalTransactionsCount,
         opexTransactions,
-        expenseTransactions, // 🔥 NUEVO: Enviado para el detalle del Excel
+        expenseTransactions,
         productSales,
         pasteleriaSales,
         inventoryStats: inventoryStats, 
@@ -222,24 +236,42 @@ export const getProductStats = async (req, res) => {
 
     let dateFilter = {};
     if (period && period !== 'all') {
-      const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-      const now = new Date(nowStr);
+      const localNow = getLocalNow();
+      const year = localNow.getFullYear();
+      const month = String(localNow.getMonth() + 1).padStart(2, '0');
+      const day = String(localNow.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
       
       let start, end;
       
       if (period === 'today') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        start = new Date(`${todayStr}T00:00:00.000-06:00`);
+        end = new Date(`${todayStr}T23:59:59.999-06:00`);
       } else if (period === 'yesterday') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+        const yesterday = new Date(localNow);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        start = new Date(`${yStr}T00:00:00.000-06:00`);
+        end = new Date(`${yStr}T23:59:59.999-06:00`);
       } else if (period === 'week') {
-        const day = now.getDay() || 7; 
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - day), 23, 59, 59, 999);
+        const dayOfWeek = localNow.getDay() || 7; 
+        const startWeek = new Date(localNow);
+        startWeek.setDate(localNow.getDate() - dayOfWeek + 1);
+        const startWStr = `${startWeek.getFullYear()}-${String(startWeek.getMonth() + 1).padStart(2, '0')}-${String(startWeek.getDate()).padStart(2, '0')}`;
+        
+        const endWeek = new Date(localNow);
+        endWeek.setDate(localNow.getDate() + (7 - dayOfWeek));
+        const endWStr = `${endWeek.getFullYear()}-${String(endWeek.getMonth() + 1).padStart(2, '0')}-${String(endWeek.getDate()).padStart(2, '0')}`;
+        
+        start = new Date(`${startWStr}T00:00:00.000-06:00`);
+        end = new Date(`${endWStr}T23:59:59.999-06:00`);
       } else if (period === 'month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const startMStr = `${year}-${month}-01`;
+        const endOfM = new Date(year, localNow.getMonth() + 1, 0);
+        const endMStr = `${year}-${month}-${String(endOfM.getDate()).padStart(2, '0')}`;
+        
+        start = new Date(`${startMStr}T00:00:00.000-06:00`);
+        end = new Date(`${endMStr}T23:59:59.999-06:00`);
       }
 
       if (start && end) {
