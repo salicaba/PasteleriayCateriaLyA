@@ -26,6 +26,17 @@ const getCleanAccountName = (str) => {
 };
 
 // =====================================================================
+// 🔥 NUEVO HELPER: DETECCIÓN BLINDADA CONTRA TILDES Y MAYÚSCULAS
+// =====================================================================
+const getOrigenProducto = (departamento) => {
+  if (!departamento) return 'CAFETERIA';
+  // Convierte "Pastelería" a "PASTELERIA" quitando acentos
+  const deptoNormalizado = String(departamento).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (deptoNormalizado.includes('PASTELERIA')) return 'PASTELERIA';
+  return 'CAFETERIA';
+};
+
+// =====================================================================
 // 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Precisión Láser Corregida)
 // =====================================================================
 const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, localNow, sourceToMatch = null) => {
@@ -140,7 +151,10 @@ export const cancelOrderItem = async (req, res) => {
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta, localNow);
+      // 🔥 Usamos el nuevo helper blindado
+      const origen = getOrigenProducto(item.product?.departamento);
+      
+      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta, localNow, origen);
     }
 
     let notesArray = [];
@@ -161,7 +175,7 @@ export const cancelOrderItem = async (req, res) => {
             notes: JSON.stringify(cancelledNotes),
             kitchenStatus: item.kitchenStatus,
             status: 'CANCELLED',
-            cancelledAt: localNow, // Fecha local
+            cancelledAt: localNow,
             cancelReason: cancelReason || `Cancelación parcial desde POS`,
             cancelledBy: userId
         });
@@ -174,7 +188,7 @@ export const cancelOrderItem = async (req, res) => {
     } else {
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: localNow, // Fecha local
+          cancelledAt: localNow,
           cancelReason: cancelReason || `Cancelado desde POS`,
           cancelledBy: userId
         });
@@ -203,7 +217,7 @@ export const cancelOrderItem = async (req, res) => {
       await order.update({ 
         status: 'CANCELLED', 
         totalAmount: 0, 
-        cancelledAt: localNow, // Fecha local
+        cancelledAt: localNow,
         cancelReason: motivoMecanismoSeguridad, 
         cancelledBy: userId 
       });
@@ -244,7 +258,11 @@ export const cancelOrder = async (req, res) => {
 
     const order = await Order.findByPk(id, { 
       include: [
-        { model: OrderItem, as: 'items' },
+        { 
+          model: OrderItem, 
+          as: 'items',
+          include: [{ model: Product, as: 'product' }] 
+        },
         { model: Table, as: 'table' } 
       ] 
     });
@@ -275,12 +293,15 @@ export const cancelOrder = async (req, res) => {
       if (item.status === 'ACTIVE') {
         let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) {
-           totalRefundByAccount[item.cuenta] = (totalRefundByAccount[item.cuenta] || 0) + Number(item.subtotal);
+           // 🔥 Usamos el nuevo helper blindado
+           const origen = getOrigenProducto(item.product?.departamento);
+           const key = `${item.cuenta}||${origen}`;
+           totalRefundByAccount[key] = (totalRefundByAccount[key] || 0) + Number(item.subtotal);
         }
 
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: localNow, // Fecha local
+          cancelledAt: localNow,
           cancelReason: motivoFinal, 
           cancelledBy: userId
         });
@@ -289,16 +310,17 @@ export const cancelOrder = async (req, res) => {
 
     getIO().emit('orderCancelled', { orderId: id, tableId: order.tableId });
 
-    for (const [cuentaName, amount] of Object.entries(totalRefundByAccount)) {
+    for (const [key, amount] of Object.entries(totalRefundByAccount)) {
        if (amount > 0) {
-          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName, localNow);
+          const [cuentaName, origen] = key.split('||');
+          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName, localNow, origen);
        }
     }
 
     await order.update({
       status: 'CANCELLED',
       totalAmount: 0,
-      cancelledAt: localNow, // Fecha local
+      cancelledAt: localNow,
       cancelReason: motivoFinal, 
       cancelledBy: userId
     });
@@ -325,7 +347,6 @@ export const cancelOrder = async (req, res) => {
 // ==========================================
 export const getDailySummary = async (req, res) => {
   try {
-    // 🔥 FECHA LOCAL (CHIAPAS)
     const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const localNow = new Date(nowLocalStr);
 
@@ -420,7 +441,10 @@ export const restoreOrderItem = async (req, res) => {
 
     if (wasPaid && amountToRestore > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta, localNow);
+      // 🔥 Usamos el nuevo helper blindado
+      const origen = getOrigenProducto(item.product?.departamento);
+
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta, localNow, origen);
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
@@ -455,7 +479,11 @@ export const restoreOrder = async (req, res) => {
 
     const order = await Order.findByPk(id, { 
       include: [
-        { model: OrderItem, as: 'items' },
+        { 
+          model: OrderItem, 
+          as: 'items',
+          include: [{ model: Product, as: 'product' }] 
+        },
         { model: Table, as: 'table' } 
       ] 
     });
@@ -499,8 +527,8 @@ export const restoreOrder = async (req, res) => {
       if (item.status === 'CANCELLED') {
         let wasPaid = wasGloballyPaid || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) {
-            // 🔥 AHORA agrupamos por cuenta y también por origen del producto (departamento)
-            const origen = item.product?.departamento?.toUpperCase() === 'PASTELERÍA' ? 'PASTELERIA' : 'CAFETERIA';
+            // 🔥 Usamos el nuevo helper blindado
+            const origen = getOrigenProducto(item.product?.departamento);
             const key = `${item.cuenta}||${origen}`;
             totalRestoredByAccount[key] = (totalRestoredByAccount[key] || 0) + Number(item.subtotal);
         }
