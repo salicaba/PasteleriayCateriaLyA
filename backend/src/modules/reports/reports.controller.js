@@ -128,30 +128,62 @@ export const getDashboardData = async (req, res) => {
       };
     }).sort((a, b) => b.cantidad - a.cantidad);
 
-    // 4. Ventas/Rendimiento de Pastelería (Pedidos Entregados)
-    const pasteleriaSalesRaw = await PasteleriaOrder.findAll({
+    // 4. Ventas/Rendimiento de Pastelería (Basado en Abonos e Ingresos Reales en Caja)
+    const pasteleriaTxs = await Transaction.findAll({
       where: { 
-        updatedAt: { [Op.between]: [start, end] },
-        estado: 'entregado'
+        ...dateFilter, 
+        type: 'INCOME', 
+        source: 'PASTELERIA', 
+        status: 'ACTIVE' 
       },
-      attributes: [
-        ['categoria', 'name'],
-        [fn('COUNT', col('id')), 'cantidad'],
-        [fn('SUM', col('costoTotal')), 'ingreso']
-      ],
-      group: ['categoria'],
+      attributes: ['referenceId', 'amount'],
       raw: true
     });
 
-    const pasteleriaSales = pasteleriaSalesRaw.map(item => {
-      let cleanName = item.name ? item.name.replace(/[\[\]"']/g, '') : 'Personalizado';
-      return {
-        name: cleanName,
-        departamento: 'PASTELERÍA',
-        cantidad: parseInt(item.cantidad || 0, 10),
-        ingreso: parseFloat(item.ingreso || 0)
-      };
-    }).sort((a, b) => b.cantidad - a.cantidad);
+    // Extraemos los IDs de los pedidos para saber a qué categoría pertenece cada abono
+    const orderIds = [...new Set(pasteleriaTxs.map(t => t.referenceId).filter(Boolean))];
+    
+    const pasteleriaOrders = orderIds.length > 0 ? await PasteleriaOrder.findAll({
+      where: { id: { [Op.in]: orderIds } },
+      attributes: ['id', 'categoria'],
+      raw: true
+    }) : [];
+
+    // Mapeamos los IDs con su categoría
+    const orderCategoryMap = {};
+    pasteleriaOrders.forEach(o => {
+      orderCategoryMap[o.id] = o.categoria;
+    });
+
+    // Agrupamos los ingresos reales por categoría
+    const pasteleriaMap = {};
+    pasteleriaTxs.forEach(tx => {
+      const catRaw = orderCategoryMap[tx.referenceId] || 'Personalizado';
+      // Limpiamos corchetes por si vienen en formato de arreglo stringificado
+      const cleanName = catRaw ? catRaw.replace(/[\[\]"']/g, '') : 'Personalizado';
+      
+      if (!pasteleriaMap[cleanName]) {
+        pasteleriaMap[cleanName] = { 
+          name: cleanName, 
+          departamento: 'PASTELERÍA', 
+          cantidad: 0, 
+          ingreso: 0,
+          _uniqueOrders: new Set() // Set temporal para no contar 2 veces el mismo pastel si dieron 2 abonos hoy
+        };
+      }
+      
+      pasteleriaMap[cleanName].ingreso += parseFloat(tx.amount || 0);
+      if (tx.referenceId) {
+        pasteleriaMap[cleanName]._uniqueOrders.add(tx.referenceId);
+      }
+    });
+
+    const pasteleriaSales = Object.values(pasteleriaMap).map(item => {
+      // La "cantidad" vendida será el número de pedidos distintos que recibieron dinero en este periodo
+      item.cantidad = item._uniqueOrders.size > 0 ? item._uniqueOrders.size : 1; 
+      delete item._uniqueOrders; // Borramos la variable temporal para no ensuciar la respuesta al frontend
+      return item;
+    }).sort((a, b) => b.ingreso - a.ingreso);
 
     // 5. Mermas y Ajustes
     const mermasActual = await InventoryTransaction.findOne({

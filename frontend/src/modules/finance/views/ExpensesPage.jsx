@@ -46,7 +46,7 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
   const selected = options.find(o => o.value === value);
 
   return (
-    <div className={`relative ${containerClassName}`} ref={dropdownRef}>
+    <div className={`relative z-30 ${containerClassName}`} ref={dropdownRef}>
       <motion.button 
         whileTap={{ scale: 0.95 }}
         type="button"
@@ -67,7 +67,8 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute z-50 top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl shadow-xl overflow-hidden py-1"
+            // 👇 Aquí el z-[100]
+            className="absolute z-[100] top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl shadow-xl overflow-hidden py-1"
           >
             {options.map((opt) => (
               <motion.button
@@ -300,8 +301,8 @@ export const ExpensesPage = () => {
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
           >
-{/* 🔥 FIX: Aumentamos a z-[60] para que el dropdown flote por encima de todo */}
-            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
+            {/* 🔥 FIX: Aumentamos a z-[60] para que el dropdown flote por encima de todo */}
+            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-20 relative transition-colors">
               <div className="flex items-center space-x-4">
                 <div className="bg-red-500 dark:bg-red-600 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-red-500/20 dark:shadow-red-900/30 lya:shadow-lya-primary/20">
                   <Briefcase size={28} />
@@ -388,7 +389,7 @@ export const ExpensesPage = () => {
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 relative">
+            <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 relative z-10">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* FORMULARIO DE REGISTRO */}
