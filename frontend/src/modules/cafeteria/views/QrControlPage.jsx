@@ -7,7 +7,7 @@ import {
   Link as LinkIcon, LayoutGrid, ShoppingBag, Plus, X, Loader2, ScanLine,
   AlertCircle, Power, PowerOff, CheckSquare, Square, Download
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 import { ToastNotification } from './components/ToastNotification';
 import html2pdf from 'html2pdf.js';
@@ -671,18 +671,10 @@ export const QrControlPage = () => {
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
               />
               <motion.div 
-                /* 🚀 1. Reducimos la distancia inicial para evitar saltos largos */
-                initial={{ scale: 0.96, opacity: 0, y: 15 }} 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
-                exit={{ scale: 0.96, opacity: 0, y: 15 }}
-                /* 🚀 2. Adiós "spring". Usamos una curva "tween" súper fluida y estable para SVGs */
-                transition={{ duration: 0.25, ease: "easeOut" }}
-                /* 🚀 3. MAGIA ANTI-PARPADEO: Fuerza la creación de una capa GPU aislada */
-                style={{ 
-                  willChange: "transform, opacity", 
-                  WebkitBackfaceVisibility: "hidden", 
-                  backfaceVisibility: "hidden" 
-                }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
               >
                 <motion.button 
