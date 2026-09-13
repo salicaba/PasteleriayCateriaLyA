@@ -7,7 +7,7 @@ import {
   Link as LinkIcon, LayoutGrid, ShoppingBag, Plus, X, Loader2, ScanLine,
   AlertCircle, Power, PowerOff, CheckSquare, Square, Download
 } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 import { ToastNotification } from './components/ToastNotification';
 import html2pdf from 'html2pdf.js';
