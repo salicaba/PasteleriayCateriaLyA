@@ -480,7 +480,7 @@ export const CheckoutModal = ({
               </>
             ) : (
               <>
-                <span>Confirmar Cobro (${amountToPay.toFixed(2)})</span>
+                <span>Confirmar Cobro</span>
                 <CheckCircle size={20} strokeWidth={2.5} />
               </>
             )}
