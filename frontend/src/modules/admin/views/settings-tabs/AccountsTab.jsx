@@ -1,13 +1,12 @@
 // src/modules/admin/views/settings-tabs/AccountsTab.jsx
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal } from 'react-dom'; // 🚀 IMPORTACIÓN CLAVE PARA CUBRIR TODA LA PANTALLA
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Landmark, Plus, Trash2, Edit2, Check, Download, 
   Sliders, Info, MessageCircle, Save, Loader2, QrCode, Maximize, X, Link as LinkIcon 
 } from 'lucide-react';
-// 🚀 IMPORTAMOS AMBOS COMPONENTES
-import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react'; // 🚀 IMPORTACIÓN DEL QR
 import client from '../../../../api/client';
 import html2pdf from 'html2pdf.js';
 
@@ -29,9 +28,11 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
   const [printQuantity, setPrintQuantity] = useState(2);
   const [isPrinting, setIsPrinting] = useState(false);
 
+  // 🚀 ESTADOS PARA EL NUEVO QR
   const [previewQR, setPreviewQR] = useState(false);
   const [isPrintingQR, setIsPrintingQR] = useState(false);
 
+  // 🚀 OBTENER DOMINIO PARA EL QR
   const baseUrl = import.meta.env.VITE_CLIENT_URL || window.location.origin;
   const displayBaseUrl = baseUrl.replace(/^https?:\/\//, '');
 
@@ -186,6 +187,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
     }
   };
 
+  // 🚀 DESCARGA EXCLUSIVA DEL QR DE TRANSFERENCIAS
   const executeDownloadQR = async () => {
     setIsPrintingQR(true);
     try {
@@ -249,8 +251,10 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
 
       <div className={`flex-1 w-full relative ${globalScroll ? 'space-y-6' : 'overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-4 space-y-6'}`}>
         
+        {/* 🚀 NUEVA CONFIGURACIÓN: GRID PARA WHATSAPP Y QR DE TRANSFERENCIAS */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           
+          {/* Tarjeta de WhatsApp */}
           <motion.div 
             whileHover={{ y: -2, scale: 1.01 }}
             className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col sm:flex-row items-center gap-6 transition-all"
@@ -284,6 +288,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
             </div>
           </motion.div>
 
+          {/* 🚀 NUEVA TARJETA: QR DE TRANSFERENCIAS */}
           <motion.div 
             whileHover={{ y: -2, scale: 1.01 }}
             className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 flex flex-col sm:flex-row items-center gap-6 transition-all"
@@ -492,6 +497,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
+      {/* 🚀 CONTENEDOR OCULTO PARA EL PDF DEL TICKET FÍSICO */}
       <div style={{ height: 0, overflow: 'hidden' }}>
         <div id="pdf-accounts-container" style={{ width: '700px', backgroundColor: '#ffffff', padding: '30px', boxSizing: 'border-box', margin: '0 auto' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px' }}>
@@ -522,6 +528,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
+      {/* 🚀 CONTENEDOR OCULTO PARA EL PDF EXCLUSIVO DEL QR */}
       <div style={{ height: 0, overflow: 'hidden' }}>
         <div id="pdf-transfer-qr-container" style={{ width: '700px', backgroundColor: '#ffffff', boxSizing: 'border-box', margin: '0 auto', padding: '40px' }}>
           <div style={{ border: '2px dashed #D4A373', borderRadius: '20px', padding: '40px', backgroundColor: '#ffffff', textAlign: 'center' }}>
@@ -529,7 +536,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
             <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#000', margin: '0 0 5px 0' }}>Datos de Transferencia</h3>
             <p style={{ fontSize: '16px', color: '#666', fontStyle: 'italic', margin: '0 0 30px 0' }}>"Escanea para copiar los números de cuenta"</p>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-               {/* 🚀 MANTENEMOS SVG AQUÍ PARA EL PDF */}
                <QRCodeSVG value={`${baseUrl}/transferencias`} size={250} level="Q" bgColor="#ffffff" fgColor="#000000" />
             </div>
             <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#000', margin: 0 }}>{displayBaseUrl}/transferencias</p>
@@ -537,12 +543,15 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
+      {/* 🚀 MODAL NEO-BENTO DE PANTALLA COMPLETA DEL QR */}
       {createPortal(
         <AnimatePresence>
           {previewQR && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => setPreviewQR(false)}
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
               />
@@ -570,8 +579,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 </h2>
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
-                  {/* 🚀 USAMOS CANVAS AQUÍ EN EL MODAL VISUAL */}
-                  <QRCodeCanvas 
+                  <QRCodeSVG 
                      value={`${baseUrl}/transferencias`} 
                      size={220} 
                      bgColor="transparent" 
@@ -587,20 +595,23 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </span>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
       )}
 
+      {/* MODAL DE DESCARGA PDF DE TICKETS FÍSICOS (EL ORIGINAL) */}
       {createPortal(
         <AnimatePresence>
           {showPrintModal && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }} 
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => { if (!isPrinting) setShowPrintModal(false) }} 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
               />
@@ -668,20 +679,23 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </motion.button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
       )}
 
+      {/* MODAL ELIMINAR CUENTA */}
       {createPortal(
         <AnimatePresence>
           {accountToDelete && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }} 
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => !isDeleting && setAccountToDelete(null)} 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
               />
@@ -727,7 +741,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </motion.button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body

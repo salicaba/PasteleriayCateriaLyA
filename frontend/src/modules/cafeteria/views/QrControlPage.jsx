@@ -1,14 +1,13 @@
 // src/modules/cafeteria/views/QrControlPage.jsx
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal } from 'react-dom'; // 🚀 IMPORTACIÓN AÑADIDA
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, Trash2, Smartphone, 
   Link as LinkIcon, LayoutGrid, ShoppingBag, Plus, X, Loader2, ScanLine,
   AlertCircle, Power, PowerOff, CheckSquare, Square, Download
 } from 'lucide-react';
-// 🚀 IMPORTAMOS AMBOS COMPONENTES
-import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 import { ToastNotification } from './components/ToastNotification';
 import html2pdf from 'html2pdf.js';
@@ -209,7 +208,6 @@ export const QrControlPage = () => {
                           <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 5px 0', color: '#000', fontFamily: 'sans-serif' }}>Mostrador 𝓛𝔂𝓪</h2>
                           <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#4b5563', fontStyle: 'italic', margin: '0 0 20px 0' }}>"Ordena sin filas"</p>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                              {/* 🚀 MANTENEMOS SVG AQUÍ PARA EL PDF */}
                               <QRCodeSVG value={`${baseUrl}/llevar?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
                           </div>
                           <p style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', margin: 0, color: '#000' }}>{displayBaseUrl}/llevar</p>
@@ -222,7 +220,6 @@ export const QrControlPage = () => {
                           <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 5px 0', color: '#000', fontFamily: 'sans-serif' }}>Mesa {mesa.number}</h2>
                           <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#4b5563', fontStyle: 'italic', margin: '0 0 20px 0' }}>"Escanea para ordenar"</p>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                              {/* 🚀 MANTENEMOS SVG AQUÍ PARA EL PDF */}
                               <QRCodeSVG value={`${baseUrl}/m/${mesa.number}?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
                           </div>
                           <p style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', margin: 0, color: '#000' }}>{displayBaseUrl}/m/{mesa.number}</p>
@@ -390,8 +387,7 @@ export const QrControlPage = () => {
                       </div>
                       
                       <div className="w-full bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-6 mb-5 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 transition-colors shadow-inner relative overflow-hidden">
-                         {/* 🚀 USAMOS CANVAS AQUÍ EN LA INTERFAZ VISUAL */}
-                         <QRCodeCanvas 
+                         <QRCodeSVG 
                            value={`${baseUrl}/m/${mesa.number}`} 
                            size={120} 
                            bgColor="transparent" 
@@ -499,8 +495,7 @@ export const QrControlPage = () => {
                     <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-8 font-medium px-4 text-justify">QR único para que los clientes en fila puedan escanear el menú digital desde sus dispositivos móviles.</p>
 
                     <div className="w-full bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg rounded-3xl flex items-center justify-center py-10 mb-6 border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 shadow-inner relative overflow-hidden">
-                       {/* 🚀 USAMOS CANVAS AQUÍ EN LA INTERFAZ VISUAL */}
-                       <QRCodeCanvas 
+                       <QRCodeSVG 
                          value={`${baseUrl}/llevar`} 
                          size={160} 
                          bgColor="transparent" 
@@ -551,12 +546,15 @@ export const QrControlPage = () => {
         </AnimatePresence>
       </div>
 
+      {/* MODAL DE DESCARGA PDF NEO-BENTO */}
       {createPortal(
         <AnimatePresence>
           {showPrintModal && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => {
                   if (!isPrinting) setShowPrintModal(false);
                 }}
@@ -654,7 +652,7 @@ export const QrControlPage = () => {
                   )}
                 </motion.button>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
@@ -664,9 +662,11 @@ export const QrControlPage = () => {
       {createPortal(
         <AnimatePresence>
           {previewMesa && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => setPreviewMesa(null)}
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
               />
@@ -694,8 +694,7 @@ export const QrControlPage = () => {
                 </h2>
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
-                  {/* 🚀 USAMOS CANVAS AQUÍ EN EL MODAL VISUAL */}
-                  <QRCodeCanvas 
+                  <QRCodeSVG 
                      value={previewMesa?.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa?.number}`} 
                      size={220} 
                      bgColor="transparent" 
@@ -712,7 +711,7 @@ export const QrControlPage = () => {
                   </span>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
@@ -721,9 +720,11 @@ export const QrControlPage = () => {
       {createPortal(
         <AnimatePresence>
           {showToggleModal && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => {
                   if (!isTogglingQr) setShowToggleModal(false);
                 }}
@@ -797,7 +798,7 @@ export const QrControlPage = () => {
                   </motion.button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
@@ -806,9 +807,11 @@ export const QrControlPage = () => {
       {createPortal(
         <AnimatePresence>
           {mesaToDelete && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => {
                   if (removingId !== mesaToDelete?.id) setMesaToDelete(null);
                 }}
@@ -863,7 +866,7 @@ export const QrControlPage = () => {
                   </motion.button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
