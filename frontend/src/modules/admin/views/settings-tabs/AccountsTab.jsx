@@ -547,9 +547,11 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       {createPortal(
         <AnimatePresence>
           {previewQR && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => setPreviewQR(false)}
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
               />
@@ -593,7 +595,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </span>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
@@ -603,11 +605,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       {createPortal(
         <AnimatePresence>
           {showPrintModal && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }} 
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => { if (!isPrinting) setShowPrintModal(false) }} 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
               />
@@ -675,7 +679,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </motion.button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
@@ -685,11 +689,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
       {createPortal(
         <AnimatePresence>
           {accountToDelete && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }} 
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            >
+              <div 
                 onClick={() => !isDeleting && setAccountToDelete(null)} 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
               />
@@ -709,7 +715,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 </h3>
                 
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 text-justify leading-relaxed">
-                  Estás a punto de eliminar la cuenta de <strong>{accountToDelete.bank_name}</strong>. Esta acción no se puede deshacer.
+                  Estás a punto de eliminar la cuenta de <strong>{accountToDelete?.bank_name}</strong>. Esta acción no se puede deshacer.
                 </p>
                 
                 <div className="flex gap-4">
@@ -735,7 +741,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </motion.button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
