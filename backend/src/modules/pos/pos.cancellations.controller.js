@@ -424,6 +424,7 @@ export const restoreOrderItem = async (req, res) => {
       return res.status(400).json({ message: `No se puede restaurar un producto individual si el ticket entero ya fue finalizado o cancelado. Restaura el ticket completo primero.` });
     }
 
+    // 🔥 FIX: Buscamos cualquier transacción de ingreso original de esta orden
     const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
     let wasPaid = !!tx || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
     
@@ -441,7 +442,6 @@ export const restoreOrderItem = async (req, res) => {
 
     if (wasPaid && amountToRestore > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      // 🔥 Usamos el nuevo helper blindado
       const origen = getOrigenProducto(item.product?.departamento);
 
       await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta, localNow, origen);
@@ -449,8 +449,14 @@ export const restoreOrderItem = async (req, res) => {
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     
+    const currentPaid = order.paidAccounts || [];
+    if (wasPaid && !currentPaid.includes(item.cuenta)) {
+      currentPaid.push(item.cuenta);
+    }
+
     await order.update({ 
       status: wasPaid ? 'PAID' : 'OPEN',
+      paidAccounts: currentPaid,
       totalAmount: newTotal,
     });
 
@@ -518,6 +524,7 @@ export const restoreOrder = async (req, res) => {
       }
     }
 
+    // 🔥 FIX: Encontramos la transacción original de ingresos de la orden sin filtrar por estatus
     const tx = await Transaction.findOne({ where: { referenceId: order.id, type: 'INCOME' } });
     const wasGloballyPaid = !!tx;
 
@@ -527,7 +534,6 @@ export const restoreOrder = async (req, res) => {
       if (item.status === 'CANCELLED') {
         let wasPaid = wasGloballyPaid || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) {
-            // 🔥 Usamos el nuevo helper blindado
             const origen = getOrigenProducto(item.product?.departamento);
             const key = `${item.cuenta}||${origen}`;
             totalRestoredByAccount[key] = (totalRestoredByAccount[key] || 0) + Number(item.subtotal);
@@ -541,7 +547,6 @@ export const restoreOrder = async (req, res) => {
 
     const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
 
-    // 🔥 Iteramos sobre las cuentas agrupadas con su origen
     for (const [key, amount] of Object.entries(totalRestoredByAccount)) {
         if (amount > 0) {
            const [cuentaName, origen] = key.split('||');
@@ -551,10 +556,17 @@ export const restoreOrder = async (req, res) => {
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
     
-    const finalStatus = (wasGloballyPaid || (Object.values(totalRestoredByAccount).reduce((a,b)=>a+b,0) >= newTotal)) && newTotal > 0 ? 'PAID' : 'OPEN';
+    const restoredSum = Object.values(totalRestoredByAccount).reduce((a,b)=>a+b,0);
+    const finalStatus = (wasGloballyPaid || restoredSum >= newTotal) && newTotal > 0 ? 'PAID' : 'OPEN';
+
+    const activeAccounts = [...new Set(order.items.map(i => i.cuenta || 'General'))];
+    const updatedPaidAccounts = finalStatus === 'PAID'
+      ? Array.from(new Set([...(order.paidAccounts || []), ...activeAccounts]))
+      : (order.paidAccounts || []);
 
     await order.update({
       status: finalStatus,
+      paidAccounts: updatedPaidAccounts,
       totalAmount: newTotal,
       cancelledAt: null,
       cancelReason: null,

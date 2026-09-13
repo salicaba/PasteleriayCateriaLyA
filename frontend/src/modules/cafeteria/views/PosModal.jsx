@@ -107,7 +107,8 @@ export const PosModal = ({
     moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
     releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture 
-  } = usePosController(mesa, isOpen, todasLasMesas, showToast); 
+  } = usePosController(mesa, isOpen, todasLasMesas, showToast, onTableRelease, onClose, inline); 
+  // 👆 Fíjate cómo agregamos onTableRelease, onClose, inline al final
 
   // 🔥 DEFINIMOS CUENTAS PAGADAS PRIMERO
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
