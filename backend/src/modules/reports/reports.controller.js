@@ -172,20 +172,25 @@ export const getDashboardData = async (req, res) => {
     };
 
     // 6. Métodos de Pago
-    const paymentMethods = await Transaction.findAll({
+    const rawPaymentMethods = await Transaction.findAll({
       where: { ...dateFilter, type: 'INCOME', status: 'ACTIVE' },
       attributes: [
-        [literal(`
-          CASE 
-            WHEN description LIKE '%Transferencia%' THEN 'Transferencia'
-            WHEN description LIKE '%Tarjeta%' THEN 'Tarjeta'
-            ELSE 'Efectivo' 
-          END
-        `), 'metodo'],
+        'paymentMethod',
         [fn('SUM', col('amount')), 'total']
       ],
-      group: ['metodo'],
+      group: ['paymentMethod'],
       raw: true
+    });
+
+    const paymentMethods = rawPaymentMethods.map(t => {
+      let nombreMetodo = 'Efectivo';
+      if (t.paymentMethod === 'TRANSFER') nombreMetodo = 'Transferencia';
+      if (t.paymentMethod === 'CARD') nombreMetodo = 'Tarjeta';
+      
+      return {
+        metodo: nombreMetodo,
+        total: parseFloat(t.total || 0)
+      };
     });
 
     // --- TENDENCIAS ---

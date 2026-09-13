@@ -129,23 +129,25 @@ export const createPedido = async (req, res) => {
   try {
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
     
-    // 🔥 Extraemos 'imagenesReferencia' crudas del body
-    const { abonos, anticipo, metodoPagoAnticipo, imagenesReferencia, ...pedidoData } = req.body;
+    // 🔥 FIX: Extraemos todas las posibles variables del método de pago
+    const { abonos, anticipo, metodoPagoAnticipo, metodoPago, metodo, imagenesReferencia, ...pedidoData } = req.body;
 
     const randomNum = Math.floor(100 + Math.random() * 900);
     const newId = `PED-${Date.now().toString().slice(-6)}${randomNum}`;
 
     let abonosParaGuardar = [];
-
-    // FECHA CORRECTA (El navegador y la BD ajustan la zona automáticamente)
     const localNow = new Date();
 
-    // 1. Registramos el anticipo inicial en la Caja
     const montoAnticipo = parseFloat(anticipo);
     if (montoAnticipo > 0) {
+      
+      // 🔥 FIX: Consolidamos lo que sea que mande el frontend
+      const metodoReal = metodoPagoAnticipo || metodoPago || metodo || '';
+      const metodoSafe = String(metodoReal).toLowerCase();
+      
       let dbMethod = 'CASH';
-      if (metodoPagoAnticipo === 'transferencia') dbMethod = 'TRANSFER';
-      else if (metodoPagoAnticipo === 'tarjeta') dbMethod = 'CARD'; 
+      if (metodoSafe.includes('transf')) dbMethod = 'TRANSFER';
+      else if (metodoSafe.includes('tarj') || metodoSafe.includes('card')) dbMethod = 'CARD';
 
       const tx = await Transaction.create({
         source: 'PASTELERIA',
@@ -161,20 +163,16 @@ export const createPedido = async (req, res) => {
         id: tx.id,
         fecha: localNow.toISOString(),
         monto: montoAnticipo,
-        metodo: metodoPagoAnticipo || 'efectivo' 
+        metodo: dbMethod === 'TRANSFER' ? 'transferencia' : dbMethod === 'CARD' ? 'tarjeta' : 'efectivo' 
       });
     }
 
-    // ELIMINAMOS EL "PASO 2" COMPLETO PARA EVITAR DUPLICADOS.
-    // Un pedido nuevo solo debe registrar su anticipo inicial. Los abonos futuros se manejan en otra función.
-
-    // 🔥 3. MAGIA: Interceptamos las imágenes, las subimos a la nube y devolvemos los Links
     const imagenesFinales = await uploadImagesToStorage(imagenesReferencia, newId);
 
     const nuevoPedido = await PasteleriaOrder.create({
       id: newId,
       ...pedidoData,
-      imagenesReferencia: imagenesFinales, // Guardamos Links Ultraligeros, cero lag
+      imagenesReferencia: imagenesFinales,
       abonos: abonosParaGuardar 
     });
 
@@ -271,7 +269,8 @@ export const updatePedido = async (req, res) => {
 export const addAbono = async (req, res) => {
   try {
     const { id } = req.params;
-    const { monto, metodo } = req.body; 
+    // 🔥 FIX: Abarcamos ambas opciones posibles del frontend
+    const { monto, metodo, metodoPago } = req.body; 
     
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
@@ -280,9 +279,13 @@ export const addAbono = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
+    // 🔥 FIX: Normalizamos el texto del abono
+    const metodoReal = metodo || metodoPago || '';
+    const metodoSafe = String(metodoReal).toLowerCase();
+    
     let dbMethod = 'CASH';
-    if (metodo === 'transferencia') dbMethod = 'TRANSFER';
-    else if (metodo === 'tarjeta') dbMethod = 'CARD';
+    if (metodoSafe.includes('transf')) dbMethod = 'TRANSFER';
+    else if (metodoSafe.includes('tarj') || metodoSafe.includes('card')) dbMethod = 'CARD';
 
     const abonosActuales = pedido.abonos || [];
     const totalPagado = abonosActuales.reduce((sum, ab) => sum + parseFloat(ab.monto), 0) + parseFloat(monto);
@@ -290,7 +293,6 @@ export const addAbono = async (req, res) => {
     const isLiquidacion = totalPagado >= costoTotal;
     const tipoMovimiento = isLiquidacion ? 'Liquidación' : 'Abono';
 
-    // 🔥 FECHA CORRECTA PARA EL ABONO
     const localNow = new Date();
 
     const tx = await Transaction.create({
@@ -300,14 +302,14 @@ export const addAbono = async (req, res) => {
       description: `${tipoMovimiento} Pedido: ${pedido.cliente} ${pedido.id}`,
       referenceId: pedido.id,
       createdBy: userId,
-      createdAt: localNow // Obliga a la caja a meter el abono HOY, no el día que se creó el pedido
+      createdAt: localNow 
     });
 
     const nuevoAbono = {
       id: tx.id, 
       fecha: localNow.toISOString(),
       monto: parseFloat(monto),
-      metodo: metodo || 'efectivo'
+      metodo: dbMethod === 'TRANSFER' ? 'transferencia' : dbMethod === 'CARD' ? 'tarjeta' : 'efectivo'
     };
 
     pedido.abonos = [...abonosActuales, nuevoAbono];
@@ -328,7 +330,6 @@ export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
-    const userId = req.user?.id || req.userId || req.usuario?.id || null;
 
     const pedido = await PasteleriaOrder.findByPk(id);
     if (!pedido) {
@@ -338,16 +339,15 @@ export const updateEstado = async (req, res) => {
     pedido.estado = estado;
     await pedido.save();
 
-    const localNow = new Date();
-
+    // 🔥 FIX 3: Solo actualizamos el status para evitar el Error 500
     if (estado === 'cancelado') {
       await Transaction.update(
-        { status: 'CANCELLED', cancelledBy: userId, cancelledAt: localNow },
+        { status: 'CANCELLED' },
         { where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'ACTIVE' } }
       );
     } else if (estado === 'pendiente') {
       await Transaction.update(
-        { status: 'ACTIVE', cancelledBy: null, cancelledAt: null },
+        { status: 'ACTIVE' },
         { where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'CANCELLED' } }
       );
     }
@@ -355,7 +355,7 @@ export const updateEstado = async (req, res) => {
     res.json({ data: pedido });
   } catch (error) {
     console.error("Error al actualizar estado:", error);
-    res.status(500).json({ message: "Error al actualizar el estado del pedido" });
+    res.status(500).json({ message: "Error al actualizar el estado del pedido", error: error.message });
   }
 };
 
@@ -367,9 +367,6 @@ export const entregarPedido = async (req, res) => {
     if (!pedido) return res.status(404).json({ message: 'Pedido no encontrado' });
 
     pedido.estado = 'entregado';
-    // Al hacer save(), Sequelize actualiza automáticamente el 'updatedAt'. 
-    // Como los reportes de rendimiento de Pastelería ahora leen el 'updatedAt' en lugar del 'createdAt',
-    // los pasteles entregados hoy aparecerán en el mes/semana/día actual.
     await pedido.save();
 
     res.json({ message: 'Pedido entregado correctamente', data: pedido });

@@ -722,7 +722,8 @@ export const ExpensesPage = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-3xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors overflow-hidden"
+              // 🔥 FIX 1: Cambiamos de max-w-3xl a max-w-4xl (más ancho)
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-4xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors overflow-hidden"
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0 transition-colors">
                 <div className="flex items-center gap-3">
@@ -752,7 +753,8 @@ export const ExpensesPage = () => {
                     <p className="text-gray-500 dark:text-gray-400 font-bold lya:text-lya-text/60 text-lg text-center">No hay gastos anulados el día de hoy.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  // 🔥 FIX 2: Lo pasamos a grid de 1 columna para que no se amontonen las tarjetas
+                  <div className="grid grid-cols-1 gap-4">
                     {cancelledExpenses.map((ex) => {
                       const catConfig = CATEGORIES.find(c => c.id === ex.expenseCategory) || CATEGORIES[5];
                       const Icon = catConfig.icon;
@@ -764,23 +766,24 @@ export const ExpensesPage = () => {
                       const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
 
                       return (
-                        <div key={ex.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4 sm:gap-0">
+                        <div key={ex.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
                           
-                          <div className="flex flex-row items-start gap-3 flex-1 min-w-0 pr-2">
+                          <div className="flex flex-row items-center gap-4 flex-1 min-w-0 pr-4">
                             <div className={`h-12 w-12 flex-shrink-0 rounded-[1.25rem] ${catConfig.color} flex items-center justify-center border border-gray-100 dark:border-gray-700 lya:border-transparent`}>
                               <Icon size={20} />
                             </div>
-                            <div className="min-w-0 flex-1 pt-0.5">
-                              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 lya:text-lya-text truncate w-full">{displayDesc}</h4>
+                            <div className="min-w-0 flex-1">
+                              {/* 🔥 FIX 3: Permitimos que el texto use todo el ancho y no se trunque a la fuerza si hay espacio */}
+                              <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text line-clamp-2">{displayDesc}</h4>
                               
                               <div className="flex flex-col mt-1 gap-1">
-                                <div className="flex flex-wrap items-center gap-x-1">
-                                  <span className="text-xs font-medium text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
+                                <div className="flex flex-wrap items-center gap-x-2">
+                                  <span className="text-xs font-bold text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
                                     Anulado: {formattedTime}
                                   </span>
                                   {realAuditDateTime && (
                                     <span 
-                                      className="ml-1 text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0"
+                                      className="text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0"
                                       title={`Teclado en sistema: ${realAuditDateTime}`}
                                     >
                                       Diferido
@@ -796,18 +799,19 @@ export const ExpensesPage = () => {
                             </div>
                           </div>
                           
-                          <div className="flex flex-col items-end sm:items-center sm:flex-row gap-4 shrink-0 w-full sm:w-auto">
-                            <span className="font-black text-base text-red-500 lya:text-red-400 hidden sm:block">
+                          <div className="flex flex-row items-center gap-6 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
+                            {/* 🔥 FIX 4: Precio más visible y separado del botón */}
+                            <span className="font-black text-xl text-red-500 lya:text-red-400">
                               ${parseFloat(ex.amount).toFixed(2)}
                             </span>
                             <motion.button 
                               whileTap={{ scale: 0.95 }}
                               onClick={() => handleRestore(ex.id)}
                               disabled={actionLoadingId === ex.id}
-                              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 disabled:opacity-50 shrink-0"
+                              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 disabled:opacity-50 shrink-0"
                             >
-                              {actionLoadingId === ex.id ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
-                              <span className="hidden sm:inline">
+                              {actionLoadingId === ex.id ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />}
+                              <span>
                                 {actionLoadingId === ex.id ? 'Restaurando' : 'Restaurar'}
                               </span>
                             </motion.button>

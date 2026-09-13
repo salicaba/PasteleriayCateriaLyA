@@ -709,7 +709,10 @@ export default function InventoryPage() {
         {isTrashOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsTrashOpen(false)} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-3xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-hidden transition-colors">
+            
+            {/* 🔥 FIX 1: Cambiamos a max-w-4xl para darle mayor amplitud y espacio al contenido */}
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-4xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-hidden transition-colors">
+              
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-red-100 dark:bg-red-900/30 lya:bg-red-500/10 rounded-2xl text-red-500 lya:text-red-500 shadow-sm border border-red-200 dark:border-red-800/50 lya:border-red-500/20"><Trash2 size={24} /></div>
@@ -720,6 +723,7 @@ export default function InventoryPage() {
                 </div>
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setIsTrashOpen(false)} className="p-2.5 text-gray-400 md:hover:text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:hover:text-lya-text lya:hover:bg-lya-border/30 rounded-xl transition-all"><X size={20} strokeWidth={2.5} /></motion.button>
               </div>
+
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30 transition-colors">
                 {cancelledKardex.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -729,24 +733,33 @@ export default function InventoryPage() {
                     <p className="text-gray-500 dark:text-gray-400 font-bold lya:text-lya-text/60 text-lg text-center">No hay movimientos anulados hoy.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  // 🔥 FIX 2: Usamos grid de 1 sola columna para que cada tarjeta respire a lo ancho
+                  <div className="grid grid-cols-1 gap-4">
                     {cancelledKardex.map((tx) => (
-                      <div key={tx.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4 sm:gap-0 shadow-sm">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="font-bold text-sm text-gray-800 dark:text-gray-200 lya:text-lya-text truncate">{tx.item?.name}</p>
-                          <div className="flex flex-col mt-1 gap-1">
+                      <div key={tx.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
+                        
+                        <div className="flex-1 min-w-0 pr-4">
+                          {/* 🔥 FIX 3: Texto sin truncarse de más para leer completo el nombre del insumo */}
+                          <p className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text w-full">{tx.item?.name}</p>
+                          
+                          <div className="flex flex-wrap items-center gap-x-3 mt-1.5">
                             <span className="text-xs font-medium text-gray-500 lya:text-lya-text/60 whitespace-nowrap">
                               Anulado: {new Date(tx.cancelledAt || tx.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' })}
                             </span>
-                            <span className="text-[11px] font-bold text-gray-500 lya:text-lya-text/60 line-clamp-1">
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 whitespace-nowrap bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
                               Cant: {Number(tx.quantity).toFixed(2)} | Costo: ${Number(tx.totalCost).toFixed(2)}
                             </span>
                           </div>
                         </div>
                         
-                        <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleRestore(tx.id)} disabled={actionLoadingId === tx.id} className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:hover:bg-emerald-500/20 transition-colors disabled:opacity-50 shrink-0">
-                          {actionLoadingId === tx.id ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />} 
-                          <span className="hidden sm:inline">{actionLoadingId === tx.id ? 'Restaurando' : 'Restaurar'}</span>
+                        <motion.button 
+                          whileTap={{ scale: 0.95 }} 
+                          onClick={() => handleRestore(tx.id)} 
+                          disabled={actionLoadingId === tx.id} 
+                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:hover:bg-emerald-500/20 transition-colors disabled:opacity-50 shrink-0"
+                        >
+                          {actionLoadingId === tx.id ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />} 
+                          <span>{actionLoadingId === tx.id ? 'Restaurando' : 'Restaurar'}</span>
                         </motion.button>
                       </div>
                     ))}

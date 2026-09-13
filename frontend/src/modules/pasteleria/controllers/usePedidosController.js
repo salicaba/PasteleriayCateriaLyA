@@ -147,16 +147,16 @@ export const usePedidosController = () => {
 
     setIsSubmitting(true);
     try {
-      // Si la acción es cancelar y hay motivo, usamos editarPedidoReal para inyectar el motivo, sino solo actualizamos estado
       let pedidoActualizado;
       
       if (tipo === 'cancelar' && motivoPersonalizado) {
-        pedidoActualizado = await editarPedidoReal(pedido.id, {
+        // 🔥 FIX 1: Primero guardamos el motivo como edición normal
+        await editarPedidoReal(pedido.id, {
           ...pedido,
-          estado: 'cancelado',
           motivoCancelacion: motivoPersonalizado
         });
-        pedidoActualizado = pedidoActualizado.data || pedidoActualizado;
+        // 🔥 Y LUEGO obligamos al sistema a usar la ruta de estado para que afecte la Caja
+        pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, 'cancelado');
       } else {
         pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, nuevoEstado);
       }
@@ -269,7 +269,8 @@ export const usePedidosController = () => {
 
     setIsSubmitting(true);
     try {
-      await registrarAbonoReal(pedidoId, monto); 
+      // 🔥 FIX 2: ¡Aquí faltaba enviar el metodoPago!
+      await registrarAbonoReal(pedidoId, monto, metodoPago); 
 
       const pedidoActual = pedidos.find(p => p.id === pedidoId);
       

@@ -492,17 +492,27 @@ export const MenuManagerPage = () => {
 
       <AnimatePresence>
         {isTrashModalOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 lya:bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+            {/* 🔥 FIX 1: Fondo sutil, idéntico al de la Papelera de Gastos Operativos */}
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setIsTrashModalOpen(false)} 
+              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" 
+            />
+            
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+              // 🔥 FIX 2: max-w-4xl y rounded-[2.5rem] para igualar el diseño de las otras papeleras
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative z-10 transition-colors"
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-red-100 dark:bg-red-900/30 rounded-xl text-red-500">
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-500">
                     <ArchiveRestore size={24} />
                   </div>
                   <div>
@@ -510,48 +520,59 @@ export const MenuManagerPage = () => {
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Productos inactivos ocultos del menú principal</p>
                   </div>
                 </div>
-                <button onClick={() => setIsTrashModalOpen(false)} className="p-2 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 lya:md:hover:text-lya-text rounded-full transition-colors outline-none"><X size={24} /></button>
+                <button onClick={() => setIsTrashModalOpen(false)} className="p-2.5 text-gray-400 md:hover:text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:hover:text-lya-text lya:hover:bg-lya-border/30 rounded-xl transition-all outline-none">
+                  <X size={20} strokeWidth={2.5} />
+                </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
                 {hiddenProducts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-10 text-center">
-                    <ArchiveRestore size={48} className="text-gray-300 dark:text-gray-700 mb-4" />
-                    <p className="text-gray-500 dark:text-gray-400 font-bold">La papelera está vacía.</p>
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4 transition-colors">
+                      <ArchiveRestore size={40} className="text-gray-400 dark:text-gray-600 lya:text-lya-text/30" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 font-bold text-lg">La papelera está vacía.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  // 🔥 FIX 3: Grid de 1 columna para que las tarjetas no se amontonen
+                  <div className="grid grid-cols-1 gap-4">
                     {hiddenProducts.map((product) => {
                       const isProcessingAvailability = processingActions?.[product.id] === 'availability';
                       
                       return (
-                        <div key={product.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 md:hover:opacity-100 transition-opacity">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                        <div key={product.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
+                          
+                          <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
+                            <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700 overflow-hidden shadow-inner">
                               {product.image || product.imageUrl ? (
-                                <img src={product.image || product.imageUrl} className="h-full w-full object-cover rounded-xl" />
+                                <img src={product.image || product.imageUrl} className="h-full w-full object-cover" />
                               ) : (
-                                <ImageIcon size={20} className="text-gray-400" />
+                                <ImageIcon size={24} className="text-gray-400" />
                               )}
                             </div>
-                            <div className="min-w-0">
-                              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">{product.nombre || product.name}</h4>
-                              <p className="text-xs text-gray-500 mt-0.5 truncate">{product.categoria || 'Sin categoría'}</p>
+                            <div className="min-w-0 flex-1">
+                              {/* Texto libre de cortes */}
+                              <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text w-full line-clamp-2">{product.nombre || product.name}</h4>
+                              <p className="text-xs font-bold text-gray-500 lya:text-lya-text/60 mt-1 uppercase tracking-wider">{product.categoria || 'Sin categoría'}</p>
                             </div>
                           </div>
                           
-                          <button 
-                            onClick={() => !isProcessingAvailability && toggleAvailability(product.id)}
-                            disabled={isProcessingAvailability}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ml-2 shrink-0 outline-none ${
-                              isProcessingAvailability 
-                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-wait'
-                                : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 active:scale-95'
-                            }`}
-                          >
-                            {isProcessingAvailability ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
-                            <span className="hidden sm:inline">Restaurar</span>
-                          </button>
+                          {/* 🔥 FIX 4: Botón de restaurar más grande y estandarizado */}
+                          <div className="flex w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
+                            <button 
+                              onClick={() => !isProcessingAvailability && toggleAvailability(product.id)}
+                              disabled={isProcessingAvailability}
+                              className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 outline-none ${
+                                isProcessingAvailability 
+                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-wait'
+                                  : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 active:scale-95'
+                              }`}
+                            >
+                              {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />}
+                              <span>{isProcessingAvailability ? 'Restaurando' : 'Restaurar'}</span>
+                            </button>
+                          </div>
+
                         </div>
                       )
                     })}
@@ -559,7 +580,7 @@ export const MenuManagerPage = () => {
                 )}
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

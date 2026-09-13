@@ -23,9 +23,10 @@ export const crearPedidoReal = async (pedidoData) => {
   }
 };
 
-export const registrarAbonoReal = async (id, monto) => {
+export const registrarAbonoReal = async (id, monto, metodo) => {
   try {
-    const response = await client.post(`${API_URL}/${id}/abonos`, { monto });
+    // 🔥 FIX: Agregamos "metodo" tanto en los parámetros como en el envío de datos
+    const response = await client.post(`${API_URL}/${id}/abonos`, { monto, metodo });
     return response.data;
   } catch (error) {
     console.error("Error al registrar el abono en la BD:", error);

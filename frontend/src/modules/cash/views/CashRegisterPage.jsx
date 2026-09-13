@@ -197,7 +197,7 @@ export const CashRegisterPage = ({ user }) => {
         <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-emerald-500 mb-1">
             <Banknote size={16}/> 
-            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Efectivo en Cajón</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Efectivo</span>
           </div>
           <h2 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]">${paymentStats.efectivo.toFixed(2)}</h2>
         </motion.div>
@@ -205,7 +205,7 @@ export const CashRegisterPage = ({ user }) => {
         <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-blue-500 mb-1">
             <Landmark size={16}/> 
-            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Banco / Digital</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Transferencias</span>
           </div>
           <h2 className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 lya:text-blue-600">${paymentStats.digital.toFixed(2)}</h2>
         </motion.div>

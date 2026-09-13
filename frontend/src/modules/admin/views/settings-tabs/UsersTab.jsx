@@ -1,5 +1,6 @@
 // src/modules/admin/views/settings-tabs/UsersTab.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // 🔥 FIX: Súper poder para cubrir toda la pantalla
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Shield, Mail, Eye, EyeOff, Loader2, Save, Edit2, UserX, UserCheck, Info, List, ArchiveRestore, X, Check } from 'lucide-react';
 import client from '../../../../api/client';
@@ -534,111 +535,124 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {isTrashModalOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 lya:bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-            >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-500">
-                    <UserX size={28} />
+      {/* 🔥 FIX: createPortal para evitar el hueco arriba, y bg-gray-900/40 para igualar el color claro de Gastos */}
+      {createPortal(
+        <AnimatePresence>
+          {isTrashModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => setIsTrashModalOpen(false)} 
+                className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" 
+              />
+              
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative z-10 transition-colors"
+              >
+                <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-500">
+                      <UserX size={28} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">Usuarios Suspendidos</h3>
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Personal con acceso bloqueado al sistema</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">Usuarios Suspendidos</h3>
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Personal con acceso bloqueado al sistema</p>
-                  </div>
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setIsTrashModalOpen(false)} 
+                    className="p-2.5 text-gray-400 md:hover:text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:hover:text-lya-text lya:hover:bg-lya-border/30 rounded-xl transition-all"
+                  >
+                    <X size={24} strokeWidth={2.5} />
+                  </motion.button>
                 </div>
-                <motion.button 
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setIsTrashModalOpen(false)} 
-                  className="p-2 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 lya:md:hover:text-lya-text rounded-full transition-colors"
-                >
-                  <X size={24} />
-                </motion.button>
-              </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
-                {inactiveUsers.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-10 text-center">
-                    <UserCheck size={48} className="text-gray-300 dark:text-gray-700 mb-4" />
-                    <p className="text-gray-500 dark:text-gray-400 font-bold">No hay personal suspendido en este momento.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {inactiveUsers.map((usr) => {
-                      const isMe = currentUser?.id === usr.id;
-                      return (
-                        <div key={usr.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 opacity-80 md:hover:opacity-100 transition-opacity">
-                          
-                          <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                            <div className="h-12 w-12 flex-shrink-0 rounded-[1rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
-                              {getInitials(usr.fullName)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">{usr.fullName}</h4>
-                                {isMe && (
-                                  <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 lya:bg-lya-primary/20 lya:text-lya-primary px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-wider shrink-0">
-                                    (Tú)
-                                  </span>
-                                )}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
+                  {inactiveUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-10 text-center">
+                      <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4 transition-colors">
+                        <UserCheck size={40} className="text-gray-300 dark:text-gray-700 lya:text-lya-text/30" strokeWidth={1.5} />
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400 font-bold">No hay personal suspendido en este momento.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {inactiveUsers.map((usr) => {
+                        const isMe = currentUser?.id === usr.id;
+                        return (
+                          <div key={usr.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
+                            
+                            <div className="flex items-center gap-4 flex-1 min-w-0 pr-2">
+                              <div className="h-12 w-12 flex-shrink-0 rounded-[1.25rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
+                                {getInitials(usr.fullName)}
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5 truncate">@{usr.username} • {usr.role}</p>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text truncate">{usr.fullName}</h4>
+                                  {isMe && (
+                                    <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 lya:bg-lya-primary/20 lya:text-lya-primary px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-wider shrink-0">
+                                      (Tú)
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">@{usr.username} • {usr.role}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
+                              <motion.button 
+                                whileTap={!isMe ? { scale: 0.95 } : {}}
+                                onClick={() => {
+                                  if (!isMe) {
+                                    editUser(usr);
+                                    setIsTrashModalOpen(false);
+                                  }
+                                }} 
+                                disabled={actionLoadingId === usr.id || isMe}
+                                className={`p-2.5 rounded-xl transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 ${
+                                  isMe 
+                                    ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                    : 'bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg text-blue-500 disabled:opacity-50'
+                                }`} 
+                                title={isMe ? "No puedes editar tu propio perfil aquí" : "Editar usuario"}
+                              >
+                                <Edit2 size={16} />
+                              </motion.button>
+                              <motion.button 
+                                whileTap={!isMe ? { scale: 0.95 } : {}}
+                                onClick={() => !isMe && toggleUserStatus(usr.id, usr.isActive)}
+                                disabled={actionLoadingId === usr.id || isMe}
+                                className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                                  isMe 
+                                    ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                    : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50'
+                                }`}
+                              >
+                                {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
+                                <span>
+                                  {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
+                                </span>
+                              </motion.button>
                             </div>
                           </div>
-                          
-                          <div className="flex gap-2 shrink-0 ml-2">
-                             <motion.button 
-                              whileTap={!isMe ? { scale: 0.9 } : {}}
-                              onClick={() => {
-                                if (!isMe) {
-                                  editUser(usr);
-                                  setIsTrashModalOpen(false);
-                                }
-                              }} 
-                              disabled={actionLoadingId === usr.id || isMe}
-                              className={`p-2.5 rounded-xl transition-all ${
-                                isMe 
-                                  ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
-                                  : 'bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg text-blue-500 disabled:opacity-50'
-                              }`} 
-                              title={isMe ? "No puedes editar tu propio perfil aquí" : "Editar usuario"}
-                            >
-                              <Edit2 size={16} />
-                            </motion.button>
-                            <motion.button 
-                              whileTap={!isMe ? { scale: 0.9 } : {}}
-                              onClick={() => !isMe && toggleUserStatus(usr.id, usr.isActive)}
-                              disabled={actionLoadingId === usr.id || isMe}
-                              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                                isMe 
-                                  ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
-                                  : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50'
-                              }`}
-                            >
-                              {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
-                              <span className="hidden sm:inline">
-                                {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
-                              </span>
-                            </motion.button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 };

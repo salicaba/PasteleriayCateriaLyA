@@ -481,11 +481,57 @@ export const ReportsPage = () => {
             <div className="h-[250px]">
               {chartData?.paymentMethods?.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                  <BarChart data={chartData.paymentMethods} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  {/* 🔥 FIX 1: Aumentamos el margen 'bottom' a 25 para que el texto NO se corte */}
+                  <BarChart data={chartData.paymentMethods} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
-                    <XAxis dataKey="name" stroke={textColor} fontSize={12} tickLine={false} axisLine={false}/>
-                    <RechartsTooltip formatter={(value) => `$${value}`} cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', color: '#111827' }}/>
-                    <Bar dataKey="value" fill={theme === 'lya' ? '#E6CCB2' : '#8b5cf6'} radius={[8, 8, 0, 0]} barSize={40} />
+                    
+                    <XAxis 
+                      dataKey="name" 
+                      tick={(props) => {
+                        const { x, y, payload, index } = props;
+                        const color = getPieColors()[index % getPieColors().length];
+                        return (
+                          // 🔥 Ajustamos 'y' para alinearlo perfecto en el nuevo espacio
+                          <foreignObject x={x - 75} y={y + 8} width={150} height={30}>
+                            <div xmlns="http://www.w3.org/1999/xhtml" className="flex items-center justify-center gap-1.5 w-full h-full">
+                              <div style={{ backgroundColor: color }} className="w-2.5 h-2.5 shrink-0"></div>
+                              <span style={{ color: color }} className="text-[13px] font-bold">
+                                {payload.value}
+                              </span>
+                            </div>
+                          </foreignObject>
+                        );
+                      }}
+                      tickLine={false} 
+                      axisLine={false}
+                    />
+                    
+                    <RechartsTooltip 
+                      cursor={{ fill: 'transparent' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0];
+                          // 🔥 FIX 2: Forzamos a que busque el color exacto que le toca en la paleta
+                          const index = chartData.paymentMethods.findIndex(p => p.name === data.payload.name);
+                          const exactColor = getPieColors()[index % getPieColors().length];
+                          
+                          return (
+                            <div className="bg-white dark:bg-gray-800 lya:bg-lya-surface px-3 py-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40">
+                              <span style={{ color: exactColor, fontWeight: 'normal', fontSize: '13px' }}>
+                                {data.payload.name} : ${data.value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>
+                      {chartData.paymentMethods.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getPieColors()[index % getPieColors().length]} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
