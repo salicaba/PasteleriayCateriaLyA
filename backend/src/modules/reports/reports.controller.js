@@ -18,19 +18,25 @@ export const getDashboardData = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    // 🔥 BLINDAJE DE ZONA HORARIA (Igual que en Caja)
     let start, end;
-    if (startDate && endDate) {
-      start = new Date(`${startDate}T00:00:00.000-06:00`);
-      end = new Date(`${endDate}T23:59:59.999-06:00`);
+
+    // 🔥 Limpiamos las fechas por si el frontend manda formato ISO con hora y 'Z'
+    const cleanStartDate = startDate ? startDate.split('T')[0] : null;
+    const cleanEndDate = endDate ? endDate.split('T')[0] : null;
+
+    if (cleanStartDate && cleanEndDate) {
+      start = new Date(`${cleanStartDate}T00:00:00.000-06:00`);
+      end = new Date(`${cleanEndDate}T23:59:59.999-06:00`);
     } else {
       const localNow = getLocalNow();
-      // Por defecto toma el mes actual en hora local
-      const startOfM = new Date(localNow.getFullYear(), localNow.getMonth(), 1);
-      const startStr = `${startOfM.getFullYear()}-${String(startOfM.getMonth() + 1).padStart(2, '0')}-01`;
-      start = new Date(`${startStr}T00:00:00.000-06:00`);
+      const year = localNow.getFullYear();
+      const month = String(localNow.getMonth() + 1).padStart(2, '0');
+      const day = String(localNow.getDate()).padStart(2, '0');
+      
+      const startStr = `${year}-${month}-01`;
+      const endStr = `${year}-${month}-${day}`;
 
-      const endStr = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+      start = new Date(`${startStr}T00:00:00.000-06:00`);
       end = new Date(`${endStr}T23:59:59.999-06:00`);
     }
 
