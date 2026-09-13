@@ -1,5 +1,6 @@
 // src/modules/cafeteria/views/QrControlPage.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // 🚀 IMPORTACIÓN AÑADIDA
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, Trash2, Smartphone, 
@@ -9,7 +10,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useQrController } from '../controllers/useQrController';
 import { ToastNotification } from './components/ToastNotification';
-import html2pdf from 'html2pdf.js'; // 🚀 LIBRERÍA PARA DESCARGA DIRECTA DE PDF
+import html2pdf from 'html2pdf.js';
 
 import client from '../../../api/client';
 import { socket } from '../../../api/socket';
@@ -120,13 +121,11 @@ export const QrControlPage = () => {
     }
   };
 
-  // 🚀 GENERADOR DE PDF ANTI-BLANCO
   const executeDownloadPDF = async () => {
     if (isPrinting || selectedToPrint.length === 0) return;
     setIsPrinting(true);
     
     try {
-      // Damos 300ms a React para que el contenedor oculto procese el nuevo estado
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const element = document.getElementById('pdf-qr-container');
@@ -136,7 +135,7 @@ export const QrControlPage = () => {
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['css', 'legacy'] } // 🚀 Le indicamos que respete las clases CSS de salto
+        pagebreak:    { mode: ['css', 'legacy'] }
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -182,11 +181,9 @@ export const QrControlPage = () => {
     >
       <ToastNotification message={activeMessage} type={activeType} />
 
-      {/* 🚀 CONTENEDOR OCULTO PARA PDF CON SALTOS DE PÁGINA FORZADOS */}
       <div style={{ height: 0, overflow: 'hidden' }}>
         <div id="pdf-qr-container" style={{ width: '700px', backgroundColor: '#ffffff', boxSizing: 'border-box', margin: '0 auto' }}>
           {(() => {
-            // 1. Recopilamos todo lo que se va a imprimir en un solo arreglo
             const itemsToPrint = [];
             if (selectedToPrint.includes('llevar')) {
               itemsToPrint.push({ type: 'llevar', id: 'llevar' });
@@ -195,16 +192,13 @@ export const QrControlPage = () => {
               itemsToPrint.push({ type: 'mesa', data: mesa, id: mesa.id });
             });
 
-            // 2. Partimos el arreglo en "Páginas" de máximo 4 QRs cada una
             const pages = [];
             for (let i = 0; i < itemsToPrint.length; i += 4) {
               pages.push(itemsToPrint.slice(i, i + 4));
             }
 
-            // 3. Renderizamos cada página con su salto de hoja
             return pages.map((pageItems, pageIndex) => (
               <React.Fragment key={`page-${pageIndex}`}>
-                {/* Contenedor de la hoja (Padding interno en vez de global para no arrastrar el margen) */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', justifyContent: 'flex-start', padding: '30px', backgroundColor: '#ffffff' }}>
                   
                   {pageItems.map((item) => {
@@ -214,7 +208,7 @@ export const QrControlPage = () => {
                           <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 5px 0', color: '#000', fontFamily: 'sans-serif' }}>Mostrador 𝓛𝔂𝓪</h2>
                           <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#4b5563', fontStyle: 'italic', margin: '0 0 20px 0' }}>"Ordena sin filas"</p>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                             <QRCodeSVG value={`${baseUrl}/llevar?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
+                              <QRCodeSVG value={`${baseUrl}/llevar?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
                           </div>
                           <p style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', margin: 0, color: '#000' }}>{displayBaseUrl}/llevar</p>
                         </div>
@@ -226,7 +220,7 @@ export const QrControlPage = () => {
                           <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 5px 0', color: '#000', fontFamily: 'sans-serif' }}>Mesa {mesa.number}</h2>
                           <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#4b5563', fontStyle: 'italic', margin: '0 0 20px 0' }}>"Escanea para ordenar"</p>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                             <QRCodeSVG value={`${baseUrl}/m/${mesa.number}?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
+                              <QRCodeSVG value={`${baseUrl}/m/${mesa.number}?qr=true`} size={160} level="Q" bgColor="#ffffff" fgColor="#000000" />
                           </div>
                           <p style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', margin: 0, color: '#000' }}>{displayBaseUrl}/m/{mesa.number}</p>
                         </div>
@@ -236,7 +230,6 @@ export const QrControlPage = () => {
 
                 </div>
                 
-                {/* 🚀 EL TRUCO: Forzamos el salto de página si NO es la última hoja */}
                 {pageIndex < pages.length - 1 && (
                   <div className="html2pdf__page-break"></div>
                 )}
@@ -554,310 +547,330 @@ export const QrControlPage = () => {
       </div>
 
       {/* MODAL DE DESCARGA PDF NEO-BENTO */}
-      <AnimatePresence>
-        {showPrintModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      {createPortal(
+        <AnimatePresence>
+          {showPrintModal && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!isPrinting) setShowPrintModal(false);
-              }}
-              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
-            />
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[420px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors max-h-[90vh]"
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-orange-100 dark:bg-orange-900/40 lya:bg-lya-primary/10 p-3 rounded-xl shadow-sm text-orange-600 dark:text-orange-400 lya:text-lya-primary">
-                    <Download size={24} />
+              <div 
+                onClick={() => {
+                  if (!isPrinting) setShowPrintModal(false);
+                }}
+                className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+              />
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[420px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors max-h-[90vh]"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-orange-100 dark:bg-orange-900/40 lya:bg-lya-primary/10 p-3 rounded-xl shadow-sm text-orange-600 dark:text-orange-400 lya:text-lya-primary">
+                      <Download size={24} />
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
+                      Descargar QRs
+                    </h3>
                   </div>
-                  <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
-                    Descargar QRs
-                  </h3>
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowPrintModal(false)}
+                    disabled={isPrinting}
+                    className="p-2 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full transition-all disabled:opacity-50"
+                  >
+                    <X size={20} />
+                  </motion.button>
                 </div>
-                <motion.button 
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setShowPrintModal(false)}
-                  disabled={isPrinting}
-                  className="p-2 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full transition-all disabled:opacity-50"
-                >
-                  <X size={20} />
-                </motion.button>
-              </div>
 
-              <div className="flex justify-between items-center mb-4 px-2">
-                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                  {selectedToPrint.length} seleccionado(s)
-                </span>
-                <button 
-                  onClick={toggleAllPrintSelection}
-                  className="text-sm font-black text-orange-500 md:hover:text-orange-600 lya:text-lya-primary transition-colors outline-none"
-                >
-                  {selectedToPrint.length === mesas.length + 1 ? 'Deseleccionar todos' : 'Seleccionar todos'}
-                </button>
-              </div>
+                <div className="flex justify-between items-center mb-4 px-2">
+                  <span className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
+                    {selectedToPrint.length} seleccionado(s)
+                  </span>
+                  <button 
+                    onClick={toggleAllPrintSelection}
+                    className="text-sm font-black text-orange-500 md:hover:text-orange-600 lya:text-lya-primary transition-colors outline-none"
+                  >
+                    {selectedToPrint.length === mesas.length + 1 ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                  </button>
+                </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 mb-6 min-h-[200px]">
-                <motion.div 
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => togglePrintSelection('llevar')}
-                  className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                    selectedToPrint.includes('llevar')
-                      ? 'border-orange-500 bg-orange-50/50 dark:border-orange-500/50 dark:bg-orange-900/10 lya:border-lya-primary/50 lya:bg-lya-primary/5'
-                      : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-white dark:bg-gray-800/50 lya:bg-lya-bg'
-                  }`}
-                >
-                  <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mostrador 𝓛𝔂𝓪 (Público)</span>
-                  {selectedToPrint.includes('llevar') 
-                    ? <CheckSquare className="text-orange-500 lya:text-lya-primary" /> 
-                    : <Square className="text-gray-300 dark:text-gray-600 lya:text-lya-border" />}
-                </motion.div>
-
-                {mesas.map(mesa => (
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 mb-6 min-h-[200px]">
                   <motion.div 
-                    key={mesa.id}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => togglePrintSelection(mesa.id)}
+                    onClick={() => togglePrintSelection('llevar')}
                     className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                      selectedToPrint.includes(mesa.id)
+                      selectedToPrint.includes('llevar')
                         ? 'border-orange-500 bg-orange-50/50 dark:border-orange-500/50 dark:bg-orange-900/10 lya:border-lya-primary/50 lya:bg-lya-primary/5'
                         : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-white dark:bg-gray-800/50 lya:bg-lya-bg'
                     }`}
                   >
-                    <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesa {mesa.number}</span>
-                    {selectedToPrint.includes(mesa.id) 
+                    <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mostrador 𝓛𝔂𝓪 (Público)</span>
+                    {selectedToPrint.includes('llevar') 
                       ? <CheckSquare className="text-orange-500 lya:text-lya-primary" /> 
                       : <Square className="text-gray-300 dark:text-gray-600 lya:text-lya-border" />}
                   </motion.div>
-                ))}
-              </div>
-              
-              <motion.button 
-                whileTap={!isPrinting && selectedToPrint.length > 0 ? { scale: 0.95 } : {}}
-                onClick={executeDownloadPDF} 
-                disabled={isPrinting || selectedToPrint.length === 0}
-                className="w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-white shadow-lg bg-orange-500 md:hover:bg-orange-600 shadow-orange-500/30 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none outline-none select-none"
-              >
-                {isPrinting ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin pointer-events-none" />
-                    <span className="pointer-events-none">Preparando PDF...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={18} className="pointer-events-none" />
-                    <span className="pointer-events-none">Generar PDF ({selectedToPrint.length})</span>
-                  </>
-                )}
-              </motion.button>
+
+                  {mesas.map(mesa => (
+                    <motion.div 
+                      key={mesa.id}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => togglePrintSelection(mesa.id)}
+                      className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                        selectedToPrint.includes(mesa.id)
+                          ? 'border-orange-500 bg-orange-50/50 dark:border-orange-500/50 dark:bg-orange-900/10 lya:border-lya-primary/50 lya:bg-lya-primary/5'
+                          : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 bg-white dark:bg-gray-800/50 lya:bg-lya-bg'
+                      }`}
+                    >
+                      <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">Mesa {mesa.number}</span>
+                      {selectedToPrint.includes(mesa.id) 
+                        ? <CheckSquare className="text-orange-500 lya:text-lya-primary" /> 
+                        : <Square className="text-gray-300 dark:text-gray-600 lya:text-lya-border" />}
+                    </motion.div>
+                  ))}
+                </div>
+                
+                <motion.button 
+                  whileTap={!isPrinting && selectedToPrint.length > 0 ? { scale: 0.95 } : {}}
+                  onClick={executeDownloadPDF} 
+                  disabled={isPrinting || selectedToPrint.length === 0}
+                  className="w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-white shadow-lg bg-orange-500 md:hover:bg-orange-600 shadow-orange-500/30 lya:bg-lya-primary lya:hover:bg-lya-primary/90 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none outline-none select-none"
+                >
+                  {isPrinting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin pointer-events-none" />
+                      <span className="pointer-events-none">Preparando PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} className="pointer-events-none" />
+                      <span className="pointer-events-none">Generar PDF ({selectedToPrint.length})</span>
+                    </>
+                  )}
+                </motion.button>
+              </motion.div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* MODAL DE PANTALLA COMPLETA (PREVIEW) */}
-      <AnimatePresence>
-        {previewMesa && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {createPortal(
+        <AnimatePresence>
+          {previewMesa && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setPreviewMesa(null)}
-              className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4"
             >
-              <motion.button 
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setPreviewMesa(null)} 
-                className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
+              <div 
+                onClick={() => setPreviewMesa(null)}
+                className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
               >
-                <X size={20} strokeWidth={2.5} className="pointer-events-none" />
-              </motion.button>
-              
-              <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
-                Escanear para ordenar
-              </div>
-              
-              <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
-                {previewMesa.isLlevar ? 'Mostrador 𝓛𝔂𝓪' : `Mesa ${previewMesa.number}`}
-              </h2>
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setPreviewMesa(null)} 
+                  className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
+                >
+                  <X size={20} strokeWidth={2.5} className="pointer-events-none" />
+                </motion.button>
+                
+                <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase mb-6 mt-4 border border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-center">
+                  Escanear para ordenar
+                </div>
+                
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
+                  {previewMesa?.isLlevar ? 'Mostrador 𝓛𝔂𝓪' : `Mesa ${previewMesa?.number}`}
+                </h2>
 
-              <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
-                <QRCodeSVG 
-                   value={previewMesa.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa.number}`} 
-                   size={220} 
-                   bgColor="transparent" 
-                   fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
-                   level="Q"
-                   className={`transition-opacity duration-300 ${isQrActive && !disabledQrs.includes(previewMesa.isLlevar ? 'llevar' : `mesa-${previewMesa.number}`) ? 'opacity-90' : 'opacity-20 grayscale blur-[2px]'}`}
-                />
-              </div>
+                <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg p-8 rounded-[2.5rem] shadow-inner border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 mb-8 flex items-center justify-center w-full relative overflow-hidden">
+                  <QRCodeSVG 
+                     value={previewMesa?.isLlevar ? `${baseUrl}/llevar` : `${baseUrl}/m/${previewMesa?.number}`} 
+                     size={220} 
+                     bgColor="transparent" 
+                     fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
+                     level="Q"
+                     className={`transition-opacity duration-300 ${isQrActive && !disabledQrs.includes(previewMesa?.isLlevar ? 'llevar' : `mesa-${previewMesa?.number}`) ? 'opacity-90' : 'opacity-20 grayscale blur-[2px]'}`}
+                  />
+                </div>
 
-              <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-sm">
-                <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0" />
-                <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest text-center">
-                  {previewMesa.isLlevar ? `${displayBaseUrl}/llevar` : `${displayBaseUrl}/m/${previewMesa.number}`}
-                </span>
-              </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg p-4 rounded-2xl flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 shadow-sm">
+                  <LinkIcon className="w-5 h-5 text-gray-500 lya:text-lya-text/50 shrink-0" />
+                  <span className="text-base text-gray-700 dark:text-gray-300 lya:text-lya-text/80 font-black tracking-widest text-center">
+                    {previewMesa?.isLlevar ? `${displayBaseUrl}/llevar` : `${displayBaseUrl}/m/${previewMesa?.number}`}
+                  </span>
+                </div>
+              </motion.div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-      <AnimatePresence>
-        {showToggleModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      {createPortal(
+        <AnimatePresence>
+          {showToggleModal && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!isTogglingQr) setShowToggleModal(false);
-              }}
-              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
-            />
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
-              <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm ${
-                isQrActive ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500' : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500'
-              }`}>
-                {isQrActive ? <PowerOff size={32} strokeWidth={2} className="text-red-500" /> : <Power size={32} strokeWidth={2} className="text-green-500 lya:text-lya-secondary" />}
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
-                {isQrActive ? '¿Suspender Servicio QR?' : '¿Reactivar Servicio QR?'}
-              </h3>
-              
-              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
-                {isQrActive 
-                  ? 'Al apagar el servicio, cualquier cliente que intente escanear los menús verá una pantalla de bloqueo. Los clientes que ya confirmaron orden conservarán su ticket visual.'
-                  : 'Al activar el servicio, todos los códigos QR volverán a ser operativos y los clientes podrán comenzar a crear órdenes inmediatamente.'
-                }
-              </p>
-              
-              <div className="flex gap-3 w-full">
-                <motion.button 
-                  whileTap={!isTogglingQr ? { scale: 0.95 } : {}}
-                  onClick={() => setShowToggleModal(false)}
-                  disabled={isTogglingQr}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
-                >
-                  Cancelar
-                </motion.button>
-                <motion.button 
-                  whileTap={!isTogglingQr ? { scale: 0.95 } : {}}
-                  onClick={async () => {
-                    try {
-                      const success = await toggleQrService(!isQrActive);
-                      if(success) {
-                        setShowToggleModal(false);
-                        showLocalToast(
-                          isQrActive ? 'Servicio QR Suspendido por seguridad.' : 'Servicio QR Reactivado con éxito.',
-                          'success'
-                        );
-                      } else {
-                        showLocalToast('No se pudo actualizar el estado del servicio QR.', 'error');
+              <div 
+                onClick={() => {
+                  if (!isTogglingQr) setShowToggleModal(false);
+                }}
+                className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+              />
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+              >
+                <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm ${
+                  isQrActive ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500' : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500'
+                }`}>
+                  {isQrActive ? <PowerOff size={32} strokeWidth={2} className="text-red-500" /> : <Power size={32} strokeWidth={2} className="text-green-500 lya:text-lya-secondary" />}
+                </div>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-4 tracking-tight text-center">
+                  {isQrActive ? '¿Suspender Servicio QR?' : '¿Reactivar Servicio QR?'}
+                </h3>
+                
+                <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
+                  {isQrActive 
+                    ? 'Al apagar el servicio, cualquier cliente que intente escanear los menús verá una pantalla de bloqueo. Los clientes que ya confirmaron orden conservarán su ticket visual.'
+                    : 'Al activar el servicio, todos los códigos QR volverán a ser operativos y los clientes podrán comenzar a crear órdenes inmediatamente.'
+                  }
+                </p>
+                
+                <div className="flex gap-3 w-full">
+                  <motion.button 
+                    whileTap={!isTogglingQr ? { scale: 0.95 } : {}}
+                    onClick={() => setShowToggleModal(false)}
+                    disabled={isTogglingQr}
+                    className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
+                  >
+                    Cancelar
+                  </motion.button>
+                  <motion.button 
+                    whileTap={!isTogglingQr ? { scale: 0.95 } : {}}
+                    onClick={async () => {
+                      try {
+                        const success = await toggleQrService(!isQrActive);
+                        if(success) {
+                          setShowToggleModal(false);
+                          showLocalToast(
+                            isQrActive ? 'Servicio QR Suspendido por seguridad.' : 'Servicio QR Reactivado con éxito.',
+                            'success'
+                          );
+                        } else {
+                          showLocalToast('No se pudo actualizar el estado del servicio QR.', 'error');
+                        }
+                      } catch(err) {
+                        showLocalToast('Error de conexión al modificar el estado QR.', 'error');
                       }
-                    } catch(err) {
-                      showLocalToast('Error de conexión al modificar el estado QR.', 'error');
-                    }
-                  }} 
-                  disabled={isTogglingQr}
-                  className={`flex-[1.5] py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg outline-none select-none ${
-                    isQrActive 
-                      ? 'bg-red-500 md:hover:bg-red-600 shadow-red-500/30' 
-                      : 'bg-gray-900 md:hover:bg-gray-800 dark:bg-gray-100 dark:md:hover:bg-white dark:text-gray-900 lya:bg-lya-text lya:text-lya-surface'
-                  }`}
-                >
-                  {isTogglingQr ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin pointer-events-none" />
-                      <span className="pointer-events-none">Guardando...</span>
-                    </>
-                  ) : (
-                    <span className="pointer-events-none">{isQrActive ? 'Sí, Suspender' : 'Sí, Reactivar'}</span>
-                  )}
-                </motion.button>
-              </div>
+                    }} 
+                    disabled={isTogglingQr}
+                    className={`flex-[1.5] py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none text-white shadow-lg outline-none select-none ${
+                      isQrActive 
+                        ? 'bg-red-500 md:hover:bg-red-600 shadow-red-500/30' 
+                        : 'bg-gray-900 md:hover:bg-gray-800 dark:bg-gray-100 dark:md:hover:bg-white dark:text-gray-900 lya:bg-lya-text lya:text-lya-surface'
+                    }`}
+                  >
+                    {isTogglingQr ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin pointer-events-none" />
+                        <span className="pointer-events-none">Guardando...</span>
+                      </>
+                    ) : (
+                      <span className="pointer-events-none">{isQrActive ? 'Sí, Suspender' : 'Sí, Reactivar'}</span>
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-      <AnimatePresence>
-        {mesaToDelete && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      {createPortal(
+        <AnimatePresence>
+          {mesaToDelete && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => {
-                if (removingId !== mesaToDelete.id) setMesaToDelete(null);
-              }}
-              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
-            />
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
-                <AlertCircle size={32} strokeWidth={1.5} />
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight text-center">
-                ¿Eliminar Mesa {mesaToDelete.number}?
-              </h3>
-              
-              <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
-                Esta acción no se puede deshacer. Las demás mesas se reordenarán automáticamente.
-              </p>
-              
-              <div className="flex gap-3 w-full">
-                <motion.button 
-                  whileTap={removingId !== mesaToDelete.id ? { scale: 0.95 } : {}}
-                  onClick={() => setMesaToDelete(null)}
-                  disabled={removingId === mesaToDelete.id}
-                  className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
-                >
-                  Cancelar
-                </motion.button>
-                <motion.button 
-                  whileTap={removingId !== mesaToDelete.id ? { scale: 0.95 } : {}}
-                  onClick={async () => {
-                    const success = await removeMesa(mesaToDelete.id);
-                    if (success) {
-                      setMesaToDelete(null);
-                    }
-                  }} 
-                  disabled={removingId === mesaToDelete.id}
-                  className="flex-[1.5] py-4 bg-red-500 md:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500 outline-none select-none"
-                >
-                  {removingId === mesaToDelete.id ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin pointer-events-none" />
-                      <span className="pointer-events-none">Eliminando...</span>
-                    </>
-                  ) : (
-                    <span className="pointer-events-none">Eliminar Mesa</span>
-                  )}
-                </motion.button>
-              </div>
+              <div 
+                onClick={() => {
+                  if (removingId !== mesaToDelete?.id) setMesaToDelete(null);
+                }}
+                className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+              />
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+              >
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
+                  <AlertCircle size={32} strokeWidth={1.5} />
+                </div>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-2 tracking-tight text-center">
+                  ¿Eliminar Mesa {mesaToDelete?.number}?
+                </h3>
+                
+                <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-medium text-sm mb-8 leading-relaxed px-2 text-justify">
+                  Esta acción no se puede deshacer. Las demás mesas se reordenarán automáticamente.
+                </p>
+                
+                <div className="flex gap-3 w-full">
+                  <motion.button 
+                    whileTap={removingId !== mesaToDelete?.id ? { scale: 0.95 } : {}}
+                    onClick={() => setMesaToDelete(null)}
+                    disabled={removingId === mesaToDelete?.id}
+                    className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
+                  >
+                    Cancelar
+                  </motion.button>
+                  <motion.button 
+                    whileTap={removingId !== mesaToDelete?.id ? { scale: 0.95 } : {}}
+                    onClick={async () => {
+                      const success = await removeMesa(mesaToDelete?.id);
+                      if (success) {
+                        setMesaToDelete(null);
+                      }
+                    }} 
+                    disabled={removingId === mesaToDelete?.id}
+                    className="flex-[1.5] py-4 bg-red-500 md:hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/30 dark:shadow-red-900/40 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:shadow-none disabled:text-gray-500 outline-none select-none"
+                  >
+                    {removingId === mesaToDelete?.id ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin pointer-events-none" />
+                        <span className="pointer-events-none">Eliminando...</span>
+                      </>
+                    ) : (
+                      <span className="pointer-events-none">Eliminar Mesa</span>
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
     </motion.div>
   );

@@ -1,5 +1,6 @@
 // src/modules/cafeteria/views/TicketPreviewModal.jsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom'; // 🚀 IMPORTACIÓN AÑADIDA
 import { motion, AnimatePresence } from 'framer-motion';
 import { Printer, X, MessageCircle, Coffee, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -204,16 +205,24 @@ export const TicketPreviewModal = ({
   const horaFormateada = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
   const currentDateTimeStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md print:hidden">
+        <motion.div 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 print:hidden"
+        >
+          {/* OVERLAY SEPARADO */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            onClick={onClose}
+          />
           <motion.div 
             initial={{ scale: 0.95, opacity: 0, y: 20 }} 
             animate={{ scale: 1, opacity: 1, y: 0 }} 
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-            className="bg-gray-100 dark:bg-gray-900 lya:bg-[#FDF8F5] rounded-[2rem] w-full max-w-md shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-orange-100 max-h-[90vh]"
+            className="bg-gray-100 dark:bg-gray-900 lya:bg-[#FDF8F5] rounded-[2rem] w-full max-w-md shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-orange-100 max-h-[90vh] relative z-10"
           >
             
             <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-800 lya:border-orange-100 bg-white dark:bg-gray-800 lya:bg-white shrink-0">
@@ -465,8 +474,9 @@ export const TicketPreviewModal = ({
             </div>
 
           </motion.div>
-        </div>
+        </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
