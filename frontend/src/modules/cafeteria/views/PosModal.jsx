@@ -371,6 +371,15 @@ export const PosModal = ({
     if (onPagoParcial && total > 0) onPagoParcial(mesa.id, total);
     try {
       await handleCloseTable(); 
+      
+      // 🔥 FIX: Si es venta de Mostrador (Vitrina), detenemos el proceso de cierre aquí.
+      // Esto limpia la orden en la base de datos y el carrito, pero deja la ventana 
+      // abierta y lista para el siguiente cliente en la fila.
+      if (isVitrina) {
+        return; 
+      }
+
+      // Si es una mesa de salón o para llevar, sí cerramos el modal y liberamos la mesa
       if (onTableRelease) await Promise.resolve(onTableRelease(mesa.id)); 
       if (!inline) onClose(); 
     } catch (error) {

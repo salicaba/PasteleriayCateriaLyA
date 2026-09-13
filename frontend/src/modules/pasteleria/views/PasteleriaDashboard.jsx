@@ -808,10 +808,22 @@ export default function PasteleriaDashboard() {
 
                             <AnimatePresence>
                               {mostrarCambio && (
-                                <motion.div initial={{ opacity: 0, scale: 0.9, height: 0 }} animate={{ opacity: 1, scale: 1, height: 'auto' }} exit={{ opacity: 0, scale: 0.9, height: 0 }} className="overflow-hidden">
-                                  <div className="bg-emerald-500 lya:bg-lya-secondary text-white lya:text-lya-surface p-4 rounded-[1.5rem] flex justify-between items-center shadow-lg shadow-emerald-500/20 lya:shadow-lya-secondary/20">
-                                    <span className="font-bold uppercase text-sm">Cambio a devolver:</span>
-                                    <span className="text-3xl font-black">${cambio.toFixed(2)}</span>
+                                <motion.div 
+                                  initial={{ opacity: 0, scale: 0.9, height: 0 }} 
+                                  animate={{ opacity: 1, scale: 1, height: 'auto' }} 
+                                  exit={{ opacity: 0, scale: 0.9, height: 0 }} 
+                                  className="overflow-hidden mt-3"
+                                >
+                                  <div className="flex justify-between items-center p-4 bg-emerald-50 dark:bg-emerald-900/20 lya:bg-lya-primary/10 rounded-[1.5rem] border border-emerald-200 dark:border-emerald-800/50 lya:border-lya-primary/30">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="bg-emerald-100 dark:bg-emerald-900/50 lya:bg-lya-primary/20 p-2 rounded-xl">
+                                        <Calculator size={20} className="text-emerald-600 dark:text-emerald-400 lya:text-lya-primary"/>
+                                      </div>
+                                      <span className="font-black text-xs sm:text-sm uppercase tracking-widest text-emerald-800 dark:text-emerald-300 lya:text-lya-text">Cambio:</span>
+                                    </div>
+                                    <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400 lya:text-lya-primary">
+                                      ${cambio >= 0 ? cambio.toFixed(2) : '0.00'}
+                                    </span>
                                   </div>
                                 </motion.div>
                               )}

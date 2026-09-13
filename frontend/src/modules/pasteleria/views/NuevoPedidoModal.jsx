@@ -570,7 +570,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
                                       </div>
                                     </div>
                                     <div className="flex justify-between items-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
-                                      <div className="flex items-center gap-2"><Calculator size={20} className="text-emerald-600 dark:text-emerald-400"/><span className="font-bold text-emerald-800 dark:text-emerald-300">Cambio a Devolver:</span></div>
+                                      <div className="flex items-center gap-2"><Calculator size={20} className="text-emerald-600 dark:text-emerald-400"/><span className="font-bold text-emerald-800 dark:text-emerald-300">CAMBIO:</span></div>
                                       <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">${change >= 0 ? change.toFixed(2) : '0.00'}</span>
                                     </div>
                                   </motion.div>
