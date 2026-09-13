@@ -218,10 +218,15 @@ export const TicketPreviewModal = ({
             onClick={onClose}
           />
           <motion.div 
-            initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+            initial={{ scale: 0.96, opacity: 0, y: 15 }} 
             animate={{ scale: 1, opacity: 1, y: 0 }} 
-            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+            exit={{ scale: 0.96, opacity: 0, y: 15 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            style={{ 
+              willChange: "transform, opacity", 
+              WebkitBackfaceVisibility: "hidden", 
+              backfaceVisibility: "hidden" 
+            }}
             className="bg-gray-100 dark:bg-gray-900 lya:bg-[#FDF8F5] rounded-[2rem] w-full max-w-md shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-orange-100 max-h-[90vh] relative z-10"
           >
             
