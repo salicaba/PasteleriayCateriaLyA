@@ -11,6 +11,7 @@ import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
 import client from '../../../api/client';
+import RefundConfirmModal from './RefundConfirmModal';
 
 // --- COMPONENTE INTERNO: CLON EXACTO DE StatCard (CAFETERÍA) ---
 const KpiCard = ({ title, value, icon: Icon, themeColor, isActive, onClick }) => {
@@ -72,7 +73,8 @@ export default function PasteleriaDashboard() {
     pedidoAEditar, iniciarEdicion,               
     calcularFinanzas, guardarPedido, registrarAbono, restaurarPedido, 
     successScreen, 
-    isSubmitting 
+    isSubmitting,
+    refundConfirmModal, setRefundConfirmModal, confirmarReembolso // 🔥 Agregado
   } = usePedidosController();
 
   const [transferInfo, setTransferInfo] = useState(null);
@@ -686,6 +688,14 @@ export default function PasteleriaDashboard() {
         onSave={guardarPedido} 
         fechaPredefinida={fechaPredefinida} 
         pedidoAEditar={pedidoAEditar}
+        isSubmitting={isSubmitting}
+      />
+
+      <RefundConfirmModal 
+        isOpen={refundConfirmModal.isOpen}
+        devolucion={refundConfirmModal.devolucion}
+        onClose={() => setRefundConfirmModal({ isOpen: false, datosPedido: null, devolucion: 0 })}
+        onConfirm={confirmarReembolso}
         isSubmitting={isSubmitting}
       />
       

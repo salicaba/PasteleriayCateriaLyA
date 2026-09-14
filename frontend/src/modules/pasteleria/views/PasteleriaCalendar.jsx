@@ -6,6 +6,7 @@ import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
+import RefundConfirmModal from './RefundConfirmModal'; // O de la carpeta modals si lo guardaste ahí
 
 // --- NUEVO COMPONENTE DE CARGA NEO-BENTO ---
 const PasteleriaLoader = () => (
@@ -34,7 +35,8 @@ export default function PasteleriaCalendar() {
     detalleModal, abrirDetalles, cerrarDetalles,
     pedidoAEditar, iniciarEdicion, calcularFinanzas, guardarPedido,
     successScreen, 
-    isSubmitting
+    isSubmitting,
+    refundConfirmModal, setRefundConfirmModal, confirmarReembolso // 🔥 AGREGADOS AQUÍ
   } = usePedidosController();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -404,6 +406,16 @@ export default function PasteleriaCalendar() {
       </AnimatePresence>
 
       <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} isSubmitting={isSubmitting} />
+      
+      {/* 🔥 CÁPSULA NEO-BENTO DE REEMBOLSO */}
+      <RefundConfirmModal 
+        isOpen={refundConfirmModal.isOpen}
+        devolucion={refundConfirmModal.devolucion}
+        onClose={() => setRefundConfirmModal({ isOpen: false, datosPedido: null, devolucion: 0 })}
+        onConfirm={confirmarReembolso}
+        isSubmitting={isSubmitting}
+      />
+
       <TicketPasteleriaModal isOpen={ticketModal.isOpen} onClose={cerrarTicket} pedido={ticketModal.pedido} calcularFinanzas={calcularFinanzas} />
       <DetallePedidoModal isOpen={detalleModal.isOpen} onClose={cerrarDetalles} pedido={detalleModal.pedido} onEdit={iniciarEdicion} calcularFinanzas={calcularFinanzas} />
 

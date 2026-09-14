@@ -196,7 +196,7 @@ export const updatePedido = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    // 🛡️ BLINDAJE 1: Limpieza del Payload
+    // 🛡️ BLINDAJE 1: Limpieza del Payload y Extracción del método de reembolso
     const { 
         id: reqId, 
         createdAt, 
@@ -204,18 +204,18 @@ export const updatePedido = async (req, res) => {
         abonos, 
         imagenesReferencia, 
         anticipo, 
-        metodoPagoAnticipo, 
+        metodoPagoAnticipo,
+        metodoReembolso, // 🔥 NUEVO: Extraemos el método de reembolso
         ...updateData 
     } = req.body;
 
-    // 🔥 2. MAGIA: Procesamos si el cliente borró o agregó fotos nuevas en la Edición
+    // Procesamos imágenes...
     if (imagenesReferencia && imagenesReferencia.length > 0) {
         updateData.imagenesReferencia = await uploadImagesToStorage(imagenesReferencia, pedido.id);
     } else {
         updateData.imagenesReferencia = [];
     }
 
-    // FECHA CORRECTA (El navegador y la BD ajustan la zona automáticamente)
     const localNow = new Date();
 
     // LÓGICA DE REEMBOLSO AUTOMÁTICO
@@ -229,9 +229,15 @@ export const updatePedido = async (req, res) => {
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
+        // 🔥 FIX: Evaluamos si el reembolso fue en Efectivo o Transferencia
+        const metodoSafe = String(metodoReembolso || 'efectivo').toLowerCase();
+        let dbMethod = 'CASH';
+        if (metodoSafe.includes('transf')) dbMethod = 'TRANSFER';
+        else if (metodoSafe.includes('tarj') || metodoSafe.includes('card')) dbMethod = 'CARD';
+
         const tx = await Transaction.create({
           source: 'PASTELERIA',
-          paymentMethod: 'CASH', 
+          paymentMethod: dbMethod, // 🔥 Aplicamos el método correcto
           amount: -Math.abs(devolucion), 
           description: `Devolución de saldo a favor por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
@@ -243,7 +249,7 @@ export const updatePedido = async (req, res) => {
           id: tx.id,
           fecha: localNow.toISOString(),
           monto: -Math.abs(devolucion), 
-          metodo: 'efectivo',
+          metodo: metodoSafe === 'transferencia' ? 'transferencia' : 'efectivo', // 🔥 Aplicamos el método en el recibo
           nota: 'Devolución automática'
         };
         

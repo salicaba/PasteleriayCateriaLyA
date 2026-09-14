@@ -34,6 +34,8 @@ export const usePedidosController = () => {
   // ESTADO PARA LA PANTALLA DE ÉXITO TIPO CAFETERÍA
   const [successScreen, setSuccessScreen] = useState({ isOpen: false, title: '', subtitle: '' });
 
+  const [refundConfirmModal, setRefundConfirmModal] = useState({ isOpen: false, datosPedido: null, devolucion: 0 });
+
   useEffect(() => {
     loadPedidos();
   }, []);
@@ -203,17 +205,34 @@ export const usePedidosController = () => {
     setPedidoAEditar(null);
   };
 
-  const guardarPedido = async (datosPedido) => {
+  // 🔥 Se añade el parámetro del método de reembolso
+  const guardarPedido = async (datosPedido, skipRefundCheck = false, metodoReembolso = 'efectivo') => {
     setIsSubmitting(true);
     try {
       const anticipoNum = parseFloat(datosPedido.anticipo) || 0;
       
       let pedidoAEnviar = { ...datosPedido };
       pedidoAEnviar.costoTotal = parseFloat(datosPedido.costoTotal);
+
+      // Si nos saltamos el chequeo de reembolso, le adjuntamos el método para que viaje al backend
+      if (skipRefundCheck) {
+        pedidoAEnviar.metodoReembolso = metodoReembolso;
+      }
       
       if (!pedidoAEditar) {
         pedidoAEnviar.abonos = anticipoNum > 0 ? [{ id: Date.now().toString(), fecha: new Date().toISOString(), monto: anticipoNum }] : [];
         pedidoAEnviar.estado = 'pendiente';
+      }
+
+      // 🛡️ PILAR 3: INTERCEPCIÓN DE SALDO A FAVOR
+      if (pedidoAEditar && !skipRefundCheck) {
+        const totalPagado = pedidoAEditar.abonos?.reduce((sum, ab) => sum + parseFloat(ab.monto), 0) || 0;
+        if (pedidoAEnviar.costoTotal < totalPagado) {
+          const devolucion = totalPagado - pedidoAEnviar.costoTotal;
+          setRefundConfirmModal({ isOpen: true, datosPedido: pedidoAEnviar, devolucion });
+          setIsSubmitting(false); 
+          return; 
+        }
       }
 
       let pedidoResult;
@@ -261,6 +280,13 @@ export const usePedidosController = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // 🔥 Ahora recibe el método desde el componente del Modal
+  const confirmarReembolso = async (metodoReembolso) => {
+    const datos = refundConfirmModal.datosPedido;
+    await guardarPedido(datos, true, metodoReembolso); 
+    setRefundConfirmModal({ isOpen: false, datosPedido: null, devolucion: 0 });
   };
 
   const registrarAbono = async (pedidoId, montoAbono, metodoPago) => {
@@ -333,6 +359,10 @@ export const usePedidosController = () => {
     registrarAbono,
     restaurarPedido, // 🔥 AHORA SÍ ESTÁ EXPORTADA
     successScreen, 
-    isSubmitting 
+    isSubmitting,
+    // ... resto de tus exports
+    refundConfirmModal, 
+    setRefundConfirmModal, 
+    confirmarReembolso 
   };
 };
