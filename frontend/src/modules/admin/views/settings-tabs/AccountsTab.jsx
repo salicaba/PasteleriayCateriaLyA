@@ -579,7 +579,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 </div>
                 
                 {/* 🔥 FIX 4: Agregado "pr-2" para darle respiro a la colita de la "y" cursiva */}
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full pr-2">
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center w-full pr-3">
                   Cuentas 𝓛𝔂𝓪
                 </h2>
 
