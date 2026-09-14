@@ -5,30 +5,39 @@ import { AlertTriangle, Loader2, Banknote, Smartphone } from 'lucide-react';
 
 export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devolucion, isSubmitting }) {
   const [metodo, setMetodo] = useState('efectivo');
+  
+  // 🔥 FIX 1: MEMORIA CACHÉ. Guardamos el monto para que al darle a "Cancelar" 
+  // el número no baje a $0.00 de golpe y arruine la animación de salida.
+  const [displayAmount, setDisplayAmount] = useState(devolucion);
 
   useEffect(() => {
-    if (isOpen) setMetodo('efectivo');
-  }, [isOpen]);
+    if (isOpen) {
+      setMetodo('efectivo');
+      if (devolucion > 0) setDisplayAmount(devolucion);
+    }
+  }, [isOpen, devolucion]);
 
   return (
     <AnimatePresence>
       {isOpen && (
-        // 🔥 FIX 1: El contenedor raíz condicional DEBE ser un motion.div con "key"
         <motion.div
           key="refund-modal-backdrop"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          // 🔥 FIX 2: Subimos el z-index al máximo para que no pelee con el modal de edición
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
         >
-          {/* 🔥 FIX 2: Escudo de clic. Usamos stopPropagation() para que el clic no atraviese el modal y golpee la pantalla de atrás */}
+          {/* 🔥 FIX 3: ELIMINAMOS EL APAGÓN. 
+              Bajamos la oscuridad de black/60 a black/20 y quitamos el blur, 
+              porque el modal que está abajo ya tiene blur y fondo oscuro. */}
           <div
             onClick={(e) => {
               e.stopPropagation();
               if (!isSubmitting) onClose();
             }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-colors"
+            className="absolute inset-0 bg-black/20 transition-colors"
           />
           
           <motion.div 
@@ -36,8 +45,7 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
             animate={{ scale: 1, opacity: 1, y: 0 }} 
             exit={{ scale: 0.9, opacity: 0, y: 20 }} 
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            onClick={(e) => e.stopPropagation()} // 🔥 Evita que hacer clic DENTRO de la tarjeta blanca la cierre
-            // 🔥 FIX 3: transform-gpu antialiased previene el parpadeo de renderizado de la tarjeta gráfica
+            onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative z-10 transform-gpu antialiased"
           >
             <div className="bg-amber-100 dark:bg-amber-900/30 p-4 rounded-full mb-5 text-amber-500 shadow-inner">
@@ -53,7 +61,7 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
             </p>
             
             <span className="text-4xl font-black text-amber-500 mb-6 block text-center tracking-tighter">
-              ${Number(devolucion).toFixed(2)}
+              ${Number(displayAmount).toFixed(2)}
             </span>
 
             {/* Selector de Método de Reembolso Neo-Bento */}
