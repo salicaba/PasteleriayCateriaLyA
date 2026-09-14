@@ -536,17 +536,29 @@ function App() {
       ) : (
         <div className="h-[100dvh] w-full flex flex-col bg-gray-50 dark:bg-gray-900 lya:bg-lya-bg text-gray-800 dark:text-gray-100 lya:text-lya-text font-sans overflow-hidden transition-colors duration-300 relative">
           
-          {/* 🔥 BANNER PERSISTENTE DE ALERTA DE RED (Abarca todo el sistema) */}
+          {/* 🔥 BANNER FLOTANTE NEO-BENTO DE ESTADO DE RED */}
           <AnimatePresence>
             {isOffline && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="bg-red-600 text-white px-4 py-2 text-xs font-black flex items-center justify-center gap-2 shadow-md z-[99999] shrink-0"
+                initial={{ y: -50, opacity: 0, scale: 0.95 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -50, opacity: 0, scale: 0.95 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="absolute top-4 left-0 right-0 z-[99999] flex justify-center pointer-events-none px-4"
               >
-                <AlertTriangle size={16} className="animate-bounce" />
-                <span>ATENCIÓN: Se ha perdido la conexión con los servidores o internet. Los cambios podrían no guardarse.</span>
+                <div className="bg-red-500/95 dark:bg-red-950/95 lya:bg-[#5C240A]/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-red-400/30 flex items-center gap-3 pointer-events-auto max-w-md w-full">
+                  
+                  <div className="w-9 h-9 rounded-xl bg-white/20 dark:bg-black/20 flex items-center justify-center shrink-0">
+                    <WifiOff size={18} className="animate-pulse text-white" />
+                  </div>
+                  
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-red-200">Sin conexión al servidor</p>
+                    <p className="text-xs font-bold leading-tight truncate">Trabajando en modo desconectado. Verifica tu red.</p>
+                  </div>
+                  
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping shrink-0 mr-1" />
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
