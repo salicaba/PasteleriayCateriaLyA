@@ -4,10 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Loader2, Banknote, Smartphone } from 'lucide-react';
 
 export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devolucion, isSubmitting }) {
-  // 🔥 Estado local para la elección del método
   const [metodo, setMetodo] = useState('efectivo');
 
-  // Resetear el método siempre que se abre el modal
   useEffect(() => {
     if (isOpen) setMetodo('efectivo');
   }, [isOpen]);
@@ -15,12 +13,21 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            onClick={() => !isSubmitting && onClose()} 
+        // 🔥 FIX 1: El contenedor raíz condicional DEBE ser un motion.div con "key"
+        <motion.div
+          key="refund-modal-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        >
+          {/* 🔥 FIX 2: Escudo de clic. Usamos stopPropagation() para que el clic no atraviese el modal y golpee la pantalla de atrás */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isSubmitting) onClose();
+            }}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-colors"
           />
           
@@ -29,7 +36,9 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
             animate={{ scale: 1, opacity: 1, y: 0 }} 
             exit={{ scale: 0.9, opacity: 0, y: 20 }} 
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative z-10"
+            onClick={(e) => e.stopPropagation()} // 🔥 Evita que hacer clic DENTRO de la tarjeta blanca la cierre
+            // 🔥 FIX 3: transform-gpu antialiased previene el parpadeo de renderizado de la tarjeta gráfica
+            className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative z-10 transform-gpu antialiased"
           >
             <div className="bg-amber-100 dark:bg-amber-900/30 p-4 rounded-full mb-5 text-amber-500 shadow-inner">
               <AlertTriangle size={36} strokeWidth={2.5} />
@@ -47,7 +56,7 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
               ${Number(devolucion).toFixed(2)}
             </span>
 
-            {/* 🔥 Selector de Método de Reembolso Neo-Bento */}
+            {/* Selector de Método de Reembolso Neo-Bento */}
             <div className="w-full mb-8">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block text-center">
                 ¿Por dónde entregarás el dinero?
@@ -70,7 +79,10 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
             <div className="flex w-full gap-3">
               <motion.button 
                 whileTap={!isSubmitting ? { scale: 0.95 } : {}}
-                onClick={onClose} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }} 
                 disabled={isSubmitting}
                 className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -79,7 +91,10 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
               
               <motion.button 
                 whileTap={!isSubmitting ? { scale: 0.95 } : {}}
-                onClick={() => onConfirm(metodo)} // 🔥 Pasamos el método aquí
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onConfirm(metodo);
+                }}
                 disabled={isSubmitting}
                 className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-white rounded-xl font-bold transition-all outline-none shadow-lg ${
                   isSubmitting 
@@ -92,7 +107,7 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
               </motion.button>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
