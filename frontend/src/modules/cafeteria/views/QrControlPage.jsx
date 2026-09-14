@@ -725,7 +725,7 @@ export const QrControlPage = () => {
       )}
 
       {createPortal(
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {showToggleModal && (
             <motion.div 
               key="modal-toggle" // 🔥 FIX
