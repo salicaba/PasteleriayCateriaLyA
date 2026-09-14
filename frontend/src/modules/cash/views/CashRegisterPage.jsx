@@ -418,7 +418,7 @@ export const CashRegisterPage = ({ user }) => {
                       </td>
                       
                       {/* 🔥 CELDA DEL MONTO CON INTELIGENCIA FINANCIERA */}
-                      <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text">
+                      <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text whitespace-nowrap">
                         <span className={
                           isCancelled 
                             ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' 
@@ -426,7 +426,7 @@ export const CashRegisterPage = ({ user }) => {
                               ? 'text-red-500 dark:text-red-400 lya:text-red-600' 
                               : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'
                         }>
-                          {isCancelled ? '' : (isNegative ? '-' : '+')} ${absAmount}
+                          {isCancelled ? '' : (isNegative ? '- ' : '+ ')}${absAmount}
                         </span>
                       </td>
 
