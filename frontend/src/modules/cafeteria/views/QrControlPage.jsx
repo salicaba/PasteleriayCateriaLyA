@@ -551,11 +551,14 @@ export const QrControlPage = () => {
         <AnimatePresence>
           {showPrintModal && (
             <motion.div 
+              key="modal-pdf" // 🔥 FIX 1: Clave única
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
+              {/* 🔥 FIX 2: Escudo de clic */}
               <div 
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (!isPrinting) setShowPrintModal(false);
                 }}
                 className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
@@ -565,7 +568,9 @@ export const QrControlPage = () => {
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[420px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors max-h-[90vh]"
+                onClick={(e) => e.stopPropagation()} // 🔥 FIX 3: Evitar cierre accidental
+                // 🔥 FIX 4: Aceleración por hardware
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[420px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors max-h-[90vh] transform-gpu antialiased"
               >
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -578,7 +583,7 @@ export const QrControlPage = () => {
                   </div>
                   <motion.button 
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => setShowPrintModal(false)}
+                    onClick={(e) => { e.stopPropagation(); setShowPrintModal(false); }}
                     disabled={isPrinting}
                     className="p-2 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg rounded-full transition-all disabled:opacity-50"
                   >
@@ -663,11 +668,12 @@ export const QrControlPage = () => {
         <AnimatePresence>
           {previewMesa && (
             <motion.div 
+              key="modal-preview" // 🔥 FIX
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-[100] flex items-center justify-center p-4"
             >
               <div 
-                onClick={() => setPreviewMesa(null)}
+                onClick={(e) => { e.stopPropagation(); setPreviewMesa(null); }}
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
               />
               <motion.div 
@@ -675,11 +681,12 @@ export const QrControlPage = () => {
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors transform-gpu antialiased"
               >
                 <motion.button 
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => setPreviewMesa(null)} 
+                  onClick={(e) => { e.stopPropagation(); setPreviewMesa(null); }} 
                   className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
                 >
                   <X size={20} strokeWidth={2.5} className="pointer-events-none" />
@@ -700,7 +707,7 @@ export const QrControlPage = () => {
                      bgColor="transparent" 
                      fgColor={document.documentElement.classList.contains('dark') ? "#ffffff" : "#000000"} 
                      level="Q"
-                     className={`transition-opacity duration-300 ${isQrActive && !disabledQrs.includes(previewMesa?.isLlevar ? 'llevar' : `mesa-${previewMesa?.number}`) ? 'opacity-90' : 'opacity-20 grayscale blur-[2px]'}`}
+                     className={`drop-shadow-sm transition-all duration-300 ${isQrActive && !disabledQrs.includes(previewMesa?.isLlevar ? 'llevar' : `mesa-${previewMesa?.number}`) ? 'opacity-90' : 'opacity-20 grayscale blur-[2px]'}`}
                   />
                 </div>
 
@@ -721,13 +728,12 @@ export const QrControlPage = () => {
         <AnimatePresence>
           {showToggleModal && (
             <motion.div 
+              key="modal-toggle" // 🔥 FIX
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
               <div 
-                onClick={() => {
-                  if (!isTogglingQr) setShowToggleModal(false);
-                }}
+                onClick={(e) => { e.stopPropagation(); if (!isTogglingQr) setShowToggleModal(false); }}
                 className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
               />
               <motion.div 
@@ -735,7 +741,8 @@ export const QrControlPage = () => {
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors transform-gpu antialiased"
               >
                 <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm ${
                   isQrActive ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500' : 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500'
@@ -756,7 +763,7 @@ export const QrControlPage = () => {
                 <div className="flex gap-3 w-full">
                   <motion.button 
                     whileTap={!isTogglingQr ? { scale: 0.95 } : {}}
-                    onClick={() => setShowToggleModal(false)}
+                    onClick={(e) => { e.stopPropagation(); setShowToggleModal(false); }}
                     disabled={isTogglingQr}
                     className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
                   >
@@ -764,7 +771,8 @@ export const QrControlPage = () => {
                   </motion.button>
                   <motion.button 
                     whileTap={!isTogglingQr ? { scale: 0.95 } : {}}
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       try {
                         const success = await toggleQrService(!isQrActive);
                         if(success) {
@@ -808,13 +816,12 @@ export const QrControlPage = () => {
         <AnimatePresence>
           {mesaToDelete && (
             <motion.div 
+              key="modal-delete" // 🔥 FIX
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
               <div 
-                onClick={() => {
-                  if (removingId !== mesaToDelete?.id) setMesaToDelete(null);
-                }}
+                onClick={(e) => { e.stopPropagation(); if (removingId !== mesaToDelete?.id) setMesaToDelete(null); }}
                 className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
               />
               <motion.div 
@@ -822,7 +829,8 @@ export const QrControlPage = () => {
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors transform-gpu antialiased"
               >
                 <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
                   <AlertCircle size={32} strokeWidth={1.5} />
@@ -838,7 +846,7 @@ export const QrControlPage = () => {
                 <div className="flex gap-3 w-full">
                   <motion.button 
                     whileTap={removingId !== mesaToDelete?.id ? { scale: 0.95 } : {}}
-                    onClick={() => setMesaToDelete(null)}
+                    onClick={(e) => { e.stopPropagation(); setMesaToDelete(null); }}
                     disabled={removingId === mesaToDelete?.id}
                     className="flex-[1] py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:hover:bg-lya-border/30 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed outline-none select-none"
                   >
@@ -846,7 +854,8 @@ export const QrControlPage = () => {
                   </motion.button>
                   <motion.button 
                     whileTap={removingId !== mesaToDelete?.id ? { scale: 0.95 } : {}}
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       const success = await removeMesa(mesaToDelete?.id);
                       if (success) {
                         setMesaToDelete(null);
