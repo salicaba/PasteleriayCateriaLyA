@@ -126,6 +126,24 @@ export const addItemsToOrder = async (req, res) => {
         return res.status(400).json({ message: 'La orden no existe.' });
     }
 
+    // 🔥 1. Buscar si los productos requieren cocina antes de insertarlos
+    const productIds = items.map(i => i.productId);
+    const productsInfo = await Product.findAll({
+      where: { id: productIds },
+      attributes: ['id', 'requiereCocina']
+    });
+    const reqCocinaMap = {};
+    productsInfo.forEach(p => {
+      reqCocinaMap[p.id] = p.requiereCocina;
+    });
+
+    // 🔥 2. Identificar si esta es una orden Express / Mostrador
+    const isExpress = order.ticketId && (
+      order.ticketId.startsWith('MOSTRADOR') || 
+      order.ticketId.startsWith('VITRINA') || 
+      order.ticketId.startsWith('MOS-')
+    );
+
     const itemsToInsert = items.map(item => {
       let parsedNotes = [];
       if (item.notes) {
@@ -142,11 +160,19 @@ export const addItemsToOrder = async (req, res) => {
         });
       }
 
+      // 🔥 3. LA MAGIA: Si es mostrador y NO requiere cocina, nace ENTREGADO
+      const requiereCocina = reqCocinaMap[item.productId] !== false; // por defecto true
+      let statusCocina = 'PENDING';
+      
+      if (isExpress && !requiereCocina) {
+        statusCocina = 'DELIVERED';
+      }
+
       return { 
         ...item, 
         orderId, 
         cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
-        kitchenStatus: 'PENDING',
+        kitchenStatus: statusCocina, // <-- Estado inteligente aplicado aquí
         isTakeaway: item.isTakeaway || false,
         notes: JSON.stringify(parsedNotes)
       };
@@ -192,7 +218,7 @@ export const addItemsToOrder = async (req, res) => {
     
     const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
     
-    res.status(201).json({ message: 'Productos enviados a cocina', orderItems: cleanItems, newOrderId: orderId });
+    res.status(201).json({ message: 'Productos procesados', orderItems: cleanItems, newOrderId: orderId });
   } catch (error) { 
     res.status(500).json({ message: 'Error al agregar productos', error: error.message }); 
   }

@@ -20,6 +20,7 @@ export const getKitchenTickets = async (req, res) => {
   try {
     const tickets = await OrderItem.findAll({
       where: {
+        // Solo traemos los que están pendientes o en preparación.
         kitchenStatus: ['PENDING', 'PREPARING']
       },
       include: [
@@ -28,6 +29,7 @@ export const getKitchenTickets = async (req, res) => {
           as: 'order',
           attributes: ['id', 'orderType', 'ticketId', 'tableId', 'createdAt', 'status'], 
           where: { 
+            // 🔥 LA MAGIA: Permitimos que lleguen las órdenes Canceladas a la cocina para avisarles
             status: { [Op.in]: ['OPEN', 'PAID', 'CANCELLED'] } 
           },
           include: [
@@ -41,11 +43,7 @@ export const getKitchenTickets = async (req, res) => {
         {
           model: Product,
           as: 'product',
-          attributes: ['name', 'requiereCocina'],
-          // 🔥 FILTRAR AQUÍ PARA QUE LOS DE MOSTRADOR/EXPRESS NUNCA LLEGUEN A COCINA
-          where: {
-            requiereCocina: true 
-          }
+          attributes: ['name', 'requiereCocina'] 
         }
       ],
       order: [['createdAt', 'ASC']]

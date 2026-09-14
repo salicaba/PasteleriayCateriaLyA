@@ -554,6 +554,13 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       setShowCheckout(false);
 
     } catch (error) {
+      // 🔥 ESCUDO ANTI RED FANTASMA (TIMEOUT)
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message === 'Network Error') {
+        triggerNotification("Conexión inestable. El pedido no se envió, intenta de nuevo.", "error");
+        return; // Salimos de inmediato para no limpiar el carrito ni la pantalla
+      }
+
+      // Si es un error normal de backend (ej. 400 o 500)
       setDiagnosticError({
         endpoint: error.config?.url || "/pos/orders",
         statusCode: error.response?.status || "Error de Red",

@@ -9,6 +9,7 @@ const baseUrl = isLocalhost
 
 const client = axios.create({
   baseURL: baseUrl,
+  timeout: 12000, // 🔥 12 segundos de espera máxima
   headers: {
     'Content-Type': 'application/json',
   },
