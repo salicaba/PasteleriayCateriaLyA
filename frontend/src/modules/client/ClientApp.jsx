@@ -168,7 +168,7 @@ export default function ClientApp({ type }) {
   // 🔥 TÍTULO DINÁMICO DE PESTAÑA (Pilar UX)
   useEffect(() => {
     // isGridMode es true cuando el usuario no ha escogido si es mesa o llevar
-    const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection;
+    const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection && type !== 'llevar' && window.location.pathname !== '/llevar';
     
     if (isGridMode) {
       document.title = "Lya | Menú Digital";
@@ -186,7 +186,7 @@ export default function ClientApp({ type }) {
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
-  const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection;
+  const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection && type !== 'llevar' && window.location.pathname !== '/llevar';
 
   const fetchStoreData = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) setIsLoadingTables(true);
