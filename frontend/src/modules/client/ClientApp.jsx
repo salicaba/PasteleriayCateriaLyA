@@ -549,7 +549,7 @@ export default function ClientApp({ type }) {
                           <ShieldAlert className="text-red-500 shrink-0 w-6 h-6 mt-1" />
                           <div>
                             <h4 className="text-red-600 dark:text-red-400 font-black text-sm text-center">Servicio Digital Suspendido</h4>
-                            <p className="text-red-500/80 text-xs font-bold mt-2 text-justify">El local está abierto, pero los pedidos desde la App están temporalmente pausados. Pase y consuma sin compromiso.</p>
+                            <p className="text-red-500/80 text-xs font-bold mt-2 text-justify">¿El local está abierto?, entonces los pedidos desde la App están temporalmente pausados. Pase y consuma sin compromiso.</p>
                           </div>
                         </motion.div>
                       )}
