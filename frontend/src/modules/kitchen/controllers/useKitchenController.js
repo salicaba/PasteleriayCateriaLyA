@@ -1,3 +1,4 @@
+//frontend/src/modules/kitchen/controllers/useKitchenController.js
 import { useState, useCallback, useEffect } from 'react';
 import client from '../../../api/client.js';
 import { socket } from '../../../api/socket.js'; // 🔥 IMPORTAMOS EL SOCKET
@@ -86,20 +87,27 @@ export const useKitchenController = () => {
 
   useEffect(() => {
     fetchKitchenOrders(false);
-    const interval = setInterval(() => fetchKitchenOrders(true), 5000);
+    // Para no causar conflictos con las actualizaciones en tiempo real, 
+    // aumentamos un poco el intervalo o confiamos en los sockets.
+    const interval = setInterval(() => fetchKitchenOrders(true), 15000); 
     return () => clearInterval(interval);
   }, [fetchKitchenOrders]);
 
-  // 🔥 MAGIA DE LIMPIEZA EN COCINA: Escuchamos las cancelaciones del cajero
+  // 🔥 MAGIA DE LIMPIEZA EN COCINA: Escuchamos eventos del socket
   useEffect(() => {
     const recargarCocina = () => fetchKitchenOrders(true);
 
+    // Escuchar actualizaciones del POS y cancelaciones
+    socket.on('pos:update', recargarCocina);
+    socket.on('kitchen:update', recargarCocina);
     socket.on('orderItemCancelled', recargarCocina);
     socket.on('orderCancelled', recargarCocina);
     socket.on('orderItemRestored', recargarCocina);
     socket.on('orderRestored', recargarCocina);
 
     return () => {
+      socket.off('pos:update', recargarCocina);
+      socket.off('kitchen:update', recargarCocina);
       socket.off('orderItemCancelled', recargarCocina);
       socket.off('orderCancelled', recargarCocina);
       socket.off('orderItemRestored', recargarCocina);
@@ -128,6 +136,7 @@ export const useKitchenController = () => {
         const isCancelled = item.status === 'CANCELLED';
         const newStatus = isCancelled ? 'READY' : (item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING');
         
+        // 1. ACTUALIZACIÓN OPTIMISTA (Instantánea en UI)
         if (isCancelled) {
              setOrders(prev => prev.map(o => {
                 if (o.id === orderId) {
@@ -142,13 +151,15 @@ export const useKitchenController = () => {
              } : o));
         }
 
+        // 2. PETICIÓN A LA API (SIN RECARGAR INMEDIATAMENTE)
         try {
             await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
-            fetchKitchenOrders(true); 
+            // Ya NO llamamos a fetchKitchenOrders(true) aquí
             if(isCancelled) showToast('Producto cancelado descartado', 'success');
         } catch(e){ 
             console.error("Error al cambiar estado individual"); 
             showToast('Error al actualizar producto', 'error');
+            // Si falla, sí recargamos para revertir la acción optimista
             fetchKitchenOrders(true); 
         } finally {
             setProcessingItems(prev => { const next = new Set(prev); next.delete(itemId); return next; });
@@ -163,17 +174,19 @@ export const useKitchenController = () => {
           return;
         }
 
+        // 1. ACTUALIZACIÓN OPTIMISTA
         setOrders(prev => prev.map(o => o.id === orderId ? {
             ...o,
             items: o.items.map(i => i.status === 'CANCELLED' ? i : { ...i, kitchenStatus: 'PREPARING' })
         } : o));
 
+        // 2. PETICIÓN A LA API
         try {
             const promises = order.items
                 .filter(i => i.kitchenStatus !== 'PREPARING' && i.status !== 'CANCELLED')
                 .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'PREPARING' }));
             await Promise.all(promises);
-            fetchKitchenOrders(true);
+            // Ya NO llamamos a fetchKitchenOrders(true) aquí
             showToast('Productos activos preparados');
         } catch(e){ 
             console.error("Error al marcar todo preparado"); 
@@ -192,18 +205,22 @@ export const useKitchenController = () => {
           return;
         }
 
+        // 1. ACTUALIZACIÓN OPTIMISTA (Oculta la orden)
         setOrders(prev => prev.filter(o => o.id !== orderId));
 
+        // 2. PETICIÓN A LA API
         try {
             const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
             await Promise.all(promises);
-            fetchKitchenOrders(true); 
+            
+            // Ya NO llamamos a fetchKitchenOrders(true) aquí
             
             const allCancelled = order.items.every(i => i.status === 'CANCELLED');
             showToast(allCancelled ? 'Comanda cancelada descartada' : '¡Comanda despachada con éxito!');
         } catch(e){ 
             console.error("Error al enviar pedido a meseros"); 
             showToast('Error al despachar la comanda', 'error');
+            // Si falla, recargamos para que vuelva a aparecer
             fetchKitchenOrders(true);
         } finally {
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
