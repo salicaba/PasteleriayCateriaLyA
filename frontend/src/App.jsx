@@ -6,11 +6,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
 import { usePWA } from './hooks/usePWA';
-import { useUiSize } from './hooks/useUiSize'; // 🔥 AGREGADO AQUÍ
+import { useUiSize } from './hooks/useUiSize';
 import { useNavigate } from 'react-router-dom';
 
-// 🔥 IMPORTACIÓN DEL SOCKET PARA EL KILL-SWITCH
-import socket from './api/socket'; 
+// 🔥 IMPORTACIÓN DEL SOCKET PARA EL KILL-SWITCH Y MONITOREO
+import { socket } from './api/socket'; 
 
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
@@ -126,7 +126,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768); 
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  const { uiSize, setUiSize } = useUiSize(); // 🔥 Reemplaza al useState y al useEffect
+  const { uiSize, setUiSize } = useUiSize(); 
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -140,16 +140,14 @@ function App() {
       setIsMobile(mobile);
       
       if (mobile) {
-        // 🔥 Si es celular, forzamos automáticamente el tamaño a 'small' y el scroll a 'true'
         setUiSize('small');
         setGlobalScroll(true);
       } else {
-        // Si es PC, solo cerramos el menú lateral flotante por si se quedó abierto
         setIsSidebarOpen(false); 
       }
     };
     
-    handleResize(); // Evaluar al cargar la página
+    handleResize(); 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -175,7 +173,6 @@ function App() {
 
   const handleLogin = (userData) => {
     const now = new Date();
-    // Expiración exacta de 24 horas (sincronizado con el backend de Node.js)
     const expiresAt = now.getTime() + (24 * 60 * 60 * 1000);
     
     localStorage.setItem('lya_pos_session', JSON.stringify({
@@ -191,7 +188,7 @@ function App() {
 
   const performCleanLogout = (message, isKickout = false) => {
     const hasToken = localStorage.getItem('lya_token');
-    if (!hasToken) return; // Si ya no hay token, alguien más ya disparó el evento (Evita doble toast)
+    if (!hasToken) return;
 
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
@@ -225,7 +222,6 @@ function App() {
       const savedSession = localStorage.getItem('lya_pos_session');
       if (savedSession) {
         const { expiresAt } = JSON.parse(savedSession);
-        // Expulsa solo si pasaron las 24 horas reales
         if (new Date().getTime() >= expiresAt) {
           performCleanLogout("Tu sesión de 24 horas ha expirado por seguridad. Vuelve a ingresar.", false);
         }
@@ -235,6 +231,38 @@ function App() {
     }, 10000); 
     return () => clearInterval(interval);
   }, [user]);
+
+  // 🔥 MONITOREO DE RED GLOBAL PARA EMPLEADOS (POS, ADMIN, COCINA)
+  useEffect(() => {
+    // 1. Escuchar los eventos de red de client.js (Peticiones HTTP trabadas)
+    const handleNetworkError = (e) => toast.error(e.detail.message, { id: 'net-err', duration: 5000 });
+    const handleNetworkTimeout = (e) => toast.error(e.detail.message, { id: 'net-time', duration: 5000 });
+
+    window.addEventListener('network_error', handleNetworkError);
+    window.addEventListener('network_timeout', handleNetworkTimeout);
+
+    // 2. Escuchar caídas en la conexión de tiempo real (Socket.io)
+    const handleSocketDisconnect = () => {
+      toast.error('Sin conexión al servidor en tiempo real. Reconectando...', { 
+        id: 'socket-err', 
+        icon: '🔌', 
+        duration: 4000 
+      });
+    };
+    const handleSocketConnect = () => {
+      toast.success('Conexión restablecida con el servidor.', { id: 'socket-ok' });
+    };
+
+    socket.on('disconnect', handleSocketDisconnect);
+    socket.on('connect', handleSocketConnect);
+
+    return () => {
+      window.removeEventListener('network_error', handleNetworkError);
+      window.removeEventListener('network_timeout', handleNetworkTimeout);
+      socket.off('disconnect', handleSocketDisconnect);
+      socket.off('connect', handleSocketConnect);
+    };
+  }, []);
 
   useEffect(() => {
     const handleAuthError = (e) => {
@@ -260,13 +288,10 @@ function App() {
   useEffect(() => {
     if (!user) return;
 
-    // Encapsulamos la emisión para poder reutilizarla
     const joinRoom = () => socket.emit('join_user_room', user.id);
     
-    // 1. Unir inmediatamente al tener el usuario
     joinRoom();
     
-    // 2. Re-unir automáticamente si el socket pierde señal y se reconecta en segundo plano
     socket.on('connect', joinRoom);
 
     const handleKickout = (data) => {
