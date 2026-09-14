@@ -490,7 +490,7 @@ export const QrControlPage = () => {
                       <Smartphone className={`w-12 h-12 ${!isLlevarActive ? 'text-red-500' : 'text-orange-500 dark:text-orange-400 lya:text-lya-secondary'}`} />
                     </div>
                     
-                    <h2 className={`text-3xl font-black mb-2 tracking-tighter truncate w-full ${!isLlevarActive ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>Mostrador 𝓛𝔂𝓪</h2>
+                    <h2 className={`text-3xl font-black mb-2 tracking-tighter w-full pr-2 ${!isLlevarActive ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>Mostrador 𝓛𝔂𝓪</h2>
                     
                     <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-sm mb-8 font-medium px-4 text-justify">QR único para que los clientes en fila puedan escanear el menú digital desde sus dispositivos móviles.</p>
 
@@ -696,7 +696,7 @@ export const QrControlPage = () => {
                   Escanear para ordenar
                 </div>
                 
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center w-full pr-3">
                   {previewMesa?.isLlevar ? 'Mostrador 𝓛𝔂𝓪' : `Mesa ${previewMesa?.number}`}
                 </h2>
 
