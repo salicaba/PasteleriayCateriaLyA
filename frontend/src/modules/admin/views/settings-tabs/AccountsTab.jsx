@@ -548,11 +548,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         <AnimatePresence>
           {previewQR && (
             <motion.div 
+              key="modal-preview-qr" // 🔥 FIX 1: Llave única
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             >
+              {/* 🔥 FIX 2: Prevención de clics fantasma en el fondo */}
               <div 
-                onClick={() => setPreviewQR(false)}
+                onClick={(e) => { e.stopPropagation(); setPreviewQR(false); }}
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
               />
               <motion.div 
@@ -560,11 +562,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors"
+                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2: Evita cerrar al tocar la tarjeta
+                // 🔥 FIX 3: Aceleración por hardware
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors transform-gpu antialiased"
               >
                 <motion.button 
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => setPreviewQR(false)} 
+                  onClick={(e) => { e.stopPropagation(); setPreviewQR(false); }} 
                   className="absolute top-6 right-6 text-gray-400 md:hover:text-gray-800 dark:md:hover:text-white bg-gray-100 dark:bg-gray-800 lya:text-lya-text/40 lya:hover:text-lya-text lya:bg-lya-bg p-3 rounded-full transition-all md:hover:scale-110 outline-none select-none"
                 >
                   <X size={20} strokeWidth={2.5} className="pointer-events-none" />
@@ -574,7 +578,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   Escanear para copiar
                 </div>
                 
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full">
+                {/* 🔥 FIX 4: Agregado "pr-2" para darle respiro a la colita de la "y" cursiva */}
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center truncate w-full pr-2">
                   Cuentas 𝓛𝔂𝓪
                 </h2>
 
@@ -601,26 +606,30 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         document.body
       )}
 
-      {/* MODAL DE DESCARGA PDF DE TICKETS FÍSICOS (EL ORIGINAL) */}
+      {/* MODAL DE DESCARGA PDF DE TICKETS FÍSICOS */}
       {createPortal(
         <AnimatePresence>
           {showPrintModal && (
             <motion.div 
+              key="modal-print-pdf" // 🔥 FIX 1
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             >
+              {/* 🔥 FIX 2 */}
               <div 
-                onClick={() => { if (!isPrinting) setShowPrintModal(false) }} 
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+                onClick={(e) => { e.stopPropagation(); if (!isPrinting) setShowPrintModal(false); }} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-colors" 
               />
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }} 
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2
+                // 🔥 FIX 3
+                className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center transform-gpu antialiased"
               >
                 <div className="mx-auto bg-emerald-500/10 lya:bg-lya-primary/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
                   <Download size={40} className="text-emerald-500 lya:text-lya-primary" />
@@ -637,7 +646,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 <div className="flex items-center justify-center gap-6 mb-10">
                   <motion.button 
                     whileTap={!isPrinting ? { scale: 0.9 } : {}}
-                    onClick={() => setPrintQuantity(Math.max(1, printQuantity - 1))} 
+                    onClick={(e) => { e.stopPropagation(); setPrintQuantity(Math.max(1, printQuantity - 1)); }} 
                     disabled={isPrinting}
                     className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                   >
@@ -648,7 +657,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </span>
                   <motion.button 
                     whileTap={!isPrinting ? { scale: 0.9 } : {}}
-                    onClick={() => setPrintQuantity(printQuantity + 1)} 
+                    onClick={(e) => { e.stopPropagation(); setPrintQuantity(printQuantity + 1); }} 
                     disabled={isPrinting}
                     className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-2xl font-bold dark:text-white lya:text-lya-text flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                   >
@@ -659,7 +668,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 <div className="flex gap-4">
                   <motion.button 
                     whileTap={!isPrinting ? { scale: 0.95 } : {}}
-                    onClick={() => setShowPrintModal(false)} 
+                    onClick={(e) => { e.stopPropagation(); setShowPrintModal(false); }} 
                     disabled={isPrinting}
                     className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                   >
@@ -667,7 +676,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </motion.button>
                   <motion.button 
                     whileTap={!isPrinting ? { scale: 0.95 } : {}}
-                    onClick={executeDownloadPDF} 
+                    onClick={(e) => { e.stopPropagation(); executeDownloadPDF(); }} 
                     disabled={isPrinting}
                     className="flex-1 py-4 font-bold text-white bg-gray-900 dark:bg-emerald-500 lya:bg-lya-primary rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
                   >
@@ -690,21 +699,25 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         <AnimatePresence>
           {accountToDelete && (
             <motion.div 
+              key="modal-delete-account" // 🔥 FIX 1
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             >
+              {/* 🔥 FIX 2 */}
               <div 
-                onClick={() => !isDeleting && setAccountToDelete(null)} 
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+                onClick={(e) => { e.stopPropagation(); if(!isDeleting) setAccountToDelete(null); }} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-colors" 
               />
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }} 
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
+                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2
+                // 🔥 FIX 3
+                className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center transform-gpu antialiased"
               >
                 <div className="mx-auto bg-red-500/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
                   <Trash2 size={40} className="text-red-500" />
@@ -721,7 +734,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 <div className="flex gap-4">
                   <motion.button 
                     whileTap={!isDeleting ? { scale: 0.95 } : {}}
-                    onClick={() => setAccountToDelete(null)} 
+                    onClick={(e) => { e.stopPropagation(); setAccountToDelete(null); }} 
                     disabled={isDeleting}
                     className="flex-1 py-4 font-bold text-gray-500 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl md:hover:bg-gray-100 dark:md:hover:bg-gray-700 transition-colors disabled:opacity-50 outline-none"
                   >
@@ -729,7 +742,7 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   </motion.button>
                   <motion.button 
                     whileTap={!isDeleting ? { scale: 0.95 } : {}}
-                    onClick={handleDeleteConfirm} 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteConfirm(); }} 
                     disabled={isDeleting}
                     className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 outline-none"
                   >
