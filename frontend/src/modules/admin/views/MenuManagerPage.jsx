@@ -318,7 +318,8 @@ export const MenuManagerPage = () => {
 
                 {categoryVisibleProducts.length > 0 ? (
                   <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <AnimatePresence mode="popLayout">
+                    {/* 🔥 FIX 1: Quitamos mode="popLayout" para estabilizar el grid */}
+                    <AnimatePresence>
                       {categoryVisibleProducts.map((product, index) => {
                         
                         const stockActual = product.stockQuantity ?? product.stock ?? 0;
@@ -344,13 +345,15 @@ export const MenuManagerPage = () => {
                         return (
                         <motion.div 
                           key={product.id} 
-                          layout 
+                          layout="position" // 🔥 FIX 2: Anima solo la posición X/Y, evitando que la caja se deforme o recalcule su ancho
+                          layoutId={`menu-card-${product.id}`} // 🔥 FIX 3: Rastreo estricto de identidad en Framer Motion
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                           whileHover={{ y: -4, transition: { duration: 0.2 } }}
                           transition={{ type: "spring", stiffness: 300, damping: 25, delay: index * 0.03 }}
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden ${
+                          // 🔥 FIX 4: "transform-gpu antialiased" obliga a usar la tarjeta gráfica sin salto de píxeles
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden transform-gpu antialiased ${
                             isAgotado 
                               ? 'border-gray-200 dark:border-neutral-800 opacity-70 grayscale-[40%]' 
                               : hasActivePromo 

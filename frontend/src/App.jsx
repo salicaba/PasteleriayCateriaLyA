@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
 import { usePWA } from './hooks/usePWA';
+import { useUiSize } from './hooks/useUiSize'; // 🔥 AGREGADO AQUÍ
 import { useNavigate } from 'react-router-dom';
 
 // 🔥 IMPORTACIÓN DEL SOCKET PARA EL KILL-SWITCH
@@ -125,9 +126,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768); 
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  const [uiSize, setUiSize] = useState(() => {
-    return localStorage.getItem('lya_ui_size') || 'large';
-  });
+  const { uiSize, setUiSize } = useUiSize(); // 🔥 Reemplaza al useState y al useEffect
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -173,15 +172,6 @@ function App() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('lya_ui_size', uiSize);
-    
-    const root = document.documentElement;
-    if (uiSize === 'large') root.style.fontSize = '16px'; 
-    if (uiSize === 'medium') root.style.fontSize = '14px'; 
-    if (uiSize === 'small') root.style.fontSize = '12px';  
-  }, [uiSize]);
 
   const handleLogin = (userData) => {
     const now = new Date();

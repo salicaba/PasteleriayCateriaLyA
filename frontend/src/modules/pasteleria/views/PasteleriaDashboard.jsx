@@ -334,7 +334,8 @@ export default function PasteleriaDashboard() {
             </motion.div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
-              <AnimatePresence mode="popLayout">
+              {/* 🔥 FIX 1: Quitamos mode="popLayout" (El modo por defecto es más estable para Grids) */}
+              <AnimatePresence>
                 {pedidosFiltrados.map((pedido) => {
                   const finanzas = calcularFinanzas(pedido);
                   const fechaRaw = new Date(pedido.fechaEntrega);
@@ -342,20 +343,21 @@ export default function PasteleriaDashboard() {
                   
                   const isAtrasado = fechaRaw < new Date() && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
                   
-                  // 🔥 Lógica de Alertas Tempranas (Badges de producción)
                   const isHoy = fechaRaw >= hudMetrics.today && fechaRaw < hudMetrics.tomorrow && !isAtrasado && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
                   const isManana = fechaRaw >= hudMetrics.tomorrow && fechaRaw < hudMetrics.dayAfterTomorrow && !isAtrasado && pedido.estado !== 'entregado' && pedido.estado !== 'cancelado';
 
                   return (
                     <motion.div
                       key={pedido.id} 
-                      layout 
+                      layout="position" // 🔥 FIX 2: Anima solo la posición X/Y, evitando que la caja se deforme o recalcule su ancho
+                      layoutId={`dash-card-${pedido.id}`} // 🔥 FIX 3: Otorga rastreo de identidad estricto a Framer Motion
                       initial={{ opacity: 0, scale: 0.9, y: 20 }} 
                       animate={{ opacity: 1, scale: 1, y: 0 }} 
                       exit={{ opacity: 0, scale: 0.8, y: -20 }}
                       transition={{ type: "spring", stiffness: 200, damping: 20 }}
                       onClick={() => abrirDetalles(pedido)} 
-                      className={`cursor-pointer relative overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface
+                      // 🔥 FIX 4: Agregamos "transform-gpu antialiased" para evitar el salto de GPU a CPU al finalizar
+                      className={`cursor-pointer relative overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface transform-gpu antialiased
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 md:hover:border-emerald-400/50 lya:border-lya-border/30 lya:md:hover:border-lya-secondary/50'}
                         ${isAtrasado ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}
                     >

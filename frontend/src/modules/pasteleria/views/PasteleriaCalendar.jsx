@@ -254,7 +254,8 @@ export default function PasteleriaCalendar() {
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 custom-scrollbar">
-            <AnimatePresence mode="popLayout">
+            {/* 🔥 FIX 1: Quitamos mode="popLayout" para estabilizar el grid */}
+            <AnimatePresence>
               {pedidosSeleccionados.length === 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9 }} 
@@ -280,15 +281,17 @@ export default function PasteleriaCalendar() {
 
                   return (
                     <motion.div
-                      layout 
+                      key={pedido.id}
+                      layout="position" // 🔥 FIX 2: Evita que recalcule el ancho y deforme la caja
+                      layoutId={`cal-card-${pedido.id}`} // 🔥 FIX 3: Rastreo estricto de identidad
                       initial={{ opacity: 0, scale: 0.95, x: 20 }} 
                       animate={{ opacity: 1, scale: 1, x: 0 }} 
                       exit={{ opacity: 0, scale: 0.95, x: -20 }}
                       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                      key={pedido.id}
                       onClick={() => abrirDetalles(pedido)} 
                       whileTap={{ scale: 0.98 }} 
-                      className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md
+                      // 🔥 FIX 4: "transform-gpu antialiased" obliga a usar la tarjeta gráfica sin salto de píxeles
+                      className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md transform-gpu antialiased
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5 md:hover:border-rose-400' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-300 lya:md:hover:border-lya-primary/50'}
                       `}
                     >
@@ -297,6 +300,7 @@ export default function PasteleriaCalendar() {
                           <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
                           <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text transition-colors">{pedido.cliente}</h4>
                         </div>
+                        {/* RESTO DE TU TARJETA INTACTO ABAJO... */}
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
                           <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {horaStr}
                         </div>
