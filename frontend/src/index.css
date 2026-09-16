@@ -3,11 +3,19 @@
 @tailwind utilities;
 
 @layer base {
-  /* Fondo por defecto (Modo Claro) */
+  /* Fondo por defecto (Modo Claro) + 🔥 NUEVO: Suavizado de fuentes anti-parpadeo */
   body {
     @apply bg-gray-50 text-gray-800 transition-colors duration-300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
+  /* 🔥 NUEVO: Aceleración de Hardware obligatoria para divs (Evita flickering en Framer Motion) */
+  div {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
   /* Modo Oscuro original intacto */
   .dark body {
     @apply bg-gray-950 text-gray-100;
@@ -18,7 +26,7 @@
     @apply bg-lya-bg text-lya-text;
   }
 
-  /* 🔥 NUEVO: Ocultar las flechitas (spinners) de los inputs numéricos globalmente */
+  /* Ocultar las flechitas (spinners) de los inputs numéricos globalmente */
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
@@ -38,7 +46,7 @@
 .theme-lya ::-webkit-scrollbar-thumb { @apply bg-lya-secondary; }
 .theme-lya ::-webkit-scrollbar-thumb:hover { @apply bg-lya-primary; }
 
-/* 🔥 NUEVO: Ocultar el ojito nativo de Chromium/Edge para inputs de contraseña */
+/* Ocultar el ojito nativo de Chromium/Edge para inputs de contraseña */
 @layer utilities {
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
