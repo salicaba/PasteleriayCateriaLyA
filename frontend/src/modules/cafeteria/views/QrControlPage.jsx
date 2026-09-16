@@ -681,7 +681,7 @@ export const QrControlPage = () => {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
               transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Modal suave sin rebote
-              className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-3xl p-8 max-w-md w-full shadow-2xl relative"
+              className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-3xl p-8 max-w-sm w-full shadow-2xl relative"
               onClick={e => e.stopPropagation()}
             >
                 <motion.button 
