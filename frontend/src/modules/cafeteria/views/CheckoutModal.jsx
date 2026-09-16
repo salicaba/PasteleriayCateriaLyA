@@ -16,10 +16,11 @@ const parseAccountName = (str) => {
   return s;
 };
 
+// 🔥 FIX: Adiós al resorte (spring), usamos transiciones suaves y predecibles
 const modalVariants = {
   hidden: { scale: 0.95, opacity: 0, y: 15 },
-  visible: { scale: 1, opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 25 } },
-  exit: { scale: 0.95, opacity: 0, y: 15 }
+  visible: { scale: 1, opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } },
+  exit: { scale: 0.95, opacity: 0, y: 15, transition: { duration: 0.2, ease: "easeIn" } }
 };
 
 export const CheckoutModal = ({ 
@@ -191,6 +192,7 @@ export const CheckoutModal = ({
               initial={{ opacity: 0, y: -40, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Notificación suave
               className="bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-red-200 dark:border-red-900/30 lya:border-red-500/30 pointer-events-auto"
             >
               <div className="bg-red-100 dark:bg-red-500/20 lya:bg-red-500/20 p-1.5 rounded-full shrink-0">
@@ -204,7 +206,7 @@ export const CheckoutModal = ({
         )}
       </AnimatePresence>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isProcessing && onClose()} className="absolute inset-0 bg-gray-900/40 dark:bg-black/70 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} onClick={() => !isProcessing && onClose()} className="absolute inset-0 bg-gray-900/40 dark:bg-black/70 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
 
       <motion.div 
         variants={modalVariants} 
@@ -282,13 +284,13 @@ export const CheckoutModal = ({
           <div className="min-h-[60px] flex items-center justify-center">
             <AnimatePresence mode="wait">
               {cobroMode === 'full' && (
-                <motion.div key="full" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="text-center w-full px-3 py-2.5 bg-orange-50/80 dark:bg-orange-900/10 lya:bg-lya-primary/10 rounded-xl border border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20">
+                <motion.div key="full" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2, ease: "easeOut" }} className="text-center w-full px-3 py-2.5 bg-orange-50/80 dark:bg-orange-900/10 lya:bg-lya-primary/10 rounded-xl border border-orange-100 dark:border-orange-900/30 lya:border-lya-primary/20">
                   <p className="text-xs font-black text-orange-700 dark:text-orange-400 lya:text-lya-primary uppercase tracking-widest">Cobro en una sola exhibición</p>
                 </motion.div>
               )}
               
               {cobroMode === 'nominal' && orderType === 'salon' && (
-                <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex flex-col gap-2">
+                <motion.div key="nominal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2, ease: "easeOut" }} className="w-full flex flex-col gap-2">
                   <div className="flex justify-between items-center px-1">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Selecciona cuentas:</span>
                     <button onClick={selectAllCuentas} disabled={isProcessing} className="text-[10px] font-black text-blue-500 md:hover:text-blue-600 uppercase transition-colors outline-none disabled:opacity-50">Seleccionar Todas</button>
@@ -333,7 +335,7 @@ export const CheckoutModal = ({
               )}
               
               {cobroMode === 'equal' && (
-                <motion.div key="equal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full flex justify-between items-center bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner">
+                <motion.div key="equal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2, ease: "easeOut" }} className="w-full flex justify-between items-center bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner">
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 lya:text-lya-text">
                     <div className="p-1.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm"><Users size={16} className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60" /></div>
                     <span className="text-xs font-black uppercase tracking-wider">Dividir:</span>
@@ -381,7 +383,7 @@ export const CheckoutModal = ({
 
           <AnimatePresence mode='wait'>
             {method === 'efectivo' && (
-              <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-3 space-y-3">
+              <motion.div key="panel-efectivo" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="overflow-hidden mt-3 space-y-3">
                 <div className="bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-4 rounded-3xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner">
                   <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-widest mb-2 block ml-1">Monto Recibido</label>
                   <div className="relative">
@@ -416,9 +418,9 @@ export const CheckoutModal = ({
             )}
 
             {method === 'transferencia' && transferInfo?.bank_accounts && transferInfo.bank_accounts.length > 0 && (
-              <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden mt-3">
+              <motion.div key="panel-transferencia" initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="overflow-hidden mt-3">
                 {transferInfo?.whatsapp_number && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-900/30 rounded-2xl p-4 flex gap-3 shadow-sm items-center">
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="mb-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-900/30 rounded-2xl p-4 flex gap-3 shadow-sm items-center">
                     <div className="bg-purple-100 dark:bg-purple-900/40 p-2.5 rounded-xl shrink-0">
                       <MessageCircle size={22} className="text-purple-600 dark:text-purple-400" />
                     </div>
