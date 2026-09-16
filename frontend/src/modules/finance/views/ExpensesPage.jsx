@@ -67,7 +67,6 @@ const ThemedDropdown = ({ value, onChange, options, icon: Icon, containerClassNa
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            // 👇 Aquí el z-[100]
             className="absolute z-[100] top-full mt-2 left-0 min-w-[200px] w-full bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl shadow-xl overflow-hidden py-1"
           >
             {options.map((opt) => (
@@ -250,7 +249,7 @@ export const ExpensesPage = () => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Notificación suave
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
                 notification.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
@@ -277,6 +276,7 @@ export const ExpensesPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
             className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 z-[100]"
           >
             <motion.div
@@ -298,7 +298,7 @@ export const ExpensesPage = () => {
             key="main-content"
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
             className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
           >
             {/* 🔥 FIX: Aumentamos a z-[60] para que el dropdown flote por encima de todo */}
@@ -338,6 +338,7 @@ export const ExpensesPage = () => {
                         initial={{ opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: 'auto' }}
                         exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
                         className="flex flex-col sm:flex-row items-center overflow-hidden mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0 gap-2 sm:gap-0"
                       >
                         <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
@@ -561,10 +562,11 @@ export const ExpensesPage = () => {
                             return (
                               <motion.div 
                                 key={ex.id} 
+                                layout="position" // 🔥 FIX: Estabiliza la lista al anular un gasto
                                 initial={{ opacity: 0, y: 15 }} 
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 24, delay: Math.min(idx * 0.04, 0.2) }}
+                                transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(idx * 0.02, 0.1) }} // 🔥 FIX
                                 className="flex flex-row items-start justify-between p-4 sm:p-5 rounded-[1.5rem] border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 md:hover:border-gray-300 dark:md:hover:border-gray-500 lya:bg-lya-surface lya:border-lya-border/50 shadow-sm transition-all gap-4"
                               >
                                 <div className="flex flex-row items-start gap-3 sm:gap-4 min-w-0 flex-1">
@@ -639,6 +641,7 @@ export const ExpensesPage = () => {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
               onClick={() => {
                 if (actionLoadingId !== cancelModal.expenseId) {
                   setCancelModal({ isOpen: false, expenseId: null, reason: '' });
@@ -650,7 +653,7 @@ export const ExpensesPage = () => {
               initial={{ scale: 0.95, opacity: 0, y: 10 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
             >
               <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
@@ -714,6 +717,7 @@ export const ExpensesPage = () => {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
               onClick={() => setIsTrashOpen(false)}
               className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
             />
@@ -721,8 +725,7 @@ export const ExpensesPage = () => {
               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-              // 🔥 FIX 1: Cambiamos de max-w-3xl a max-w-4xl (más ancho)
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-4xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors overflow-hidden"
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0 transition-colors">
@@ -731,7 +734,7 @@ export const ExpensesPage = () => {
                     <Trash2 size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text tracking-tight truncate">Papelera de Gastos</h3>
+                    <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight truncate">Papelera de Gastos</h3>
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 line-clamp-1">Los gastos eliminados hoy desaparecerán a medianoche</p>
                   </div>
                 </div>
@@ -753,7 +756,6 @@ export const ExpensesPage = () => {
                     <p className="text-gray-500 dark:text-gray-400 font-bold lya:text-lya-text/60 text-lg text-center">No hay gastos anulados el día de hoy.</p>
                   </div>
                 ) : (
-                  // 🔥 FIX 2: Lo pasamos a grid de 1 columna para que no se amontonen las tarjetas
                   <div className="grid grid-cols-1 gap-4">
                     {cancelledExpenses.map((ex) => {
                       const catConfig = CATEGORIES.find(c => c.id === ex.expenseCategory) || CATEGORIES[5];
@@ -766,14 +768,21 @@ export const ExpensesPage = () => {
                       const displayDesc = ex.description ? ex.description.replace(/\[Registrado el: .*?\]\s*/, '') : '';
 
                       return (
-                        <div key={ex.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
+                        <motion.div 
+                          key={ex.id} 
+                          layout="position" // 🔥 FIX: Para que no brinque al restaurar
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4"
+                        >
                           
                           <div className="flex flex-row items-center gap-4 flex-1 min-w-0 pr-4">
                             <div className={`h-12 w-12 flex-shrink-0 rounded-[1.25rem] ${catConfig.color} flex items-center justify-center border border-gray-100 dark:border-gray-700 lya:border-transparent`}>
                               <Icon size={20} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              {/* 🔥 FIX 3: Permitimos que el texto use todo el ancho y no se trunque a la fuerza si hay espacio */}
                               <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text line-clamp-2">{displayDesc}</h4>
                               
                               <div className="flex flex-col mt-1 gap-1">
@@ -800,7 +809,6 @@ export const ExpensesPage = () => {
                           </div>
                           
                           <div className="flex flex-row items-center gap-6 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
-                            {/* 🔥 FIX 4: Precio más visible y separado del botón */}
                             <span className="font-black text-xl text-red-500 lya:text-red-400">
                               ${parseFloat(ex.amount).toFixed(2)}
                             </span>
@@ -808,7 +816,7 @@ export const ExpensesPage = () => {
                               whileTap={{ scale: 0.95 }}
                               onClick={() => handleRestore(ex.id)}
                               disabled={actionLoadingId === ex.id}
-                              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 disabled:opacity-50 shrink-0"
+                              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 disabled:opacity-50 shrink-0"
                             >
                               {actionLoadingId === ex.id ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />}
                               <span>
@@ -816,8 +824,8 @@ export const ExpensesPage = () => {
                               </span>
                             </motion.button>
                           </div>
-                        </div>
-                      )
+                        </motion.div>
+                      );
                     })}
                   </div>
                 )}
