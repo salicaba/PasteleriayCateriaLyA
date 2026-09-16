@@ -74,7 +74,7 @@ export default function PasteleriaDashboard() {
     calcularFinanzas, guardarPedido, registrarAbono, restaurarPedido, 
     successScreen, 
     isSubmitting,
-    refundConfirmModal, setRefundConfirmModal, confirmarReembolso // 🔥 Agregado
+    refundConfirmModal, setRefundConfirmModal, confirmarReembolso
   } = usePedidosController();
 
   const [transferInfo, setTransferInfo] = useState(null);
@@ -83,12 +83,11 @@ export default function PasteleriaDashboard() {
   const [modalInputValue, setModalInputValue] = useState('');
   const [restoringId, setRestoringId] = useState(null);
 
-  // 🔥 PILAR 3: Candado asíncrono para evitar múltiples submits accidentales
   const lockRef = useRef(false);
 
   useEffect(() => {
     if (abonoModal.isOpen) {
-      lockRef.current = false; // Liberar candado al abrir modal de abono
+      lockRef.current = false;
       if (abonoForm.metodo === 'transferencia') {
         client.get('/settings')
           .then(res => { if (res.data) setTransferInfo(res.data); })
@@ -97,7 +96,6 @@ export default function PasteleriaDashboard() {
     }
   }, [abonoModal.isOpen, abonoForm.metodo]);
 
-  // 🔥 LÓGICA DEL HUD DE ANTICIPACIÓN (Mise en place) ABSOLUTA
   const hudMetrics = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -116,12 +114,10 @@ export default function PasteleriaDashboard() {
     let proximos7 = 0;
 
     (pedidos || []).forEach(p => {
-      // Si ya se entregó o canceló, lo ignoramos
       if (p.estado === 'entregado' || p.estado === 'cancelado') return;
       
       const fechaEntrega = new Date(p.fechaEntrega);
       
-      // Si el pedido ya está atrasado (es del pasado), no debe salir en el radar
       if (fechaEntrega < today) return; 
       
       if (fechaEntrega >= today && fechaEntrega < tomorrow) {
@@ -130,7 +126,6 @@ export default function PasteleriaDashboard() {
         manana++;
       }
       
-      // 🔥 FIX: Radar de 7 días estrictamente contando a partir de MAÑANA
       if (fechaEntrega >= tomorrow && fechaEntrega <= next7Days) {
         proximos7++;
       }
@@ -142,7 +137,6 @@ export default function PasteleriaDashboard() {
   if (loading) return <PasteleriaLoader />; 
 
   const handleRestaurarDirecto = async (pedido) => {
-    // 🔥 BLOQUEO DE DOBLE CLIC
     if (lockRef.current) return;
     lockRef.current = true;
     
@@ -162,7 +156,7 @@ export default function PasteleriaDashboard() {
       setTimeout(() => {
         setRestoringId(null);
         lockRef.current = false;
-      }, 1000); // 1 segundo de debounce
+      }, 1000); 
     }
   };
 
@@ -326,7 +320,7 @@ export default function PasteleriaDashboard() {
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }} 
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación sin resorte
               className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50"
             >
               <ShoppingBasket size={64} className="mb-4 opacity-20" />
@@ -334,7 +328,6 @@ export default function PasteleriaDashboard() {
             </motion.div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 content-start">
-              {/* 🔥 FIX 1: Quitamos mode="popLayout" (El modo por defecto es más estable para Grids) */}
               <AnimatePresence>
                 {pedidosFiltrados.map((pedido) => {
                   const finanzas = calcularFinanzas(pedido);
@@ -349,14 +342,13 @@ export default function PasteleriaDashboard() {
                   return (
                     <motion.div
                       key={pedido.id} 
-                      layout="position" // 🔥 FIX 2: Anima solo la posición X/Y, evitando que la caja se deforme o recalcule su ancho
-                      layoutId={`dash-card-${pedido.id}`} // 🔥 FIX 3: Otorga rastreo de identidad estricto a Framer Motion
+                      layout="position" 
+                      layoutId={`dash-card-${pedido.id}`} 
                       initial={{ opacity: 0, scale: 0.9, y: 20 }} 
                       animate={{ opacity: 1, scale: 1, y: 0 }} 
                       exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación suave
                       onClick={() => abrirDetalles(pedido)} 
-                      // 🔥 FIX 4: Agregamos "transform-gpu antialiased" para evitar el salto de GPU a CPU al finalizar
                       className={`cursor-pointer relative overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface transform-gpu antialiased
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 md:hover:border-emerald-400/50 lya:border-lya-border/30 lya:md:hover:border-lya-secondary/50'}
                         ${isAtrasado ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}
@@ -451,11 +443,13 @@ export default function PasteleriaDashboard() {
           <div className="fixed inset-0 z-40 flex justify-end overflow-hidden">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave del fondo
               onClick={() => { setShowCancelados(false); setShowEntregados(false); setActiveTab('activos'); }} 
               className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" 
             />
             <motion.div 
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} 
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} 
+              transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Panel deslizable suave sin resorte
               className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-2xl flex flex-col"
             >
               <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
@@ -590,7 +584,7 @@ export default function PasteleriaDashboard() {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              transition={{ duration: 0.4, ease: "easeOut" }} // Ya estaba suave
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
               <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
@@ -608,7 +602,13 @@ export default function PasteleriaDashboard() {
       <AnimatePresence>
         {confirmModal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 lya:bg-black/40 backdrop-blur-sm">
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 10 }} 
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30"
+            >
               <div className="flex flex-col items-center text-center mb-6">
                 <div className={`p-4 rounded-full mb-4 ${detallesModal.bgIcon}`}>
                   {detallesModal.icon}
@@ -650,7 +650,6 @@ export default function PasteleriaDashboard() {
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={async () => {
-                    // 🔥 BLOQUEO DE DOBLE CLIC EN CONFIRMACIONES (Cancelar/Entregar)
                     if (lockRef.current) return;
                     lockRef.current = true;
 
@@ -718,7 +717,6 @@ export default function PasteleriaDashboard() {
           const mostrarCambio = abonoForm.metodo === 'efectivo' && recibidoNum > 0;
           const cambio = Math.max(recibidoNum - montoIngresadoNum, 0);
 
-          // 🔥 SOLUCIÓN ESTRICTA: BLOQUEO DE DOBLE ABONO
           const submitPago = async (e) => {
             e.preventDefault();
             if (lockRef.current) return;
@@ -726,7 +724,6 @@ export default function PasteleriaDashboard() {
             try {
               await Promise.resolve(registrarAbono(p.id, abonoForm.monto, abonoForm.metodo));
             } finally {
-              // Liberamos el candado después de 1 segundo para anular el doble rebote del click
               setTimeout(() => { lockRef.current = false; }, 1000); 
             }
           };
@@ -737,7 +734,13 @@ export default function PasteleriaDashboard() {
 
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 lya:bg-black/50 backdrop-blur-md">
-              <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] w-full max-w-lg shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col max-h-[90vh]">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.95, y: 10 }} 
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+                className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] w-full max-w-lg shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col max-h-[90vh]"
+              >
                 
                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30 lya:bg-lya-bg/50">
                   <div>
