@@ -159,7 +159,7 @@ export const InventoryReconciliationPage = () => {
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
-      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+      transition={{ duration: 0.3, ease: "easeOut" }} // 🔥 FIX: Transición suave del contenedor, sin resorte
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors flex-wrap">
@@ -251,11 +251,11 @@ export const InventoryReconciliationPage = () => {
                   {reconciliationItems.map((item, index) => (
                     <motion.tr 
                       key={item.id}
-                      layout
+                      layout="position" // 🔥 FIX: Estabiliza la tabla para que no brinque
                       initial={{ opacity: 0, y: 15 }} 
                       animate={{ opacity: 1, y: 0 }} 
                       exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.02, 0.2) }}
+                      transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.2) }} // 🔥 FIX: Transición directa sin resorte
                       className="md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40 transition-colors"
                     >
                       <td className="p-5">
@@ -322,6 +322,7 @@ export const InventoryReconciliationPage = () => {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Modal suave sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2rem] shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 lya:border-lya-border/30"
             >
               <div className="flex flex-col items-center text-center mb-6">
@@ -393,6 +394,7 @@ export const InventoryReconciliationPage = () => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Notificación suave
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-[2rem] shadow-2xl flex items-start gap-4 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto max-w-sm sm:max-w-md w-full"
             >
               <div className={`p-1.5 rounded-full shrink-0 mt-0.5 ${toastType === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' : 'bg-red-100 dark:bg-red-500/20 text-red-500'}`}>
