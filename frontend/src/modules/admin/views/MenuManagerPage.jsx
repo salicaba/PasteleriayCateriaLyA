@@ -66,6 +66,7 @@ export const MenuManagerPage = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isOptionsManagerOpen, setIsOptionsManagerOpen] = useState(false);
   const [newOpt, setNewOpt] = useState({ tipo: 'tamanos', nombre: '', precio: 0 });
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   useEffect(() => {
     if (categoryToEdit) setNewCategoryName(categoryToEdit.name);
@@ -640,7 +641,7 @@ export const MenuManagerPage = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
             >
               <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
@@ -650,12 +651,37 @@ export const MenuManagerPage = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed px-2 text-center text-justify">
                 Esta acción no se puede deshacer. Recuerda que <strong className="text-gray-700 dark:text-gray-300 lya:text-lya-text">no puedes eliminar una categoría si aún tiene productos</strong> dentro.
               </p>
+              
               <div className="flex w-full gap-3">
-                <button onClick={cancelRemoveCategory} className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-colors outline-none">
+                <button 
+                  disabled={isDeletingCategory}
+                  onClick={cancelRemoveCategory} 
+                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-colors outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Cancelar
                 </button>
-                <button onClick={confirmRemoveCategory} className="flex-1 py-3.5 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all transform md:hover:-translate-y-0.5 outline-none">
-                  Eliminar
+                <button 
+                  disabled={isDeletingCategory}
+                  onClick={async () => {
+                    setIsDeletingCategory(true);
+                    try {
+                      await confirmRemoveCategory();
+                    } finally {
+                      setIsDeletingCategory(false);
+                    }
+                  }} 
+                  className={`flex-1 py-3.5 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 outline-none ${
+                    isDeletingCategory ? 'opacity-70 cursor-not-allowed shadow-none' : 'transform md:hover:-translate-y-0.5'
+                  }`}
+                >
+                  {isDeletingCategory ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Borrando...</span>
+                    </>
+                  ) : (
+                    'Eliminar'
+                  )}
                 </button>
               </div>
             </motion.div>
