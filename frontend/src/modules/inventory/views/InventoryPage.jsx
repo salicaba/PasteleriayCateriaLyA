@@ -1,4 +1,4 @@
-// frontend/src/modules/inventory/views/InventoryPage.jsx
+// src/modules/inventory/views/InventoryPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PackagePlus, Search, AlertCircle, Boxes, Loader2, CheckCircle2, TrendingUp, History, Calendar, Wallet, ChevronDown, Activity, Trash2, ArchiveRestore, X, AlertTriangle } from 'lucide-react';
@@ -200,6 +200,7 @@ export default function InventoryPage() {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
                 notification?.type === 'error' ? 'border-red-100 dark:border-red-900/30 lya:border-red-500/30' : 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30'
               }`}
@@ -227,6 +228,7 @@ export default function InventoryPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Salida limpia y suave del loader
             className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 z-[100]"
           >
             <motion.div
@@ -248,7 +250,7 @@ export default function InventoryPage() {
             key="main-content"
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte en la carga principal
             className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
           >
             <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative transition-colors">
@@ -284,7 +286,7 @@ export default function InventoryPage() {
               
               {/* ================== VISTA 1: CATÁLOGO ================== */}
               {activeTab === 'catalog' && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="h-full flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden relative transition-colors">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="h-full flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden relative transition-colors">
                   
                   {isLoading && !isFullScreenLoader && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-sm z-30 rounded-[2rem]">
@@ -333,8 +335,12 @@ export default function InventoryPage() {
                               const isLowStock = parseFloat(item.currentStock) <= parseFloat(item.minimumStock);
                               return (
                                 <motion.tr 
-                                  key={item.id} layout initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3, delay: Math.min(index * 0.02, 0.1) }}
+                                  key={item.id} 
+                                  layout="position" // 🔥 FIX: Estabiliza la tabla al filtrar/modificar
+                                  initial={{ opacity: 0, y: 15 }} 
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95 }} 
+                                  transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.1) }} // 🔥 FIX: Listado suave
                                   onClick={() => setSelectedItem(item)}
                                   className="md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:hover:bg-lya-bg/50 transition-colors cursor-pointer"
                                 >
@@ -388,7 +394,7 @@ export default function InventoryPage() {
 
               {/* ================== VISTA 2: KARDEX GLOBAL ================== */}
               {activeTab === 'kardex' && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="h-full flex flex-col gap-4 lg:gap-6 overflow-hidden relative">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="h-full flex flex-col gap-4 lg:gap-6 overflow-hidden relative">
                   
                   {/* Controles Fijos */}
                   <div className="shrink-0 bg-white dark:bg-gray-900 lya:bg-lya-surface p-4 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-wrap gap-4 items-center transition-colors">
@@ -411,6 +417,7 @@ export default function InventoryPage() {
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.15, ease: "easeOut" }} // 🔥 FIX: Transición de dropdown
                             className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 lya:bg-lya-surface border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 rounded-2xl shadow-xl z-50 overflow-hidden transition-colors"
                           >
                             {Object.entries(filterLabels).map(([key, label]) => (
@@ -668,8 +675,8 @@ export default function InventoryPage() {
       <AnimatePresence>
         {cancelModal.isOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (actionLoadingId !== cancelModal.txId) setCancelModal({ isOpen: false, txId: null, reason: '' })}} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 10 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} onClick={() => { if (actionLoadingId !== cancelModal.txId) setCancelModal({ isOpen: false, txId: null, reason: '' })}} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 10 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors">
               <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 lya:bg-red-500/20 mx-auto rounded-full flex items-center justify-center mb-5 shadow-sm">
                 <AlertTriangle size={32} strokeWidth={1.5} />
               </div>
@@ -708,10 +715,10 @@ export default function InventoryPage() {
       <AnimatePresence>
         {isTrashOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsTrashOpen(false)} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} onClick={() => setIsTrashOpen(false)} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
             
             {/* 🔥 FIX 1: Cambiamos a max-w-4xl para darle mayor amplitud y espacio al contenido */}
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-4xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-hidden transition-colors">
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-4xl flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-hidden transition-colors">
               
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0 transition-colors">
                 <div className="flex items-center gap-3">
