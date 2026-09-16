@@ -1,6 +1,6 @@
 // src/modules/cafeteria/views/QrControlPage.jsx
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal } from 'react-dom'; // 🚀 IMPORTACIÓN AÑADIDA
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, Trash2, Smartphone, 
@@ -335,11 +335,11 @@ export const QrControlPage = () => {
                   return (
                     <motion.div 
                       key={mesa.id}
-                      layout="position" // 🔥 FIX: Evita el parpadeo al reordenar o cambiar la lista
+                      layout="position"
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación suave
+                      transition={{ duration: 0.2, ease: "easeOut" }}
                       className={`w-full max-w-[320px] mx-auto md:mx-0 border-2 p-6 rounded-[2rem] shadow-sm relative overflow-hidden flex flex-col transition-all md:hover:shadow-md md:hover:-translate-y-1 ${
                         !isThisMesaActive 
                           ? 'bg-gray-50/80 dark:bg-gray-900/50 lya:bg-lya-bg/50 border-red-200 dark:border-red-900/30' 
@@ -556,6 +556,7 @@ export const QrControlPage = () => {
             <motion.div 
               key="modal-pdf" 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SUAVE
               className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
               <div 
@@ -569,7 +570,7 @@ export const QrControlPage = () => {
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SIN RESORTE
                 onClick={(e) => e.stopPropagation()} 
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[420px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors max-h-[90vh] transform-gpu antialiased"
               >
@@ -669,19 +670,20 @@ export const QrControlPage = () => {
         <AnimatePresence>
         {previewMesa && (
           <motion.div
+            key="modal-preview"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Overlay suave
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SUAVE
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
             onClick={() => setPreviewMesa(null)}
           >
             <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Modal suave sin rebote
-              className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-3xl p-8 max-w-md w-full shadow-2xl relative" // 🔥 FIX: max-w-md restaurado
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SIN RESORTE
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors transform-gpu antialiased"
               onClick={e => e.stopPropagation()}
             >
                 <motion.button 
@@ -730,6 +732,7 @@ export const QrControlPage = () => {
             <motion.div 
               key="modal-toggle" 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SUAVE
               className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
               <div 
@@ -740,7 +743,7 @@ export const QrControlPage = () => {
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SIN RESORTE
                 onClick={(e) => e.stopPropagation()}
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[380px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors transform-gpu antialiased"
               >
@@ -818,6 +821,7 @@ export const QrControlPage = () => {
             <motion.div 
               key="modal-delete" 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SUAVE
               className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             >
               <div 
@@ -828,7 +832,7 @@ export const QrControlPage = () => {
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 SIN RESORTE
                 onClick={(e) => e.stopPropagation()}
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[360px] flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors transform-gpu antialiased"
               >
