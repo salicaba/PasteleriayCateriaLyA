@@ -426,11 +426,11 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                     accounts.map((acc) => (
                       <motion.div 
                         key={acc.id} 
-                        layout 
+                        layout="position" // 🔥 FIX: previene el parpadeo en las listas
                         initial={{ opacity: 0, y: 10 }} 
                         animate={{ opacity: 1, y: 0 }} 
                         exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: animación rápida y directa
                         className="group relative p-5 rounded-2xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-900/40 lya:bg-lya-bg/30 md:hover:shadow-md md:hover:border-gray-200 dark:md:hover:border-gray-600 lya:md:hover:border-lya-primary/30 transition-all flex justify-between items-start"
                       >
                         <div className="flex-1 pr-2 sm:pr-4 space-y-2 min-w-0">
@@ -548,11 +548,11 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         <AnimatePresence>
           {previewQR && (
             <motion.div 
-              key="modal-preview-qr" // 🔥 FIX 1: Llave única
+              key="modal-preview-qr" 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Overlay suave sin parpadeo
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             >
-              {/* 🔥 FIX 2: Prevención de clics fantasma en el fondo */}
               <div 
                 onClick={(e) => { e.stopPropagation(); setPreviewQR(false); }}
                 className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-lya-dark/70 backdrop-blur-md transition-colors"
@@ -561,9 +561,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2: Evita cerrar al tocar la tarjeta
-                // 🔥 FIX 3: Aceleración por hardware
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
+                onClick={(e) => e.stopPropagation()} 
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-10 rounded-[3rem] shadow-2xl relative z-10 w-full max-w-[400px] flex flex-col items-center border-2 border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors transform-gpu antialiased"
               >
                 <motion.button 
@@ -578,7 +577,6 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                   Escanear para copiar
                 </div>
                 
-                {/* 🔥 FIX 4: Agregado "pr-2" para darle respiro a la colita de la "y" cursiva */}
                 <h2 className="text-4xl font-black text-gray-900 dark:text-white lya:text-lya-text mb-8 tracking-tighter text-center w-full pr-3">
                   Cuentas 𝓛𝔂𝓪
                 </h2>
@@ -611,13 +609,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         <AnimatePresence>
           {showPrintModal && (
             <motion.div 
-              key="modal-print-pdf" // 🔥 FIX 1
+              key="modal-print-pdf" 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Overlay suave sin parpadeo
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             >
-              {/* 🔥 FIX 2 */}
               <div 
                 onClick={(e) => { e.stopPropagation(); if (!isPrinting) setShowPrintModal(false); }} 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-colors" 
@@ -626,9 +624,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2
-                // 🔥 FIX 3
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
+                onClick={(e) => e.stopPropagation()} 
                 className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center transform-gpu antialiased"
               >
                 <div className="mx-auto bg-emerald-500/10 lya:bg-lya-primary/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
@@ -699,13 +696,13 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
         <AnimatePresence>
           {accountToDelete && (
             <motion.div 
-              key="modal-delete-account" // 🔥 FIX 1
+              key="modal-delete-account" 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Overlay suave sin parpadeo
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             >
-              {/* 🔥 FIX 2 */}
               <div 
                 onClick={(e) => { e.stopPropagation(); if(!isDeleting) setAccountToDelete(null); }} 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-colors" 
@@ -714,9 +711,8 @@ export const AccountsTab = ({ showNotification, globalScroll }) => {
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2
-                // 🔥 FIX 3
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
+                onClick={(e) => e.stopPropagation()} 
                 className="relative bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-10 w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center transform-gpu antialiased"
               >
                 <div className="mx-auto bg-red-500/10 w-24 h-24 rounded-full flex items-center justify-center mb-6">
