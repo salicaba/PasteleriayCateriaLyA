@@ -162,7 +162,7 @@ export const NetProfitDashboard = () => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } } // 🔥 FIX: Transición suave para las tarjetas en cascada
   };
 
   const isDarkMode = document.documentElement.classList.contains('dark');
@@ -193,7 +193,7 @@ export const NetProfitDashboard = () => {
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
-      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte de la página principal
       className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300"
     >
       {/* 🔥 FIX: Aumentamos a z-[60] para que el dropdown flote por encima de todo */}
@@ -233,6 +233,7 @@ export const NetProfitDashboard = () => {
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave añadida
                   className="flex items-center overflow-hidden whitespace-nowrap mt-2 sm:mt-0 pb-2 sm:pb-0 px-2 sm:px-0"
                 >
                   <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 lya:bg-lya-border/40 mx-2 hidden sm:block"></div>
