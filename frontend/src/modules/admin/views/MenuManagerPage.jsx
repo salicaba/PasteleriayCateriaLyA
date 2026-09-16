@@ -66,7 +66,10 @@ export const MenuManagerPage = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isOptionsManagerOpen, setIsOptionsManagerOpen] = useState(false);
   const [newOpt, setNewOpt] = useState({ tipo: 'tamanos', nombre: '', precio: 0 });
+
+  // 🔥 ESTADOS DE CARGA ANTI-DOBLE CLIC:
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   useEffect(() => {
     if (categoryToEdit) setNewCategoryName(categoryToEdit.name);
@@ -205,10 +208,15 @@ export const MenuManagerPage = () => {
     }
   };
 
-  const handleCreateOrUpdateCategory = () => {
-    if (newCategoryName.trim()) {
-      saveCategory(newCategoryName);
-      setNewCategoryName('');
+  const handleCreateOrUpdateCategory = async () => {
+    if (newCategoryName.trim() && !isSavingCategory) {
+      setIsSavingCategory(true);
+      try {
+        await saveCategory(newCategoryName);
+        setNewCategoryName('');
+      } finally {
+        setIsSavingCategory(false);
+      }
     }
   };
 
@@ -608,10 +616,46 @@ export const MenuManagerPage = () => {
               </div>
 
               <div className="flex space-x-2 mb-6">
-                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 font-medium transition-all ${categoryToEdit ? 'border-blue-200 dark:border-blue-900 lya:border-lya-secondary focus:ring-blue-500 lya:focus:ring-lya-secondary' : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:ring-orange-500 lya:focus:ring-lya-primary'}`} onKeyDown={(e) => e.key === 'Enter' && handleCreateOrUpdateCategory()} />
-                {categoryToEdit && <button onClick={() => setCategoryToEdit(null)} className="bg-gray-200 md:hover:bg-gray-300 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-border/40 lya:md:hover:bg-lya-border/60 transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text px-3 py-3 rounded-xl font-bold outline-none"><X size={20} /></button>}
-                <button onClick={handleCreateOrUpdateCategory} className={`${categoryToEdit ? 'bg-blue-500 md:hover:bg-blue-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90' : 'bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90'} transition-colors text-white lya:text-lya-surface px-4 py-3 rounded-xl font-bold outline-none`}>
-                  {categoryToEdit ? <Save size={20} /> : <Plus size={20} />}
+                <input 
+                  type="text" 
+                  value={newCategoryName} 
+                  disabled={isSavingCategory}
+                  onChange={(e) => setNewCategoryName(e.target.value)} 
+                  placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} 
+                  className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 font-medium transition-all ${
+                    categoryToEdit 
+                      ? 'border-blue-200 dark:border-blue-900 lya:border-lya-secondary focus:ring-blue-500 lya:focus:ring-lya-secondary' 
+                      : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:ring-orange-500 lya:focus:ring-lya-primary'
+                  } ${isSavingCategory ? 'opacity-60 cursor-not-allowed' : ''}`} 
+                  onKeyDown={(e) => e.key === 'Enter' && !isSavingCategory && handleCreateOrUpdateCategory()} 
+                />
+                
+                {categoryToEdit && (
+                  <button 
+                    disabled={isSavingCategory}
+                    onClick={() => setCategoryToEdit(null)} 
+                    className="bg-gray-200 md:hover:bg-gray-300 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-border/40 lya:md:hover:bg-lya-border/60 transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text px-3 py-3 rounded-xl font-bold outline-none disabled:opacity-50"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+
+                {/* 🔥 BOTÓN NARANJA CON SPINNER SIN TEXTO Y BLOQUEO */}
+                <button 
+                  type="button"
+                  disabled={isSavingCategory || !newCategoryName.trim()}
+                  onClick={handleCreateOrUpdateCategory} 
+                  className={`${
+                    categoryToEdit 
+                      ? 'bg-blue-500 md:hover:bg-blue-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90' 
+                      : 'bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90'
+                  } transition-all text-white lya:text-lya-surface px-4 py-3 rounded-xl font-bold outline-none flex items-center justify-center min-w-[48px] disabled:opacity-50 disabled:cursor-not-allowed active:scale-95`}
+                >
+                  {isSavingCategory ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    categoryToEdit ? <Save size={20} /> : <Plus size={20} />
+                  )}
                 </button>
               </div>
 
