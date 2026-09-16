@@ -704,6 +704,8 @@ export const MenuManagerPage = () => {
                 >
                   Cancelar
                 </button>
+                
+                {/* 🔥 BOTÓN ELIMINAR: Solo circulito girando cuando está cargando */}
                 <button 
                   disabled={isDeletingCategory}
                   onClick={async () => {
@@ -714,15 +716,12 @@ export const MenuManagerPage = () => {
                       setIsDeletingCategory(false);
                     }
                   }} 
-                  className={`flex-1 py-3.5 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 outline-none ${
-                    isDeletingCategory ? 'opacity-70 cursor-not-allowed shadow-none' : 'transform md:hover:-translate-y-0.5'
+                  className={`flex-1 py-3.5 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center outline-none ${
+                    isDeletingCategory ? 'opacity-70 cursor-not-allowed shadow-none' : 'active:scale-95 md:hover:-translate-y-0.5'
                   }`}
                 >
                   {isDeletingCategory ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      <span>Borrando...</span>
-                    </>
+                    <Loader2 size={18} className="animate-spin" />
                   ) : (
                     'Eliminar'
                   )}
