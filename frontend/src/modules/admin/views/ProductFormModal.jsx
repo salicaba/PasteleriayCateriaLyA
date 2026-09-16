@@ -1,3 +1,4 @@
+// src/modules/admin/views/ProductFormModal.jsx
 import React, { useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -182,6 +183,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         exit={{ opacity: 0 }} 
+        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave de fondo
         onClick={() => !isSubmitting && !imageSrc && onClose()} 
         className="absolute inset-0 bg-black/60 lya:bg-black/50 backdrop-blur-sm"
       />
@@ -194,6 +196,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
               initial={{ opacity: 0, y: -20, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave del toast
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
                 toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
                 toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
@@ -217,7 +220,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
         className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-2xl relative flex flex-col max-h-[95vh] sm:max-h-[90vh] transition-colors"
       >
         {imageSrc ? (

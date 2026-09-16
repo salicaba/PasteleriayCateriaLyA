@@ -1,3 +1,4 @@
+// src/modules/admin/views/MenuManagerPage.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -233,6 +234,7 @@ export const MenuManagerPage = () => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
                 toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
                 toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
@@ -318,7 +320,6 @@ export const MenuManagerPage = () => {
 
                 {categoryVisibleProducts.length > 0 ? (
                   <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {/* 🔥 FIX 1: Quitamos mode="popLayout" para estabilizar el grid */}
                     <AnimatePresence>
                       {categoryVisibleProducts.map((product, index) => {
                         
@@ -345,14 +346,13 @@ export const MenuManagerPage = () => {
                         return (
                         <motion.div 
                           key={product.id} 
-                          layout="position" // 🔥 FIX 2: Anima solo la posición X/Y, evitando que la caja se deforme o recalcule su ancho
-                          layoutId={`menu-card-${product.id}`} // 🔥 FIX 3: Rastreo estricto de identidad en Framer Motion
+                          layout="position" // 🔥 FIX 2: Anima solo la posición X/Y
+                          layoutId={`menu-card-${product.id}`} // 🔥 FIX 3: Rastreo estricto
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                          transition={{ type: "spring", stiffness: 300, damping: 25, delay: index * 0.03 }}
-                          // 🔥 FIX 4: "transform-gpu antialiased" obliga a usar la tarjeta gráfica sin salto de píxeles
+                          transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.1) }} // 🔥 FIX 4: Adiós al resorte
                           className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden transform-gpu antialiased ${
                             isAgotado 
                               ? 'border-gray-200 dark:border-neutral-800 opacity-70 grayscale-[40%]' 
@@ -496,11 +496,12 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {isTrashModalOpen && (
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-            {/* 🔥 FIX 1: Fondo sutil, idéntico al de la Papelera de Gastos Operativos */}
+            {/* 🔥 FIX 1: Fondo suave */}
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
+              transition={{ duration: 0.2, ease: "easeOut" }}
               onClick={() => setIsTrashModalOpen(false)} 
               className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" 
             />
@@ -509,8 +510,7 @@ export const MenuManagerPage = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              // 🔥 FIX 2: max-w-4xl y rounded-[2.5rem] para igualar el diseño de las otras papeleras
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX 2: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative z-10 transition-colors"
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0">
@@ -523,7 +523,7 @@ export const MenuManagerPage = () => {
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Productos inactivos ocultos del menú principal</p>
                   </div>
                 </div>
-                <button onClick={() => setIsTrashModalOpen(false)} className="p-2.5 text-gray-400 md:hover:text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white lya:bg-lya-bg lya:text-lya-text/40 lya:hover:text-lya-text lya:hover:bg-lya-border/30 rounded-xl transition-all outline-none">
+                <button onClick={() => setIsTrashModalOpen(false)} className="p-2.5 text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/40 rounded-xl transition-colors outline-none">
                   <X size={20} strokeWidth={2.5} />
                 </button>
               </div>
@@ -537,16 +537,11 @@ export const MenuManagerPage = () => {
                     <p className="text-gray-500 dark:text-gray-400 font-bold text-lg">La papelera está vacía.</p>
                   </div>
                 ) : (
-                  // 🔥 FIX 3: Grid de 1 columna para que las tarjetas no se amontonen
+                  // 🔥 FIX 3: Grid de 1 columna
                   <div className="grid grid-cols-1 gap-4">
                     {hiddenProducts.map((product) => {
-                      // PILAR 3: Estado de bloqueo asíncrono
                       const isProcessingAvailability = processingActions?.[product.id] === 'availability';
-                      
-                      // Cruzamos la categoría para evitar "SIN CATEGORÍA"
-                      const categoriaReal = categories.find(c => c.id === product.categoryId)?.name 
-                                            || product.categoria 
-                                            || 'Sin categoría';
+                      const categoriaReal = categories.find(c => c.id === product.categoryId)?.name || product.categoria || 'Sin categoría';
 
                       return (
                         <div key={product.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
@@ -560,7 +555,6 @@ export const MenuManagerPage = () => {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              {/* PILAR 4: Textos con line-clamp para no romper el layout */}
                               <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text w-full line-clamp-2">{product.nombre || product.name}</h4>
                               <p className="text-xs font-bold text-gray-500 lya:text-lya-text/60 mt-1 uppercase tracking-wider">
                                 {categoriaReal}
@@ -569,7 +563,6 @@ export const MenuManagerPage = () => {
                           </div>
                           
                           <div className="flex w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
-                            {/* PILAR 2 y 3: motion.button, whileTap y opacidad reducida en carga */}
                             <motion.button 
                               whileTap={!isProcessingAvailability ? { scale: 0.95 } : {}}
                               onClick={() => !isProcessingAvailability && toggleAvailability(product.id)}
@@ -580,7 +573,6 @@ export const MenuManagerPage = () => {
                                   : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20'
                               }`}
                             >
-                              {/* PILAR 3: Loader en lugar del ícono cuando está procesando */}
                               {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />}
                               <span>{isProcessingAvailability ? 'Restaurando...' : 'Restaurar'}</span>
                             </motion.button>
@@ -599,12 +591,12 @@ export const MenuManagerPage = () => {
 
       <AnimatePresence>
         {isCategoryManagerOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 lya:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 bg-black/50 lya:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]"
             >
               <div className="flex justify-between items-center mb-6">
@@ -643,12 +635,12 @@ export const MenuManagerPage = () => {
 
       <AnimatePresence>
         {categoryToDelete && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
             >
               <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
@@ -673,12 +665,12 @@ export const MenuManagerPage = () => {
 
       <AnimatePresence>
         {isOptionsManagerOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
@@ -766,12 +758,12 @@ export const MenuManagerPage = () => {
       {/* 🔥 CÁPSULA NEO-BENTO: ANALÍTICAS DE PRODUCTO */}
       <AnimatePresence>
         {isStatsModalOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative overflow-hidden"
             >
               {/* Decoración de fondo */}
