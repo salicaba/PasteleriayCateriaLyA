@@ -1,3 +1,4 @@
+// src/modules/kitchen/views/KitchenPage.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKitchenController } from '../controllers/useKitchenController';
@@ -54,6 +55,7 @@ export const KitchenPage = () => {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
               <div className={`p-1.5 rounded-full shrink-0 ${toast.type === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20'}`}>
@@ -121,7 +123,7 @@ export const KitchenPage = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte
             className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 lya:text-lya-text/50 space-y-5"
           >
             <div className="p-8 rounded-full bg-gray-100 dark:bg-gray-900 lya:bg-lya-surface lya:border lya:border-lya-border/30">
@@ -155,11 +157,11 @@ export const KitchenPage = () => {
                       {ordersMesa.map(order => (
                         <motion.div
                           key={order.id}
-                          layout
+                          layout="position" // 🔥 FIX: Estabiliza la lista al marcar completadas
                           initial={{ opacity: 0, scale: 0.8, y: 20 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                          exit={{ opacity: 0, scale: 0.8 }} // 🔥 FIX: Quitada la transition anidada aquí
+                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición lineal sin resorte
                         >
                           <KitchenOrderCard 
                             order={order} 
@@ -196,11 +198,11 @@ export const KitchenPage = () => {
                       {ordersLlevar.map(order => (
                         <motion.div
                           key={order.id}
-                          layout
+                          layout="position" // 🔥 FIX: Estabiliza la lista al marcar completadas
                           initial={{ opacity: 0, scale: 0.8, y: 20 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-                          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                          exit={{ opacity: 0, scale: 0.8 }} // 🔥 FIX: Quitada la transition anidada aquí
+                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición lineal sin resorte
                         >
                           <KitchenOrderCard 
                             order={order} 
