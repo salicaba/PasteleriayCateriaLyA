@@ -211,7 +211,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
     <motion.div 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición inicial sin resorte
       className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full flex-1 overflow-hidden'}`}
     >
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
@@ -437,11 +437,11 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     return (
                       <motion.div 
                         key={usr.id}
-                        layout
+                        layout="position" // 🔥 FIX: Listado suave de tarjetas
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al spring
                         className={`p-6 rounded-[2rem] border bg-white dark:bg-gray-800 lya:bg-lya-surface shadow-sm relative transition-all flex flex-col justify-between md:hover:shadow-md border-gray-100 dark:border-gray-700 lya:border-lya-border/40 ${isMe ? 'ring-2 ring-blue-500/50 lya:ring-lya-primary/50' : 'md:hover:border-blue-200 lya:md:hover:border-lya-primary/30'}`}
                       >
                         <div className="flex items-start justify-between mb-5">
@@ -544,6 +544,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
                 exit={{ opacity: 0 }} 
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
                 onClick={() => setIsTrashModalOpen(false)} 
                 className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" 
               />
@@ -552,7 +553,7 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Modal suave sin rebote
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative z-10 transition-colors"
               >
                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
@@ -584,66 +585,76 @@ export const UsersTab = ({ showNotification, globalScroll }) => {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-4">
-                      {inactiveUsers.map((usr) => {
-                        const isMe = currentUser?.id === usr.id;
-                        return (
-                          <div key={usr.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
-                            
-                            <div className="flex items-center gap-4 flex-1 min-w-0 pr-2">
-                              <div className="h-12 w-12 flex-shrink-0 rounded-[1.25rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
-                                {getInitials(usr.fullName)}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text truncate">{usr.fullName}</h4>
-                                  {isMe && (
-                                    <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 lya:bg-lya-primary/20 lya:text-lya-primary px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-wider shrink-0">
-                                      (Tú)
-                                    </span>
-                                  )}
+                      <AnimatePresence mode="popLayout">
+                        {inactiveUsers.map((usr) => {
+                          const isMe = currentUser?.id === usr.id;
+                          return (
+                            <motion.div 
+                              key={usr.id}
+                              layout="position" // 🔥 FIX: Estabilidad de las tarjetas
+                              initial={{ opacity: 0, y: 15 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX
+                              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-red-100 dark:border-red-900/30 lya:border-red-500/20 opacity-80 md:hover:opacity-100 transition-opacity gap-4"
+                            >
+                              
+                              <div className="flex items-center gap-4 flex-1 min-w-0 pr-2">
+                                <div className="h-12 w-12 flex-shrink-0 rounded-[1.25rem] bg-gray-400 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 text-white font-black text-sm">
+                                  {getInitials(usr.fullName)}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5 truncate">@{usr.username} • {usr.role}</p>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text truncate">{usr.fullName}</h4>
+                                    {isMe && (
+                                      <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 lya:bg-lya-primary/20 lya:text-lya-primary px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-wider shrink-0">
+                                        (Tú)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5 truncate">@{usr.username} • {usr.role}</p>
+                                </div>
                               </div>
-                            </div>
-                            
-                            <div className="flex gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
-                              <motion.button 
-                                whileTap={!isMe ? { scale: 0.95 } : {}}
-                                onClick={() => {
-                                  if (!isMe) {
-                                    editUser(usr);
-                                    setIsTrashModalOpen(false);
-                                  }
-                                }} 
-                                disabled={actionLoadingId === usr.id || isMe}
-                                className={`p-2.5 rounded-xl transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 ${
-                                  isMe 
-                                    ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
-                                    : 'bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg text-blue-500 disabled:opacity-50'
-                                }`} 
-                                title={isMe ? "No puedes editar tu propio perfil aquí" : "Editar usuario"}
-                              >
-                                <Edit2 size={16} />
-                              </motion.button>
-                              <motion.button 
-                                whileTap={!isMe ? { scale: 0.95 } : {}}
-                                onClick={() => !isMe && toggleUserStatus(usr.id, usr.isActive)}
-                                disabled={actionLoadingId === usr.id || isMe}
-                                className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-                                  isMe 
-                                    ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
-                                    : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50'
-                                }`}
-                              >
-                                {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
-                                <span>
-                                  {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
-                                </span>
-                              </motion.button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                              
+                              <div className="flex gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
+                                <motion.button 
+                                  whileTap={!isMe ? { scale: 0.95 } : {}}
+                                  onClick={() => {
+                                    if (!isMe) {
+                                      editUser(usr);
+                                      setIsTrashModalOpen(false);
+                                    }
+                                  }} 
+                                  disabled={actionLoadingId === usr.id || isMe}
+                                  className={`p-2.5 rounded-xl transition-all border border-gray-100 dark:border-gray-600 lya:border-lya-border/40 ${
+                                    isMe 
+                                      ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                      : 'bg-gray-50 md:hover:bg-blue-50 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-bg text-blue-500 disabled:opacity-50'
+                                  }`} 
+                                  title={isMe ? "No puedes editar tu propio perfil aquí" : "Editar usuario"}
+                                >
+                                  <Edit2 size={16} />
+                                </motion.button>
+                                <motion.button 
+                                  whileTap={!isMe ? { scale: 0.95 } : {}}
+                                  onClick={() => !isMe && toggleUserStatus(usr.id, usr.isActive)}
+                                  disabled={actionLoadingId === usr.id || isMe}
+                                  className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                                    isMe 
+                                      ? 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-300 dark:text-gray-600 lya:text-lya-text/20 cursor-not-allowed' 
+                                      : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 disabled:opacity-50'
+                                  }`}
+                                >
+                                  {actionLoadingId === usr.id ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
+                                  <span>
+                                    {actionLoadingId === usr.id ? 'Restaurando...' : 'Restaurar'}
+                                  </span>
+                                </motion.button>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
                     </div>
                   )}
                 </div>
