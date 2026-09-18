@@ -130,7 +130,7 @@ export const TicketCartGroup = ({
       }
   });
 
-  // 🔥 ORDEN COMBO BLINDADO: Prioridad -> Alfabético -> Ancla por ID
+  // 🔥 ORDEN COMBO BLINDADO
   const sortedDisplayItems = [...displayItems].sort((a, b) => {
     const getPriority = (item) => {
       const status = (item.kitchenStatus || '').toUpperCase();
@@ -160,7 +160,6 @@ export const TicketCartGroup = ({
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
   const isOcultarProcessing = actionLocks[`${cuentaName}-ocultar`];
 
-  // 🔥 CREACIÓN DE FLAG SEGURO PARA ELIMINACIÓN DE PROMOS
   const createBreakFlag = (item, qty) => {
       return {
           ...item,
@@ -251,7 +250,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={!isOcultarProcessing ? { scale: 0.95 } : {}}
                   disabled={isOcultarProcessing}
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar`, () => setCuentasOcultas(prev => [...prev, cuentaName]))} 
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar`, async () => setCuentasOcultas(prev => [...prev, cuentaName]))} 
                   className={clsx(
                     "text-[9px] font-black bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border border-transparent dark:border-gray-700 lya:border-lya-border/40 text-gray-500 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation",
                     !isOcultarProcessing && "md:hover:border-red-200 dark:md:hover:border-red-900 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 lya:md:hover:bg-red-500/10 md:hover:text-red-500",
@@ -266,7 +265,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={isTodoEntregadoEnCuenta && !isCobrarProcessing ? { scale: 0.95 } : {}}
                   disabled={!isTodoEntregadoEnCuenta || isCobrarProcessing} 
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-cobrar`, () => onPayCuenta(cuentaName))} 
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-cobrar`, async () => await onPayCuenta(cuentaName))} 
                   className={clsx(
                       "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border outline-none touch-manipulation flex items-center gap-1", 
                       isCobrarProcessing ? "bg-gray-300 dark:bg-gray-700 text-gray-500 border-transparent opacity-70 cursor-wait" :
@@ -282,7 +281,7 @@ export const TicketCartGroup = ({
             {!isVitrina && !isLlevar && (isCuentaPagada || isCompletamentePagada) && displayItems.length > 0 && (
               <motion.button 
                   whileTap={{ scale: 0.95 }}
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-print`, () => onPrintTicket(cuentaName))} 
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-print`, async () => await onPrintTicket(cuentaName))} 
                   className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation"
               >
                 <Printer size={10}/> Ticket
@@ -293,7 +292,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={!isOcultarProcessing ? { scale: 0.95 } : {}}
                   disabled={isOcultarProcessing}
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar-pagada`, () => setCuentasOcultas(prev => [...prev, cuentaName]))} 
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar-pagada`, async () => setCuentasOcultas(prev => [...prev, cuentaName]))} 
                   className={clsx(
                     "text-[9px] font-black bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation",
                     !isOcultarProcessing && "text-red-600 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40",
@@ -314,7 +313,6 @@ export const TicketCartGroup = ({
           const isGhostPromo = item.isAutoPromo && isCero;
           
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-          // 🔥 LÓGICA DE BLOQUEO: Solo bloqueamos fantasmas (GRATIS) o Nth (Rebajado). Las OFERTAS directas mantienen sus botones +/-
           const isLockedPromo = isGhostPromo || isNthPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
@@ -489,7 +487,9 @@ export const TicketCartGroup = ({
                     {item.enviadoCocina ? (
                       <motion.button 
                         whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
-                        onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             if (item.kitchenStatus === 'READY' && item.qty > 1) {
                                 openConfirmModal({
                                     title: 'Entregar Producto',
@@ -509,9 +509,9 @@ export const TicketCartGroup = ({
                                     }
                                 });
                             } else {
-                                await handleToggleStatus(item);
+                                executeWithLock(e, lockKeyToggle, async () => await handleToggleStatus(item));
                             }
-                        })} 
+                        }} 
                         disabled={isLocalProcessingToggle || isStatusLocked || (item.kitchenStatus !== 'READY' && item.kitchenStatus !== 'DELIVERED')} 
                         className={clsx(
                             "flex items-center justify-center gap-1.5 text-[10px] font-black px-3 py-2 rounded-xl border uppercase transition-colors w-full text-center shadow-sm outline-none touch-manipulation", 
@@ -543,7 +543,7 @@ export const TicketCartGroup = ({
                           <motion.button 
                               whileTap={!isTakeawayLocal ? { scale: 0.95 } : {}}
                               disabled={isTakeawayLocal}
-                              onClick={(e) => executeWithLock(e, lockKeyTakeaway, () => toggleItemTakeaway(item))} 
+                              onClick={(e) => executeWithLock(e, lockKeyTakeaway, async () => await toggleItemTakeaway(item))} 
                               className={clsx(
                                   "flex items-center justify-center gap-1.5 text-[9px] font-black px-2 py-2 rounded-xl border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
                                   isTakeawayLocal ? "bg-gray-100 text-gray-400 border-transparent opacity-70 cursor-wait" :
@@ -568,7 +568,7 @@ export const TicketCartGroup = ({
                                 <motion.button 
                                     whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
                                     disabled={isRemovingLocal}
-                                    onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
+                                    onClick={(e) => executeWithLock(e, lockKeyRemove, async () => await handleRemoveUnsent(item))} 
                                     className={clsx(
                                         "rounded-lg transition-colors outline-none", 
                                         isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
@@ -581,12 +581,12 @@ export const TicketCartGroup = ({
                                 <motion.button 
                                   whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
                                   disabled={isAddingLocal}
-                                  onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
+                                  onClick={(e) => executeWithLock(e, lockKeyAdd, async () => {
                                     if (isLimitReached) {
                                       if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
                                       return; 
                                     }
-                                    onAdd(item, cuentaName);
+                                    await onAdd(item, cuentaName);
                                   })} 
                                   className={clsx(
                                     "rounded-lg transition-colors flex items-center justify-center outline-none", 
@@ -608,7 +608,9 @@ export const TicketCartGroup = ({
                         <motion.button 
                             whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                             disabled={isDeletingLocal}
-                            onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 if (isLockedPromo) {
                                     if (item.qty > 1) {
                                         openConfirmModal({
@@ -621,9 +623,9 @@ export const TicketCartGroup = ({
                                             inputType: 'number',
                                             inputMax: item.qty,
                                             inputDefault: item.qty.toString(),
-                                            onConfirm: (val) => {
+                                            onConfirm: async (val) => {
                                                 const qty = parseInt(val, 10);
-                                                if (qty > 0) handleDeleteUnsent(createBreakFlag(item, qty));
+                                                if (qty > 0) await handleDeleteUnsent(createBreakFlag(item, qty));
                                             }
                                         });
                                     } else {
@@ -633,13 +635,13 @@ export const TicketCartGroup = ({
                                             icon: AlertTriangle,
                                             color: 'red',
                                             confirmText: 'Confirmar',
-                                            onConfirm: () => handleDeleteUnsent(createBreakFlag(item, 1))
+                                            onConfirm: async () => await handleDeleteUnsent(createBreakFlag(item, 1))
                                         });
                                     }
                                 } else {
-                                    handleDeleteUnsent(item);
+                                    executeWithLock(e, lockKeyDelete, async () => await handleDeleteUnsent(item));
                                 }
-                            })} 
+                            }} 
                             className={clsx(
                                 "rounded-lg transition-colors outline-none", 
                                 isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
@@ -656,7 +658,7 @@ export const TicketCartGroup = ({
                     <motion.button 
                         whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
                         disabled={isCancelingLocal}
-                        onClick={(e) => executeWithLock(e, lockKeyCancel, () => handleCancelItem(item))} 
+                        onClick={(e) => executeWithLock(e, lockKeyCancel, async () => await handleCancelItem(item))} 
                         className={clsx(
                             "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
                             isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 
