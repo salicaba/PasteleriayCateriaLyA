@@ -9,7 +9,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
   const [activePhotoIdx, setActivePhotoIdx] = useState(0); 
   const [isLoadingEdit, setIsLoadingEdit] = useState(false);
   
-  // 🔥 PILAR 3: Candado asíncrono preventivo
+  // 🔥 PILAR 3: Candado asíncrono
   const lockRef = useRef(false);
 
   useEffect(() => {
@@ -52,32 +52,21 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
   const hora = new Date(pedido.fechaEntrega).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            onClick={() => !isLoadingEdit && onClose()} 
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" 
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isLoadingEdit && onClose()} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
           
-          <motion.div 
-            layout="position"
-            initial={{ x: '100%' }} 
-            animate={{ x: 0 }} 
-            exit={{ x: '100%' }} 
-            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 PILAR 5: Sin parpadeos, transición lineal suave
-            className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] flex flex-col rounded-l-[2rem] border-l border-white/10 overflow-hidden" // 🔥 PILAR 1: flex-col, h-full y overflow-hidden raíz
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10"
           >
-            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20 shrink-0">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
               <div className="flex items-center gap-4">
                 <div className="bg-emerald-500 p-2 rounded-2xl text-white shadow-lg shadow-emerald-500/20">
                   <ShoppingBasket size={24} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black dark:text-white uppercase tracking-tighter truncate">{pedido.id}</h2>
+                  <h2 className="text-xl font-black dark:text-white uppercase tracking-tighter">{pedido.id}</h2>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pedido.estado === 'entregado' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
                     PEDIDO {pedido.estado.toUpperCase()}
                   </span>
@@ -85,28 +74,19 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
               </div>
               <div className="flex gap-2">
                 {(pedido.estado !== 'entregado' && pedido.estado !== 'cancelado') && (
-                  <motion.button 
-                    whileTap={{ scale: 0.95 }} // 🔥 PILAR 2: Táctil seguro
+                  <button 
                     onClick={handleEditClick} 
                     disabled={isLoadingEdit}
-                    className="flex items-center gap-2 bg-orange-500 md:hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
+                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
                   >
                     {isLoadingEdit ? <Loader2 size={18} className="animate-spin" /> : <Edit3 size={18} />}
                     {isLoadingEdit ? 'Preparando...' : 'Editar'}
-                  </motion.button>
+                  </button>
                 )}
-                <motion.button 
-                  whileTap={{ scale: 0.95 }}
-                  disabled={isLoadingEdit} 
-                  onClick={onClose} 
-                  className="p-2 text-gray-400 md:hover:text-gray-600 dark:md:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors outline-none disabled:opacity-50"
-                >
-                  <X size={24} />
-                </motion.button>
+                <button disabled={isLoadingEdit} onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors outline-none disabled:opacity-50"><X size={24} /></button>
               </div>
             </div>
 
-            {/* 🔥 PILAR 1: Scroll interno encapsulado */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
               
               <div className="space-y-3">
@@ -128,10 +108,10 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                           initial={{ opacity: 0, scale: 0.98 }} 
                           animate={{ opacity: 1, scale: 1 }} 
                           exit={{ opacity: 0, scale: 1.02 }}
-                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 PILAR 5: easeOut
+                          transition={{ duration: 0.2 }}
                           src={pedido.imagenesReferencia[activePhotoIdx]} 
                           alt={`Referencia ${activePhotoIdx + 1}`} 
-                          className="w-full h-full object-contain drop-shadow-lg rounded-[1.5rem]" 
+                          className="w-full h-full object-contain drop-shadow-lg rounded-xl" 
                         />
                       </AnimatePresence>
                     </div>
@@ -139,14 +119,13 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                     {pedido.imagenesReferencia.length > 1 && (
                       <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
                         {pedido.imagenesReferencia.map((_, idx) => (
-                          <motion.button
-                            whileTap={{ scale: 0.95 }}
+                          <button
                             key={idx}
                             onClick={() => setActivePhotoIdx(idx)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all outline-none ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-200'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all outline-none ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                           >
                             Foto {idx + 1}
-                          </motion.button>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -162,14 +141,14 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase">Cliente</label>
-                  <div className="flex items-center gap-3 text-gray-800 dark:text-gray-100 font-bold truncate">
-                    <User size={18} className="text-emerald-500 shrink-0" /> <span className="truncate">{pedido.cliente}</span>
+                  <div className="flex items-center gap-3 text-gray-800 dark:text-gray-100 font-bold">
+                    <User size={18} className="text-emerald-500" /> {pedido.cliente}
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase">Teléfono</label>
-                  <div className="flex items-center gap-3 text-gray-800 dark:text-gray-100 font-bold truncate">
-                    <Phone size={18} className="text-emerald-500 shrink-0" /> <span className="truncate">{pedido.telefono || 'No registrado'}</span>
+                  <div className="flex items-center gap-3 text-gray-800 dark:text-gray-100 font-bold">
+                    <Phone size={18} className="text-emerald-500" /> {pedido.telefono || 'No registrado'}
                   </div>
                 </div>
               </div>
@@ -177,27 +156,27 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
               <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-[2rem] space-y-4 border border-gray-100 dark:border-gray-800">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
-                    <Calendar className="text-emerald-500 shrink-0" size={20} />
-                    <div className="truncate">
+                    <Calendar className="text-emerald-500" size={20} />
+                    <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase">Fecha de Entrega</p>
-                      <p className="font-bold dark:text-white capitalize truncate">{fecha}</p>
+                      <p className="font-bold dark:text-white capitalize">{fecha}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Clock className="text-emerald-500 shrink-0" size={20} />
-                    <div className="truncate">
+                    <Clock className="text-emerald-500" size={20} />
+                    <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase">Hora Programada</p>
-                      <p className="font-bold dark:text-white truncate">{hora}</p>
+                      <p className="font-bold dark:text-white">{hora}</p>
                     </div>
                   </div>
                 </div>
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-start gap-3">
-                    <MapPin className="text-emerald-500 mt-1 shrink-0" size={20} />
-                    <div className="w-full">
+                    <MapPin className="text-emerald-500 mt-1" size={20} />
+                    <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase">Tipo de Entrega</p>
-                      <p className="font-bold dark:text-white uppercase text-sm truncate">{pedido.tipoEntrega}</p>
-                      {pedido.tipoEntrega === 'domicilio' && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 text-justify">{pedido.direccion}</p>}
+                      <p className="font-bold dark:text-white uppercase text-sm">{pedido.tipoEntrega}</p>
+                      {pedido.tipoEntrega === 'domicilio' && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{pedido.direccion}</p>}
                     </div>
                   </div>
                 </div>
@@ -228,8 +207,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Descripción y Notas</p>
-                    {/* 🔥 PILAR 4: text-justify para textos largos */}
-                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm text-justify">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm">
                       "{pedido.descripcion}"
                     </div>
                   </div>
@@ -243,15 +221,15 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-[2rem] overflow-hidden">
                   <div className="p-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700">
                     <span className="text-sm font-medium text-gray-500">Costo Total</span>
-                    <span className="text-lg font-black dark:text-white truncate">${parseFloat(pedido.costoTotal).toFixed(2)}</span>
+                    <span className="text-lg font-black dark:text-white">${parseFloat(pedido.costoTotal).toFixed(2)}</span>
                   </div>
                   <div className="p-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-black/10">
                     <span className="text-sm font-medium text-gray-500">Pagado a la fecha</span>
-                    <span className="text-lg font-bold text-emerald-600 truncate">${finanzas.totalPagado.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-emerald-600">${finanzas.totalPagado.toFixed(2)}</span>
                   </div>
                   <div className="p-4 flex justify-between items-center bg-rose-50 dark:bg-rose-900/10">
                     <span className="text-sm font-bold text-rose-600 uppercase tracking-tighter">Deuda Pendiente</span>
-                    <span className="text-2xl font-black text-rose-600 truncate">${finanzas.deuda.toFixed(2)}</span>
+                    <span className="text-2xl font-black text-rose-600">${finanzas.deuda.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -263,15 +241,13 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   </h3>
                   
                   {transferInfo?.whatsapp_number && (
-                    <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-[2rem] p-4 flex gap-3 shadow-sm">
+                    <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
                       <div className="bg-purple-500/20 p-2.5 rounded-xl shrink-0 h-fit">
                         <MessageCircle size={24} className="text-purple-600 dark:text-purple-400" />
                       </div>
                       <div>
                         <h4 className="text-[11px] font-black text-purple-800 dark:text-purple-300 uppercase tracking-widest mb-1">Aviso para el Staff</h4>
-                        <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed text-justify">
-                          Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.
-                        </p>
+                        <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed">Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.</p>
                       </div>
                     </div>
                   )}
@@ -281,7 +257,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                       <div key={acc.id} className="min-w-[85%] sm:min-w-[280px] p-5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 rounded-3xl shrink-0 shadow-sm">
                         <div className="flex items-center gap-2 mb-3">
                           <Smartphone className="text-purple-600 dark:text-purple-400" size={18} />
-                          <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase truncate">{acc.bank_name}</span>
+                          <span className="font-black text-xs text-purple-800 dark:text-purple-300 uppercase">{acc.bank_name}</span>
                         </div>
                         <div className="space-y-2">
                           {acc.account_holder && (
@@ -293,13 +269,13 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                           {acc.account_number && (
                             <div className="flex justify-between items-center border-t border-purple-200/50 dark:border-purple-700/50 pt-2 mt-2">
                               <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">Cuenta/Tarjeta:</span>
-                              <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider truncate">{acc.account_number}</span>
+                              <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.account_number}</span>
                             </div>
                           )}
                           {acc.clabe && (
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] text-purple-400 font-bold uppercase shrink-0 mr-2">CLABE:</span>
-                              <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider truncate">{acc.clabe}</span>
+                              <span className="text-sm font-mono font-black text-purple-900 dark:text-white tracking-wider">{acc.clabe}</span>
                             </div>
                           )}
                         </div>
