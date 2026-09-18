@@ -652,13 +652,18 @@ export const TicketCartGroup = ({
                                 }
                             })} 
                             className={clsx(
-                                "rounded-lg transition-colors outline-none", 
+                                "rounded-lg transition-colors outline-none flex items-center justify-center", 
                                 isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "text-gray-400 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 md:hover:text-red-500",
                                 (isVitrina || isLockedPromo) ? "flex-1 py-2 flex justify-center text-red-500 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/50" : "p-1.5"
                             )}
                         >
-                            {isDeletingLocal ? <Loader2 size={16} className="animate-spin" /> : 
-                             isLockedPromo ? <div className="flex items-center gap-2 font-black tracking-wide"><Trash2 size={16} /> ELIMINAR PROMO</div> : <Trash2 size={16} />}
+                            {isDeletingLocal ? (
+                              <Loader2 size={16} className="animate-spin text-red-500" />
+                            ) : isLockedPromo ? (
+                              <div className="flex items-center gap-2 font-black tracking-wide"><Trash2 size={16} /> ELIMINAR PROMO</div>
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
                         </motion.button>
                   </div>
                 )}
