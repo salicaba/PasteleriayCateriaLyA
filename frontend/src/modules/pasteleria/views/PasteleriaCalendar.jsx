@@ -8,6 +8,7 @@ import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
 import RefundConfirmModal from './RefundConfirmModal';
 
+// --- NUEVO COMPONENTE DE CARGA NEO-BENTO ---
 const PasteleriaLoader = () => (
   <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
@@ -61,6 +62,7 @@ export default function PasteleriaCalendar() {
     setFechaBusqueda(dateVal); 
     if (!dateVal) return;
     
+    // 🔥 FIX CALENDARIO: Forzamos la fecha a 12:00 PM para evitar problemas de desfase
     const [year, month, day] = dateVal.split('-');
     const newDate = new Date(year, month - 1, day, 12, 0, 0);
     
@@ -144,11 +146,12 @@ export default function PasteleriaCalendar() {
       </header>
 
       {/* CONTENEDOR PRINCIPAL */}
-      <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
+      {/* 🔥 FIX: min-h-0 en el flex-1 bloquea que el contenedor se expanda más allá de la pantalla */}
+      <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden min-h-0">
         
         {/* --- PANEL DE CALENDARIO --- */}
-        <div className={`w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-[2.5rem] p-6 shadow-xl overflow-y-auto custom-scrollbar 
-          ${showMobileList ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
+        <div className={`w-full lg:w-7/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-[2.5rem] p-6 shadow-xl flex flex-col min-h-0 
+          ${showMobileList ? 'hidden lg:flex' : 'flex'}`}>
           
           <div className="flex justify-between items-center mb-6 shrink-0">
             <h2 className="text-2xl font-bold dark:text-white lya:text-lya-text capitalize">
@@ -172,7 +175,7 @@ export default function PasteleriaCalendar() {
           </div>
 
           {/* GRID DE DÍAS */}
-          <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr">
+          <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr overflow-y-auto custom-scrollbar pr-1 min-h-0">
             {blanks.map(b => <div key={`blank-${b}`} className="rounded-[1.2rem] border border-dashed border-gray-200 dark:border-gray-800/50 lya:border-lya-border/30 opacity-30"></div>)}
             
             {days.map(day => {
@@ -229,12 +232,13 @@ export default function PasteleriaCalendar() {
         </div>
 
         {/* --- LISTA DE PEDIDOS DEL DÍA (AGENDA) --- */}
-        <div className={`w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-[2.5rem] p-6 shadow-xl overflow-hidden h-full
-          ${showMobileList ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'}`}>
+        {/* 🔥 FIX: flex-col min-h-0 encierra la lista y fuerza el scroll interno */}
+        <div className={`w-full lg:w-5/12 bg-white/40 dark:bg-black/20 lya:bg-lya-surface/40 backdrop-blur-md border border-white/20 dark:border-gray-800 lya:border-lya-border/20 rounded-[2.5rem] p-6 shadow-xl flex flex-col min-h-0
+          ${showMobileList ? 'flex' : 'hidden lg:flex'}`}>
           
           <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 shrink-0 flex items-start gap-3">
             <motion.button 
-              whileTap={{ scale: 0.9 }} 
+              whileTap={{ scale: 0.9 }}
               onClick={() => setShowMobileList(false)} 
               className="lg:hidden mt-0.5 p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-bg/80 rounded-xl transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30"
             >
@@ -248,8 +252,8 @@ export default function PasteleriaCalendar() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 custom-scrollbar">
-            {/* 🔥 FIX MAESTRO: Transición fluida con mode="wait" por fecha, sin saltos de scroll ni desajustes */}
+          {/* 🔥 FIX: Contenedor con overflow-y-auto que evita el estiramiento */}
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
             <AnimatePresence mode="wait">
               <motion.div
                 key={selectedDate.toDateString()}
@@ -257,7 +261,7 @@ export default function PasteleriaCalendar() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15, ease: "easeOut" }}
-                className="space-y-4"
+                className="space-y-4 mb-4"
               >
                 {pedidosSeleccionados.length === 0 ? (
                   <div className="py-20 flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40 text-center">
@@ -278,9 +282,14 @@ export default function PasteleriaCalendar() {
                     return (
                       <motion.div
                         key={pedido.id}
-                        whileTap={{ scale: 0.98 }}
+                        // 🔥 FIX: Eliminado layout="position" y layoutId que causaban vuelos erráticos
+                        initial={{ opacity: 0, scale: 0.95 }} 
+                        animate={{ opacity: 1, scale: 1 }} 
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
                         onClick={() => abrirDetalles(pedido)} 
-                        className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md
+                        whileTap={{ scale: 0.98 }} 
+                        className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md transform-gpu antialiased
                           ${finanzas.requiereLiquidacionUrgente 
                             ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5 md:hover:border-rose-400' 
                             : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-300 lya:md:hover:border-lya-primary/50'
