@@ -171,8 +171,11 @@ export const TicketCartGroup = ({
 
   return (
     <motion.div 
-      layout 
-      initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
+      layout="position"
+      initial={{ opacity: 0, y: 15 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       onDragOver={(e) => { 
         e.preventDefault(); 
         if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar && !isVitrina) setDragOverCuenta(cuentaName);
@@ -183,7 +186,7 @@ export const TicketCartGroup = ({
         handleDropOnCuenta(cuentaName);
       }}
       className={clsx(
-        "rounded-[1.5rem] transition-all duration-300 overflow-hidden shadow-sm",
+        "rounded-[2rem] transition-all duration-300 overflow-hidden shadow-sm transform-gpu antialiased",
         isCuentaPagada ? "border border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-900/10 lya:bg-lya-primary/5 opacity-80"
         : isDragTarget ? "border border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 lya:border-lya-secondary lya:bg-lya-secondary/10 shadow-inner scale-[1.02]" 
         : isActive ? "border-2 border-transparent bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-md" 
@@ -354,7 +357,7 @@ export const TicketCartGroup = ({
           const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
           const isTakeawayLocal = actionLocks[lockKeyTakeaway];
 
-          let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
+          let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border transform-gpu antialiased ";
           
           if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
               containerClasses += "cursor-grab active:cursor-grabbing ";
@@ -385,7 +388,9 @@ export const TicketCartGroup = ({
 
           return (
           <motion.div 
-            key={currentItemKey} layout
+            key={currentItemKey} 
+            layout="position"
+            transition={{ duration: 0.2, ease: "easeOut" }}
             draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo}
             onDragStart={(e) => { 
                 if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo) return; 
@@ -404,7 +409,7 @@ export const TicketCartGroup = ({
 
             <div className="flex gap-3">
               <div className={clsx(
-                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
+                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative md:group-hover:shadow-inner shadow-sm transition-shadow",
                 isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
               )}>
                 {item.imagen || item.image ? (
@@ -414,7 +419,7 @@ export const TicketCartGroup = ({
                 )}
                 
                 {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo && (
-                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                    <div className="absolute inset-0 bg-black/30 opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
                         <GripVertical size={16} className="text-white drop-shadow-md" />
                     </div>
                 )}
