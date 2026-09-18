@@ -55,10 +55,21 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isLoadingEdit && onClose()} className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" />
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={() => !isLoadingEdit && onClose()} 
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] transform-gpu" 
+          />
           
-          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10"
+          <motion.div 
+            initial={{ x: '100%' }} 
+            animate={{ x: 0 }} 
+            exit={{ x: '100%' }} 
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10 transform-gpu antialiased"
           >
             <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
               <div className="flex items-center gap-4">
@@ -74,16 +85,24 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
               </div>
               <div className="flex gap-2">
                 {(pedido.estado !== 'entregado' && pedido.estado !== 'cancelado') && (
-                  <button 
+                  <motion.button 
+                    whileTap={{ scale: 0.95 }}
                     onClick={handleEditClick} 
                     disabled={isLoadingEdit}
-                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
+                    className="flex items-center gap-2 bg-orange-500 md:hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
                   >
                     {isLoadingEdit ? <Loader2 size={18} className="animate-spin" /> : <Edit3 size={18} />}
                     {isLoadingEdit ? 'Preparando...' : 'Editar'}
-                  </button>
+                  </motion.button>
                 )}
-                <button disabled={isLoadingEdit} onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors outline-none disabled:opacity-50"><X size={24} /></button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  disabled={isLoadingEdit} 
+                  onClick={onClose} 
+                  className="p-2 text-gray-400 md:hover:text-gray-600 dark:md:hover:text-white bg-white dark:bg-gray-800 rounded-full shadow-sm transition-colors outline-none disabled:opacity-50"
+                >
+                  <X size={24} />
+                </motion.button>
               </div>
             </div>
 
@@ -108,7 +127,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                           initial={{ opacity: 0, scale: 0.98 }} 
                           animate={{ opacity: 1, scale: 1 }} 
                           exit={{ opacity: 0, scale: 1.02 }}
-                          transition={{ duration: 0.2 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
                           src={pedido.imagenesReferencia[activePhotoIdx]} 
                           alt={`Referencia ${activePhotoIdx + 1}`} 
                           className="w-full h-full object-contain drop-shadow-lg rounded-xl" 
@@ -119,13 +138,14 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                     {pedido.imagenesReferencia.length > 1 && (
                       <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
                         {pedido.imagenesReferencia.map((_, idx) => (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             key={idx}
                             onClick={() => setActivePhotoIdx(idx)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all outline-none ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all outline-none ${activePhotoIdx === idx ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-200'}`}
                           >
                             Foto {idx + 1}
-                          </button>
+                          </motion.button>
                         ))}
                       </div>
                     )}
@@ -207,7 +227,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                   </div>
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">Descripción y Notas</p>
-                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-3xl border border-emerald-100 dark:border-emerald-500/20 text-gray-700 dark:text-gray-300 italic text-sm text-justify">
                       "{pedido.descripcion}"
                     </div>
                   </div>
@@ -247,7 +267,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                       </div>
                       <div>
                         <h4 className="text-[11px] font-black text-purple-800 dark:text-purple-300 uppercase tracking-widest mb-1">Aviso para el Staff</h4>
-                        <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed">Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.</p>
+                        <p className="text-xs text-purple-700 dark:text-purple-400 font-medium leading-relaxed text-justify">Pide al cliente que envíe el comprobante al <b className="text-purple-900 dark:text-purple-200">{transferInfo.whatsapp_number}</b> o que te lo muestre en pantalla.</p>
                       </div>
                     </div>
                   )}
