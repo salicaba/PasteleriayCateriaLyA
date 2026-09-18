@@ -6,9 +6,8 @@ import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
-import RefundConfirmModal from './RefundConfirmModal'; 
+import RefundConfirmModal from './RefundConfirmModal';
 
-// --- NUEVO COMPONENTE DE CARGA NEO-BENTO ---
 const PasteleriaLoader = () => (
   <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg relative z-10 transition-colors duration-300">
     <motion.div
@@ -62,7 +61,6 @@ export default function PasteleriaCalendar() {
     setFechaBusqueda(dateVal); 
     if (!dateVal) return;
     
-    // 🔥 FIX CALENDARIO: Forzamos la fecha a 12:00 PM para evitar problemas de desfase
     const [year, month, day] = dateVal.split('-');
     const newDate = new Date(year, month - 1, day, 12, 0, 0);
     
@@ -82,16 +80,13 @@ export default function PasteleriaCalendar() {
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
-  // 🔥 FIX DE PINTADO DE CALENDARIO
   const getPedidosForDate = (date) => {
-    // Convertimos la fecha que estamos pintando en formato YYYY-MM-DD local
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     const targetDateStr = `${y}-${m}-${d}`;
 
     return pedidos.filter(p => {
-      // Extraemos solo el YYYY-MM-DD de la fecha guardada en el backend
       const pDateStr = p.fechaEntrega ? p.fechaEntrega.split('T')[0] : '';
       return pDateStr === targetDateStr;
     });
@@ -111,7 +106,7 @@ export default function PasteleriaCalendar() {
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
     >
       {/* HEADER */}
@@ -163,12 +158,12 @@ export default function PasteleriaCalendar() {
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={handleIrAHoy} 
-                className="px-4 py-2 mr-1 bg-emerald-100/50 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 text-emerald-700 dark:text-emerald-400 lya:text-lya-primary rounded-xl font-bold text-sm transition-colors shadow-sm"
+                className="px-4 py-2 mr-1 bg-emerald-100/50 md:hover:bg-emerald-200 dark:bg-emerald-900/30 dark:md:hover:bg-emerald-800/50 lya:bg-lya-primary/10 lya:md:hover:bg-lya-primary/20 text-emerald-700 dark:text-emerald-400 lya:text-lya-primary rounded-xl font-bold text-sm transition-colors shadow-sm"
               >
                 Hoy
               </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={prevMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text"><ChevronLeft size={20}/></motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={nextMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text"><ChevronRight size={20}/></motion.button>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={prevMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text"><ChevronLeft size={20}/></motion.button>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={nextMonth} className="p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg rounded-xl shadow-sm md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-surface transition-colors dark:text-white lya:text-lya-text"><ChevronRight size={20}/></motion.button>
             </div>
           </div>
 
@@ -239,9 +234,9 @@ export default function PasteleriaCalendar() {
           
           <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 shrink-0 flex items-start gap-3">
             <motion.button 
-              whileTap={{ scale: 0.9 }}
+              whileTap={{ scale: 0.9 }} 
               onClick={() => setShowMobileList(false)} 
-              className="lg:hidden mt-0.5 p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg hover:bg-gray-50 dark:hover:bg-gray-700 lya:hover:bg-lya-bg/80 rounded-xl transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30"
+              className="lg:hidden mt-0.5 p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-bg/80 rounded-xl transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30"
             >
               <ChevronLeft size={20} />
             </motion.button>
@@ -254,121 +249,119 @@ export default function PasteleriaCalendar() {
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 custom-scrollbar">
-            {/* 🔥 FIX 1: Quitamos mode="popLayout" para estabilizar el grid */}
-            <AnimatePresence>
-              {pedidosSeleccionados.length === 0 ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }} 
-                  animate={{ opacity: 1, scale: 1 }} 
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación suave
-                  className="h-full flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40"
-                >
-                  <Cake size={48} className="mb-3 opacity-20" />
-                  <p className="mb-4 text-center font-medium">No hay entregas agendadas<br/>para este día.</p>
-                </motion.div>
-              ) : (
-                pedidosSeleccionados.map(pedido => {
-                  const finanzas = calcularFinanzas(pedido);
-                  
-                  // 🔥 FIX HORAS: Convertimos el ISO del backend a hora local
-                  let horaStr = '--:--';
-                  if (pedido.fechaEntrega) {
-                    const rawD = new Date(pedido.fechaEntrega);
-                    const localD = new Date(rawD.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
-                    horaStr = localD.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
-                  }
+            {/* 🔥 FIX MAESTRO: Transición fluida con mode="wait" por fecha, sin saltos de scroll ni desajustes */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedDate.toDateString()}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                className="space-y-4"
+              >
+                {pedidosSeleccionados.length === 0 ? (
+                  <div className="py-20 flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40 text-center">
+                    <Cake size={48} className="mb-3 opacity-20" />
+                    <p className="font-medium">No hay entregas agendadas<br/>para este día.</p>
+                  </div>
+                ) : (
+                  pedidosSeleccionados.map(pedido => {
+                    const finanzas = calcularFinanzas(pedido);
+                    
+                    let horaStr = '--:--';
+                    if (pedido.fechaEntrega) {
+                      const rawD = new Date(pedido.fechaEntrega);
+                      const localD = new Date(rawD.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+                      horaStr = localD.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+                    }
 
-                  return (
-                    <motion.div
-                      key={pedido.id}
-                      layout="position" // 🔥 FIX 2: Evita que recalcule el ancho y deforme la caja
-                      layoutId={`cal-card-${pedido.id}`} // 🔥 FIX 3: Rastreo estricto de identidad
-                      initial={{ opacity: 0, scale: 0.95, x: 20 }} 
-                      animate={{ opacity: 1, scale: 1, x: 0 }} 
-                      exit={{ opacity: 0, scale: 0.95, x: -20 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte, entrada suave
-                      onClick={() => abrirDetalles(pedido)} 
-                      whileTap={{ scale: 0.98 }} 
-                      // 🔥 FIX 4: "transform-gpu antialiased" obliga a usar la tarjeta gráfica sin salto de píxeles
-                      className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md transform-gpu antialiased
-                        ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5 md:hover:border-rose-400' : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-300 lya:md:hover:border-lya-primary/50'}
-                      `}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
-                          <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text transition-colors">{pedido.cliente}</h4>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
-                          <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {horaStr}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5 my-0.5">
-                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 lya:bg-lya-bg lya:text-lya-text border border-indigo-100 dark:border-indigo-900/50 lya:border-lya-border/40 shadow-sm">
-                          {pedido.categoria || 'Pastel'}
-                        </span>
-                        
-                        {Array.isArray(pedido.porciones) ? (
-                          pedido.porciones.map((p, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text border border-amber-100 dark:border-amber-900/40 lya:border-lya-border/40 shadow-sm">
-                              {p}
-                            </span>
-                          ))
-                        ) : pedido.porciones && (
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text border border-amber-100 dark:border-amber-900/40 lya:border-lya-border/40 shadow-sm">
-                            {pedido.porciones}
-                          </span>
-                        )}
-
-                        {Array.isArray(pedido.saborPan) ? (
-                          pedido.saborPan.map((s, i) => (
-                            <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text border border-purple-100 dark:border-purple-900/40 lya:border-lya-border/40 shadow-sm">
-                              {s}
-                            </span>
-                          ))
-                        ) : pedido.saborPan && (
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text border border-purple-100 dark:border-purple-900/40 lya:border-lya-border/40 shadow-sm">
-                            {pedido.saborPan}
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 line-clamp-2 italic">
-                        "{pedido.descripcion}"
-                      </p>
-
-                      <div className="pt-3 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex justify-between items-center mt-auto">
-                        {finanzas.estaLiquidado ? (
-                          <span className="text-xs font-bold text-emerald-500 lya:text-lya-secondary flex items-center gap-1"><CheckCircle2 size={14}/> Liquidado</span>
-                        ) : (
-                          <span className={`text-xs font-bold flex items-center gap-1 ${finanzas.requiereLiquidacionUrgente ? 'text-rose-500' : 'text-amber-500 lya:text-lya-primary'}`}>
-                            {finanzas.requiereLiquidacionUrgente && <AlertCircle size={14} className="animate-pulse" />} Resta: ${finanzas.deuda}
-                          </span>
-                        )}
-                        
-                        <div className="flex gap-2">
-                          <div className="p-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-xl" title="Ver Detalles">
-                            <Eye size={16}/>
+                    return (
+                      <motion.div
+                        key={pedido.id}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => abrirDetalles(pedido)} 
+                        className={`cursor-pointer outline-none touch-manipulation p-5 rounded-[1.5rem] bg-white dark:bg-gray-800 lya:bg-lya-surface border shadow-sm flex flex-col gap-3 transition-all md:hover:shadow-md
+                          ${finanzas.requiereLiquidacionUrgente 
+                            ? 'border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/10 lya:border-rose-500/50 lya:bg-rose-500/5 md:hover:border-rose-400' 
+                            : 'border-gray-100 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-300 lya:md:hover:border-lya-primary/50'
+                          }
+                        `}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
+                            <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text transition-colors">{pedido.cliente}</h4>
                           </div>
-                          <motion.button 
-                            whileTap={{ scale: 0.9 }} 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              abrirTicket(pedido); 
-                            }} 
-                            className="p-2 bg-blue-50 md:hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-xl transition-colors" 
-                            title="Ver Ticket"
-                          >
-                            <FileText size={16}/>
-                          </motion.button>
+                          <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
+                            <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {horaStr}
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
+
+                        <div className="flex flex-wrap gap-1.5 my-0.5">
+                          <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 lya:bg-lya-bg lya:text-lya-text border border-indigo-100 dark:border-indigo-900/50 lya:border-lya-border/40 shadow-sm">
+                            {pedido.categoria || 'Pastel'}
+                          </span>
+                          
+                          {Array.isArray(pedido.porciones) ? (
+                            pedido.porciones.map((p, i) => (
+                              <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text border border-amber-100 dark:border-amber-900/40 lya:border-lya-border/40 shadow-sm">
+                                {p}
+                              </span>
+                            ))
+                          ) : pedido.porciones && (
+                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 lya:bg-lya-bg lya:text-lya-text border border-amber-100 dark:border-amber-900/40 lya:border-lya-border/40 shadow-sm">
+                              {pedido.porciones}
+                            </span>
+                          )}
+
+                          {Array.isArray(pedido.saborPan) ? (
+                            pedido.saborPan.map((s, i) => (
+                              <span key={i} className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text border border-purple-100 dark:border-purple-900/40 lya:border-lya-border/40 shadow-sm">
+                                {s}
+                              </span>
+                            ))
+                          ) : pedido.saborPan && (
+                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 lya:bg-lya-bg lya:text-lya-text border border-purple-100 dark:border-purple-900/40 lya:border-lya-border/40 shadow-sm">
+                              {pedido.saborPan}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-400 lya:text-lya-text/70 line-clamp-2 italic">
+                          "{pedido.descripcion}"
+                        </p>
+
+                        <div className="pt-3 border-t border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex justify-between items-center mt-auto">
+                          {finanzas.estaLiquidado ? (
+                            <span className="text-xs font-bold text-emerald-500 lya:text-lya-secondary flex items-center gap-1"><CheckCircle2 size={14}/> Liquidado</span>
+                          ) : (
+                            <span className={`text-xs font-bold flex items-center gap-1 ${finanzas.requiereLiquidacionUrgente ? 'text-rose-500' : 'text-amber-500 lya:text-lya-primary'}`}>
+                              {finanzas.requiereLiquidacionUrgente && <AlertCircle size={14} className="animate-pulse" />} Resta: ${finanzas.deuda}
+                            </span>
+                          )}
+                          
+                          <div className="flex gap-2">
+                            <div className="p-2 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-xl" title="Ver Detalles">
+                              <Eye size={16}/>
+                            </div>
+                            <motion.button 
+                              whileTap={{ scale: 0.9 }} 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                abrirTicket(pedido); 
+                              }} 
+                              className="p-2 bg-blue-50 md:hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary rounded-xl transition-colors" 
+                              title="Ver Ticket"
+                            >
+                              <FileText size={16}/>
+                            </motion.button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
+              </motion.div>
             </AnimatePresence>
           </div>
 
@@ -377,7 +370,7 @@ export default function PasteleriaCalendar() {
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => abrirModalNuevoPedido(selectedDate)}
-                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white lya:text-lya-surface font-bold rounded-[1.2rem] shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transition-transform flex items-center justify-center gap-2"
+                className="w-full py-4 bg-emerald-500 md:hover:bg-emerald-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white lya:text-lya-surface font-bold rounded-[1.2rem] shadow-lg shadow-emerald-500/30 lya:shadow-lya-primary/30 transition-transform flex items-center justify-center gap-2"
               >
                 <Plus size={18} strokeWidth={2.5} /> Crear Pedido Aquí
               </motion.button>
@@ -393,7 +386,7 @@ export default function PasteleriaCalendar() {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
               <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
@@ -410,7 +403,6 @@ export default function PasteleriaCalendar() {
 
       <NuevoPedidoModal isOpen={isModalOpen} onClose={cerrarModalNuevoPedido} onSave={guardarPedido} fechaPredefinida={fechaPredefinida} pedidoAEditar={pedidoAEditar} isSubmitting={isSubmitting} />
       
-      {/* 🔥 CÁPSULA NEO-BENTO DE REEMBOLSO */}
       <RefundConfirmModal 
         isOpen={refundConfirmModal.isOpen}
         devolucion={refundConfirmModal.devolucion}
