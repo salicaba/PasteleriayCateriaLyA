@@ -6,7 +6,7 @@ import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
 import TicketPasteleriaModal from './TicketPasteleriaModal';
 import DetallePedidoModal from './DetallePedidoModal';
-import RefundConfirmModal from './RefundConfirmModal'; // O de la carpeta modals si lo guardaste ahí
+import RefundConfirmModal from './RefundConfirmModal'; 
 
 // --- NUEVO COMPONENTE DE CARGA NEO-BENTO ---
 const PasteleriaLoader = () => (
@@ -36,7 +36,7 @@ export default function PasteleriaCalendar() {
     pedidoAEditar, iniciarEdicion, calcularFinanzas, guardarPedido,
     successScreen, 
     isSubmitting,
-    refundConfirmModal, setRefundConfirmModal, confirmarReembolso // 🔥 AGREGADOS AQUÍ
+    refundConfirmModal, setRefundConfirmModal, confirmarReembolso 
   } = usePedidosController();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -261,7 +261,7 @@ export default function PasteleriaCalendar() {
                   initial={{ opacity: 0, scale: 0.9 }} 
                   animate={{ opacity: 1, scale: 1 }} 
                   exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación suave
                   className="h-full flex flex-col items-center justify-center text-gray-400 lya:text-lya-text/40"
                 >
                   <Cake size={48} className="mb-3 opacity-20" />
@@ -287,7 +287,7 @@ export default function PasteleriaCalendar() {
                       initial={{ opacity: 0, scale: 0.95, x: 20 }} 
                       animate={{ opacity: 1, scale: 1, x: 0 }} 
                       exit={{ opacity: 0, scale: 0.95, x: -20 }}
-                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte, entrada suave
                       onClick={() => abrirDetalles(pedido)} 
                       whileTap={{ scale: 0.98 }} 
                       // 🔥 FIX 4: "transform-gpu antialiased" obliga a usar la tarjeta gráfica sin salto de píxeles
@@ -300,7 +300,6 @@ export default function PasteleriaCalendar() {
                           <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">{pedido.id}</span>
                           <h4 className="font-bold text-gray-800 dark:text-white lya:text-lya-text transition-colors">{pedido.cliente}</h4>
                         </div>
-                        {/* RESTO DE TU TARJETA INTACTO ABAJO... */}
                         <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg px-2 py-1 rounded-lg">
                           <Clock size={14} className="text-emerald-500 lya:text-lya-secondary" /> {horaStr}
                         </div>
@@ -394,7 +393,7 @@ export default function PasteleriaCalendar() {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
               <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
