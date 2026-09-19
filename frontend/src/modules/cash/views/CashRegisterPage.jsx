@@ -14,8 +14,9 @@ export const CashRegisterPage = ({ user }) => {
   const [filterSource, setFilterSource] = useState('ALL');
   const [showModDetails, setShowModDetails] = useState(false);
   
-  // 🔥 NUEVO ESTADO: Buscador
+  // 🔥 NUEVO ESTADO: Buscador y Estado de Filtrado Animado
   const [searchTerm, setSearchTerm] = useState('');
+  const [isFiltering, setIsFiltering] = useState(false); // 🔥 El truco maestro para el loader
   
   // PILAR 3: Estado local para bloqueo asíncrono del modal
   const [isProcessing, setIsProcessing] = useState(false);
@@ -26,6 +27,18 @@ export const CashRegisterPage = ({ user }) => {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     setSelectedDate(`${year}-${month}-${day}`);
+  };
+
+  // 🔥 FUNCIÓN PARA ANIMAR EL CAMBIO DE FILTROS
+  const handleFilterChange = (source) => {
+    if (filterSource === source) return; // Si ya estamos en ese filtro, no hacer nada
+    setIsFiltering(true); // Encendemos la pantallita de carga
+    setFilterSource(source); // Aplicamos el filtro por detrás
+    
+    // Apagamos la pantallita de carga después de 350ms (suficiente para que se vea elegante)
+    setTimeout(() => {
+      setIsFiltering(false);
+    }, 350);
   };
 
   // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia (Tarjetas eliminadas)
@@ -110,14 +123,13 @@ export const CashRegisterPage = ({ user }) => {
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } } // 🔥 Quitado el spring para evitar parpadeos
+    show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } } 
   };
 
   // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
   const todayForLimit = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
   const maxDateLimit = `${todayForLimit.getFullYear()}-${String(todayForLimit.getMonth() + 1).padStart(2, '0')}-${String(todayForLimit.getDate()).padStart(2, '0')}`;
 
-  // 🔥 FIX: Formateador para evitar que el UTC sume 1 día en los inputs
   const formatLocalInputDate = (dateObj) => {
     if (!dateObj || isNaN(dateObj)) return '';
     const y = dateObj.getFullYear();
@@ -157,8 +169,6 @@ export const CashRegisterPage = ({ user }) => {
             Hoy
           </motion.button>
 
-          {/* 🔥 FIX: Cuadro de fecha 100% clickeable (como Agenda Pastelería) */}
-          {/* 🔥 FIX: Calendario estrictamente clickeable (Bloquea escritura) */}
           <div className="flex w-full sm:w-auto items-center bg-gray-50 dark:bg-gray-800 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner lya:bg-lya-bg lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-orange-500 lya:focus-within:ring-lya-primary transition-all relative">
             <CalendarIcon size={20} className="text-gray-400 lya:text-lya-text/50 mx-2 shrink-0 pointer-events-none" />
             <input 
@@ -257,24 +267,24 @@ export const CashRegisterPage = ({ user }) => {
           </div>
 
           <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto flex-shrink-0">
-            {/* PILAR 2: Botones de filtro táctiles */}
+            {/* 🔥 USAMOS handleFilterChange en lugar de setFilterSource directo */}
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => setFilterSource('ALL')}
+              onClick={() => handleFilterChange('ALL')}
               className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all ${filterSource === 'ALL' ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm' : 'text-gray-500 md:hover:text-gray-700 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text/80'}`}
             >
               Todos
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => setFilterSource('CAFETERIA')}
+              onClick={() => handleFilterChange('CAFETERIA')}
               className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 shadow-sm lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'text-gray-500 md:hover:text-orange-500 lya:text-lya-text/50 lya:md:hover:text-[#9B1C1C]'}`}
             >
               <Coffee size={14} /> Cafetería
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => setFilterSource('PASTELERIA')}
+              onClick={() => handleFilterChange('PASTELERIA')}
               className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 shadow-sm lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'text-gray-500 md:hover:text-pink-500 lya:text-lya-text/50 lya:md:hover:text-[#9D174D]'}`}
             >
               <Cake size={14} /> Pastelería
@@ -296,10 +306,10 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL: PILAR 1 y 4 (Contenedor scrolleable) */}
+      {/* TABLA PRINCIPAL */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4">
         <div className="overflow-y-auto custom-scrollbar flex-1">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse relative">
             <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-10 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
               <tr>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Hora</th>
@@ -312,186 +322,207 @@ export const CashRegisterPage = ({ user }) => {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
               
-              {filteredTransactions.length === 0 && !loading && (
-                <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <td colSpan="6" className="text-center py-10 text-gray-400 font-medium lya:text-lya-text/50">
-                    {searchTerm !== '' 
-                      ? `No se encontraron resultados para "${searchTerm}"`
-                      : filterSource === 'ALL' 
-                        ? 'No hay movimientos registrados en esta fecha.' 
-                        : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
-                    }
-                  </td>
-                </motion.tr>
-              )}
+              {/* 🔥 mode="wait" obliga a Framer Motion a terminar de ocultar antes de mostrar el Loader o las Filas Nuevas */}
+              <AnimatePresence mode="wait">
+                {isFiltering ? (
+                  /* PANTALLITA DE CARGA */
+                  <motion.tr 
+                    key="loading-state"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <td colSpan="6" className="text-center py-20">
+                      <div className="flex flex-col items-center justify-center text-orange-500 dark:text-orange-400 lya:text-lya-primary">
+                        <Loader2 size={32} className="animate-spin mb-3" />
+                        <span className="text-xs font-black tracking-widest uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/50">Filtrando movimientos...</span>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ) : filteredTransactions.length === 0 && !loading ? (
+                  /* ESTADO VACÍO */
+                  <motion.tr 
+                    key="empty-state"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <td colSpan="6" className="text-center py-16 text-gray-400 font-medium lya:text-lya-text/50">
+                      {searchTerm !== '' 
+                        ? `No se encontraron resultados para "${searchTerm}"`
+                        : filterSource === 'ALL' 
+                          ? 'No hay movimientos registrados en esta fecha.' 
+                          : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
+                      }
+                    </td>
+                  </motion.tr>
+                ) : (
+                  /* RESULTADOS NORMALES */
+                  filteredTransactions.map((tx, index) => {
+                    const isCancelled = tx.status === 'CANCELLED';
+                    const creatorName = tx.creator 
+                      ? (tx.creator.fullName?.split(' ')[0] || tx.creator.username) 
+                      : 'Sistema';
+                    
+                    const payInfo = getPaymentInfo(tx);
 
-              {/* 🔥 Le quitamos el mode="popLayout" porque rompe las tablas HTML */}
-              <AnimatePresence>
-                {filteredTransactions.map((tx, index) => {
-                  const isCancelled = tx.status === 'CANCELLED';
-                  const creatorName = tx.creator 
-                    ? (tx.creator.fullName?.split(' ')[0] || tx.creator.username) 
-                    : 'Sistema';
-                  
-                  const payInfo = getPaymentInfo(tx);
+                    const rawAmount = parseFloat(tx.amount) || 0;
+                    const isNegative = rawAmount < 0;
+                    const absAmount = Math.abs(rawAmount).toFixed(2);
 
-                  const rawAmount = parseFloat(tx.amount) || 0;
-                  const isNegative = rawAmount < 0;
-                  const absAmount = Math.abs(rawAmount).toFixed(2);
-
-                  return (
-                    <motion.tr 
-                      key={tx.id} 
-                      // 🔥 Quitamos layout="position" en tablas para evitar recálculos raros
-                      initial={{ opacity: 0, y: 10 }} 
-                      animate={{ opacity: 1, y: 0 }} 
-                      exit={{ opacity: 0 }} // 🔥 Salida ultra limpia, sin escalar, para no deformar la tabla
-                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 Quitamos el delay para que el filtro sea responsivo e instantáneo
-                      className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
-                    >
-                      <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                        {new Date(tx.createdAt).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
-                      </td>
-                      <td className="p-5">
-                        <span className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit ${tx.source === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : tx.source === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
-                          {tx.source === 'CAFETERIA' ? <Coffee size={12} /> : tx.source === 'PASTELERIA' ? <Cake size={12} /> : <Calculator size={12} />}
-                          {tx.source}
-                        </span>
-                      </td>
-                      <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">
-                        
-                        {(() => {
-                          const partes = (tx.description || '').split(' | ');
-                          const descOriginal = partes[0];
-                          const modificaciones = partes.slice(1);
+                    return (
+                      <motion.tr 
+                        key={tx.id} 
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.15) }}
+                        className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
+                      >
+                        <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
+                          {new Date(tx.createdAt).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
+                        </td>
+                        <td className="p-5">
+                          <span className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit ${tx.source === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : tx.source === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
+                            {tx.source === 'CAFETERIA' ? <Coffee size={12} /> : tx.source === 'PASTELERIA' ? <Cake size={12} /> : <Calculator size={12} />}
+                            {tx.source}
+                          </span>
+                        </td>
+                        <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">
                           
-                          return (
-                            <div className="flex flex-col gap-1.5">
-                              <p className={isCancelled ? 'line-through opacity-50' : ''}>
-                                {descOriginal}
-                              </p>
-                              
-                              {modificaciones.length > 0 && showModDetails && (
-                                <div className="flex flex-col gap-1 mt-0.5">
-                                  {modificaciones.map((mod, i) => {
-                                    const isRestaurado = mod.includes('📈');
-                                    const isMixto = mod.includes('🔗');
-                                    
-                                    let badgeClasses = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500';
-                                    
-                                    if (isRestaurado) {
-                                      badgeClasses = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500';
-                                    } else if (isMixto) {
-                                      badgeClasses = 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50 lya:bg-purple-500/10 lya:border-purple-500/20 lya:text-purple-500';
-                                    }
+                          {(() => {
+                            const partes = (tx.description || '').split(' | ');
+                            const descOriginal = partes[0];
+                            const modificaciones = partes.slice(1);
+                            
+                            return (
+                              <div className="flex flex-col gap-1.5">
+                                <p className={isCancelled ? 'line-through opacity-50' : ''}>
+                                  {descOriginal}
+                                </p>
+                                
+                                {modificaciones.length > 0 && showModDetails && (
+                                  <div className="flex flex-col gap-1 mt-0.5">
+                                    {modificaciones.map((mod, i) => {
+                                      const isRestaurado = mod.includes('📈');
+                                      const isMixto = mod.includes('🔗');
+                                      
+                                      let badgeClasses = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500';
+                                      
+                                      if (isRestaurado) {
+                                        badgeClasses = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500';
+                                      } else if (isMixto) {
+                                        badgeClasses = 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50 lya:bg-purple-500/10 lya:border-purple-500/20 lya:text-purple-500';
+                                      }
 
-                                    return (
-                                      <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${badgeClasses}`}>
-                                        {mod}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                                      return (
+                                        <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${badgeClasses}`}>
+                                          {mod}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
 
-                              {modificaciones.length > 0 && !showModDetails && (
-                                 <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold italic flex items-center gap-1">
-                                   <RotateCcw size={10}/> {modificaciones.length} etiqueta(s) oculta(s)
-                                 </span>
-                              )}
+                                {modificaciones.length > 0 && !showModDetails && (
+                                   <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold italic flex items-center gap-1">
+                                     <RotateCcw size={10}/> {modificaciones.length} etiqueta(s) oculta(s)
+                                   </span>
+                                )}
 
-                            </div>
-                          );
-                        })()}
+                              </div>
+                            );
+                          })()}
 
-                        <div className={`text-[11px] font-semibold mt-1.5 flex flex-wrap items-center gap-2 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
-                          <span className="flex items-center gap-1"><UserCheck size={12} /> Por: {creatorName}</span>
-                          {!isCancelled && (
-                            <>
-                              <span className="text-gray-300 dark:text-gray-700 lya:text-lya-border">•</span>
-                              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest ${payInfo.bg} ${payInfo.color}`}>
-                                <payInfo.icon size={10} /> {payInfo.label}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      
-                      {/* 🔥 CELDA DEL MONTO CON INTELIGENCIA FINANCIERA */}
-                      <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text whitespace-nowrap">
-                        <span className={
-                          isCancelled 
-                            ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' 
-                            : isNegative 
-                              ? 'text-red-500 dark:text-red-400 lya:text-red-600' 
-                              : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'
-                        }>
-                          {isCancelled ? '' : (isNegative ? '- ' : '+ ')}${absAmount}
-                        </span>
-                      </td>
-
-                      <td className="p-5 text-center">
-                        {isCancelled ? (
-                          <div className="flex flex-col items-center">
-                            <span className="text-[10px] font-black uppercase text-red-600 bg-red-100 dark:bg-red-900/30 px-3 py-1.5 rounded-lg mb-1 border border-red-200 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500">Anulado</span>
-                            {tx.canceller && (
-                              <span className="text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/50 font-bold whitespace-nowrap">
-                                Por: {tx.canceller.fullName?.split(' ')[0] || tx.canceller.username}
-                              </span>
+                          <div className={`text-[11px] font-semibold mt-1.5 flex flex-wrap items-center gap-2 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
+                            <span className="flex items-center gap-1"><UserCheck size={12} /> Por: {creatorName}</span>
+                            {!isCancelled && (
+                              <>
+                                <span className="text-gray-300 dark:text-gray-700 lya:text-lya-border">•</span>
+                                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest ${payInfo.bg} ${payInfo.color}`}>
+                                  <payInfo.icon size={10} /> {payInfo.label}
+                                </span>
+                              </>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 px-3 py-1.5 rounded-lg lya:bg-emerald-500/10 lya:border-emerald-500/20 lya:text-[#03543F]">Activo</span>
-                        )}
-                      </td>
-
-                      {/* PILAR 2: Botones de tabla con whileTap */}
-                      <td className="p-5 text-center">
-                        {tx.source !== 'MANUAL' ? (
-                          <span 
-                            className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-lg select-none"
-                            title={`Los movimientos de ${tx.source === 'CAFETERIA' ? 'Cafetería' : 'Pastelería'} solo se pueden anular o restaurar desde su módulo correspondiente.`}
-                          >
-                            Automático
+                        </td>
+                        
+                        <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text whitespace-nowrap">
+                          <span className={
+                            isCancelled 
+                              ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' 
+                              : isNegative 
+                                ? 'text-red-500 dark:text-red-400 lya:text-red-600' 
+                                : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'
+                          }>
+                            {isCancelled ? '' : (isNegative ? '- ' : '+ ')}${absAmount}
                           </span>
-                        ) : (
-                          <>
-                            {!isCancelled && user?.role === 'Administrador' && (
-                              <motion.button 
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleCancelTransaction(tx.id)}
-                                className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 rounded-xl outline-none lya:bg-red-500/10 lya:text-red-500 lya:md:hover:bg-red-500/20"
-                                title="Anular Movimiento Manual"
-                              >
-                                <XCircle size={20} />
-                              </motion.button>
-                            )}
-                            {isCancelled && user?.role === 'Administrador' && (
-                              <motion.button 
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleRestoreTransaction(tx.id)}
-                                className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 rounded-xl outline-none lya:bg-lya-primary/10 lya:text-lya-primary lya:md:hover:bg-lya-primary/20"
-                                title="Restaurar Movimiento Manual"
-                              >
-                                <RotateCcw size={20} />
-                              </motion.button>
-                            )}
-                            {user?.role !== 'Administrador' && (
-                               <span className="text-xs font-bold text-gray-400 lya:text-lya-text/30 select-none">No auto.</span>
-                            )}
-                          </>
-                        )}
-                      </td>
-                    </motion.tr>
-                  );
-                })}
+                        </td>
+
+                        <td className="p-5 text-center">
+                          {isCancelled ? (
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] font-black uppercase text-red-600 bg-red-100 dark:bg-red-900/30 px-3 py-1.5 rounded-lg mb-1 border border-red-200 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500">Anulado</span>
+                              {tx.canceller && (
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/50 font-bold whitespace-nowrap">
+                                  Por: {tx.canceller.fullName?.split(' ')[0] || tx.canceller.username}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 px-3 py-1.5 rounded-lg lya:bg-emerald-500/10 lya:border-emerald-500/20 lya:text-[#03543F]">Activo</span>
+                          )}
+                        </td>
+
+                        <td className="p-5 text-center">
+                          {tx.source !== 'MANUAL' ? (
+                            <span 
+                              className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-lg select-none"
+                              title={`Los movimientos de ${tx.source === 'CAFETERIA' ? 'Cafetería' : 'Pastelería'} solo se pueden anular o restaurar desde su módulo correspondiente.`}
+                            >
+                              Automático
+                            </span>
+                          ) : (
+                            <>
+                              {!isCancelled && user?.role === 'Administrador' && (
+                                <motion.button 
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleCancelTransaction(tx.id)}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 rounded-xl outline-none lya:bg-red-500/10 lya:text-red-500 lya:md:hover:bg-red-500/20"
+                                  title="Anular Movimiento Manual"
+                                >
+                                  <XCircle size={20} />
+                                </motion.button>
+                              )}
+                              {isCancelled && user?.role === 'Administrador' && (
+                                <motion.button 
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleRestoreTransaction(tx.id)}
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 rounded-xl outline-none lya:bg-lya-primary/10 lya:text-lya-primary lya:md:hover:bg-lya-primary/20"
+                                  title="Restaurar Movimiento Manual"
+                                >
+                                  <RotateCcw size={20} />
+                                </motion.button>
+                              )}
+                              {user?.role !== 'Administrador' && (
+                                 <span className="text-xs font-bold text-gray-400 lya:text-lya-text/30 select-none">No auto.</span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  })
+                )}
               </AnimatePresence>
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* MODAL DE CONFIRMACIÓN: PILAR 4 y 5 (Cápsulas y Locks Asíncronos) */}
+      {/* MODAL DE CONFIRMACIÓN */}
       <AnimatePresence>
         {confirmModal.isOpen && (
           <motion.div 
@@ -504,7 +535,7 @@ export const CashRegisterPage = ({ user }) => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 Quita el resorte agresivo para evitar el "temblor"
+              transition={{ duration: 0.2, ease: "easeOut" }} 
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
             >
               <div className={`mx-auto w-20 h-20 flex items-center justify-center rounded-full mb-5 ${
@@ -531,7 +562,6 @@ export const CashRegisterPage = ({ user }) => {
                 >
                   Cancelar
                 </motion.button>
-                {/* PILAR 3: Botón de confirmación con estado de carga (Anti-doble clic) */}
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleConfirmLock}
