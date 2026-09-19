@@ -14,7 +14,10 @@ export const CashRegisterPage = ({ user }) => {
   const [filterSource, setFilterSource] = useState('ALL');
   const [showModDetails, setShowModDetails] = useState(false);
   
+  // 🔥 NUEVO ESTADO: Buscador
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // PILAR 3: Estado local para bloqueo asíncrono del modal
   const [isProcessing, setIsProcessing] = useState(false);
 
   const setToday = () => {
@@ -25,6 +28,7 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
+  // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia (Tarjetas eliminadas)
   const getPaymentInfo = (tx) => {
     const methodStr = String(tx.paymentMethod || '').toUpperCase();
     const isTransfer = methodStr === 'TRANSFER' || tx.description?.toLowerCase().includes('transferencia');
@@ -49,6 +53,7 @@ export const CashRegisterPage = ({ user }) => {
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
 
+  // PILAR 3: Envoltura asíncrona para la confirmación
   const handleConfirmLock = async () => {
     setIsProcessing(true);
     try {
@@ -62,7 +67,7 @@ export const CashRegisterPage = ({ user }) => {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden">
         <motion.div
-          animate={{ opacity: [0.5, 1, 0.5] }}
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
           className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800"
         >
@@ -78,9 +83,12 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
+  // 🔥 LÓGICA DE FILTRADO Y BÚSQUEDA
   const filteredTransactions = transactions.filter(tx => {
+    // 1. Filtro por origen (Cafetería, Pastelería, Todos)
     if (filterSource !== 'ALL' && tx.source !== filterSource) return false;
     
+    // 2. Filtro por búsqueda (Folio, Nombre o Descripción)
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       const desc = (tx.description || '').toLowerCase();
@@ -97,26 +105,37 @@ export const CashRegisterPage = ({ user }) => {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.03 } }
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
 
-  // 🔥 FIX: Transición lineal y suave sin resortes (evita parpadeos)
   const cardVariants = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } }
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
+  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
   const todayForLimit = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
   const maxDateLimit = `${todayForLimit.getFullYear()}-${String(todayForLimit.getMonth() + 1).padStart(2, '0')}-${String(todayForLimit.getDate()).padStart(2, '0')}`;
 
+  // 🔥 FIX: Formateador para evitar que el UTC sume 1 día en los inputs
+  const formatLocalInputDate = (dateObj) => {
+    if (!dateObj || isNaN(dateObj)) return '';
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   return (
+    // PILAR 1: Contenedor Raíz bloqueado
     <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
       
+      {/* HEADER: PILAR 4 Geometría premium */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
@@ -129,21 +148,24 @@ export const CashRegisterPage = ({ user }) => {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* PILAR 2: Botón con whileTap y md:hover */}
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={setToday}
-            className="w-full sm:w-auto px-5 py-3.5 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-bold rounded-xl md:hover:bg-orange-200 dark:md:hover:bg-orange-500/30 transition-all shadow-sm lya:bg-lya-primary/10 lya:text-lya-primary lya:hover:bg-lya-primary/20"
+            className="w-full sm:w-auto px-5 py-3.5 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-bold rounded-xl md:hover:bg-orange-200 dark:md:hover:bg-orange-500/30 transition-all shadow-sm transform md:hover:-translate-y-0.5 lya:bg-lya-primary/10 lya:text-lya-primary lya:hover:bg-lya-primary/20"
           >
             Hoy
           </motion.button>
 
+          {/* 🔥 FIX: Cuadro de fecha 100% clickeable (como Agenda Pastelería) */}
+          {/* 🔥 FIX: Calendario estrictamente clickeable (Bloquea escritura) */}
           <div className="flex w-full sm:w-auto items-center bg-gray-50 dark:bg-gray-800 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner lya:bg-lya-bg lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-orange-500 lya:focus-within:ring-lya-primary transition-all relative">
             <CalendarIcon size={20} className="text-gray-400 lya:text-lya-text/50 mx-2 shrink-0 pointer-events-none" />
             <input 
               id="cash-date-picker"
               type="date" 
               value={selectedDate}
-              max={maxDateLimit}
+              max={maxDateLimit} // 🔥 AQUÍ ESTÁ EL SEGURO ANTI-FUTURO
               onChange={(e) => setSelectedDate(e.target.value)}
               onClick={(e) => e.stopPropagation()} 
               className="bg-transparent border-none text-gray-700 dark:text-white lya:text-lya-text font-bold outline-none cursor-pointer w-full
@@ -159,19 +181,20 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </header>
 
+      {/* KPIs: PILAR 4 Geometría */}
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         animate="show"
         className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6 shrink-0"
       >
-        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-gray-900 dark:bg-gray-800 lya:bg-[#03543F] text-white rounded-[2rem] p-5 shadow-lg relative overflow-hidden">
+        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-gray-900 dark:bg-gray-800 lya:bg-[#03543F] text-white rounded-[2rem] p-5 shadow-lg relative overflow-hidden transform transition-all md:hover:-translate-y-1">
           <p className="text-gray-400 lya:text-emerald-100 text-[10px] font-black uppercase tracking-wider mb-1">Total del Día</p>
           <h2 className="text-3xl font-black">${resumen.total.toFixed(2)}</h2>
           <Calculator className="absolute -right-4 -bottom-4 opacity-10 w-20 h-20" />
         </motion.div>
 
-        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30">
+        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-emerald-500 mb-1">
             <Banknote size={16}/> 
             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Efectivo</span>
@@ -179,7 +202,7 @@ export const CashRegisterPage = ({ user }) => {
           <h2 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]">${paymentStats.efectivo.toFixed(2)}</h2>
         </motion.div>
 
-        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30">
+        <motion.div variants={cardVariants} className="col-span-2 md:col-span-1 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-blue-500 mb-1">
             <Landmark size={16}/> 
             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Transferencias</span>
@@ -187,7 +210,7 @@ export const CashRegisterPage = ({ user }) => {
           <h2 className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 lya:text-blue-600">${paymentStats.digital.toFixed(2)}</h2>
         </motion.div>
         
-        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30">
+        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-orange-500 mb-1">
             <Coffee size={14}/> 
             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Cafetería</span>
@@ -195,7 +218,7 @@ export const CashRegisterPage = ({ user }) => {
           <h2 className="text-xl font-extrabold text-orange-600 dark:text-orange-400 lya:text-[#9B1C1C]">${resumen.cafeteria.toFixed(2)}</h2>
         </motion.div>
 
-        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30">
+        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-pink-500 mb-1">
             <Cake size={14}/> 
             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Pastelería</span>
@@ -203,7 +226,7 @@ export const CashRegisterPage = ({ user }) => {
           <h2 className="text-xl font-extrabold text-pink-600 dark:text-pink-400 lya:text-[#9D174D]">${resumen.pasteleria.toFixed(2)}</h2>
         </motion.div>
 
-        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30">
+        <motion.div variants={cardVariants} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-5 shadow-sm lya:bg-lya-surface lya:border-lya-border/30 transform transition-all md:hover:-translate-y-1">
           <div className="flex items-center gap-2 text-red-500 mb-1">
             <XCircle size={14}/> 
             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 lya:text-lya-text/50">Anulado</span>
@@ -219,6 +242,7 @@ export const CashRegisterPage = ({ user }) => {
         
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar p-1">
           
+          {/* 🔥 BARRA DE BÚSQUEDA */}
           <div className="relative w-full sm:w-64 flex-shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={16} className="text-gray-400 lya:text-lya-text/50" />
@@ -228,29 +252,30 @@ export const CashRegisterPage = ({ user }) => {
               placeholder="Buscar folio, cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-xl text-sm font-bold text-gray-800 dark:text-white lya:text-lya-text focus:outline-none focus:ring-2 focus:ring-orange-500/30 lya:focus:ring-lya-primary/35 transition-all placeholder-gray-400"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-xl text-sm font-bold text-gray-800 dark:text-white lya:text-lya-text focus:outline-none focus:ring-2 focus:ring-orange-500/30 lya:focus:ring-lya-primary/30 transition-all placeholder-gray-400"
             />
           </div>
 
           <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto flex-shrink-0">
+            {/* PILAR 2: Botones de filtro táctiles */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setFilterSource('ALL')}
-              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all ${filterSource === 'ALL' ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm' : 'text-gray-500 md:hover:text-gray-700 dark:md:hover:text-gray-300 lya:text-lya-text/50'}`}
+              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all ${filterSource === 'ALL' ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm' : 'text-gray-500 md:hover:text-gray-700 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text/80'}`}
             >
               Todos
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setFilterSource('CAFETERIA')}
-              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 shadow-sm lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'text-gray-500 md:hover:text-orange-500 lya:text-lya-text/50'}`}
+              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 shadow-sm lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'text-gray-500 md:hover:text-orange-500 lya:text-lya-text/50 lya:md:hover:text-[#9B1C1C]'}`}
             >
               <Coffee size={14} /> Cafetería
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setFilterSource('PASTELERIA')}
-              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 shadow-sm lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'text-gray-500 md:hover:text-pink-500 lya:text-lya-text/50'}`}
+              className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 shadow-sm lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'text-gray-500 md:hover:text-pink-500 lya:text-lya-text/50 lya:md:hover:text-[#9D174D]'}`}
             >
               <Cake size={14} /> Pastelería
             </motion.button>
@@ -261,8 +286,8 @@ export const CashRegisterPage = ({ user }) => {
             onClick={() => setShowModDetails(!showModDetails)}
             className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-black rounded-xl transition-all w-full sm:w-auto flex-shrink-0 ${
               showModDetails 
-                ? 'bg-orange-100 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 lya:bg-lya-primary/10 lya:text-lya-primary' 
-                : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/40'
+                ? 'bg-orange-100 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/50 lya:bg-lya-primary/10 lya:text-lya-primary lya:border-lya-primary/20' 
+                : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 lya:bg-lya-surface lya:border-lya-border/40 md:hover:bg-gray-50 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-bg/50'
             } border shadow-sm`}
           >
             {showModDetails ? <EyeOff size={14}/> : <Eye size={14}/>}
@@ -271,6 +296,7 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
+      {/* TABLA PRINCIPAL: PILAR 1 y 4 (Contenedor scrolleable) */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4">
         <div className="overflow-y-auto custom-scrollbar flex-1">
           <table className="w-full text-left border-collapse">
@@ -300,13 +326,15 @@ export const CashRegisterPage = ({ user }) => {
               )}
 
               <AnimatePresence mode="popLayout">
-                {filteredTransactions.map((tx) => {
+                {filteredTransactions.map((tx, index) => {
                   const isCancelled = tx.status === 'CANCELLED';
                   const creatorName = tx.creator 
                     ? (tx.creator.fullName?.split(' ')[0] || tx.creator.username) 
                     : 'Sistema';
                   
                   const payInfo = getPaymentInfo(tx);
+
+                  // 🔥 NUEVA LÓGICA DE MONTO INTELIGENTE (Ingresos vs Egresos)
                   const rawAmount = parseFloat(tx.amount) || 0;
                   const isNegative = rawAmount < 0;
                   const absAmount = Math.abs(rawAmount).toFixed(2);
@@ -314,11 +342,12 @@ export const CashRegisterPage = ({ user }) => {
                   return (
                     <motion.tr 
                       key={tx.id} 
-                      initial={{ opacity: 0 }} 
-                      animate={{ opacity: 1 }} 
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15, ease: "easeOut" }} // 🔥 FIX: Transición limpia y sin saltos
-                      className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40'} transition-colors`}
+                      layout
+                      initial={{ opacity: 0, y: 15 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.02, 0.2) }}
+                      className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
                     >
                       <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
                         {new Date(tx.createdAt).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
@@ -348,12 +377,12 @@ export const CashRegisterPage = ({ user }) => {
                                     const isRestaurado = mod.includes('📈');
                                     const isMixto = mod.includes('🔗');
                                     
-                                    let badgeClasses = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500';
+                                    let badgeClasses = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500';
                                     
                                     if (isRestaurado) {
-                                      badgeClasses = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500';
+                                      badgeClasses = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500';
                                     } else if (isMixto) {
-                                      badgeClasses = 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 lya:bg-purple-500/10 lya:border-purple-500/20 lya:text-purple-500';
+                                      badgeClasses = 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50 lya:bg-purple-500/10 lya:border-purple-500/20 lya:text-purple-500';
                                     }
 
                                     return (
@@ -388,12 +417,13 @@ export const CashRegisterPage = ({ user }) => {
                         </div>
                       </td>
                       
+                      {/* 🔥 CELDA DEL MONTO CON INTELIGENCIA FINANCIERA */}
                       <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text whitespace-nowrap">
                         <span className={
                           isCancelled 
-                            ? 'line-through opacity-50 text-gray-400 dark:text-gray-600' 
+                            ? 'line-through opacity-50 text-gray-400 dark:text-gray-600 lya:text-lya-text/40' 
                             : isNegative 
-                              ? 'text-red-500 dark:text-red-400' 
+                              ? 'text-red-500 dark:text-red-400 lya:text-red-600' 
                               : 'text-emerald-600 dark:text-emerald-400 lya:text-[#03543F]'
                         }>
                           {isCancelled ? '' : (isNegative ? '- ' : '+ ')}${absAmount}
@@ -403,23 +433,24 @@ export const CashRegisterPage = ({ user }) => {
                       <td className="p-5 text-center">
                         {isCancelled ? (
                           <div className="flex flex-col items-center">
-                            <span className="text-[10px] font-black uppercase text-red-600 bg-red-100 dark:bg-red-900/30 px-3 py-1.5 rounded-lg mb-1 border border-red-200 dark:border-red-800/50">Anulado</span>
+                            <span className="text-[10px] font-black uppercase text-red-600 bg-red-100 dark:bg-red-900/30 px-3 py-1.5 rounded-lg mb-1 border border-red-200 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500">Anulado</span>
                             {tx.canceller && (
-                              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/50 font-bold whitespace-nowrap">
                                 Por: {tx.canceller.fullName?.split(' ')[0] || tx.canceller.username}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 px-3 py-1.5 rounded-lg">Activo</span>
+                          <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 px-3 py-1.5 rounded-lg lya:bg-emerald-500/10 lya:border-emerald-500/20 lya:text-[#03543F]">Activo</span>
                         )}
                       </td>
 
+                      {/* PILAR 2: Botones de tabla con whileTap */}
                       <td className="p-5 text-center">
                         {tx.source !== 'MANUAL' ? (
                           <span 
                             className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-lg select-none"
-                            title="Automático"
+                            title={`Los movimientos de ${tx.source === 'CAFETERIA' ? 'Cafetería' : 'Pastelería'} solo se pueden anular o restaurar desde su módulo correspondiente.`}
                           >
                             Automático
                           </span>
@@ -429,7 +460,7 @@ export const CashRegisterPage = ({ user }) => {
                               <motion.button 
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => handleCancelTransaction(tx.id)}
-                                className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 rounded-xl outline-none"
+                                className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 rounded-xl outline-none lya:bg-red-500/10 lya:text-red-500 lya:md:hover:bg-red-500/20"
                                 title="Anular Movimiento Manual"
                               >
                                 <XCircle size={20} />
@@ -439,14 +470,14 @@ export const CashRegisterPage = ({ user }) => {
                               <motion.button 
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => handleRestoreTransaction(tx.id)}
-                                className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl outline-none"
+                                className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 rounded-xl outline-none lya:bg-lya-primary/10 lya:text-lya-primary lya:md:hover:bg-lya-primary/20"
                                 title="Restaurar Movimiento Manual"
                               >
                                 <RotateCcw size={20} />
                               </motion.button>
                             )}
                             {user?.role !== 'Administrador' && (
-                               <span className="text-xs font-bold text-gray-400 select-none">No auto.</span>
+                               <span className="text-xs font-bold text-gray-400 lya:text-lya-text/30 select-none">No auto.</span>
                             )}
                           </>
                         )}
@@ -460,25 +491,26 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
+      {/* MODAL DE CONFIRMACIÓN: PILAR 4 y 5 (Cápsulas y Locks Asíncronos) */}
       <AnimatePresence>
         {confirmModal.isOpen && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 dark:bg-black/60 lya:bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 text-center"
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
             >
               <div className={`mx-auto w-20 h-20 flex items-center justify-center rounded-full mb-5 ${
                 confirmModal.actionType === 'CANCEL' 
-                  ? 'bg-red-100 text-red-500' 
-                  : 'bg-blue-100 text-blue-500'
+                  ? 'bg-red-100 text-red-500 dark:bg-red-500/10 lya:bg-red-500/10 lya:text-red-500' 
+                  : 'bg-blue-100 text-blue-500 dark:bg-blue-500/10 lya:bg-lya-primary/10 lya:text-lya-primary'
               }`}>
                 {confirmModal.actionType === 'CANCEL' ? <AlertTriangle size={40} /> : <RotateCcw size={40} />}
               </div>
@@ -486,7 +518,7 @@ export const CashRegisterPage = ({ user }) => {
               <h3 className="text-2xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text mb-2 tracking-tight">
                 {confirmModal.title}
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed text-center">
                 {confirmModal.message}
               </p>
 
@@ -495,18 +527,19 @@ export const CashRegisterPage = ({ user }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={closeConfirmModal}
                   disabled={isProcessing}
-                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 rounded-xl font-bold transition-colors disabled:opacity-50 outline-none"
+                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-colors disabled:opacity-50 outline-none"
                 >
                   Cancelar
                 </motion.button>
+                {/* PILAR 3: Botón de confirmación con estado de carga (Anti-doble clic) */}
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleConfirmLock}
                   disabled={isProcessing}
-                  className={`flex-1 flex items-center justify-center py-3.5 font-bold rounded-xl transition-all text-white shadow-lg outline-none ${
+                  className={`flex-1 flex items-center justify-center py-3.5 font-bold rounded-xl transition-all transform md:hover:-translate-y-0.5 text-white shadow-lg outline-none ${
                     confirmModal.actionType === 'CANCEL'
-                      ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30'
-                      : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/30'
+                      ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30 lya:bg-red-600 lya:hover:bg-red-700'
+                      : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/30 lya:bg-lya-primary lya:hover:opacity-90 lya:shadow-lya-primary/30'
                   } ${isProcessing ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
                   {isProcessing ? (
