@@ -72,6 +72,7 @@ export const TicketBottomBar = ({
             initial={{ opacity: 0, height: 0, marginBottom: 0 }}
             animate={{ opacity: 1, height: 'auto', marginBottom: 4 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave y directa
             className="flex gap-2 overflow-hidden"
           >
             <motion.button 
@@ -104,6 +105,7 @@ export const TicketBottomBar = ({
             initial={{ opacity: 0, height: 0, marginBottom: 0 }}
             animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Evita el rebote de la altura (spring)
             className="overflow-hidden"
           >
             <motion.button
@@ -134,7 +136,13 @@ export const TicketBottomBar = ({
 
       <AnimatePresence>
         {hasCuentasActivas && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación directa para evitar parpadeos
+            className="space-y-3"
+          >
              <div className="space-y-1.5">
                <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-[10px] font-bold uppercase tracking-wider">
                  <span>{isVitrina ? 'Total de Productos' : (isLlevar ? 'Subtotal Pedido' : 'Pendiente por Pagar')}</span>
