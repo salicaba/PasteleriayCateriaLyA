@@ -91,8 +91,8 @@ export const registerTransaction = async (req, res) => {
       throw new Error('Tipo de transacción no soportada desde este endpoint');
     }
 
-    // 🔥 BLINDAJE DE ZONA HORARIA
-    const localNow = getLocalNow();
+    // 🔥 FIX: FECHA PURA PARA LA BASE DE DATOS
+    const dbNow = new Date();
 
     await InventoryTransaction.create({
       inventoryItemId,
@@ -103,13 +103,13 @@ export const registerTransaction = async (req, res) => {
       totalCost: transactionTotalCost,
       reference: reference || null,
       notes: notes || null,
-      createdAt: localNow // Estampado exacto de Chiapas
+      createdAt: dbNow // ✅ Estándar UTC
     }, { transaction: t });
 
     await item.update({
       currentStock: newStock,
       averageCost: newAvgCost,
-      updatedAt: localNow
+      updatedAt: dbNow // ✅ Estándar UTC
     }, { transaction: t });
 
     await t.commit(); 
@@ -159,7 +159,8 @@ export const deleteItem = async (req, res) => {
     
     if (!item) return res.status(404).json({ message: 'Insumo no encontrado' });
 
-    await item.update({ isActive: false, updatedAt: getLocalNow() });
+    // 🔥 FIX: FECHA PURA
+    await item.update({ isActive: false, updatedAt: new Date() });
     res.status(200).json({ message: 'Insumo eliminado correctamente' });
   } catch (error) {
     console.error('Error deleting item:', error);
@@ -180,14 +181,16 @@ export const processReconciliation = async (req, res) => {
       throw new Error('No se enviaron insumos para el arqueo.');
     }
 
-    // 🔥 BLINDAJE DE ZONA HORARIA
-    const realExecutionDate = getLocalNow(); 
+    // 🔥 FIX: FECHA PURA PARA LA BASE DE DATOS
+    const realExecutionDate = new Date(); 
     let accountingDate = realExecutionDate; 
     let isRetroactive = false;
 
-    const localYear = realExecutionDate.getFullYear();
-    const localMonth = String(realExecutionDate.getMonth() + 1).padStart(2, '0');
-    const localDay = String(realExecutionDate.getDate()).padStart(2, '0');
+    // Usamos getLocalNow SOLO para extraer el YYYY-MM-DD de Chiapas
+    const localForCompare = getLocalNow();
+    const localYear = localForCompare.getFullYear();
+    const localMonth = String(localForCompare.getMonth() + 1).padStart(2, '0');
+    const localDay = String(localForCompare.getDate()).padStart(2, '0');
     const todayLocalStr = `${localYear}-${localMonth}-${localDay}`;
 
     if (date && date !== todayLocalStr) {
@@ -199,7 +202,7 @@ export const processReconciliation = async (req, res) => {
 
     const baseNote = notes || 'Arqueo periódico';
     const finalNote = isRetroactive 
-      ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] ${baseNote}` 
+      ? `[Registrado el: ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}] ${baseNote}` 
       : baseNote;
 
     const reconciliation = await InventoryReconciliation.create({
@@ -250,7 +253,7 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: consumedCost,
           reference: `Arqueo #${reconciliation.id}`,
-          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] Ajuste negativo diferido` : (notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'),
+          notes: isRetroactive ? `[Registrado el: ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}] Ajuste negativo diferido` : (notes ? `Arqueo: ${notes}` : 'Consumo determinado por arqueo'),
           createdAt: accountingDate 
         }, { transaction: t });
 
@@ -263,7 +266,7 @@ export const processReconciliation = async (req, res) => {
           unitCost: averageCost,
           totalCost: Math.abs(differenceCost),
           reference: `Arqueo #${reconciliation.id}`,
-          notes: isRetroactive ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] Ajuste positivo diferido` : (notes ? `Ajuste: ${notes}` : 'Ajuste positivo por arqueo'),
+          notes: isRetroactive ? `[Registrado el: ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}] Ajuste positivo diferido` : (notes ? `Ajuste: ${notes}` : 'Ajuste positivo por arqueo'),
           createdAt: accountingDate 
         }, { transaction: t });
       }
@@ -338,14 +341,14 @@ export const cancelTransaction = async (req, res) => {
       newStock += txQty;
     }
 
-    // 🔥 BLINDAJE HORARIO: La cancelación debe quedar con la hora actual en México
-    const localNow = getLocalNow();
+    // 🔥 FIX: FECHA PURA DE LA BASE DE DATOS
+    const dbNow = new Date();
 
-    await item.update({ currentStock: newStock, averageCost: newAvgCost, updatedAt: localNow }, { transaction: t });
+    await item.update({ currentStock: newStock, averageCost: newAvgCost, updatedAt: dbNow }, { transaction: t });
     
     await tx.update({ 
       status: 'CANCELLED', 
-      cancelledAt: localNow, 
+      cancelledAt: dbNow, 
       cancelledBy: req.user?.id || null, 
       cancelReason: reason 
     }, { transaction: t });
@@ -391,10 +394,10 @@ export const restoreTransaction = async (req, res) => {
       if (newStock < 0) throw new Error('No se puede restaurar: El stock actual no soporta esta salida de nuevo.');
     }
 
-    // 🔥 BLINDAJE DE ZONA HORARIA PARA RESTAURAR
-    const localNow = getLocalNow();
+    // 🔥 FIX: FECHA PURA DE LA BASE DE DATOS
+    const dbNow = new Date();
 
-    await item.update({ currentStock: newStock, averageCost: newAvgCost, updatedAt: localNow }, { transaction: t });
+    await item.update({ currentStock: newStock, averageCost: newAvgCost, updatedAt: dbNow }, { transaction: t });
     
     await tx.update({ 
       status: 'ACTIVE', 

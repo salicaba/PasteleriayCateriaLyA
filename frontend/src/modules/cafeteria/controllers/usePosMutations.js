@@ -42,7 +42,7 @@ export const usePosMutations = ({
         id: dbItem.productId, 
         nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
         imagen: dbItem.product?.imageUrl || null, 
-        precio: parseFloat(dbItem.subtotal) / (dbItem.quantity || 1), // 🔥 Prevención NaN
+        precio: parseFloat(dbItem.subtotal) / (dbItem.quantity || 1), 
         qty: dbItem.quantity, 
         preparaciones: parsedPreps, 
         enviadoCocina: true, 
@@ -50,7 +50,7 @@ export const usePosMutations = ({
         status: dbItem.status || 'ACTIVE', 
         cuenta: dbItem.cuenta || 'General', 
         isTakeaway: dbItem.isTakeaway || false, 
-        backendItemId: String(dbItem.id), // 🛡️ Blindado como String
+        backendItemId: String(dbItem.id), 
         requiereCocina: itemsNuevos.find(n => String(n.id) === String(dbItem.productId))?.requiereCocina !== false,
         isAutoPromo: dbItem.isAutoPromo || false,
         promoLabel: dbItem.promoLabel || null,
@@ -58,26 +58,36 @@ export const usePosMutations = ({
       };
   };
 
-  const simulateKitchenSend = async (onComplete = null) => {
+  // 🔥 FIX: preventUnlock evita que se libere el candado si otra función (como Cobrar) lo llamó
+  const simulateKitchenSend = async (preventUnlock = false, onComplete = null) => {
+    // Soporte para mantener compatibilidad si se manda la función como primer argumento
+    if (typeof preventUnlock === 'function') {
+        onComplete = preventUnlock;
+        preventUnlock = false;
+    }
+
     const itemsNuevos = cart.filter(p => !p.enviadoCocina);
     if (itemsNuevos.length === 0) { 
-      if (onComplete) onComplete(); 
-      return; 
+      if (!preventUnlock && onComplete) onComplete(); 
+      return activeOrderId; 
     }
     
-    if (lockRef.current) return;
-    lockRef.current = true;
-    setIsProcessing(true);
-    setIsSuccess(true);
+    if (!preventUnlock) {
+        if (lockRef.current) return activeOrderId;
+        lockRef.current = true;
+        setIsProcessing(true);
+        setIsSuccess(true);
+    }
     
     try {
       let orderId = activeOrderId;
       if (!orderId) {
-        const isLlevarMode = mesaActual?.zona === 'llevar';
+        // 🔥 FIX 500 ERROR: Añadimos 'vitrina' a isLlevarMode para que NUNCA envíe un tableId inválido
+        const isLlevarMode = mesaActual?.zona === 'llevar' || mesaActual?.zona === 'vitrina';
         const res = await client.post('/pos/orders', { 
           orderType: isLlevarMode ? 'LLEVAR' : 'SALON', 
           tableId: isLlevarMode ? null : mesaActual?.id, 
-          ticketId: isLlevarMode ? mesaActual?.numero : null 
+          ticketId: isLlevarMode ? (mesaActual?.numero || 'MOSTRADOR') : null 
         });
         
         orderId = res.data?.order?.id || res.data?.id || res.data?.newOrderId;
@@ -107,6 +117,7 @@ export const usePosMutations = ({
       
       if (response.data.newOrderId && response.data.newOrderId !== orderId) {
           setActiveOrderId(response.data.newOrderId);
+          orderId = response.data.newOrderId; // Actualizamos la referencia local
       }
 
       let allItemsFromDB = response.data.orderItems || response.data.items || response.data.order?.items || response.data.order?.OrderItems || [];
@@ -126,18 +137,66 @@ export const usePosMutations = ({
           ));
       }
       
-      setTimeout(() => { 
-        setIsSuccess(false); 
-        if (onComplete) onComplete(); 
-      }, 1500);
+      if (!preventUnlock) {
+          setTimeout(() => { 
+            setIsSuccess(false); 
+            if (onComplete) onComplete(); 
+          }, 1500);
+      }
+
+      return orderId; // 🔥 Retornamos el orderId fresquito
 
     } catch (error) { 
-        setIsSuccess(false); 
+        if (!preventUnlock) setIsSuccess(false); 
         console.error("Error al enviar a cocina:", error);
         throw error;
     } finally {
-        lockRef.current = false;
-        setIsProcessing(false);
+        if (!preventUnlock) {
+            lockRef.current = false;
+            setIsProcessing(false);
+        }
+    }
+  };
+
+  const handleCheckout = async (paymentDetails, onComplete) => {
+    // 🔥 BLOQUEO MAESTRO: Si ya está procesando, ignora clics dobles
+    if (lockRef.current) return;
+    lockRef.current = true;
+    setIsProcessing(true); // Se muestra el loader instantáneamente
+
+    try {
+      let targetOrderId = activeOrderId;
+
+      if (cart.some(p => !p.enviadoCocina)) {
+        // 🔥 Esperamos SECUENCIALMENTE a que termine, mandando true para que no libere el candado
+        targetOrderId = await simulateKitchenSend(true);
+      }
+      
+      const method = paymentDetails?.method || 'efectivo';
+      
+      // 🔥 Usamos el targetOrderId garantizado, en lugar del activeOrderId de React (que tarda en refrescarse)
+      if (targetOrderId) {
+        await client.put(`/pos/orders/${targetOrderId}/pay`, { isFullPayment: true, paymentMethod: method });
+      }
+      
+      setOrderStatus('PAID');
+      
+      setPaidAccounts(prev => {
+        const todasLasCuentas = Array.from(new Set(cart.map(i => i.cuenta || 'General')));
+        const newArr = Array.from(new Set([...prev, ...todasLasCuentas]));
+        if (targetOrderId) localStorage.setItem(`lya_paid_${targetOrderId}`, JSON.stringify(newArr));
+        return newArr;
+      });
+
+      if (onComplete) onComplete();
+
+    } catch (error) { 
+      if (triggerNotification) triggerNotification(error?.response?.data?.message || "Error al procesar el pago en caja", "error");
+      throw error; 
+    } finally {
+      // 🔥 LA LIBERACIÓN OCURRE SOLO HASTA EL FINAL DE TODO EL FLUJO
+      lockRef.current = false;
+      setIsProcessing(false);
     }
   };
 
@@ -232,7 +291,6 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 EXTRACTOR PLANO: Encuentra todas las filas de la base de datos sin importar cómo se agruparon
   const flattenGroupedItems = (groupedItem) => {
     let leaves = [];
     const traverse = (node) => {
@@ -247,11 +305,8 @@ export const usePosMutations = ({
     return leaves.length > 0 ? leaves : [groupedItem];
   };
 
-  // 🔥 NUEVA LÓGICA DE ENTREGAS PARCIALES Y COMPLETAS (Soporte Total para Promos Multilínea)
   const toggleDeliveredStatus = async (groupedItem, qtyToDeliver = null) => {
     if (!groupedItem) return;
-    
-    // Extraemos TODAS las filas reales de la base de datos que componen la tarjeta
     const itemsToUpdate = flattenGroupedItems(groupedItem);
     if (itemsToUpdate.length === 0) return;
     
@@ -266,7 +321,6 @@ export const usePosMutations = ({
     try {
         const targetQty = qtyToDeliver ? parseInt(qtyToDeliver, 10) : itemsToUpdate.reduce((acc, curr) => acc + curr.qty, 0);
         
-        // 1. ACTUALIZACIÓN VISUAL INSTANTÁNEA
         setCart(prev => { 
             const newCart = [...prev]; 
             let remainingLocal = targetQty;
@@ -289,13 +343,11 @@ export const usePosMutations = ({
             return newCart; 
         });
 
-        // 2. EJECUCIÓN EN BACKEND A TODAS LAS FILAS HERMANAS
         let remainingToDeliver = targetQty;
         const peticiones = [];
 
         for (const subItem of itemsToUpdate) {
             if (remainingToDeliver <= 0) break;
-            
             const qtyFromThisRow = Math.min(subItem.qty, remainingToDeliver);
             
             if (newStatus === 'DELIVERED') {
@@ -303,11 +355,9 @@ export const usePosMutations = ({
             } else {
                 peticiones.push(client.put(`/kitchen/tickets/${subItem.backendItemId}/status`, { status: newStatus }));
             }
-            
             remainingToDeliver -= qtyFromThisRow;
         }
 
-        // Disparamos a todas las filas de la promo al mismo tiempo
         await Promise.all(peticiones);
 
     } catch (e) { 
@@ -339,8 +389,6 @@ export const usePosMutations = ({
             return;
         }
 
-        // 🔥 TAMBIÉN CORREGIMOS EL BOTÓN DE "ENTREGAR TODA LA MESA"
-        // Ahora usa el endpoint inteligente para que ningún producto se quede a la mitad.
         await Promise.all(itemsListos.map(item => 
           client.post(`/pos/orders/items/${item.backendItemId}/split-deliver`, { qtyToDeliver: item.qty })
         ));
@@ -354,7 +402,6 @@ export const usePosMutations = ({
         triggerNotification("Productos entregados a la mesa.", "success");
     } catch (error) { 
       triggerNotification("Hubo un error al entregar los productos.", "error");
-      console.error("Error en deliverAllActiveItems:", error);
       throw error; 
     } finally {
       lockRef.current = false;
@@ -477,48 +524,7 @@ export const usePosMutations = ({
       });
       if (onComplete) onComplete();
     } catch (error) { 
-      // 🔥 AHORA EL ERROR SE MUESTRA EN PANTALLA
       if (triggerNotification) triggerNotification(error?.response?.data?.message || "Error al cobrar la cuenta", "error");
-      throw error; 
-    } finally {
-      lockRef.current = false;
-      setIsProcessing(false);
-    }
-  };
-
-  const handleCheckout = async (paymentDetails, onComplete) => {
-    if (lockRef.current) return;
-    lockRef.current = true;
-    setIsProcessing(true);
-
-    try {
-      if (cart.some(p => !p.enviadoCocina)) {
-        lockRef.current = false; 
-        
-        await new Promise((resolve, reject) => {
-            simulateKitchenSend(resolve).catch(reject);
-        });
-        
-        lockRef.current = true;  
-        setIsProcessing(true);   
-      }
-      
-      const method = paymentDetails?.method || 'efectivo';
-      if(activeOrderId) {
-        await client.put(`/pos/orders/${activeOrderId}/pay`, { isFullPayment: true, paymentMethod: method });
-      }
-      setOrderStatus('PAID');
-      
-      setPaidAccounts(prev => {
-        const todasLasCuentas = Array.from(new Set(cart.map(i => i.cuenta || 'General')));
-        const newArr = Array.from(new Set([...prev, ...todasLasCuentas]));
-        if (activeOrderId) localStorage.setItem(`lya_paid_${activeOrderId}`, JSON.stringify(newArr));
-        return newArr;
-      });
-      if (onComplete) onComplete();
-    } catch (error) { 
-      // 🔥 AHORA EL ERROR SE MUESTRA EN PANTALLA Y DEJA DE CARGAR
-      if (triggerNotification) triggerNotification(error?.response?.data?.message || "Error al procesar el pago en caja", "error");
       throw error; 
     } finally {
       lockRef.current = false;
