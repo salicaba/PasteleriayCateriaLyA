@@ -11,14 +11,14 @@ export const CashRegisterPage = ({ user }) => {
     confirmModal, closeConfirmModal, executeConfirmAction 
   } = useCashController(user);
 
-  const [filterSource, setFilterSource] = useState('ALL');
+  // 🔥 ESTADOS DE FILTRO
+  const [filterSource, setFilterSource] = useState('ALL'); // Rige los botones
+  const [displayFilter, setDisplayFilter] = useState('ALL'); // Rige los datos de la tabla (tras bambalinas)
   const [showModDetails, setShowModDetails] = useState(false);
   
-  // 🔥 NUEVO ESTADO: Buscador y Estado de Filtrado Animado
+  // ESTADOS DE UI
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFiltering, setIsFiltering] = useState(false);
-  
-  // PILAR 3: Estado local para bloqueo asíncrono del modal
+  const [isFiltering, setIsFiltering] = useState(false); // Controla la cortina mágica (Overlay)
   const [isProcessing, setIsProcessing] = useState(false);
 
   const setToday = () => {
@@ -29,18 +29,27 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  // 🔥 FUNCIÓN PARA ANIMAR EL CAMBIO DE FILTROS
+  // 🔥 LA SOLUCIÓN DEFINITIVA: CORTINA DE CARGA (OVERLAY)
   const handleFilterChange = (source) => {
     if (filterSource === source) return;
-    setIsFiltering(true);
-    setFilterSource(source);
     
+    // 1. Activar botón y bajar la cortina de carga al instante
+    setFilterSource(source);
+    setIsFiltering(true);
+    
+    // 2. Darle 150ms a la cortina para que aparezca suavemente
     setTimeout(() => {
-      setIsFiltering(false);
-    }, 350);
+      // 3. Cambiamos los datos de la tabla por debajo (oculto a la vista)
+      setDisplayFilter(source);
+      
+      // 4. Levantamos la cortina 300ms después. ¡Efecto premium y ultra fluido!
+      setTimeout(() => {
+        setIsFiltering(false);
+      }, 300);
+    }, 150);
   };
 
-  // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia (Tarjetas eliminadas)
+  // REGLA ESTRICTA DE NEGOCIO
   const getPaymentInfo = (tx) => {
     const methodStr = String(tx.paymentMethod || '').toUpperCase();
     const isTransfer = methodStr === 'TRANSFER' || tx.description?.toLowerCase().includes('transferencia');
@@ -65,7 +74,6 @@ export const CashRegisterPage = ({ user }) => {
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
 
-  // PILAR 3: Envoltura asíncrona para la confirmación
   const handleConfirmLock = async () => {
     setIsProcessing(true);
     try {
@@ -95,9 +103,10 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
-  // 🔥 LÓGICA DE FILTRADO Y BÚSQUEDA
+  // 🔥 LÓGICA DE FILTRADO
   const filteredTransactions = transactions.filter(tx => {
-    if (filterSource !== 'ALL' && tx.source !== filterSource) return false;
+    // Usamos displayFilter para que los datos esperen a que baje la cortina
+    if (displayFilter !== 'ALL' && tx.source !== displayFilter) return false;
     
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
@@ -291,11 +300,32 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL: Cero parpadeos implementando motion.tbody */}
-      <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4">
-        <div className="overflow-y-auto custom-scrollbar flex-1">
-          <table className="w-full text-left border-collapse relative">
-            <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-10 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
+      {/* TABLA PRINCIPAL: Cero parpadeos implementando Overlay Absoluto */}
+      <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4 min-h-[300px]">
+        
+        {/* 🔥 EL OVERLAY MÁGICO: Se posiciona en el centro absoluto y tapa el recálculo */}
+        <AnimatePresence>
+          {isFiltering && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-[2px]"
+            >
+              <div className="bg-white dark:bg-gray-800 lya:bg-lya-bg px-8 py-5 rounded-[2rem] shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col items-center transform -translate-y-4">
+                <Loader2 size={36} className="animate-spin text-orange-500 mb-3" />
+                <span className="text-[11px] font-black tracking-widest uppercase text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
+                  Filtrando...
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
+          <table className="w-full text-left border-collapse relative min-w-max">
+            <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
               <tr>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Hora</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Origen</th>
@@ -305,56 +335,20 @@ export const CashRegisterPage = ({ user }) => {
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-center lya:text-lya-text/50">Acciones</th>
               </tr>
             </thead>
-            
-            {/* 🔥 EL TRUCO ESTÁ AQUÍ: Animar los TBODY enteros, no las filas sueltas */}
-            <AnimatePresence mode="wait">
-              {isFiltering ? (
-                <motion.tbody 
-                  key="loading-tbody"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
-                >
-                  <tr>
-                    <td colSpan="6" className="text-center py-20">
-                      <div className="flex flex-col items-center justify-center text-orange-500 dark:text-orange-400 lya:text-lya-primary">
-                        <Loader2 size={32} className="animate-spin mb-3" />
-                        <span className="text-xs font-black tracking-widest uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/50">Filtrando movimientos...</span>
-                      </div>
-                    </td>
-                  </tr>
-                </motion.tbody>
-              ) : filteredTransactions.length === 0 && !loading ? (
-                <motion.tbody 
-                  key="empty-tbody"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
-                >
-                  <tr>
-                    <td colSpan="6" className="text-center py-16 text-gray-400 font-medium lya:text-lya-text/50">
-                      {searchTerm !== '' 
-                        ? `No se encontraron resultados para "${searchTerm}"`
-                        : filterSource === 'ALL' 
-                          ? 'No hay movimientos registrados en esta fecha.' 
-                          : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
-                      }
-                    </td>
-                  </tr>
-                </motion.tbody>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
+              {filteredTransactions.length === 0 && !loading ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-20 text-gray-400 font-medium lya:text-lya-text/50">
+                    {searchTerm !== '' 
+                      ? `No se encontraron resultados para "${searchTerm}"`
+                      : displayFilter === 'ALL' 
+                        ? 'No hay movimientos registrados en esta fecha.' 
+                        : `No hay movimientos de ${displayFilter.toLowerCase()} en esta fecha.`
+                    }
+                  </td>
+                </tr>
               ) : (
-                <motion.tbody 
-                  key="data-tbody"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
-                >
+                <AnimatePresence>
                   {filteredTransactions.map((tx, index) => {
                     const isCancelled = tx.status === 'CANCELLED';
                     const creatorName = tx.creator 
@@ -372,7 +366,8 @@ export const CashRegisterPage = ({ user }) => {
                         key={tx.id} 
                         initial={{ opacity: 0, y: 10 }} 
                         animate={{ opacity: 1, y: 0 }} 
-                        transition={{ duration: 0.25, ease: "easeOut", delay: Math.min(index * 0.02, 0.15) }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.15) }}
                         className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
                       >
                         <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
@@ -509,9 +504,9 @@ export const CashRegisterPage = ({ user }) => {
                       </motion.tr>
                     );
                   })}
-                </motion.tbody>
+                </AnimatePresence>
               )}
-            </AnimatePresence>
+            </tbody>
           </table>
         </div>
       </div>
