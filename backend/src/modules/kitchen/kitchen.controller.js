@@ -67,13 +67,12 @@ export const updateKitchenStatus = async (req, res) => {
     const item = await OrderItem.findByPk(itemId);
     if (!item) return res.status(404).json({ message: 'Platillo no encontrado.' });
 
-    // 🔥 BLINDAJE DE ZONA HORARIA
-    // Forzamos el reloj de Chiapas al momento de tocar el estado.
-    // Esto es crucial para medir los "Tiempos de Preparación" de los cocineros.
-    const localNow = getLocalNow();
+    // 🔥 FIX: Guardamos la fecha estándar (UTC) para evitar el Error 500 en producción.
+    // El frontend de cocina se encargará de calcular los tiempos de preparación correctamente.
+    const dbNow = new Date();
 
     item.kitchenStatus = status;
-    item.updatedAt = localNow; // Obliga al KDS a medir el tiempo real
+    item.updatedAt = dbNow; // ✅ Seguro para la Base de Datos
     
     await item.save();
 

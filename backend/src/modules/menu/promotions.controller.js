@@ -48,7 +48,8 @@ export const setupPromotion = async (req, res) => {
       }
     }
 
-    const localNow = getLocalNow();
+    // 🔥 FIX: Guardamos la fecha estándar (UTC) para evitar el Error 500 en producción
+    const dbNow = new Date();
 
     const newPromotion = await Promotion.create({ 
       productId, 
@@ -58,8 +59,8 @@ export const setupPromotion = async (req, res) => {
       buyQty, 
       payQty, 
       discountValue,
-      createdAt: localNow,
-      updatedAt: localNow
+      createdAt: dbNow, // ✅ Seguro para la BD
+      updatedAt: dbNow  // ✅ Seguro para la BD
     });
 
     getIO().emit('menu:promotions_updated', { productId, promotion: newPromotion });
@@ -89,8 +90,8 @@ export const togglePromotionStatus = async (req, res) => {
     }
 
     promotion.isActive = nextStatus;
-    // 🔥 Forzamos la actualización de la hora local
-    promotion.updatedAt = getLocalNow(); 
+    // 🔥 FIX: Fecha estándar UTC
+    promotion.updatedAt = new Date(); 
     await promotion.save();
     
     getIO().emit('menu:promotions_updated', { productId: promotion.productId, promotion });
@@ -121,7 +122,7 @@ export const updatePromotion = async (req, res) => {
 
     await promotion.update({ 
         type, buyQty, payQty, discountValue, validDays, isActive, 
-        updatedAt: getLocalNow() // 🔥 Blindaje local 
+        updatedAt: new Date() // 🔥 FIX: Fecha estándar UTC para evitar Error 500
     });
     
     getIO().emit('menu:promotions_updated', { productId: promotion.productId, promotion });
