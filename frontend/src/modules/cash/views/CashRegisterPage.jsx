@@ -11,14 +11,9 @@ export const CashRegisterPage = ({ user }) => {
     confirmModal, closeConfirmModal, executeConfirmAction 
   } = useCashController(user);
 
-  // 🔥 ESTADOS DE FILTRO
-  const [filterSource, setFilterSource] = useState('ALL'); // Rige los botones
-  const [displayFilter, setDisplayFilter] = useState('ALL'); // Rige los datos de la tabla
+  const [filterSource, setFilterSource] = useState('ALL');
   const [showModDetails, setShowModDetails] = useState(false);
-  
-  // ESTADOS DE UI
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFiltering, setIsFiltering] = useState(false); // Controla la cortina mágica
   const [isProcessing, setIsProcessing] = useState(false);
 
   const setToday = () => {
@@ -29,27 +24,7 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  // 🔥 LA SOLUCIÓN: TIEMPOS PERFECTOS DE SIMULACIÓN
-  const handleFilterChange = (source) => {
-    if (filterSource === source) return;
-    
-    // 1. Cambia el color del botón y baja la cortina de carga
-    setFilterSource(source);
-    setIsFiltering(true);
-    
-    // 2. Esperamos 300ms para que la animación de la cortina baje por completo y tape la tabla
-    setTimeout(() => {
-      // 3. Acomodamos los datos reales (esto toma 1 milisegundo)
-      setDisplayFilter(source);
-      
-      // 4. Dejamos la cortina 400ms extra para que el ojo humano alcance a leer "Filtrando..." y no se vea como un error.
-      setTimeout(() => {
-        setIsFiltering(false); // Subimos la cortina
-      }, 400); 
-    }, 300);
-  };
-
-  // REGLA ESTRICTA DE NEGOCIO
+  // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia
   const getPaymentInfo = (tx) => {
     const methodStr = String(tx.paymentMethod || '').toUpperCase();
     const isTransfer = methodStr === 'TRANSFER' || tx.description?.toLowerCase().includes('transferencia');
@@ -83,7 +58,6 @@ export const CashRegisterPage = ({ user }) => {
     }
   };
 
-  // 🔥 CARGA REAL DE DATOS (Cuando cambias de fecha)
   if (loading) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden">
@@ -104,9 +78,9 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
-  // LÓGICA DE FILTRADO
+  // LÓGICA DE FILTRADO DIRECTA
   const filteredTransactions = transactions.filter(tx => {
-    if (displayFilter !== 'ALL' && tx.source !== displayFilter) return false;
+    if (filterSource !== 'ALL' && tx.source !== filterSource) return false;
     
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
@@ -264,21 +238,21 @@ export const CashRegisterPage = ({ user }) => {
           <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto flex-shrink-0">
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => handleFilterChange('ALL')}
+              onClick={() => setFilterSource('ALL')}
               className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all ${filterSource === 'ALL' ? 'bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm' : 'text-gray-500 md:hover:text-gray-700 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text/80'}`}
             >
               Todos
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => handleFilterChange('CAFETERIA')}
+              onClick={() => setFilterSource('CAFETERIA')}
               className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 shadow-sm lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : 'text-gray-500 md:hover:text-orange-500 lya:text-lya-text/50 lya:md:hover:text-[#9B1C1C]'}`}
             >
               <Coffee size={14} /> Cafetería
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => handleFilterChange('PASTELERIA')}
+              onClick={() => setFilterSource('PASTELERIA')}
               className={`flex-1 sm:flex-none px-5 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${filterSource === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 shadow-sm lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'text-gray-500 md:hover:text-pink-500 lya:text-lya-text/50 lya:md:hover:text-[#9D174D]'}`}
             >
               <Cake size={14} /> Pastelería
@@ -300,29 +274,8 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL Y OVERLAY DE CARGA */}
+      {/* TABLA PRINCIPAL: Animando el bloque TBODY de manera nativa y directa */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4 min-h-[300px]">
-        
-        {/* 🔥 EL OVERLAY MÁGICO CON TIEMPOS AMPLIADOS */}
-        <AnimatePresence>
-          {isFiltering && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-[2px]"
-            >
-              <div className="bg-white dark:bg-gray-800 lya:bg-lya-bg px-8 py-5 rounded-[2rem] shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col items-center transform -translate-y-4">
-                <Loader2 size={36} className="animate-spin text-orange-500 mb-3" />
-                <span className="text-[11px] font-black tracking-widest uppercase text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                  Filtrando...
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
           <table className="w-full text-left border-collapse relative min-w-max">
             <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
@@ -335,21 +288,39 @@ export const CashRegisterPage = ({ user }) => {
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-center lya:text-lya-text/50">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10">
+            
+            {/* 🔥 EL TRUCO ESTÁ AQUÍ: Le damos la llave "key" al TBODY completo */}
+            <AnimatePresence mode="wait">
               {filteredTransactions.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan="6" className="text-center py-20 text-gray-400 font-medium lya:text-lya-text/50">
-                    {searchTerm !== '' 
-                      ? `No se encontraron resultados para "${searchTerm}"`
-                      : displayFilter === 'ALL' 
-                        ? 'No hay movimientos registrados en esta fecha.' 
-                        : `No hay movimientos de ${displayFilter.toLowerCase()} en esta fecha.`
-                    }
-                  </td>
-                </tr>
+                <motion.tbody 
+                  key="empty-state"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
+                >
+                  <tr>
+                    <td colSpan="6" className="text-center py-20 text-gray-400 font-medium lya:text-lya-text/50">
+                      {searchTerm !== '' 
+                        ? `No se encontraron resultados para "${searchTerm}"`
+                        : filterSource === 'ALL' 
+                          ? 'No hay movimientos registrados en esta fecha.' 
+                          : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
+                      }
+                    </td>
+                  </tr>
+                </motion.tbody>
               ) : (
-                <AnimatePresence>
-                  {filteredTransactions.map((tx, index) => {
+                <motion.tbody 
+                  key={filterSource + searchTerm} // 🔥 Esto forza la animación del bloque entero
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
+                >
+                  {filteredTransactions.map((tx) => {
                     const isCancelled = tx.status === 'CANCELLED';
                     const creatorName = tx.creator 
                       ? (tx.creator.fullName?.split(' ')[0] || tx.creator.username) 
@@ -362,12 +333,8 @@ export const CashRegisterPage = ({ user }) => {
                     const absAmount = Math.abs(rawAmount).toFixed(2);
 
                     return (
-                      <motion.tr 
+                      <tr 
                         key={tx.id} 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.15) }}
                         className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
                       >
                         <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
@@ -501,12 +468,12 @@ export const CashRegisterPage = ({ user }) => {
                             </>
                           )}
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })}
-                </AnimatePresence>
+                </motion.tbody>
               )}
-            </tbody>
+            </AnimatePresence>
           </table>
         </div>
       </div>
