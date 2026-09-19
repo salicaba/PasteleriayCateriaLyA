@@ -110,7 +110,7 @@ export const CashRegisterPage = ({ user }) => {
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } } // 🔥 Quitado el spring para evitar parpadeos
   };
 
   // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
@@ -342,11 +342,11 @@ export const CashRegisterPage = ({ user }) => {
                   return (
                     <motion.tr 
                       key={tx.id} 
-                      layout
+                      layout="position" // 🔥 Estabiliza el parpadeo en las listas
                       initial={{ opacity: 0, y: 15 }} 
                       animate={{ opacity: 1, y: 0 }} 
                       exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 26, delay: Math.min(index * 0.02, 0.2) }}
+                      transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.2) }} // 🔥 Animación lineal sin resorte
                       className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
                     >
                       <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
@@ -504,7 +504,7 @@ export const CashRegisterPage = ({ user }) => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 Quita el resorte agresivo para evitar el "temblor"
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center"
             >
               <div className={`mx-auto w-20 h-20 flex items-center justify-center rounded-full mb-5 ${
