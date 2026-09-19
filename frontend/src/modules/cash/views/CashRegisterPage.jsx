@@ -13,12 +13,12 @@ export const CashRegisterPage = ({ user }) => {
 
   // 🔥 ESTADOS DE FILTRO
   const [filterSource, setFilterSource] = useState('ALL'); // Rige los botones
-  const [displayFilter, setDisplayFilter] = useState('ALL'); // Rige los datos de la tabla (tras bambalinas)
+  const [displayFilter, setDisplayFilter] = useState('ALL'); // Rige los datos de la tabla
   const [showModDetails, setShowModDetails] = useState(false);
   
   // ESTADOS DE UI
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFiltering, setIsFiltering] = useState(false); // Controla la cortina mágica (Overlay)
+  const [isFiltering, setIsFiltering] = useState(false); // Controla la cortina mágica
   const [isProcessing, setIsProcessing] = useState(false);
 
   const setToday = () => {
@@ -29,24 +29,24 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  // 🔥 LA SOLUCIÓN DEFINITIVA: CORTINA DE CARGA (OVERLAY)
+  // 🔥 LA SOLUCIÓN: TIEMPOS PERFECTOS DE SIMULACIÓN
   const handleFilterChange = (source) => {
     if (filterSource === source) return;
     
-    // 1. Activar botón y bajar la cortina de carga al instante
+    // 1. Cambia el color del botón y baja la cortina de carga
     setFilterSource(source);
     setIsFiltering(true);
     
-    // 2. Darle 150ms a la cortina para que aparezca suavemente
+    // 2. Esperamos 300ms para que la animación de la cortina baje por completo y tape la tabla
     setTimeout(() => {
-      // 3. Cambiamos los datos de la tabla por debajo (oculto a la vista)
+      // 3. Acomodamos los datos reales (esto toma 1 milisegundo)
       setDisplayFilter(source);
       
-      // 4. Levantamos la cortina 300ms después. ¡Efecto premium y ultra fluido!
+      // 4. Dejamos la cortina 400ms extra para que el ojo humano alcance a leer "Filtrando..." y no se vea como un error.
       setTimeout(() => {
-        setIsFiltering(false);
-      }, 300);
-    }, 150);
+        setIsFiltering(false); // Subimos la cortina
+      }, 400); 
+    }, 300);
   };
 
   // REGLA ESTRICTA DE NEGOCIO
@@ -83,6 +83,7 @@ export const CashRegisterPage = ({ user }) => {
     }
   };
 
+  // 🔥 CARGA REAL DE DATOS (Cuando cambias de fecha)
   if (loading) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden">
@@ -103,9 +104,8 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
-  // 🔥 LÓGICA DE FILTRADO
+  // LÓGICA DE FILTRADO
   const filteredTransactions = transactions.filter(tx => {
-    // Usamos displayFilter para que los datos esperen a que baje la cortina
     if (displayFilter !== 'ALL' && tx.source !== displayFilter) return false;
     
     if (searchTerm.trim() !== '') {
@@ -300,10 +300,10 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL: Cero parpadeos implementando Overlay Absoluto */}
+      {/* TABLA PRINCIPAL Y OVERLAY DE CARGA */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4 min-h-[300px]">
         
-        {/* 🔥 EL OVERLAY MÁGICO: Se posiciona en el centro absoluto y tapa el recálculo */}
+        {/* 🔥 EL OVERLAY MÁGICO CON TIEMPOS AMPLIADOS */}
         <AnimatePresence>
           {isFiltering && (
             <motion.div
