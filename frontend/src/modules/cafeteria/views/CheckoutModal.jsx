@@ -16,7 +16,6 @@ const parseAccountName = (str) => {
   return s;
 };
 
-// 🔥 FIX: Adiós al resorte (spring), usamos transiciones suaves y predecibles
 const modalVariants = {
   hidden: { scale: 0.95, opacity: 0, y: 15 },
   visible: { scale: 1, opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } },
@@ -55,6 +54,7 @@ export const CheckoutModal = ({
 
   const isTableFullyDelivered = validateAllDelivered ? validateAllDelivered() : true;
 
+  // 🔥 FIX 1: Este efecto SOLO limpia el modal cuando pasa de Cerrado a Abierto.
   useEffect(() => {
     if (isOpen) {
       setMethod('efectivo');
@@ -63,9 +63,14 @@ export const CheckoutModal = ({
       setSplitCount(1);
       setTransferInfo(null);
       setIsProcessing(false); 
-      lockRef.current = false; // Reiniciamos el candado al abrir
+      lockRef.current = false; 
       setToast({ show: false, message: '', type: 'error' }); 
+    }
+  }, [isOpen]);
 
+  // 🔥 FIX 2: Este efecto configura las pestañas, pero NO INTERRUMPE si ya se está procesando un pago.
+  useEffect(() => {
+    if (isOpen && !isProcessing && !lockRef.current) {
       if (orderType === 'salon' && !isTableFullyDelivered) {
         setCobroMode('nominal');
         const isInitialDelivered = initialTarget?.cuentaName && validateAllDelivered ? validateAllDelivered(initialTarget.cuentaName) : true;
@@ -147,8 +152,6 @@ export const CheckoutModal = ({
               });
           }
       } else if (cobroMode === 'full' && orderType === 'salon') {
-          // 🔥 FIX DEFINITIVO: Eliminamos el bucle "silent_partial" que duplicaba los pagos.
-          // Solo enviamos una petición limpia para pagar la mesa completa.
           await onConfirmPayment({ 
             method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
             change, amountPaid: amountToPay, targetType: 'full', cuentaName: null, isLastInBatch: true
@@ -192,7 +195,7 @@ export const CheckoutModal = ({
               initial={{ opacity: 0, y: -40, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.95, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Notificación suave
+              transition={{ duration: 0.2, ease: "easeOut" }} 
               className="bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-red-200 dark:border-red-900/30 lya:border-red-500/30 pointer-events-auto"
             >
               <div className="bg-red-100 dark:bg-red-500/20 lya:bg-red-500/20 p-1.5 rounded-full shrink-0">
