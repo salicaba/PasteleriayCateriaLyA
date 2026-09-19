@@ -130,6 +130,7 @@ export const TicketCartGroup = ({
       }
   });
 
+  // 🔥 ORDEN COMBO BLINDADO: Prioridad -> Alfabético -> Ancla por ID
   const sortedDisplayItems = [...displayItems].sort((a, b) => {
     const getPriority = (item) => {
       const status = (item.kitchenStatus || '').toUpperCase();
@@ -158,9 +159,8 @@ export const TicketCartGroup = ({
 
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
   const isOcultarProcessing = actionLocks[`${cuentaName}-ocultar`];
-  const isOcultarPagadaProcessing = actionLocks[`${cuentaName}-ocultar-pagada`];
-  const isPrintProcessing = actionLocks[`${cuentaName}-print`];
 
+  // 🔥 CREACIÓN DE FLAG SEGURO PARA ELIMINACIÓN DE PROMOS
   const createBreakFlag = (item, qty) => {
       return {
           ...item,
@@ -171,11 +171,11 @@ export const TicketCartGroup = ({
 
   return (
     <motion.div 
-      layout="position"
+      layout="position" // 🔥 FIX: Estabiliza el contenedor general
       initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
+      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Elimina el resorte
       onDragOver={(e) => { 
         e.preventDefault(); 
         if (draggedItem && draggedItem.cuentaName !== cuentaName && !isCuentaPagada && !isLlevar && !isVitrina) setDragOverCuenta(cuentaName);
@@ -186,7 +186,7 @@ export const TicketCartGroup = ({
         handleDropOnCuenta(cuentaName);
       }}
       className={clsx(
-        "rounded-[2rem] transition-all duration-300 overflow-hidden shadow-sm transform-gpu antialiased",
+        "rounded-[1.5rem] transition-all duration-300 overflow-hidden shadow-sm",
         isCuentaPagada ? "border border-emerald-500/50 bg-emerald-50/30 dark:bg-emerald-900/10 lya:bg-lya-primary/5 opacity-80"
         : isDragTarget ? "border border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 lya:border-lya-secondary lya:bg-lya-secondary/10 shadow-inner scale-[1.02]" 
         : isActive ? "border-2 border-transparent bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-md" 
@@ -251,8 +251,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={!isOcultarProcessing ? { scale: 0.95 } : {}}
                   disabled={isOcultarProcessing}
-                  // 🔥 FIX ASYNC: Añadimos async/await
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar`, async () => await setCuentasOcultas(prev => [...prev, cuentaName]))} 
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar`, () => setCuentasOcultas(prev => [...prev, cuentaName]))} 
                   className={clsx(
                     "text-[9px] font-black bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border border-transparent dark:border-gray-700 lya:border-lya-border/40 text-gray-500 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation",
                     !isOcultarProcessing && "md:hover:border-red-200 dark:md:hover:border-red-900 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 lya:md:hover:bg-red-500/10 md:hover:text-red-500",
@@ -267,8 +266,7 @@ export const TicketCartGroup = ({
               <motion.button 
                   whileTap={isTodoEntregadoEnCuenta && !isCobrarProcessing ? { scale: 0.95 } : {}}
                   disabled={!isTodoEntregadoEnCuenta || isCobrarProcessing} 
-                  // 🔥 FIX ASYNC: Añadimos async/await
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-cobrar`, async () => await onPayCuenta(cuentaName))} 
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-cobrar`, () => onPayCuenta(cuentaName))} 
                   className={clsx(
                       "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border outline-none touch-manipulation flex items-center gap-1", 
                       isCobrarProcessing ? "bg-gray-300 dark:bg-gray-700 text-gray-500 border-transparent opacity-70 cursor-wait" :
@@ -283,34 +281,26 @@ export const TicketCartGroup = ({
             
             {!isVitrina && !isLlevar && (isCuentaPagada || isCompletamentePagada) && displayItems.length > 0 && (
               <motion.button 
-                  whileTap={!isPrintProcessing ? { scale: 0.95 } : {}}
-                  disabled={isPrintProcessing}
-                  // 🔥 FIX ASYNC: Añadimos async/await
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-print`, async () => await onPrintTicket(cuentaName))} 
-                  className={clsx(
-                    "text-[9px] font-black border px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation",
-                    !isPrintProcessing && "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 border-gray-200 dark:border-gray-700",
-                    isPrintProcessing && "bg-gray-200 dark:bg-gray-700 text-gray-400 border-transparent opacity-70 cursor-wait"
-                  )}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-print`, () => onPrintTicket(cuentaName))} 
+                  className="text-[9px] font-black bg-gray-100 dark:bg-gray-800 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation"
               >
-                {isPrintProcessing ? <Loader2 size={10} className="animate-spin" /> : <Printer size={10}/>}
-                <span>{isPrintProcessing ? '...' : 'Ticket'}</span>
+                <Printer size={10}/> Ticket
               </motion.button>
             )}
 
             {!isVitrina && !isLlevar && isCuentaPagada && displayItems.length > 0 && (
               <motion.button 
-                  whileTap={!isOcultarPagadaProcessing ? { scale: 0.95 } : {}}
-                  disabled={isOcultarPagadaProcessing}
-                  // 🔥 FIX ASYNC: Añadimos async/await
-                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar-pagada`, async () => await setCuentasOcultas(prev => [...prev, cuentaName]))} 
+                  whileTap={!isOcultarProcessing ? { scale: 0.95 } : {}}
+                  disabled={isOcultarProcessing}
+                  onClick={(e) => executeWithLock(e, `${cuentaName}-ocultar-pagada`, () => setCuentasOcultas(prev => [...prev, cuentaName]))} 
                   className={clsx(
-                    "text-[9px] font-black border px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation",
-                    !isOcultarPagadaProcessing && "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40",
-                    isOcultarPagadaProcessing && "bg-gray-100 dark:bg-gray-800 text-red-400 opacity-70 cursor-wait border-transparent"
+                    "text-[9px] font-black bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 px-2 py-1 rounded-lg uppercase flex gap-1 items-center transition-colors shadow-sm outline-none touch-manipulation",
+                    !isOcultarProcessing && "text-red-600 dark:text-red-400 md:hover:bg-red-100 dark:md:hover:bg-red-900/40",
+                    isOcultarProcessing && "text-red-400 opacity-70 cursor-wait"
                   )}
               >
-                {isOcultarPagadaProcessing ? <Loader2 size={10} className="animate-spin" /> : <XCircle size={10}/>} Ocultar
+                {isOcultarProcessing ? <Loader2 size={10} className="animate-spin" /> : <XCircle size={10}/>} Ocultar
               </motion.button>
             )}
           </div>
@@ -324,6 +314,7 @@ export const TicketCartGroup = ({
           const isGhostPromo = item.isAutoPromo && isCero;
           
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
+          // 🔥 LÓGICA DE BLOQUEO: Solo bloqueamos fantasmas (GRATIS) o Nth (Rebajado). Las OFERTAS directas mantienen sus botones +/-
           const isLockedPromo = isGhostPromo || isNthPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
@@ -366,7 +357,7 @@ export const TicketCartGroup = ({
           const isLocalProcessingToggle = actionLocks[lockKeyToggle] || isProcessingParent;
           const isTakeawayLocal = actionLocks[lockKeyTakeaway];
 
-          let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border transform-gpu antialiased ";
+          let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
           
           if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
               containerClasses += "cursor-grab active:cursor-grabbing ";
@@ -398,8 +389,8 @@ export const TicketCartGroup = ({
           return (
           <motion.div 
             key={currentItemKey} 
-            layout="position"
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            layout="position" // 🔥 FIX: Estabiliza los elementos individuales en la lista
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición directa
             draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo}
             onDragStart={(e) => { 
                 if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo) return; 
@@ -418,7 +409,7 @@ export const TicketCartGroup = ({
 
             <div className="flex gap-3">
               <div className={clsx(
-                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative md:group-hover:shadow-inner shadow-sm transition-shadow",
+                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
                 isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
               )}>
                 {item.imagen || item.image ? (
@@ -428,7 +419,7 @@ export const TicketCartGroup = ({
                 )}
                 
                 {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo && (
-                    <div className="absolute inset-0 bg-black/30 opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
                         <GripVertical size={16} className="text-white drop-shadow-md" />
                     </div>
                 )}
@@ -498,7 +489,6 @@ export const TicketCartGroup = ({
                     {item.enviadoCocina ? (
                       <motion.button 
                         whileTap={!isLocalProcessingToggle && !isStatusLocked && (item.kitchenStatus === 'READY' || item.kitchenStatus === 'DELIVERED') ? { scale: 0.95 } : {}}
-                        // 🔥 FIX ASYNC: Agregado async/await
                         onClick={(e) => executeWithLock(e, lockKeyToggle, async () => {
                             if (item.kitchenStatus === 'READY' && item.qty > 1) {
                                 openConfirmModal({
@@ -553,8 +543,7 @@ export const TicketCartGroup = ({
                           <motion.button 
                               whileTap={!isTakeawayLocal ? { scale: 0.95 } : {}}
                               disabled={isTakeawayLocal}
-                              // 🔥 FIX ASYNC: Agregado async/await
-                              onClick={(e) => executeWithLock(e, lockKeyTakeaway, async () => await toggleItemTakeaway(item))} 
+                              onClick={(e) => executeWithLock(e, lockKeyTakeaway, () => toggleItemTakeaway(item))} 
                               className={clsx(
                                   "flex items-center justify-center gap-1.5 text-[9px] font-black px-2 py-2 rounded-xl border uppercase tracking-tighter transition-colors cursor-pointer flex-1 text-center shadow-sm outline-none touch-manipulation", 
                                   isTakeawayLocal ? "bg-gray-100 text-gray-400 border-transparent opacity-70 cursor-wait" :
@@ -579,11 +568,10 @@ export const TicketCartGroup = ({
                                 <motion.button 
                                     whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
                                     disabled={isRemovingLocal}
-                                    // 🔥 FIX ASYNC: Agregado async/await
-                                    onClick={(e) => executeWithLock(e, lockKeyRemove, async () => await handleRemoveUnsent(item))} 
+                                    onClick={(e) => executeWithLock(e, lockKeyRemove, () => handleRemoveUnsent(item))} 
                                     className={clsx(
                                         "rounded-lg transition-colors outline-none", 
-                                        isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "text-gray-400 md:hover:bg-gray-100 dark:md:hover:bg-gray-800 md:hover:text-red-500",
+                                        isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
                                         isVitrina ? "flex-1 py-2 flex justify-center" : "p-1.5"
                                     )}
                                 >
@@ -593,13 +581,12 @@ export const TicketCartGroup = ({
                                 <motion.button 
                                   whileTap={!isLimitReached && !isAddingLocal ? { scale: 0.9 } : {}}
                                   disabled={isAddingLocal}
-                                  // 🔥 FIX ASYNC: Agregado async/await
-                                  onClick={(e) => executeWithLock(e, lockKeyAdd, async () => {
+                                  onClick={(e) => executeWithLock(e, lockKeyAdd, () => {
                                     if (isLimitReached) {
                                       if (showToast) showToast(`Límite en carrito: Solo quedan ${item.stock} en stock.`, 'warning');
                                       return; 
                                     }
-                                    await onAdd(item, cuentaName);
+                                    onAdd(item, cuentaName);
                                   })} 
                                   className={clsx(
                                     "rounded-lg transition-colors flex items-center justify-center outline-none", 
@@ -621,8 +608,7 @@ export const TicketCartGroup = ({
                         <motion.button 
                             whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                             disabled={isDeletingLocal}
-                            // 🔥 FIX ASYNC: Agregado async/await para el botón de la imagen adjunta
-                            onClick={(e) => executeWithLock(e, lockKeyDelete, async () => {
+                            onClick={(e) => executeWithLock(e, lockKeyDelete, () => {
                                 if (isLockedPromo) {
                                     if (item.qty > 1) {
                                         openConfirmModal({
@@ -635,9 +621,9 @@ export const TicketCartGroup = ({
                                             inputType: 'number',
                                             inputMax: item.qty,
                                             inputDefault: item.qty.toString(),
-                                            onConfirm: async (val) => {
+                                            onConfirm: (val) => {
                                                 const qty = parseInt(val, 10);
-                                                if (qty > 0) await handleDeleteUnsent(createBreakFlag(item, qty));
+                                                if (qty > 0) handleDeleteUnsent(createBreakFlag(item, qty));
                                             }
                                         });
                                     } else {
@@ -647,25 +633,34 @@ export const TicketCartGroup = ({
                                             icon: AlertTriangle,
                                             color: 'red',
                                             confirmText: 'Confirmar',
-                                            onConfirm: async () => await handleDeleteUnsent(createBreakFlag(item, 1))
+                                            onConfirm: () => handleDeleteUnsent(createBreakFlag(item, 1))
                                         });
                                     }
                                 } else {
-                                    await handleDeleteUnsent(item);
+                                    handleDeleteUnsent(item);
                                 }
                             })} 
                             className={clsx(
-                                "rounded-lg transition-colors outline-none flex items-center justify-center", 
-                                isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "text-gray-400 md:hover:bg-red-50 dark:md:hover:bg-red-900/20 md:hover:text-red-500",
+                                "rounded-lg transition-colors outline-none", 
+                                isDeletingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-red-50 dark:md:hover:bg-red-900/20 text-gray-400 md:hover:text-red-500",
                                 (isVitrina || isLockedPromo) ? "flex-1 py-2 flex justify-center text-red-500 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/50" : "p-1.5"
                             )}
                         >
+                            {/* 🔥 FIX: Se mantiene la estructura del texto para evitar que el botón brinque de tamaño */}
                             {isDeletingLocal ? (
-                              <Loader2 size={16} className="animate-spin text-red-500" />
+                                isLockedPromo ? (
+                                    <div className="flex items-center gap-2 font-black tracking-wide">
+                                        <Loader2 size={16} className="animate-spin" /> PROCESANDO
+                                    </div>
+                                ) : (
+                                    <Loader2 size={16} className="animate-spin" />
+                                )
                             ) : isLockedPromo ? (
-                              <div className="flex items-center gap-2 font-black tracking-wide"><Trash2 size={16} /> ELIMINAR PROMO</div>
+                                <div className="flex items-center gap-2 font-black tracking-wide">
+                                    <Trash2 size={16} /> ELIMINAR PROMO
+                                </div>
                             ) : (
-                              <Trash2 size={16} />
+                                <Trash2 size={16} />
                             )}
                         </motion.button>
                   </div>
@@ -675,8 +670,7 @@ export const TicketCartGroup = ({
                     <motion.button 
                         whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
                         disabled={isCancelingLocal}
-                        // 🔥 FIX ASYNC: Agregado async/await
-                        onClick={(e) => executeWithLock(e, lockKeyCancel, async () => await handleCancelItem(item))} 
+                        onClick={(e) => executeWithLock(e, lockKeyCancel, () => handleCancelItem(item))} 
                         className={clsx(
                             "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
                             isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 

@@ -22,12 +22,18 @@ export const ConfirmActionModal = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave para el fondo oscuro
+        className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors"
+      >
         <motion.div 
           initial={{ scale: 0.95, y: 20, opacity: 0 }} 
           animate={{ scale: 1, y: 0, opacity: 1 }} 
           exit={{ scale: 0.95, y: 20, opacity: 0 }} 
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
           className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
         >
           <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center mb-4 shadow-sm", modalColors[modalConfig.color].bg)}>
@@ -85,7 +91,7 @@ export const ConfirmActionModal = ({
             </button>
           </div>
         </motion.div>
-      </div>
+      </motion.div>
     </AnimatePresence>
   );
 };

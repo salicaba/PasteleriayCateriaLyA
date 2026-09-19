@@ -59,7 +59,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave del fondo
+            transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Transición suave para el fondo
             onClick={() => !isLoadingEdit && onClose()} 
             className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70]" 
           />
@@ -68,8 +68,8 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
             initial={{ x: '100%' }} 
             animate={{ x: 0 }} 
             exit={{ x: '100%' }} 
-            transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Deslizamiento lineal sin resorte
-            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10"
+            transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
+            className="fixed right-0 top-0 h-screen w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-[80] overflow-hidden flex flex-col rounded-l-[2rem] border-l border-white/10 transform-gpu"
           >
             <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
               <div className="flex items-center gap-4">
@@ -119,7 +119,7 @@ export default function DetallePedidoModal({ isOpen, onClose, pedido, onEdit, ca
                           initial={{ opacity: 0, scale: 0.98 }} 
                           animate={{ opacity: 1, scale: 1 }} 
                           exit={{ opacity: 0, scale: 1.02 }}
-                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición de imágenes suave
+                          transition={{ duration: 0.2 }}
                           src={pedido.imagenesReferencia[activePhotoIdx]} 
                           alt={`Referencia ${activePhotoIdx + 1}`} 
                           className="w-full h-full object-contain drop-shadow-lg rounded-xl" 
