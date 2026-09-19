@@ -325,7 +325,8 @@ export const CashRegisterPage = ({ user }) => {
                 </motion.tr>
               )}
 
-              <AnimatePresence mode="popLayout">
+              {/* 🔥 Le quitamos el mode="popLayout" porque rompe las tablas HTML */}
+              <AnimatePresence>
                 {filteredTransactions.map((tx, index) => {
                   const isCancelled = tx.status === 'CANCELLED';
                   const creatorName = tx.creator 
@@ -334,7 +335,6 @@ export const CashRegisterPage = ({ user }) => {
                   
                   const payInfo = getPaymentInfo(tx);
 
-                  // 🔥 NUEVA LÓGICA DE MONTO INTELIGENTE (Ingresos vs Egresos)
                   const rawAmount = parseFloat(tx.amount) || 0;
                   const isNegative = rawAmount < 0;
                   const absAmount = Math.abs(rawAmount).toFixed(2);
@@ -342,11 +342,11 @@ export const CashRegisterPage = ({ user }) => {
                   return (
                     <motion.tr 
                       key={tx.id} 
-                      layout="position" // 🔥 Estabiliza el parpadeo en las listas
-                      initial={{ opacity: 0, y: 15 }} 
+                      // 🔥 Quitamos layout="position" en tablas para evitar recálculos raros
+                      initial={{ opacity: 0, y: 10 }} 
                       animate={{ opacity: 1, y: 0 }} 
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.2) }} // 🔥 Animación lineal sin resorte
+                      exit={{ opacity: 0 }} // 🔥 Salida ultra limpia, sin escalar, para no deformar la tabla
+                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 Quitamos el delay para que el filtro sea responsivo e instantáneo
                       className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
                     >
                       <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
