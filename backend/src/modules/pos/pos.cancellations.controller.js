@@ -39,7 +39,7 @@ const getOrigenProducto = (departamento) => {
 // =====================================================================
 // 🔥 FUNCIÓN MAESTRA: MODIFICAR TRANSACCIÓN (Precisión Láser Corregida)
 // =====================================================================
-const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, localNow, sourceToMatch = null) => {
+const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, baseDateForDb, sourceToMatch = null) => {
   let whereClause = { referenceId: orderId, type: 'INCOME' };
   
   // 1. Buscamos todas las transacciones de ingresos de esta orden (tanto anuladas como activas)
@@ -98,7 +98,7 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 
       if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
           newStatus = 'CANCELLED';
-          cancelledAt = localNow; 
+          cancelledAt = baseDateForDb; // 🔥 Recibe la fecha pura de la BD
           cancelledBy = userId;
       } else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
           newStatus = 'ACTIVE';
@@ -146,15 +146,15 @@ export const cancelOrderItem = async (req, res) => {
 
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
-    // 🔥 FECHA LOCAL (CHIAPAS)
-    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    // 🔥 FIX: Fecha pura (UTC) para que no truene la BD al guardar en "cancelledAt"
+    const dbNow = new Date();
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
       // 🔥 Usamos el nuevo helper blindado
       const origen = getOrigenProducto(item.product?.departamento);
       
-      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta, localNow, origen);
+      await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta, dbNow, origen);
     }
 
     let notesArray = [];
@@ -175,7 +175,7 @@ export const cancelOrderItem = async (req, res) => {
             notes: JSON.stringify(cancelledNotes),
             kitchenStatus: item.kitchenStatus,
             status: 'CANCELLED',
-            cancelledAt: localNow,
+            cancelledAt: dbNow, // 🔥 Fecha limpia
             cancelReason: cancelReason || `Cancelación parcial desde POS`,
             cancelledBy: userId
         });
@@ -188,7 +188,7 @@ export const cancelOrderItem = async (req, res) => {
     } else {
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: localNow,
+          cancelledAt: dbNow, // 🔥 Fecha limpia
           cancelReason: cancelReason || `Cancelado desde POS`,
           cancelledBy: userId
         });
@@ -217,7 +217,7 @@ export const cancelOrderItem = async (req, res) => {
       await order.update({ 
         status: 'CANCELLED', 
         totalAmount: 0, 
-        cancelledAt: localNow,
+        cancelledAt: dbNow, // 🔥 Fecha limpia
         cancelReason: motivoMecanismoSeguridad, 
         cancelledBy: userId 
       });
@@ -287,7 +287,8 @@ export const cancelOrder = async (req, res) => {
     const motivoFinal = cancelReason ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` : `Cancelación de ${textoPapelera}`;
 
     let totalRefundByAccount = {};
-    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    // 🔥 FIX: Fecha pura para la Base de Datos
+    const dbNow = new Date();
 
     for (const item of order.items) {
       if (item.status === 'ACTIVE') {
@@ -301,7 +302,7 @@ export const cancelOrder = async (req, res) => {
 
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: localNow,
+          cancelledAt: dbNow, // 🔥 Fecha limpia
           cancelReason: motivoFinal, 
           cancelledBy: userId
         });
@@ -313,14 +314,14 @@ export const cancelOrder = async (req, res) => {
     for (const [key, amount] of Object.entries(totalRefundByAccount)) {
        if (amount > 0) {
           const [cuentaName, origen] = key.split('||');
-          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName, localNow, origen);
+          await modificarTransaccionOriginal(order.id, amount, 'restar', `Cancelación Mesa`, userId, cuentaName, dbNow, origen);
        }
     }
 
     await order.update({
       status: 'CANCELLED',
       totalAmount: 0,
-      cancelledAt: localNow,
+      cancelledAt: dbNow, // 🔥 Fecha limpia
       cancelReason: motivoFinal, 
       cancelledBy: userId
     });
@@ -438,13 +439,14 @@ export const restoreOrderItem = async (req, res) => {
       cancelledBy: null
     });
 
-    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    // 🔥 FIX: Fecha pura para usar en Base de Datos
+    const dbNow = new Date();
 
     if (wasPaid && amountToRestore > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
       const origen = getOrigenProducto(item.product?.departamento);
 
-      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta, localNow, origen);
+      await modificarTransaccionOriginal(order.id, amountToRestore, 'sumar', `${item.quantity}x ${nombreProducto}`, userId, item.cuenta, dbNow, origen);
     }
 
     const newTotal = await OrderItem.sum('subtotal', { where: { orderId: id, status: 'ACTIVE' } }) || 0;
@@ -545,12 +547,13 @@ export const restoreOrder = async (req, res) => {
 
     getIO().emit('orderRestored', { orderId: id, tableId: order.tableId });
 
-    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    // 🔥 FIX: Fecha pura para la BD
+    const dbNow = new Date();
 
     for (const [key, amount] of Object.entries(totalRestoredByAccount)) {
         if (amount > 0) {
            const [cuentaName, origen] = key.split('||');
-           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName, localNow, origen);
+           await modificarTransaccionOriginal(order.id, amount, 'sumar', `Orden Restaurada`, userId, cuentaName, dbNow, origen);
         }
     }
 
