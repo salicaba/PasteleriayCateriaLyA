@@ -70,7 +70,8 @@ export const registerManualTransaction = async (req, res) => {
 
     // 🔥 BLINDAJE ZONA HORARIA
     const realExecutionDate = getLocalNow(); 
-    let accountingDate = realExecutionDate; 
+    // 🔥 FIX: Aquí usamos new Date() estándar para que la base de datos lo acepte si es un gasto normal de hoy
+    let accountingDate = new Date(); 
     let isRetroactive = false;
 
     const localYear = realExecutionDate.getFullYear();
@@ -97,7 +98,7 @@ export const registerManualTransaction = async (req, res) => {
       expenseCategory: expenseCategory || 'OTHER',
       amount,
       description: finalDescription, 
-      createdAt: accountingDate,     // 🔥 Fecha Contable Local
+      createdAt: accountingDate,     // 🔥 Se envía limpio (ya sea el UTC exacto o el formateado válido de arriba)
       createdBy: req.user.id
     });
 
@@ -144,8 +145,8 @@ export const cancelTransaction = async (req, res) => {
 
     tx.status = 'CANCELLED';
     tx.cancelledBy = req.user.id;
-    // 🔥 FECHA LOCAL DE CHIAPAS PARA LA CANCELACIÓN
-    tx.cancelledAt = getLocalNow();
+    // 🔥 FIX: Enviamos new Date() puro a la base de datos para evitar el error 500 al cancelar
+    tx.cancelledAt = new Date();
     
     if (reason && reason.trim() !== '') {
       tx.description = `${tx.description} (Motivo Anulación: ${reason})`;

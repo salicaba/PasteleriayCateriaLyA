@@ -77,7 +77,9 @@ export const createOrder = async (req, res) => {
     }
 
     // 🔥 FECHA LOCAL DE CHIAPAS
-    const localNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    // FIX: Se usa la fecha estándar (UTC) para que la base de datos no arroje Error 500. 
+    // El frontend se encargará de mostrarla en la zona horaria correcta.
+    const localNow = new Date();
 
     const newOrder = await Order.create({ 
       orderType: finalOrderType, 
