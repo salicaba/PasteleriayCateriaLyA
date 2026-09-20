@@ -469,13 +469,14 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                          {/* 🔥 FIX: El ícono está afuera del input, así que no hay problema de solapamiento */}
                                          <span className="text-xs font-black text-orange-600 dark:text-orange-400 lya:text-lya-primary opacity-70">+$</span>
                                          <input 
-                                           type="number" min="0" step="1" placeholder="0.00"
-                                           disabled={isSubmitting}
-                                           value={selectedOpt.precioAdicional}
-                                           onChange={handlePriceChange}
-                                           className="w-20 p-1.5 text-xs sm:text-sm bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 rounded-lg outline-none text-right font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text focus:border-orange-400 lya:focus:border-lya-primary transition-colors shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
-                                           onClick={(e) => e.stopPropagation()} 
-                                         />
+                                            type="number" min="0" step="1" placeholder="0.00"
+                                            disabled={isSubmitting}
+                                            // 🔥 FIX: Si el valor es 0, lo pasamos como vacío para que actúe el placeholder "0.00"
+                                            value={selectedOpt.precioAdicional === 0 ? '' : selectedOpt.precioAdicional} 
+                                            onChange={handlePriceChange}
+                                            className="w-20 p-1.5 text-xs sm:text-sm bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 rounded-lg outline-none text-right font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text focus:border-orange-400 lya:focus:border-lya-primary transition-colors shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
+                                            onClick={(e) => e.stopPropagation()} 
+                                          />
                                        </div>
                                      </div>
                                    ) : (
