@@ -348,14 +348,18 @@ export const cancelOrder = async (req, res) => {
 // ==========================================
 export const getDailySummary = async (req, res) => {
   try {
+    // 🔥 BLINDAJE DE ZONA HORARIA: Evita que el servidor UTC revuelva los días
     const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const localNow = new Date(nowLocalStr);
 
-    const startOfDay = new Date(localNow);
-    startOfDay.setHours(0, 0, 0, 0);
+    const year = localNow.getFullYear();
+    const month = String(localNow.getMonth() + 1).padStart(2, '0');
+    const day = String(localNow.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
 
-    const endOfDay = new Date(localNow);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Forzamos el límite a las 00:00 y 23:59:59 con el offset de Chiapas (-06:00)
+    const startOfDay = new Date(`${todayStr}T00:00:00.000-06:00`);
+    const endOfDay = new Date(`${todayStr}T23:59:59.999-06:00`);
 
     const dateFilter = { [Op.between]: [startOfDay, endOfDay] };
 
