@@ -392,7 +392,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                 <p className="text-gray-500 lya:text-lya-text/60 text-xs sm:text-sm mb-5 sm:mb-6 font-medium">Asigna qué opciones del catálogo global estarán disponibles para este producto.</p>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {['tamanos', 'leches', 'extras'].map((tipo) => {
+                  {['tamaños', 'leches', 'extras'].map((tipo) => {
                     const optsDisponibles = globalOptions.filter(o => o.tipo === tipo);
                     const optsSeleccionadas = formData.opciones[tipo] || [];
                     

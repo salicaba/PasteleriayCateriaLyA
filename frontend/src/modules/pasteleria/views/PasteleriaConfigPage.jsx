@@ -90,7 +90,8 @@ const SortableCategoria = ({ cat, setAsDefault, deleteCategoria, processingActio
   );
 };
 
-const SortableString = ({ item, field, deleteString, processingAction }) => {
+// 🔥 FIX: Actualizamos SortableString para que soporte "isDefault" y "setAsDefault"
+const SortableString = ({ item, field, deleteString, isDefault, setAsDefault, processingAction }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item });
   
   const style = {
@@ -100,28 +101,52 @@ const SortableString = ({ item, field, deleteString, processingAction }) => {
   };
 
   const isDeleting = processingAction === `del-${field}-${item}`;
+  const isSettingDefault = processingAction === `def-${field}-${item}`;
+  const isDisabled = isDeleting || isSettingDefault;
 
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={`relative flex items-center justify-between p-3 mb-2 rounded-2xl border bg-white border-gray-100 md:hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40 transition-colors ${
-        isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'
-      } ${isDeleting ? 'opacity-60 cursor-not-allowed' : ''}`}
+      className={`relative flex items-center justify-between p-3 mb-2 rounded-2xl border transition-colors ${
+        isDefault 
+          ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30 lya:bg-lya-primary/10 lya:border-lya-primary/40' 
+          : 'bg-white border-gray-100 md:hover:border-gray-300 dark:bg-gray-900 dark:border-gray-800 lya:bg-lya-surface lya:border-lya-border/40'
+      } ${isDragging ? 'opacity-50 shadow-2xl scale-105' : 'shadow-sm'} ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-2 overflow-hidden">
         <div {...attributes} {...listeners} className="text-gray-400 md:hover:text-emerald-500 dark:md:hover:text-emerald-400 lya:md:hover:text-lya-primary cursor-grab active:cursor-grabbing p-1 transition-colors -ml-1">
           <GripVertical size={18} />
         </div>
-        <span className="font-bold text-sm text-gray-700 dark:text-gray-300 lya:text-lya-text truncate pr-2">
+
+        <motion.button 
+          whileTap={!isDisabled ? { scale: 0.95 } : {}}
+          onClick={() => setAsDefault(field, item)} 
+          disabled={isDisabled}
+          title={isDefault ? "Opción predeterminada" : "Fijar como predeterminado"} 
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+            isDefault 
+              ? 'text-emerald-600 bg-emerald-100 dark:bg-emerald-500/20 dark:text-emerald-400 lya:text-lya-secondary lya:bg-lya-secondary/20 shadow-inner' 
+              : 'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:bg-lya-bg lya:md:hover:bg-lya-border/50'
+          }`}
+        >
+          {isSettingDefault ? (
+            <Loader2 size={16} className="animate-spin text-emerald-500" />
+          ) : (
+            <CheckCircle2 size={16} className={isDefault ? 'opacity-100' : 'opacity-40'} /> 
+          )}
+          <span className="hidden xl:inline">{isDefault ? 'Por defecto' : 'Fijar'}</span>
+        </motion.button>
+
+        <span className={`font-bold text-sm truncate pr-2 ${isDefault ? 'text-emerald-800 dark:text-emerald-300 lya:text-lya-primary' : 'text-gray-700 dark:text-gray-300 lya:text-lya-text'}`}>
           {item}
         </span>
       </div>
       <div className="flex items-center shrink-0">
         <motion.button 
-          whileTap={!isDeleting ? { scale: 0.9 } : {}}
+          whileTap={!isDisabled ? { scale: 0.9 } : {}}
           onClick={() => deleteString(field, item)} 
-          disabled={isDeleting}
+          disabled={isDisabled}
           className="p-2 text-red-400 md:hover:text-red-600 md:hover:bg-red-50 dark:md:hover:bg-red-500/10 lya:md:hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
         >
           {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16}/>}
@@ -242,12 +267,21 @@ export default function PasteleriaConfigPage() {
     }
   };
 
+  // 🔥 FIX: Lógica mejorada para agregar strings y hacerlos por defecto si son los primeros
   const handleAddString = async (e, field, value, setValue) => {
     e.preventDefault();
     if (!value.trim() || config[field].includes(value.trim())) return;
     setProcessingAction(`add-${field}`);
     try {
-      await updateConfig({ ...config, [field]: [...config[field], value.trim()] });
+      const isFirst = config[field].length === 0;
+      const defaultKey = field === 'tamanos' ? 'defaultTamano' : 'defaultSabor';
+      
+      const newConfig = { ...config, [field]: [...config[field], value.trim()] };
+      if (isFirst) {
+        newConfig[defaultKey] = value.trim();
+      }
+
+      await updateConfig(newConfig);
       setValue('');
       showSuccess(`${field === 'tamanos' ? 'Tamaño agregado' : 'Sabor agregado'} con éxito`);
     } catch (err) {
@@ -257,10 +291,35 @@ export default function PasteleriaConfigPage() {
     }
   };
 
+  // 🔥 NUEVA FUNCIÓN: Para marcar un texto como el seleccionado por defecto
+  const setDefaultString = async (field, value) => {
+    setProcessingAction(`def-${field}-${value}`);
+    try {
+      const defaultKey = field === 'tamanos' ? 'defaultTamano' : 'defaultSabor';
+      await updateConfig({ ...config, [defaultKey]: value });
+      showSuccess(`${field === 'tamanos' ? 'Tamaño' : 'Sabor'} predeterminado actualizado`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  // 🔥 FIX: Lógica para que si borras el string predeterminado, asigne otro
   const deleteString = async (field, valueToRemove) => {
     setProcessingAction(`del-${field}-${valueToRemove}`);
     try {
-      await updateConfig({ ...config, [field]: config[field].filter(v => v !== valueToRemove) });
+      const defaultKey = field === 'tamanos' ? 'defaultTamano' : 'defaultSabor';
+      const updatedArray = config[field].filter(v => v !== valueToRemove);
+      
+      const newConfig = { ...config, [field]: updatedArray };
+      
+      // Si eliminaste el que estaba por defecto, seleccionamos el primero que quede (si hay)
+      if (config[defaultKey] === valueToRemove) {
+          newConfig[defaultKey] = updatedArray.length > 0 ? updatedArray[0] : null;
+      }
+
+      await updateConfig(newConfig);
       showSuccess(`${field === 'tamanos' ? 'Tamaño eliminado' : 'Sabor eliminado'}`);
     } catch (err) {
       console.error(err);
@@ -274,7 +333,6 @@ export default function PasteleriaConfigPage() {
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }} 
       transition={{ duration: 0.4, ease: "easeOut" }}
-      // PILAR 1: Flexbox estricto
       className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
@@ -362,7 +420,15 @@ export default function PasteleriaConfigPage() {
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndString('tamanos')}>
                  <SortableContext items={config.tamanos} strategy={verticalListSortingStrategy}>
                      {config.tamanos.map(tam => (
-                       <SortableString key={tam} item={tam} field="tamanos" deleteString={deleteString} processingAction={processingAction} />
+                       <SortableString 
+                         key={tam} 
+                         item={tam} 
+                         field="tamanos" 
+                         isDefault={config.defaultTamano === tam} // 🔥 Prop Inyectada
+                         setAsDefault={setDefaultString}          // 🔥 Prop Inyectada
+                         deleteString={deleteString} 
+                         processingAction={processingAction} 
+                       />
                      ))}
                  </SortableContext>
                </DndContext>
@@ -400,7 +466,15 @@ export default function PasteleriaConfigPage() {
                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndString('sabores')}>
                  <SortableContext items={config.sabores} strategy={verticalListSortingStrategy}>
                      {config.sabores.map(sabor => (
-                       <SortableString key={sabor} item={sabor} field="sabores" deleteString={deleteString} processingAction={processingAction} />
+                       <SortableString 
+                         key={sabor} 
+                         item={sabor} 
+                         field="sabores" 
+                         isDefault={config.defaultSabor === sabor} // 🔥 Prop Inyectada
+                         setAsDefault={setDefaultString}           // 🔥 Prop Inyectada
+                         deleteString={deleteString} 
+                         processingAction={processingAction} 
+                       />
                      ))}
                  </SortableContext>
                </DndContext>
