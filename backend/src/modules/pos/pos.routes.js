@@ -18,7 +18,7 @@ import {
 import { getTables, createTable, deleteTable, getPublicTables } from './pos.tables.controller.js';
 import { payOrder } from './pos.payments.controller.js';
 import { printOrderTicket, shareOrderTicket } from './pos.tickets.controller.js';
-import { cancelOrderItem, cancelOrder, getDailySummary, restoreOrderItem, restoreOrder } from './pos.cancellations.controller.js';
+import { cancelOrderItem, cancelOrder, getDailySummary } from './pos.cancellations.controller.js';
 
 const router = Router();
 
@@ -63,7 +63,5 @@ router.post('/orders/items/:itemId/split-deliver', splitDeliverItem);
 router.put('/orders/:id/deliver-all', deliverAllItems);
 router.put('/orders/:id/items/:itemId/cancel', cancelOrderItem);
 router.put('/orders/:id/cancel', cancelOrder);
-router.put('/orders/:id/restore', restoreOrder);
-router.put('/orders/:id/items/:itemId/restore', restoreOrderItem);
 
 export default router;

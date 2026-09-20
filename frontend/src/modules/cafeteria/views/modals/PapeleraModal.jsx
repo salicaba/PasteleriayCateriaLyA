@@ -9,16 +9,11 @@ export const PapeleraModal = ({
   dailySummary,
   mesasSalon,
   mesasLlevar,
-  selectedMesa,
-  onRestoreOrder,
-  restoringOrderId,
-  onRestoreItem,
-  restoringItemId
+  selectedMesa
+  // 🗑️ ELIMINADOS: onRestoreOrder, restoringOrderId, onRestoreItem, restoringItemId
 }) => {
-  // 🔥 ESTADO LOCAL: Controla la carga cuando restauramos una cuenta virtual completa
-  const [restoringVirtualId, setRestoringVirtualId] = useState(null);
-
-  // 🔥 HELPER INTELIGENTE MEJORADO: Siempre exige el número de mesa como respaldo
+  // 🗑️ ELIMINADO: const [restoringVirtualId, setRestoringVirtualId] = useState(null);
+  
   const parseTicketData = (ticketId, fallbackName, tableNum) => {
     let origin = ticketId || '';
     let name = fallbackName || 'General';
@@ -55,25 +50,6 @@ export const PapeleraModal = ({
     }
     
     return { origin, name, phone };
-  };
-
-  // 🔥 FUNCIÓN MAESTRA: Restaura todos los items de una cuenta virtual automáticamente
-  const handleRestoreVirtualAccount = async (virtualOrder) => {
-    setRestoringVirtualId(virtualOrder.id);
-    const itemsToRestore = dailySummary.cancelledItems.filter(item => 
-      item.orderId === virtualOrder.realOrderId && 
-      (item.cuenta || 'General') === virtualOrder.cuenta
-    );
-
-    for (const item of itemsToRestore) {
-      try {
-        await onRestoreItem(item.orderId, item.id);
-        await new Promise(r => setTimeout(r, 200)); 
-      } catch (error) {
-        console.error("Error al restaurar item virtual:", error);
-      }
-    }
-    setRestoringVirtualId(null);
   };
 
   const fullyCancelledOrderIds = dailySummary.cancelledOrders.map(o => o.id);
@@ -169,42 +145,11 @@ export const PapeleraModal = ({
                               {tituloPrincipal}
                             </span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
-                              
-                              {order.isVirtual ? (
-                                <button 
-                                  onClick={() => handleRestoreVirtualAccount(order)} 
-                                  disabled={restoringVirtualId === order.id}
-                                  className={`px-2 py-1.5 rounded-lg shadow-sm border transition-all flex items-center gap-1.5 ${
-                                    restoringVirtualId === order.id 
-                                      ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
-                                      : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
-                                  }`} 
-                                  title="Restaurar Cuenta Específica"
-                                >
-                                  {restoringVirtualId === order.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
-                                  <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
-                                    {restoringVirtualId === order.id ? 'Restaurando...' : 'Restaurar'}
-                                  </span>
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => onRestoreOrder(order.id)} 
-                                  disabled={restoringOrderId === order.id}
-                                  className={`px-2 py-1.5 rounded-lg shadow-sm border transition-all flex items-center gap-1.5 ${
-                                    restoringOrderId === order.id 
-                                      ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
-                                      : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
-                                  }`} 
-                                  title="Restaurar Cuenta Completa"
-                                >
-                                  {restoringOrderId === order.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
-                                  <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
-                                    {restoringOrderId === order.id ? 'Restaurando...' : 'Restaurar'}
-                                  </span>
-                                </button>
-                              )}
-                            </div>
+  <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">
+    Anulada
+  </span>
+  {/* 🗑️ Botones de restaurar orden eliminados por completo */}
+</div>
                           </div>
                           <div className="mb-2">
                             <div className="inline-flex flex-col bg-white dark:bg-gray-800 lya:bg-lya-bg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
@@ -301,32 +246,14 @@ export const PapeleraModal = ({
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2 shrink-0">
-                            <span className="text-sm font-black text-gray-400 line-through">${Number(item.subtotal).toFixed(2)}</span>
-                            {canRestore ? (
-                                <button 
-                                    onClick={() => onRestoreItem(item.orderId, item.id)} 
-                                    disabled={restoringItemId === item.id}
-                                    className={`px-2 py-1.5 rounded-xl border shadow-sm transition-all flex items-center gap-1.5 ${
-                                      restoringItemId === item.id 
-                                        ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-400 border-orange-200 dark:border-orange-800/50 opacity-70 cursor-wait' 
-                                        : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95'
-                                    }`} 
-                                    title="Restaurar Producto a la Orden Original"
-                                >
-                                    {restoringItemId === item.id ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />} 
-                                    <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
-                                      {restoringItemId === item.id ? 'Restaurando...' : 'Restaurar'}
-                                    </span>
-                                </button>
-                            ) : (
-                                <span 
-                                    className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-2 py-1 rounded-md" 
-                                    title="No se puede restaurar porque la cuenta/mesa ya fue cerrada o finalizada."
-                                >
-                                    {textoCerrado}
-                                </span>
-                            )}
-                          </div>
+  <span className="text-sm font-black text-gray-400 line-through">
+    ${Number(item.subtotal).toFixed(2)}
+  </span>
+  <span className="text-[9px] font-black text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface px-2 py-1 rounded-md">
+    Cancelado definitivo
+  </span>
+  {/* 🗑️ Botones de restaurar producto eliminados por completo */}
+</div>
                         </div>
                       )
                     })}
