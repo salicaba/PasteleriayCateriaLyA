@@ -96,15 +96,11 @@ export const useCashController = (user) => {
 
     // 1. EXTRAER ANULACIONES PARCIALES OCULTAS EN LA DESCRIPCIÓN
     let anuladoParcial = 0;
-    // Partimos la descripción por el separador " | " para leer las etiquetas
     const partes = (tx.description || '').split(' | ');
     
     for (let i = 1; i < partes.length; i++) {
       const mod = partes[i];
-      // Si la etiqueta incluye un descuento monetario (ej. "-$40.00")
       if (mod.includes('-$')) {
-        // Usamos una expresión regular para atrapar solo el número exacto que está después del "$"
-        // Esto evita que sume cantidades de productos como "1x Pastel"
         const match = mod.match(/\$\s*(\d+(\.\d+)?)/);
         if (match) {
           anuladoParcial += parseFloat(match[1]);
@@ -113,19 +109,19 @@ export const useCashController = (user) => {
     }
 
     // 2. SUMAR AL RESUMEN
-    if (tx.status === 'CANCELLED') {
-      // Si todo el ticket se anuló, sumamos el valor total de la transacción
-      acc.anulados += Math.abs(val);
-    } else {
-      // Si el ticket está ACTIVO, sumamos las anulaciones parciales encontradas en el texto
-      acc.anulados += anuladoParcial;
+    // Siempre sumamos el dinero de las etiquetas, sin importar si el ticket se canceló completo o no
+    let dineroAnulado = anuladoParcial;
 
-      // Si la transacción en sí es negativa (ej. una devolución pura)
+    if (tx.status === 'CANCELLED') {
+      // Sumamos el valor remanente (para cancelaciones manuales que no bajan a 0)
+      dineroAnulado += Math.abs(val);
+    } else {
+      // Si está activo pero es negativo (ej. una devolución pura)
       if (val < 0) {
-        acc.anulados += Math.abs(val);
+        dineroAnulado += Math.abs(val);
       }
 
-      // Afectamos la caja general (Los ingresos netos)
+      // 3. Afectamos la caja general (Los ingresos netos)
       if (tx.type === 'INCOME') {
         acc.total += val;
         if (tx.source === 'CAFETERIA') acc.cafeteria += val;
@@ -133,6 +129,7 @@ export const useCashController = (user) => {
       }
     }
     
+    acc.anulados += dineroAnulado;
     return acc;
   }, { total: 0, cafeteria: 0, pasteleria: 0, anulados: 0 });
 
