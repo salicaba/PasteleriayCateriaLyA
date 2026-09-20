@@ -94,17 +94,38 @@ export const useCashController = (user) => {
   const resumen = transactions.reduce((acc, tx) => {
     const val = parseFloat(tx.amount) || 0;
 
+    // 1. EXTRAER ANULACIONES PARCIALES OCULTAS EN LA DESCRIPCIÓN
+    let anuladoParcial = 0;
+    // Partimos la descripción por el separador " | " para leer las etiquetas
+    const partes = (tx.description || '').split(' | ');
+    
+    for (let i = 1; i < partes.length; i++) {
+      const mod = partes[i];
+      // Si la etiqueta incluye un descuento monetario (ej. "-$40.00")
+      if (mod.includes('-$')) {
+        // Usamos una expresión regular para atrapar solo el número exacto que está después del "$"
+        // Esto evita que sume cantidades de productos como "1x Pastel"
+        const match = mod.match(/\$\s*(\d+(\.\d+)?)/);
+        if (match) {
+          anuladoParcial += parseFloat(match[1]);
+        }
+      }
+    }
+
+    // 2. SUMAR AL RESUMEN
     if (tx.status === 'CANCELLED') {
-      // 1. Si el ticket completo está cancelado, sumamos el valor a la tarjeta
+      // Si todo el ticket se anuló, sumamos el valor total de la transacción
       acc.anulados += Math.abs(val);
     } else {
-      // 2. Si está activo pero es un monto negativo (devolución de dinero / edición)
+      // Si el ticket está ACTIVO, sumamos las anulaciones parciales encontradas en el texto
+      acc.anulados += anuladoParcial;
+
+      // Si la transacción en sí es negativa (ej. una devolución pura)
       if (val < 0) {
         acc.anulados += Math.abs(val);
       }
-      
-      // 3. Afectamos los totales de la caja
-      // (Si es negativo, 'val' restará automáticamente, lo cual mantiene la caja cuadrada)
+
+      // Afectamos la caja general (Los ingresos netos)
       if (tx.type === 'INCOME') {
         acc.total += val;
         if (tx.source === 'CAFETERIA') acc.cafeteria += val;
