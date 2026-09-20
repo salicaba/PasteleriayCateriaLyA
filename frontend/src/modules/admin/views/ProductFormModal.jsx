@@ -57,7 +57,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
       if (parsedOps[tipo] && Array.isArray(parsedOps[tipo])) {
         result[tipo] = parsedOps[tipo].map(item => {
            if (typeof item === 'string') return { nombre: item, precioAdicional: '' };
-           return { ...item, precioAdicional: item.precioAdicional === 0 ? '' : item.precioAdicional };
+           // 🔥 FIX: Convertimos a Number seguro, para que los "0.00" que vengan de BDD se limpien a ''
+           return { ...item, precioAdicional: Number(item.precioAdicional) === 0 ? '' : item.precioAdicional };
         });
       }
     });
@@ -67,10 +68,12 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   const [formData, setFormData] = useState({
     id: initialData?.id || undefined,
     name: initialData?.name || initialData?.nombre || '',
-    basePrice: initialData ? (initialData.basePrice ?? initialData.precioBase ?? '') : '',
+    // 🔥 FIX: Limpiamos los ceros también del precio base al editar
+    basePrice: initialData ? (Number(initialData.basePrice ?? initialData.precioBase) === 0 ? '' : (initialData.basePrice ?? initialData.precioBase ?? '')) : '',
     categoryId: initialData?.categoryId || (categories.length > 0 ? categories[0].id : ''),
     controlarStock: initialData?.controlarStock || false,
-    stockQuantity: initialData ? (initialData.stockQuantity ?? initialData.stock ?? '') : '',
+    // 🔥 FIX: Limpiamos los ceros también del stock
+    stockQuantity: initialData ? (Number(initialData.stockQuantity ?? initialData.stock) === 0 ? '' : (initialData.stockQuantity ?? initialData.stock ?? '')) : '',
     imageUrl: initialData?.imageUrl || initialData?.image || null,
     isActive: initialData?.isActive !== undefined ? initialData.isActive : (initialData?.disponible !== undefined ? initialData.disponible : true),
     departamento: initialData?.departamento || 'cafeteria',
@@ -84,11 +87,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   
-  // 🔥 ESTADOS DE CARGA PARA PREVENIR DOBLE CLIC
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
 
-  // 🔥 ESTADO DE NOTIFICACIÓN INTERNA
   const [toast, setToast] = useState(null);
 
   const showToast = (message, type = 'error') => {
@@ -106,7 +107,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     } else {
       newArray = [...current, { 
         nombre: globalOpt.nombre, 
-        precioAdicional: globalOpt.precioAdicional === 0 ? '' : globalOpt.precioAdicional 
+        // 🔥 FIX: Evalúa bien los "0.00" del catálogo global
+        precioAdicional: Number(globalOpt.precioAdicional) === 0 ? '' : globalOpt.precioAdicional 
       }];
     }
 
@@ -144,22 +146,22 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
   };
 
   const handleSaveSubmit = async () => {
-    // 🔥 VALIDACIONES DE SEGURIDAD (Evita guardar productos rotos)
     if (!formData.name.trim()) return showToast('El nombre del producto es obligatorio', 'warning');
     if (!formData.categoryId) return showToast('Debes seleccionar una categoría', 'warning');
     if (formData.basePrice === '' || isNaN(formData.basePrice)) return showToast('Ingresa un precio base válido', 'warning');
 
     setIsSubmitting(true);
     
+    // 🔥 FIX: Aquí es donde finalmente lo volvemos un número matemático real para la BDD
     const cleanOpts = (arr) => arr.map(opt => ({
       ...opt, 
-      precioAdicional: opt.precioAdicional === '' ? 0 : parseFloat(opt.precioAdicional)
+      precioAdicional: opt.precioAdicional === '' ? 0 : (parseFloat(opt.precioAdicional) || 0)
     }));
 
     const finalData = {
       ...formData,
-      basePrice: parseFloat(formData.basePrice),
-      stockQuantity: formData.stockQuantity === '' ? 0 : parseInt(formData.stockQuantity),
+      basePrice: parseFloat(formData.basePrice) || 0,
+      stockQuantity: formData.stockQuantity === '' ? 0 : (parseInt(formData.stockQuantity) || 0),
       opciones: {
         tamanos: cleanOpts(formData.opciones.tamanos),
         leches: cleanOpts(formData.opciones.leches),
@@ -170,25 +172,22 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
     
     try {
       await onSave(finalData);
-      // El closeModal() se dispara desde el controlador externo al haber éxito
     } catch (error) {
-      setIsSubmitting(false); // Liberar spinner si falla el backend
+      setIsSubmitting(false); 
     }
   };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
-      {/* Fondo difuminado interactivo */}
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         exit={{ opacity: 0 }} 
-        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave de fondo
+        transition={{ duration: 0.2, ease: "easeOut" }} 
         onClick={() => !isSubmitting && !imageSrc && onClose()} 
         className="absolute inset-0 bg-black/60 lya:bg-black/50 backdrop-blur-sm"
       />
 
-      {/* 🔥 CÁPSULA DE NOTIFICACIONES NEO-BENTO */}
       <AnimatePresence>
         {toast && (
           <div className="absolute top-6 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
@@ -196,7 +195,7 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
               initial={{ opacity: 0, y: -20, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave del toast
+              transition={{ duration: 0.2, ease: "easeOut" }} 
               className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold border pointer-events-auto transition-colors ${
                 toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
                 toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
@@ -220,13 +219,10 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte (spring)
+        transition={{ duration: 0.2, ease: "easeOut" }} 
         className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-2xl relative flex flex-col max-h-[95vh] sm:max-h-[90vh] transition-colors"
       >
         {imageSrc ? (
-          // ==========================================
-          // INTERFAZ DE RECORTE DE IMAGEN
-          // ==========================================
           <div className="relative h-[60vh] sm:h-[500px] w-full bg-gray-950 lya:bg-black/90">
             <Cropper
               image={imageSrc} crop={crop} zoom={zoom} rotation={rotation} aspect={1}
@@ -246,9 +242,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
             </div>
           </div>
         ) : (
-          // ==========================================
-          // INTERFAZ DEL FORMULARIO
-          // ==========================================
           <div className="flex flex-col h-full overflow-hidden">
             <header className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 transition-colors">
               <h2 className="text-xl sm:text-2xl font-black dark:text-white lya:text-lya-text tracking-tight">{initialData ? 'Editar Producto' : 'Nuevo Producto'}</h2>
@@ -260,7 +253,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
             <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-8 space-y-6 sm:space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
                 
-                {/* COLUMNA 1: FOTO */}
                 <div className="md:col-span-1">
                   <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40 rounded-[2rem] p-6 hover:border-orange-500 lya:hover:border-lya-primary transition-colors bg-gray-50/50 dark:bg-gray-800/30 lya:bg-lya-bg/50 h-full">
                     {formData.imageUrl ? (
@@ -277,7 +269,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                   </div>
                 </div>
 
-                {/* COLUMNA 2: DATOS BÁSICOS */}
                 <div className="md:col-span-2 space-y-5">
                   <div>
                     <label className="text-[10px] sm:text-xs font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-widest ml-1 mb-1 block">Nombre del Producto *</label>
@@ -295,7 +286,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       <label className="text-[10px] sm:text-xs font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-widest ml-1 mb-1 block">Categoría *</label>
                       <div className="relative">
                         <Folder className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
-                        {/* 🔥 FIX: pl-11 asegura que el texto no tape al ícono */}
                         <select
                           value={formData.categoryId}
                           disabled={isSubmitting}
@@ -314,7 +304,6 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       <label className="text-[10px] sm:text-xs font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-widest ml-1 mb-1 block" title="A qué caja se irá este dinero en los reportes">Caja de Ingreso</label>
                       <div className="relative">
                         <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={18} />
-                        {/* 🔥 FIX: pl-11 asegura que el texto no tape al ícono */}
                         <select
                           value={formData.departamento}
                           disabled={isSubmitting}
@@ -333,11 +322,11 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       <label className="text-[10px] sm:text-xs font-black text-gray-400 lya:text-lya-text/50 uppercase tracking-widest ml-1 mb-1 block">Precio Base *</label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/50 font-black text-lg">$</span>
-                        {/* 🔥 FIX: pl-10 asegura que los números no pisen el signo de dólar */}
+                        {/* 🔥 FIX: Guardamos e.target.value puro en onChange para no borrar decimales */}
                         <input 
-                          type="number" value={formData.basePrice}
+                          type="number" step="any" value={formData.basePrice}
                           disabled={isSubmitting}
-                          onChange={(e) => setFormData({...formData, basePrice: e.target.value === '' ? '' : parseFloat(e.target.value)})}
+                          onChange={(e) => setFormData({...formData, basePrice: e.target.value})}
                           placeholder="0.00"
                           className="w-full p-3 sm:p-4 pr-4 pl-10 sm:pl-11 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 focus:border-orange-500 lya:focus:border-lya-primary rounded-2xl outline-none dark:text-white lya:text-lya-text transition-all font-bold text-sm sm:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
                         />
@@ -354,11 +343,11 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                       {formData.controlarStock && (
                         <div className="relative animate-in fade-in zoom-in duration-200">
                           <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 lya:text-lya-text/40" size={16} />
-                          {/* 🔥 FIX: pl-9 asegura que los números no pisen el ícono del paquete */}
+                          {/* 🔥 FIX: Guardamos e.target.value puro en onChange para evitar el "0" inicial */}
                           <input 
                             type="number" value={formData.stockQuantity}
                             disabled={isSubmitting}
-                            onChange={(e) => setFormData({...formData, stockQuantity: e.target.value === '' ? '' : parseInt(e.target.value)})}
+                            onChange={(e) => setFormData({...formData, stockQuantity: e.target.value})}
                             placeholder="Ej: 15"
                             className="w-full py-2.5 pr-3 pl-9 bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:border-orange-500 lya:focus:border-lya-secondary rounded-xl outline-none dark:text-white lya:text-lya-text text-sm transition-all font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
                           />
@@ -420,8 +409,8 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                const isSelected = !!selectedOpt;
 
                                const handlePriceChange = (e) => {
-                                 const val = e.target.value;
-                                 const newPrice = val === '' ? '' : parseFloat(val);
+                                 // 🔥 FIX: Guardamos el string directo para no romper decimales (ej: "15.")
+                                 const newPrice = e.target.value; 
                                  
                                  setFormData(prev => ({
                                    ...prev,
@@ -466,13 +455,12 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                                      <div className="mt-3 pt-3 border-t border-orange-200/50 dark:border-orange-500/20 lya:border-lya-primary/30 flex items-center justify-between animate-in fade-in slide-in-from-top-1">
                                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-orange-600 dark:text-orange-400 lya:text-lya-primary opacity-80">Precio extra:</span>
                                        <div className="flex items-center gap-1 relative">
-                                         {/* 🔥 FIX: El ícono está afuera del input, así que no hay problema de solapamiento */}
                                          <span className="text-xs font-black text-orange-600 dark:text-orange-400 lya:text-lya-primary opacity-70">+$</span>
+                                         {/* 🔥 FIX: step="any" permite decimales, y el value directo maneja bien los ceros */}
                                          <input 
-                                            type="number" min="0" step="1" placeholder="0.00"
+                                            type="number" min="0" step="any" placeholder="0.00"
                                             disabled={isSubmitting}
-                                            // 🔥 FIX: Si el valor es 0, lo pasamos como vacío para que actúe el placeholder "0.00"
-                                            value={selectedOpt.precioAdicional === 0 ? '' : selectedOpt.precioAdicional} 
+                                            value={selectedOpt.precioAdicional} 
                                             onChange={handlePriceChange}
                                             className="w-20 p-1.5 text-xs sm:text-sm bg-white dark:bg-gray-900 lya:bg-lya-surface border border-orange-200 dark:border-orange-500/30 lya:border-lya-primary/30 rounded-lg outline-none text-right font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text focus:border-orange-400 lya:focus:border-lya-primary transition-colors shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-60"
                                             onClick={(e) => e.stopPropagation()} 
