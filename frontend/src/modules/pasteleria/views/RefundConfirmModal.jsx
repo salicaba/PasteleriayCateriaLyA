@@ -41,10 +41,10 @@ export default function RefundConfirmModal({ isOpen, onClose, onConfirm, devoluc
           />
           
           <motion.div 
-            initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+            initial={{ scale: 0.95, opacity: 0, y: 15 }} 
             animate={{ scale: 1, opacity: 1, y: 0 }} 
-            exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            exit={{ scale: 0.95, opacity: 0, y: 15 }} 
+            transition={{ duration: 0.2, ease: "easeOut" }} /* 🔥 Transición suave y directa */
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative z-10 transform-gpu antialiased"
           >
