@@ -132,7 +132,7 @@ export const CashRegisterPage = ({ user }) => {
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } // 🔥 Adiós al resorte, transición suave
   };
 
   // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
