@@ -92,16 +92,26 @@ export const useCashController = (user) => {
   };
 
   const resumen = transactions.reduce((acc, tx) => {
-    const val = parseFloat(tx.amount);
+    const val = parseFloat(tx.amount) || 0;
+
     if (tx.status === 'CANCELLED') {
-      acc.anulados += val;
+      // 1. Si el ticket completo está cancelado, sumamos el valor a la tarjeta
+      acc.anulados += Math.abs(val);
     } else {
+      // 2. Si está activo pero es un monto negativo (devolución de dinero / edición)
+      if (val < 0) {
+        acc.anulados += Math.abs(val);
+      }
+      
+      // 3. Afectamos los totales de la caja
+      // (Si es negativo, 'val' restará automáticamente, lo cual mantiene la caja cuadrada)
       if (tx.type === 'INCOME') {
         acc.total += val;
         if (tx.source === 'CAFETERIA') acc.cafeteria += val;
         if (tx.source === 'PASTELERIA') acc.pasteleria += val;
       }
     }
+    
     return acc;
   }, { total: 0, cafeteria: 0, pasteleria: 0, anulados: 0 });
 
