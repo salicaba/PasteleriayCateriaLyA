@@ -71,7 +71,7 @@ export default function PasteleriaDashboard() {
     confirmModal, pedirConfirmacion, cerrarConfirmacion, ejecutarAccionConfirmada,
     detalleModal, abrirDetalles, cerrarDetalles, 
     pedidoAEditar, iniciarEdicion,               
-    calcularFinanzas, guardarPedido, registrarAbono, restaurarPedido, 
+    calcularFinanzas, guardarPedido, registrarAbono, 
     successScreen, 
     isSubmitting,
     refundConfirmModal, setRefundConfirmModal, confirmarReembolso
@@ -81,7 +81,6 @@ export default function PasteleriaDashboard() {
   const [showCancelados, setShowCancelados] = useState(false);
   const [showEntregados, setShowEntregados] = useState(false);
   const [modalInputValue, setModalInputValue] = useState('');
-  const [restoringId, setRestoringId] = useState(null);
 
   const lockRef = useRef(false);
 
@@ -136,30 +135,6 @@ export default function PasteleriaDashboard() {
 
   if (loading) return <PasteleriaLoader />; 
 
-  const handleRestaurarDirecto = async (pedido) => {
-    if (lockRef.current) return;
-    lockRef.current = true;
-    
-    setRestoringId(pedido.id);
-    try {
-      if (restaurarPedido) {
-        await Promise.resolve(restaurarPedido(pedido.id));
-      } else {
-        pedirConfirmacion(pedido, 'restaurar');
-        setTimeout(() => {
-          ejecutarAccionConfirmada();
-        }, 50);
-      }
-    } catch (error) {
-      console.error("Error al restaurar:", error);
-    } finally {
-      setTimeout(() => {
-        setRestoringId(null);
-        lockRef.current = false;
-      }, 1000); 
-    }
-  };
-
   const getConfirmacionDetalles = () => {
     if (!confirmModal.pedido) return {};
     const esAntesDeTiempo = new Date() < new Date(confirmModal.pedido.fechaEntrega);
@@ -177,7 +152,8 @@ export default function PasteleriaDashboard() {
         return {
           icon: <Ban size={28} className="text-red-500 lya:text-red-500" />,
           title: 'Cancelar Pedido',
-          description: 'El pedido se marcará como cancelado y desaparecerá mañana. Esta acción se puede deshacer hoy.',
+          // 🔥 TEXTO ACTUALIZADO Y CORREGIDO
+          description: 'El pedido se marcará como cancelado. Esta acción es definitiva y no se puede deshacer.',
           color: 'bg-red-500 hover:bg-red-600',
           bgIcon: 'bg-red-50 dark:bg-red-500/10',
           requireInput: true,
@@ -320,7 +296,7 @@ export default function PasteleriaDashboard() {
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }} 
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación sin resorte
+              transition={{ duration: 0.2, ease: "easeOut" }} 
               className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600 lya:text-lya-text/50"
             >
               <ShoppingBasket size={64} className="mb-4 opacity-20" />
@@ -347,7 +323,7 @@ export default function PasteleriaDashboard() {
                       initial={{ opacity: 0, scale: 0.9, y: 20 }} 
                       animate={{ opacity: 1, scale: 1, y: 0 }} 
                       exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación suave
+                      transition={{ duration: 0.2, ease: "easeOut" }} 
                       onClick={() => abrirDetalles(pedido)} 
                       className={`cursor-pointer relative overflow-hidden rounded-[2rem] border p-5 shadow-sm transition-colors duration-300 flex flex-col justify-between h-full bg-white dark:bg-gray-900 lya:bg-lya-surface transform-gpu antialiased
                         ${finanzas.requiereLiquidacionUrgente ? 'border-rose-500/50 shadow-rose-500/10 lya:border-rose-500/50' : 'border-gray-100 dark:border-gray-800 md:hover:border-emerald-400/50 lya:border-lya-border/30 lya:md:hover:border-lya-secondary/50'}
@@ -443,13 +419,13 @@ export default function PasteleriaDashboard() {
           <div className="fixed inset-0 z-40 flex justify-end overflow-hidden">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave del fondo
+              transition={{ duration: 0.2, ease: "easeOut" }} 
               onClick={() => { setShowCancelados(false); setShowEntregados(false); setActiveTab('activos'); }} 
               className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" 
             />
             <motion.div 
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} 
-              transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Panel deslizable suave sin resorte
+              transition={{ duration: 0.25, ease: "easeOut" }} 
               className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-2xl flex flex-col"
             >
               <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
@@ -492,18 +468,6 @@ export default function PasteleriaDashboard() {
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
-                              <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={(e) => { e.stopPropagation(); handleRestaurarDirecto(pedido); }} 
-                                disabled={restoringId === pedido.id}
-                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Restaurar Pedido"
-                              >
-                                {restoringId === pedido.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
-                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
-                                  {restoringId === pedido.id ? 'Restaurando...' : 'Restaurar'}
-                                </span>
-                              </motion.button>
                             </div>
                           </div>
                           <div className="mb-2">
@@ -530,18 +494,6 @@ export default function PasteleriaDashboard() {
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded uppercase">Entregado</span>
-                              <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={(e) => { e.stopPropagation(); handleRestaurarDirecto(pedido); }} 
-                                disabled={restoringId === pedido.id}
-                                className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg shadow-sm border border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Deshacer Entrega"
-                              >
-                                {restoringId === pedido.id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} 
-                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">
-                                  {restoringId === pedido.id ? 'Restaurando...' : 'Deshacer'}
-                                </span>
-                              </motion.button>
                             </div>
                           </div>
                           <div className="mb-2">
@@ -584,7 +536,7 @@ export default function PasteleriaDashboard() {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.4, ease: "easeOut" }} // Ya estaba suave
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 pointer-events-auto"
             >
               <div className="bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 p-1.5 rounded-full shrink-0">
@@ -606,7 +558,7 @@ export default function PasteleriaDashboard() {
               initial={{ opacity: 0, scale: 0.95, y: 10 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 10 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30"
             >
               <div className="flex flex-col items-center text-center mb-6">
@@ -738,7 +690,7 @@ export default function PasteleriaDashboard() {
                 initial={{ opacity: 0, scale: 0.95, y: 10 }} 
                 animate={{ opacity: 1, scale: 1, y: 0 }} 
                 exit={{ opacity: 0, scale: 0.95, y: 10 }} 
-                transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] w-full max-w-lg shadow-2xl border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 overflow-hidden flex flex-col max-h-[90vh]"
               >
                 

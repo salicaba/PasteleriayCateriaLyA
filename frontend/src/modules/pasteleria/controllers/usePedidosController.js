@@ -125,19 +125,6 @@ export const usePedidosController = () => {
   const pedirConfirmacion = (pedido, tipo) => setConfirmModal({ isOpen: true, tipo, pedido });
   const cerrarConfirmacion = () => setConfirmModal({ isOpen: false, tipo: '', pedido: null });
 
-  // 🔥 NUEVA FUNCIÓN: Restauración Directa (Sin Modales)
-  const restaurarPedido = async (pedidoId) => {
-    try {
-      const pedidoActualizado = await actualizarEstadoPedidoReal(pedidoId, 'pendiente');
-      setPedidos(pedidos.map(p => p.id === pedidoId ? pedidoActualizado : p));
-      toast.success('Pedido restaurado exitosamente');
-    } catch (error) {
-      console.error("Error al restaurar el pedido:", error);
-      toast.error('Hubo un error al restaurar el pedido');
-      throw error; // Lanzamos el error para que el frontend quite el spinner si falla
-    }
-  };
-
   const ejecutarAccionConfirmada = async (motivoPersonalizado) => {
     const { tipo, pedido } = confirmModal;
     if (!pedido) return;
@@ -145,7 +132,6 @@ export const usePedidosController = () => {
     let nuevoEstado = '';
     if (tipo === 'entregar') nuevoEstado = 'entregado';
     if (tipo === 'cancelar') nuevoEstado = 'cancelado';
-    if (tipo === 'restaurar') nuevoEstado = 'pendiente';
 
     setIsSubmitting(true);
     try {
@@ -168,7 +154,6 @@ export const usePedidosController = () => {
 
       if (tipo === 'entregar') toast.success('Pedido entregado con éxito');
       if (tipo === 'cancelar') toast.success('Pedido cancelado');
-      if (tipo === 'restaurar') toast.success('Pedido restaurado');
     } catch (error) {
       toast.error('Hubo un error al conectar con el servidor');
       cerrarConfirmacion();
@@ -357,7 +342,6 @@ export const usePedidosController = () => {
     calcularFinanzas, 
     guardarPedido,  
     registrarAbono,
-    restaurarPedido, // 🔥 AHORA SÍ ESTÁ EXPORTADA
     successScreen, 
     isSubmitting,
     // ... resto de tus exports

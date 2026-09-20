@@ -397,7 +397,9 @@ export const cancelarPedido = async (req, res) => {
     pedido.estado = 'cancelado';
     await pedido.save({ transaction: t });
 
-    const localNow = new Date();
+    // 🔥 BLINDAJE ZONA HORARIA
+    const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const localNow = new Date(nowLocalStr);
 
     await Transaction.update(
       { status: 'CANCELLED', cancelledBy: userId, cancelledAt: localNow },
@@ -413,37 +415,6 @@ export const cancelarPedido = async (req, res) => {
     await t.rollback();
     console.error('Error al cancelar pedido de pastelería:', error);
     res.status(500).json({ message: 'Error interno al cancelar el pedido' });
-  }
-};
-
-export const restaurarPedido = async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    const { id } = req.params;
-    const pedido = await PasteleriaOrder.findByPk(id, { transaction: t });
-
-    if (!pedido) {
-      await t.rollback();
-      return res.status(404).json({ message: 'Pedido no encontrado' });
-    }
-
-    pedido.estado = 'pendiente';
-    await pedido.save({ transaction: t });
-
-    await Transaction.update(
-      { status: 'ACTIVE', cancelledBy: null, cancelledAt: null },
-      { 
-        where: { referenceId: pedido.id, source: 'PASTELERIA', status: 'CANCELLED' },
-        transaction: t 
-      }
-    );
-
-    await t.commit();
-    res.json({ message: 'Pedido restaurado. El dinero ha vuelto a la caja.', data: pedido });
-  } catch (error) {
-    await t.rollback();
-    console.error('Error al restaurar pedido de pastelería:', error);
-    res.status(500).json({ message: 'Error interno al restaurar el pedido' });
   }
 };
 

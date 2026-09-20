@@ -10,8 +10,7 @@ import {
   printPedidoTicket,   
   sharePedidoTicket,
   entregarPedido,    // 🔥 NUEVO: Para marcar entregas
-  cancelarPedido,    // 🔥 NUEVO: Cancela pedido y anula dinero en Caja
-  restaurarPedido    // 🔥 NUEVO: Restaura pedido y revive dinero en Caja
+  cancelarPedido     // 🔥 NUEVO: Cancela pedido y anula dinero en Caja
 } from './pasteleria.controller.js';
 import { verifyToken } from '../../middlewares/auth.middleware.js';
 
@@ -44,6 +43,5 @@ router.put('/pedidos/:id/estado', updateEstado);
 // 🔥 NUEVAS RUTAS DE ESTADOS ESPECÍFICOS (Con sincronización de caja y transacciones)
 router.put('/pedidos/:id/entregar', entregarPedido);
 router.put('/pedidos/:id/cancelar', cancelarPedido);
-router.put('/pedidos/:id/restaurar', restaurarPedido);
 
 export default router;
