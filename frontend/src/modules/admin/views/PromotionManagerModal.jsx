@@ -42,7 +42,7 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
           type: 'NxM', 
           buyQty: 2, 
           payQty: 1, 
-          // 🔥 FIX: Si no hay precio base, lo dejamos vacío para que actúe el placeholder
+          // 🔥 FIX: Si no hay precio base o es 0, lo dejamos vacío para que actúe el placeholder
           discountValue: basePrice === 0 ? '' : basePrice, 
           validDays: [0, 1, 2, 3, 4, 5, 6], 
           isActive: true
@@ -129,7 +129,14 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+        // 🔥 FIX: Animación suave en el fondo para evitar el parpadeo negro al abrir
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm"
+        >
           
           {/* NOTIFICACIÓN FLOTANTE (Pilar 5) */}
           <AnimatePresence>
@@ -138,7 +145,8 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
                 initial={{ opacity: 0, y: -20, scale: 0.9 }} 
                 animate={{ opacity: 1, y: 0, scale: 1 }} 
                 exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                className="fixed top-8 left-0 right-0 z-[110] flex justify-center px-4 pointer-events-none"
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="absolute top-8 left-0 right-0 z-[110] flex justify-center px-4 pointer-events-none"
               >
                 <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-full shadow-2xl border border-red-100 dark:border-red-900/30 lya:border-red-500/30 px-6 py-4 flex items-center gap-3 max-w-md w-full sm:w-auto">
                   <div className="bg-red-100 dark:bg-red-500/20 text-red-500 p-1.5 rounded-full shrink-0">
@@ -152,10 +160,11 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
 
           {/* CONTENEDOR RAÍZ (Pilar 1 & 4) */}
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.98 }} 
+            initial={{ opacity: 0, y: 15, scale: 0.98 }} 
             animate={{ opacity: 1, y: 0, scale: 1 }} 
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            exit={{ opacity: 0, y: 15, scale: 0.98 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()} // Previene cierres accidentales al hacer clic dentro
             className="w-full max-w-3xl max-h-[95vh] bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-lya-border/40"
           >
             
@@ -234,10 +243,10 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
                       <div className="flex flex-col items-center w-full sm:w-auto">
                         <span className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3">El cliente añade al carrito:</span>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 p-2 w-full sm:w-auto">
-                          {/* 🔥 FIX: Manejamos el borrado dejándolo vacío en lugar de un "0" visual o error de concatenación */}
+                          {/* 🔥 FIX: Manejamos el borrado dejándolo vacío. step="1" para que solo acepte enteros */}
                           <input 
-                            type="number" min="2" 
-                            value={formData.buyQty === 0 ? '' : formData.buyQty}
+                            type="number" min="2" step="1"
+                            value={Number(formData.buyQty) === 0 ? '' : formData.buyQty}
                             onChange={(e) => setFormData({...formData, buyQty: e.target.value})}
                             className="w-20 bg-transparent text-center text-3xl font-black text-gray-900 dark:text-white lya:text-lya-text focus:outline-none focus:text-orange-500 lya:focus:text-lya-primary transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             placeholder="2"
@@ -253,10 +262,10 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
                       <div className="flex flex-col items-center w-full sm:w-auto">
                         <span className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-3">Pero el sistema solo cobra:</span>
                         <div className="flex items-center bg-orange-50 dark:bg-orange-900/10 lya:bg-lya-primary/10 rounded-2xl border border-orange-200 dark:border-orange-800/30 lya:border-lya-primary/30 p-2 w-full sm:w-auto">
-                          {/* 🔥 FIX: Misma solución del string vacío al borrar */}
+                          {/* 🔥 FIX: Igual aquí */}
                           <input 
-                            type="number" min="1" 
-                            value={formData.payQty === 0 ? '' : formData.payQty}
+                            type="number" min="1" step="1"
+                            value={Number(formData.payQty) === 0 ? '' : formData.payQty}
                             onChange={(e) => setFormData({...formData, payQty: e.target.value})}
                             className="w-20 bg-transparent text-center text-3xl font-black text-orange-600 dark:text-orange-500 lya:text-lya-primary focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             placeholder="1"
@@ -277,7 +286,7 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
                         {/* 🔥 FIX: step="any" para decimales, value limpia el cero */}
                         <input 
                           type="number" min="0" step="any" placeholder="0.00"
-                          value={formData.discountValue === 0 ? '' : formData.discountValue}
+                          value={Number(formData.discountValue) === 0 ? '' : formData.discountValue}
                           onChange={(e) => setFormData({...formData, discountValue: e.target.value})}
                           className="w-full bg-transparent text-center text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text focus:outline-none focus:text-emerald-600 dark:focus:text-emerald-400 lya:focus:text-emerald-400 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
@@ -296,10 +305,10 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
                       <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center text-center sm:text-left">
                         <span className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">Si el cliente tiene</span>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 px-3 py-1">
-                          {/* 🔥 FIX: Evitamos truncamiento a 0 visual en la compra */}
+                          {/* 🔥 FIX: Evitamos truncamiento a 0 visual */}
                           <input 
-                            type="number" min="2" placeholder="2"
-                            value={formData.buyQty === 0 ? '' : formData.buyQty}
+                            type="number" min="2" step="1" placeholder="2"
+                            value={Number(formData.buyQty) === 0 ? '' : formData.buyQty}
                             onChange={(e) => setFormData({...formData, buyQty: e.target.value})}
                             className="w-14 bg-transparent text-center text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text focus:outline-none focus:text-blue-500 lya:focus:text-lya-secondary transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -316,7 +325,7 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
                           {/* 🔥 FIX: step="any" para que se puedan escribir decimales antes de guardar */}
                           <input 
                             type="number" min="0" step="any" placeholder="0.00"
-                            value={formData.discountValue === 0 ? '' : formData.discountValue}
+                            value={Number(formData.discountValue) === 0 ? '' : formData.discountValue}
                             onChange={(e) => setFormData({...formData, discountValue: e.target.value})}
                             className="w-20 bg-transparent text-center text-3xl font-black text-blue-600 dark:text-blue-400 lya:text-lya-secondary focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -414,7 +423,7 @@ export default function PromotionManagerModal({ isOpen, onClose, product, editDa
             </div>
 
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
