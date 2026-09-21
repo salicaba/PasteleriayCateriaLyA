@@ -70,7 +70,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
           defaultDate = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}T12:00`;
         }
         
+        // 🔥 FIX: Buscar el valor por defecto configurado
         const catDefecto = config?.categorias?.find(c => c.isDefault)?.nombre || 'Pastel';
+        const tamanoDefecto = config?.defaultTamano || '';
+        const saborDefecto = config?.defaultSabor || '';
 
         setFormData({
           cliente: '', telefono: '', descripcion: '', 
@@ -79,8 +82,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, onSave, fechaPredefi
         });
         
         setCategoriasTags(catDefecto ? [catDefecto] : []);
-        setPorcionesTags([]);
-        setSaboresTags([]);
+        // 🔥 FIX: Inicializar con el valor configurado si existe
+        setPorcionesTags(tamanoDefecto ? [tamanoDefecto] : []);
+        setSaboresTags(saborDefecto ? [saborDefecto] : []);
       }
       
       setCustomCategoria('');

@@ -398,7 +398,9 @@ export const ProductFormModal = ({ initialData, onClose, onSave, categories = []
                     
                     return (
                       <div key={tipo} className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 p-4 sm:p-5 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 transition-colors">
-                        <h4 className="font-black text-sm text-gray-700 dark:text-gray-200 lya:text-lya-text uppercase tracking-widest mb-4">{tipo}</h4>
+                        <h4 className="font-black text-sm text-gray-700 dark:text-gray-200 lya:text-lya-text uppercase tracking-widest mb-4">
+                          {tipo === 'tamanos' ? 'Tamaños' : tipo}
+                        </h4>
                         
                         {optsDisponibles.length === 0 ? (
                            <p className="text-xs font-medium text-gray-400 lya:text-lya-text/50 italic bg-white dark:bg-gray-900 lya:bg-lya-surface p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40">No hay opciones registradas.</p>
