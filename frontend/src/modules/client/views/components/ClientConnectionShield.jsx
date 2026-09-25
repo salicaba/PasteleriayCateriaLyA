@@ -51,12 +51,20 @@ export default function ClientConnectionShield({ children }) {
 
   // Escuchadores nativos del navegador para cambios drásticos de red
   useEffect(() => {
+    let offlineTimeout; // 🔥 FIX: Variable para guardar nuestro temporizador de gracia
+
     const handleOnline = () => {
+      clearTimeout(offlineTimeout); // 🔥 FIX: Si el internet regresa rápido, cancelamos la alerta
       verifyRealConnectivity();
     };
+
     const handleOffline = () => {
-      setIsOnline(false);
-      setIsSlowConnection(false);
+      // 🔥 FIX: Período de gracia de 2.5 segundos. 
+      // Ignora los micro-cortes al apagar/encender la pantalla del celular.
+      offlineTimeout = setTimeout(() => {
+        setIsOnline(false);
+        setIsSlowConnection(false);
+      }, 2500);
     };
 
     window.addEventListener('online', handleOnline);
@@ -65,7 +73,7 @@ export default function ClientConnectionShield({ children }) {
     // Verificación inicial automática al montar el cliente
     verifyRealConnectivity().finally(() => setHasCheckedOnce(true));
 
-    // 🔥 FIX: Radar Activo de Auto-Recuperación
+    // Radar Activo de Auto-Recuperación
     const interval = setInterval(() => {
       if (!navigator.onLine) return;
 
@@ -86,6 +94,7 @@ export default function ClientConnectionShield({ children }) {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearTimeout(offlineTimeout); // 🔥 FIX: Limpiar el timeout si el componente se desmonta
       clearInterval(interval);
     };
   }, [verifyRealConnectivity, isSlowConnection]);
@@ -118,10 +127,10 @@ export default function ClientConnectionShield({ children }) {
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 h-[100dvh] w-full overflow-hidden bg-black/40 dark:bg-black/60 pointer-events-auto backdrop-blur-md">
             
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 30 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 240 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Adiós al resorte físico, hola transición suave
               className="bg-white dark:bg-gray-800 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-200 dark:border-gray-700 lya:border-lya-border/50 flex flex-col items-center text-center max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
               {/* Contenedor del Icono Neo-Bento */}
