@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
 // 🔥 Agregamos Shield, AlertTriangle y AlertCircle para notificaciones Premium Neo-Bento
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield, AlertTriangle, AlertCircle } from 'lucide-react';
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield, AlertTriangle, AlertCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -553,6 +553,20 @@ function App() {
 
           <div className="flex flex-1 overflow-hidden relative">
 
+            {/* 🔥 BACKDROP PARA EL MENÚ EN MÓVILES */}
+            <AnimatePresence>
+              {isMobile && isSidebarOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm z-[40]"
+                />
+              )}
+            </AnimatePresence>
+
             {/* 🔥 SIDEBAR Z-[50] EN MÓVILES */}
             <motion.aside
               initial={false}
@@ -563,15 +577,28 @@ function App() {
               className="fixed top-0 bottom-0 left-0 w-[240px] md:relative h-full bg-white dark:bg-gray-800 lya:bg-lya-surface md:border-r border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-2xl md:shadow-none z-[50] md:z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
             >
               <div className="w-[240px] flex flex-col h-full">
-                <div className="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/20 dark:border-gray-600 lya:border-lya-primary shadow-sm bg-white flex items-center justify-center shrink-0">
-                    <img 
-                      src={logoLyA} 
-                      alt="Logo 𝓛𝔂𝓪" 
-                      className="w-full h-full object-cover"
-                    />
+                <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/20 dark:border-gray-600 lya:border-lya-primary shadow-sm bg-white flex items-center justify-center shrink-0">
+                      <img 
+                        src={logoLyA} 
+                        alt="Logo 𝓛𝔂𝓪" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <span className="ml-3 font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text uppercase tracking-tight text-sm">Menú Principal</span>
                   </div>
-                  <span className="ml-3 font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text uppercase tracking-tight text-sm">Menú Principal</span>
+                  
+                  {/* 🔥 BOTÓN DE CERRAR EN MÓVILES */}
+                  {isMobile && (
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setIsSidebarOpen(false)}
+                      className="p-2 -mr-2 bg-gray-100 dark:bg-gray-700 lya:bg-lya-bg text-gray-500 dark:text-gray-300 lya:text-lya-text/70 rounded-full outline-none"
+                    >
+                      <X size={18} />
+                    </motion.button>
+                  )}
                 </div>
 
                 <nav className="flex-1 py-4 flex flex-col gap-1.5 px-3 overflow-y-auto custom-scrollbar">
