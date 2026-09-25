@@ -1,3 +1,4 @@
+// src/modules/client/views/components/ClientSettingsModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Palette, Type, LogOut, Maximize, Minimize } from 'lucide-react';
@@ -49,9 +50,23 @@ export default function ClientSettingsModal({
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-[80] flex items-center justify-center p-6">
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }} 
+      transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 Transición suave para el fondo
+      className="fixed inset-0 bg-black/60 dark:bg-black/80 z-[80] flex items-center justify-center p-6"
+    >
       <div className="absolute inset-0" onClick={onClose} />
-      <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="relative bg-white dark:bg-gray-900 lya:bg-lya-bg rounded-[2.5rem] p-6 shadow-2xl max-w-[280px] w-full border border-gray-200 dark:border-gray-800 lya:border-lya-border/50 flex flex-col">
+      
+      {/* 🔥 FIX: Eliminado el 'spring', reemplazado por 'easeOut' para que no haya parpadeo */}
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0, y: 15 }} 
+        animate={{ scale: 1, opacity: 1, y: 0 }} 
+        exit={{ scale: 0.95, opacity: 0, y: 15 }} 
+        transition={{ duration: 0.2, ease: "easeOut" }} 
+        className="relative bg-white dark:bg-gray-900 lya:bg-lya-bg rounded-[2.5rem] p-6 shadow-2xl max-w-[280px] w-full border border-gray-200 dark:border-gray-800 lya:border-lya-border/50 flex flex-col"
+      >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text text-center">Ajustes</h3>
           <motion.button whileTap={{ scale: 0.95 }} onClick={onClose} className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface text-gray-500 dark:text-gray-400 lya:text-lya-text md:hover:bg-gray-200 transition-colors outline-none"><X size={18} strokeWidth={3} /></motion.button>
