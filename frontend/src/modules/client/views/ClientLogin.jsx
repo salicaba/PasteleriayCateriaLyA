@@ -162,6 +162,7 @@ export default function ClientLogin({ onLogin, type, tableId }) {
               initial={{ opacity: 0, y: -50, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave sin rebotes
               className={`bg-white/95 dark:bg-gray-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-[#3E2723] px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${
                 notification.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-emerald-400/30' :
                 notification.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
@@ -183,10 +184,11 @@ export default function ClientLogin({ onLogin, type, tableId }) {
         )}
       </AnimatePresence>
 
+      {/* 🔥 FIX: CUADRO PRINCIPAL DEL LOGIN SIN EFECTO RESORTE */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', damping: 25 }}
+        transition={{ duration: 0.3, ease: "easeOut" }} // 🔥 Adiós al parpadeo
         className="w-full max-w-sm bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] p-8 flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9] relative overflow-hidden"
       >
         {/* Barra de color superior */}
