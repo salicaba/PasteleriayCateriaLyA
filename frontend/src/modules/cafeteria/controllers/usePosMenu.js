@@ -12,10 +12,11 @@ export const usePosMenu = (isVitrina) => {
 
   const loadData = useCallback(async () => {
     try {
+      const timestamp = Date.now(); // 🔥 FIX: Rompemos la caché
       const [prodsRes, catsRes, promoRes] = await Promise.all([
-        client.get('/menu/products'),
-        client.get('/menu/categories'),
-        client.get('/promotions').catch((err) => {
+        client.get(`/menu/products?_t=${timestamp}`),
+        client.get(`/menu/categories?_t=${timestamp}`),
+        client.get(`/promotions?_t=${timestamp}`).catch((err) => {
           console.error("⚠️ Error exacto al pedir promociones:", err);
           return { data: [] };
         })
@@ -81,7 +82,8 @@ export const usePosMenu = (isVitrina) => {
 
     const handlePromoChange = async () => {
       try {
-        const res = await client.get('/promotions');
+        // 🔥 FIX: Rompemos la caché en la actualización por socket también
+        const res = await client.get(`/promotions?_t=${Date.now()}`);
         const raw = res.data;
         const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
         setActivePromotions(list);

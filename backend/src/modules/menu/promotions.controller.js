@@ -64,7 +64,8 @@ export const setupPromotion = async (req, res) => {
     });
 
     getIO().emit('menu:promotions_updated', { productId, promotion: newPromotion });
-    
+    getIO().emit('pos:update'); // 🔥 FIX: Obligamos a los clientes a recargar
+
     return res.status(201).json({ success: true, data: newPromotion });
   } catch (error) {
     console.error("🔥 Error CRÍTICO al guardar promoción:", error);
@@ -95,6 +96,7 @@ export const togglePromotionStatus = async (req, res) => {
     await promotion.save();
     
     getIO().emit('menu:promotions_updated', { productId: promotion.productId, promotion });
+    getIO().emit('pos:update'); // 🔥 FIX: Obligamos a los clientes a recargar
     
     return res.status(200).json({ success: true, data: promotion, message: "Estado de promoción actualizado." });
   } catch (error) {
@@ -126,6 +128,7 @@ export const updatePromotion = async (req, res) => {
     });
     
     getIO().emit('menu:promotions_updated', { productId: promotion.productId, promotion });
+    getIO().emit('pos:update'); // 🔥 FIX: Obligamos a los clientes a recargar
     
     return res.status(200).json({ success: true, data: promotion, message: "Promoción editada correctamente." });
   } catch (error) {
@@ -144,6 +147,8 @@ export const deletePromotion = async (req, res) => {
     await promotion.destroy();
     
     getIO().emit('menu:promotions_updated', { productId });
+    getIO().emit('pos:update'); // 🔥 FIX: Obligamos a los clientes a recargar
+
     return res.status(200).json({ success: true, message: "Promoción eliminada definitivamente." });
   } catch (error) {
     console.error("🔥 Error al eliminar promoción:", error);
