@@ -236,6 +236,8 @@ function App() {
 
   // 🔥 MONITOREO DE RED GLOBAL CON BANNER PERSISTENTE
   useEffect(() => {
+    let disconnectTimeout; // 🔥 Variable para nuestro cronómetro de gracia
+
     const handleNetworkError = (e) => {
       setIsOffline(true);
       toast.error(e.detail.message, { id: 'net-err', duration: 5000 });
@@ -249,15 +251,22 @@ function App() {
     window.addEventListener('network_timeout', handleNetworkTimeout);
 
     const handleSocketDisconnect = () => {
-      setIsOffline(true);
-      toast.error('Sin conexión con el servidor. Trabajando en modo local/desconectado...', { 
-        id: 'socket-err', 
-        icon: '🔌', 
-        duration: 4000 
-      });
+      // 🔥 FIX: Período de gracia de 3 segundos. 
+      // Ignora los micro-cortes cuando el empleado apaga/enciende la pantalla.
+      disconnectTimeout = setTimeout(() => {
+        setIsOffline(true);
+        toast.error('Sin conexión con el servidor. Trabajando en modo local/desconectado...', { 
+          id: 'socket-err', 
+          icon: '🔌', 
+          duration: 4000 
+        });
+      }, 3000);
     };
 
     const handleSocketConnect = () => {
+      // 🔥 FIX: Si el socket se reconecta rápido, cancelamos la alarma
+      clearTimeout(disconnectTimeout);
+      
       if (isOffline) {
         toast.success('¡Conexión restablecida con éxito!', { id: 'socket-ok' });
       }
@@ -272,6 +281,7 @@ function App() {
       window.removeEventListener('network_timeout', handleNetworkTimeout);
       socket.off('disconnect', handleSocketDisconnect);
       socket.off('connect', handleSocketConnect);
+      clearTimeout(disconnectTimeout); // 🔥 Limpiamos el cronómetro al desmontar
     };
   }, [isOffline]);
 

@@ -64,7 +64,7 @@ export default function ClientConnectionShield({ children }) {
       offlineTimeout = setTimeout(() => {
         setIsOnline(false);
         setIsSlowConnection(false);
-      }, 2500);
+      }, 3000);
     };
 
     window.addEventListener('online', handleOnline);
