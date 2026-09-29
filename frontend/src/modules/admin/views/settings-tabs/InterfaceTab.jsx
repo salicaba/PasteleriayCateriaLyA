@@ -33,11 +33,12 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+      layout="position"
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`flex flex-col w-full transition-all duration-300 ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className={`flex flex-col w-full ${globalScroll ? 'space-y-6' : 'h-full overflow-hidden'}`}
     >
       
       <div className={`shrink-0 bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col sm:flex-row items-center sm:items-start gap-4 ${globalScroll ? '' : 'mb-6 z-10'}`}>
