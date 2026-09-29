@@ -12,12 +12,8 @@ export const CashRegisterPage = ({ user }) => {
   } = useCashController(user);
 
   const [filterSource, setFilterSource] = useState('ALL');
-  const [displayFilter, setDisplayFilter] = useState('ALL'); // 🔥 NUEVO: Controla los datos tras bambalinas
   const [showModDetails, setShowModDetails] = useState(false);
-  
-  // 🔥 NUEVO ESTADO: Buscador y Estado de Filtrado Animado
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFiltering, setIsFiltering] = useState(false); // 🔥 El truco maestro para el loader
   
   // PILAR 3: Estado local para bloqueo asíncrono del modal
   const [isProcessing, setIsProcessing] = useState(false);
@@ -30,24 +26,9 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  // 🔥 LA SOLUCIÓN DEFINITIVA: CORTINA DE CARGA (OVERLAY)
+  // 🔥 Filtro directo y sin retrasos
   const handleFilterChange = (source) => {
-    if (filterSource === source) return;
-    
-    // 1. Activar botón y bajar la cortina de carga
     setFilterSource(source);
-    setIsFiltering(true);
-    
-    // 2. Darle 150ms a la cortina para que aparezca suavemente
-    setTimeout(() => {
-      // 3. Cambiamos los datos de la tabla por debajo (oculto a la vista)
-      setDisplayFilter(source);
-      
-      // 4. Levantamos la cortina 300ms después.
-      setTimeout(() => {
-        setIsFiltering(false);
-      }, 300);
-    }, 150);
   };
 
   // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia (Tarjetas eliminadas)
@@ -105,12 +86,10 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
-  // 🔥 LÓGICA DE FILTRADO Y BÚSQUEDA
+  // 🔥 LÓGICA DE FILTRADO Y BÚSQUEDA INSTANTÁNEA
   const filteredTransactions = transactions.filter(tx => {
-    // 1. Usamos displayFilter para que los datos esperen a que baje la cortina
-    if (displayFilter !== 'ALL' && tx.source !== displayFilter) return false;
+    if (filterSource !== 'ALL' && tx.source !== filterSource) return false;
     
-    // 2. Filtro por búsqueda (Folio, Nombre o Descripción)
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       const desc = (tx.description || '').toLowerCase();
@@ -132,21 +111,12 @@ export const CashRegisterPage = ({ user }) => {
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } // 🔥 Adiós al resorte, transición suave
+    show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } }
   };
 
   // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
   const todayForLimit = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
   const maxDateLimit = `${todayForLimit.getFullYear()}-${String(todayForLimit.getMonth() + 1).padStart(2, '0')}-${String(todayForLimit.getDate()).padStart(2, '0')}`;
-
-  // 🔥 FIX: Formateador para evitar que el UTC sume 1 día en los inputs
-  const formatLocalInputDate = (dateObj) => {
-    if (!dateObj || isNaN(dateObj)) return '';
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const d = String(dateObj.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
 
   return (
     // PILAR 1: Contenedor Raíz bloqueado
@@ -318,29 +288,8 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL Y OVERLAY DE CARGA */}
+      {/* TABLA PRINCIPAL */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4 min-h-[300px]">
-        
-        {/* 🔥 EL OVERLAY MÁGICO: Flota en el centro absoluto para no romper la tabla */}
-        <AnimatePresence>
-          {isFiltering && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 lya:bg-lya-surface/60 backdrop-blur-[2px]"
-            >
-              <div className="bg-white dark:bg-gray-800 lya:bg-lya-bg px-8 py-5 rounded-[2rem] shadow-xl border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 flex flex-col items-center transform -translate-y-4">
-                <Loader2 size={36} className="animate-spin text-orange-500 mb-3" />
-                <span className="text-[11px] font-black tracking-widest uppercase text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                  Filtrando...
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
           <table className="w-full text-left border-collapse relative min-w-max">
             <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
@@ -354,35 +303,35 @@ export const CashRegisterPage = ({ user }) => {
               </tr>
             </thead>
             
-            {/* 🔥 ANIMAMOS EL TBODY COMPLETO, NO FILA POR FILA */}
+            {/* 🔥 ANIMAMOS EL TBODY COMPLETO DE MANERA FLUIDA */}
             <AnimatePresence mode="wait">
               {filteredTransactions.length === 0 && !loading ? (
                 <motion.tbody 
                   key="empty-state"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
                   className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
                 >
                   <tr>
                     <td colSpan="6" className="text-center py-16 text-gray-400 font-medium lya:text-lya-text/50">
                       {searchTerm !== '' 
                         ? `No se encontraron resultados para "${searchTerm}"`
-                        : displayFilter === 'ALL' 
+                        : filterSource === 'ALL' 
                           ? 'No hay movimientos registrados en esta fecha.' 
-                          : `No hay movimientos de ${displayFilter.toLowerCase()} en esta fecha.`
+                          : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
                       }
                     </td>
                   </tr>
                 </motion.tbody>
               ) : (
                 <motion.tbody 
-                  key={displayFilter + searchTerm}
+                  key={filterSource + searchTerm}
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
                   className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
                 >
                   {filteredTransactions.map((tx) => {

@@ -1,7 +1,7 @@
 // frontend/src/modules/admin/views/settings-tabs/InterfaceTab.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Palette, Monitor, Maximize, Minimize, Layout, Pin, ArrowUpDown } from 'lucide-react';
+import { Palette, Monitor, Maximize, Minimize, Layout, Pin, ArrowUpDown, Loader2 } from 'lucide-react';
 import { ThemeSelector } from '../../../../components/ThemeSelector';
 import { usePWA } from '../../../../hooks/usePWA'; 
 
@@ -9,6 +9,8 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
   const { isStandalone } = usePWA(); 
   
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // 🔥 Nuevo estado para manejar la pantalla de carga
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -16,8 +18,14 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     
+    // 🔥 Simulamos un pequeño tiempo de carga (500ms) para mantener la consistencia visual con las otras pestañas
+    const timer = setTimeout(() => {
+      setFetching(false);
+    }, 500);
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      clearTimeout(timer); // Limpiamos el timer si el componente se desmonta
     };
   }, []);
 
@@ -30,6 +38,27 @@ export const InterfaceTab = ({ uiSize, setUiSize, globalScroll, setGlobalScroll,
       if (document.exitFullscreen) document.exitFullscreen();
     }
   };
+
+  // 🔥 PANTALLA DE CARGA IDÉNTICA A HARDWARE
+  if (fetching) {
+    return (
+      <div className="h-full w-full flex-1 flex flex-col items-center justify-center">
+        <motion.div
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-24 h-24 bg-white dark:bg-gray-800 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-700 lya:border-lya-border/40"
+        >
+          <Palette size={40} className="text-purple-500 lya:text-lya-primary" />
+        </motion.div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight text-center">
+          Cargando Interfaz
+        </h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2 text-center">
+          <Loader2 size={16} className="animate-spin text-purple-500 lya:text-lya-primary" /> Sincronizando preferencias...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
