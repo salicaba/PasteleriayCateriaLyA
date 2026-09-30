@@ -75,7 +75,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const mesaId = mesaActual?.id;
   const mesaEstado = mesaActual?.estado;
   const mesaOrderId = mesaActual?.orderId;
-  const mesaOrderStatus = mesaActual?.status || mesaActual?.orderStatus; // 🔥 FIX: Leemos .status de la BD
+  const mesaOrderStatus = mesaActual?.status || mesaActual?.orderStatus; 
   
   // 🔥 FIX BBDD UNIVERSAL PARA LLEVAR Y MOSTRADOR
   const rawItems = mesaActual?.items || mesaActual?.orderItems || mesaActual?.OrderItems || [];
@@ -121,7 +121,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
     if (isMesaActiva) {
         setActiveOrderId(mesaOrderId || activeOrderId);
-        // 🔥 FIX: Actualizamos el estatus con el valor real de la base de datos
         setOrderStatus(mesaActual?.status || mesaActual?.orderStatus || orderStatus || 'OPEN');
         
         let loadedPaidAccounts = [];
@@ -173,7 +172,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 requiereCocina: item.product?.requiereCocina !== false,
                 isAutoPromo: item.isAutoPromo || false,
                 promoLabel: item.promoLabel || null,
-                precioOriginal: item.precioOriginal || null
+                precioOriginal: item.precioOriginal || null,
+                promoId: item.promoId || null,
+                promoType: item.promoType || null
             };
         });
 
@@ -237,19 +238,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
     }
 
-  // 🔥 FIX MAESTRO: Removemos isSyncLocked y mutations.isProcessing del array de dependencias 
-  // para evitar que el efecto se dispare de forma prematura y sobrescriba los cambios visuales de entrega.
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId, mesaActual?.status]);
 
 // 🔥 WRAPPERS CON ANIMACIÓN DE CARGA Y ACTUALIZACIÓN FLUIDA
   const wrappedCancelFullOrder = async (motivo) => {
-      // 1. Esperamos a que el backend procese (el botón mostrará su animación de carga)
       await mutations.cancelFullOrder(motivo);
       if (clearEntireCart) clearEntireCart();
       localStorage.removeItem(`lya_draft_${mesaId}`);
       
-      // 2. Al terminar con éxito, actualizamos la UI y cerramos con elegancia
       setCart(prev => prev.map(item => ({ ...item, status: 'CANCELLED' })));
       setActiveOrderId(null); 
       setOrderStatus('OPEN');
@@ -259,11 +256,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   };
 
   const wrappedCancelAccountItems = async (cuenta, motivo) => {
-      // 1. Esperamos al backend (botón con carga)
       await mutations.cancelAccountItems(cuenta, motivo);
       if (clearCartByAccount) clearCartByAccount(cuenta);
       
-      // 2. Actualizamos la UI al instante al recibir respuesta
       setCart(prev => prev.map(item => 
           ((item.cuenta || 'General') === cuenta) ? { ...item, status: 'CANCELLED' } : item
       ));
@@ -275,10 +270,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   };
 
   const wrappedCancelItem = async (itemId, cancelReason, cancelQty) => {
-      // 1. Esperamos al backend (botón con carga)
       await mutations.cancelItem(itemId, cancelReason, cancelQty);
 
-      // 2. Actualizamos la UI al instante para que el producto desaparezca de la comanda sin refrescar
       setCart(prev => prev.map(item => {
           if (String(item.backendItemId) === String(itemId) || String(item.id) === String(itemId)) {
               if (cancelQty && cancelQty < item.qty) {
@@ -318,6 +311,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     confirmPromoRupture: cartLogic.confirmPromoRupture,
     cancelPromoRupture: cartLogic.cancelPromoRupture,
     
+    // 🔥 ESTADOS DEL MODAL DE SELECCIÓN DE RECOMPENSA EXPUESTOS AQUÍ
+    pendingPromoReward: cartLogic.pendingPromoReward,
+    setPendingPromoReward: cartLogic.setPendingPromoReward,
+    claimPromoReward: cartLogic.claimPromoReward,
+    
     filtroTexto: menu.filtroTexto, 
     setFiltroTexto: menu.setFiltroTexto, 
     categoriaActiva: menu.categoriaActiva, 
@@ -345,7 +343,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     payCuenta: mutations.payCuenta,
     validateAllDelivered: mutations.validateAllDelivered,
     deliverAllActiveItems: mutations.deliverAllActiveItems, 
-    cancelItem: wrappedCancelItem,  // 🔥 AQUÍ: Cambia mutations.cancelItem por wrappedCancelItem
+    cancelItem: wrappedCancelItem, 
     cancelFullOrder: wrappedCancelFullOrder, 
     cancelAccountItems: wrappedCancelAccountItems, 
     releaseAccount: mutations.releaseAccount,

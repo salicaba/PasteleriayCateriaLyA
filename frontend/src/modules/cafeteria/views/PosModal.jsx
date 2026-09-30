@@ -1,7 +1,6 @@
-// src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown } from 'lucide-react';
+import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -59,7 +58,6 @@ export const PosModal = ({
   };
 
   const nombreCajero = getLoggedUserName();
-
   const [isMenuLoaded, setIsMenuLoaded] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -67,12 +65,10 @@ export const PosModal = ({
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
   const [previewTicketData, setPreviewTicketData] = useState(null);
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
-
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   const lockWhatsAppRef = useRef(false);
-  
   const [localToast, setLocalToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -90,15 +86,14 @@ export const PosModal = ({
   const isVitrina = mesa?.zona === 'vitrina' || mesa?.id === 'VITRINA-EXPRESS';
 
   const { 
-    dbCategories, 
-    activePromotions, 
-    filtroTexto, 
-    setFiltroTexto, 
-    categoriaActiva, 
-    setCategoriaActiva, 
-    filteredProducts 
+    dbCategories, activePromotions, filtroTexto, setFiltroTexto, 
+    categoriaActiva, setCategoriaActiva, filteredProducts 
   } = usePosMenu(isVitrina);
 
+  // Aplanamos todas las categorías para tener acceso global a productos (necesario para el Modal de Recompensa)
+  const allGlobalProducts = useMemo(() => dbCategories.flatMap(cat => cat.productos || []), [dbCategories]);
+
+  // Asegúrate de que usePosController esté retornando estos 3 nuevos campos
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
@@ -106,35 +101,24 @@ export const PosModal = ({
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
     moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
-    releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture 
+    releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture,
+    pendingPromoReward, setPendingPromoReward, claimPromoReward 
   } = usePosController(mesa, isOpen, todasLasMesas, showToast, onTableRelease, onClose, inline); 
-  // 👆 Fíjate cómo agregamos onTableRelease, onClose, inline al final
 
-  // 🔥 DEFINIMOS CUENTAS PAGADAS PRIMERO
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
-
-  // 🔥 FILTROS ANTI-FANTASMAS Y ORDENAMIENTO CRONOLÓGICO ESTRICTO
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
 
   const cleanCuentasDisponibles = cuentasDisponibles.filter(cuenta => {
     const itemsDeCuenta = cart.filter(i => (i.cuenta || 'General') === cuenta);
     if (itemsDeCuenta.length === 0) return true; 
-    const todosCancelados = itemsDeCuenta.every(i => i.status === 'CANCELLED');
-    return !todosCancelados; 
+    return !itemsDeCuenta.every(i => i.status === 'CANCELLED'); 
   }).sort((a, b) => {
     const isAPaid = cuentasPagadasReales.includes(a);
     const isBPaid = cuentasPagadasReales.includes(b);
-
-    // 1. Regla de oro: Las cuentas PAGADAS siempre se hunden al fondo
     if (isAPaid && !isBPaid) return 1;
     if (!isAPaid && isBPaid) return -1;
-
-    // 2. Regla de estabilidad: Conservar el orden cronológico original.
-    const originalIndexA = cuentasDisponibles.indexOf(a);
-    const originalIndexB = cuentasDisponibles.indexOf(b);
-
-    return originalIndexA - originalIndexB;
+    return cuentasDisponibles.indexOf(a) - cuentasDisponibles.indexOf(b);
   });
 
   useEffect(() => {
@@ -159,16 +143,9 @@ export const PosModal = ({
   } else {
      numeroReal = rawNumeroStr.trim();
   }
+  if (!isLlevar && !isVitrina) numeroReal = numeroReal.replace(/#/g, '').trim();
 
-  if (!isLlevar && !isVitrina) {
-    numeroReal = numeroReal.replace(/#/g, '').trim();
-  }
-
-  const loaderTitle = isVitrina 
-    ? "Preparando el mostrador..." 
-    : isLlevar 
-      ? "Preparando pedido para llevar..." 
-      : "Preparando tu mesa...";
+  const loaderTitle = isVitrina ? "Preparando el mostrador..." : isLlevar ? "Preparando pedido para llevar..." : "Preparando tu mesa...";
 
   const HeaderTitle = () => {
     if (isVitrina) return <h3 className="font-black text-gray-900 dark:text-white lya:text-lya-text text-xl flex items-center gap-2">Mostrador ⚡</h3>;
@@ -182,18 +159,11 @@ export const PosModal = ({
     setIsProcessingAction(true);
 
     const orderId = mesa?.orderId || mesa?.id;
-
     let baseApiUrl = client.defaults.baseURL || 'https://lya-backend-2gay.onrender.com/api';
-    if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
-      baseApiUrl = 'https://lya-backend-2gay.onrender.com/api';
-    }
-    
     const shortId = orderId.split('-')[0];
     let shareLink = `https://pascaf-lya.vercel.app/api/pos/ticket/${shortId}`;
     
-    if (cuentaName && cuentaName !== 'Todas') {
-      shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
-    }
+    if (cuentaName && cuentaName !== 'Todas') shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
 
     const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
@@ -214,22 +184,16 @@ export const PosModal = ({
 
     const mensajeWhatsApp = `🧁 *𝓛𝔂𝓪 Pastelería & Cafetería* ☕\n\n¡Hola! Agradecemos mucho tu preferencia. Aquí tienes tu ticket digital${textoCuenta}:\n\n🔗 ${shareLink}\n\n*Total a pagar:* $${totalToPrint.toFixed(2)}\n\n${direccionTexto}\n\n¡Esperamos verte pronto de nuevo! ✨`;
 
-    // 🔥 DEEP LINK (Abre la app en Tablet/PC sin crear pestañas)
     const appUrl = `whatsapp://send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
-    // 🔥 ENLACE WEB DIRECTO (Se salta la landing page de Meta)
     const webUrl = `https://web.whatsapp.com/send?phone=52${phone}&text=${encodeURIComponent(mensajeWhatsApp)}`;
 
-    // 1. Intentamos abrir la aplicación nativa
     window.location.href = appUrl;
 
-    // 2. Sensor Inteligente: Si el navegador no perdió el foco en 600ms, significa que no hay app instalada.
     setTimeout(() => {
       if (!document.hidden) {
         window.open(webUrl, 'whatsapp_window');
         showToast('Abriendo WhatsApp Web...', 'success');
       }
-      
-      // Liberamos los candados
       setTimeout(() => {
         lockWhatsAppRef.current = false;
         setIsProcessingAction(false);
@@ -256,18 +220,13 @@ export const PosModal = ({
     } catch (error) {
       console.error(error);
       showToast('Error al enviar comanda', 'error');
-      throw error;
     } finally {
       setIsProcessingAction(false);
     }
   };
 
   const handleOpenCheckout = () => {
-    const cuentasActivas = Array.from(new Set(
-      activeCart.filter(i => !cuentasPagadasReales.includes(i.cuenta || 'General'))
-          .map(i => i.cuenta || 'General')
-    ));
-    
+    const cuentasActivas = Array.from(new Set(activeCart.filter(i => !cuentasPagadasReales.includes(i.cuenta || 'General')).map(i => i.cuenta || 'General')));
     const isMesaCompletaLista = validateAllDelivered();
     const isAlgunaCuentaLista = cuentasActivas.some(cuenta => validateAllDelivered(cuenta));
 
@@ -293,31 +252,23 @@ export const PosModal = ({
     }
   };
 
-  // 🔥 EL FIX MAESTRO PARA PAGOS DE MESAS
   const handleFinalizePayment = async (paymentDetails) => {
     const { amountPaid, targetType, cuentaName, isLastInBatch } = paymentDetails;
     
-    // 1. PAGO PARCIAL (Flujo normal por cuenta)
     if (targetType === 'partial' || targetType === 'silent_partial') { 
       await payCuenta(cuentaName, paymentDetails, () => { 
         if (onPagoParcial) onPagoParcial(mesa.id, amountPaid); 
-        
         if (targetType === 'partial') {
           setPaymentSuccessData({ title: '¡Cuenta Cobrada!', message: `La cuenta "${parseAccountName(cuentaName)}" ha sido pagada exitosamente.` });
           setTimeout(() => setPaymentSuccessData(null), 2000);
         }
-        
-        if (isLastInBatch) {
-          setShowCheckout(false); 
-        }
+        if (isLastInBatch) setShowCheckout(false); 
       }); 
       return; 
     }
     
-    // 2. PAGO COMPLETO
     if (unsentTotal > 0 && onUpdateTable) onUpdateTable(mesa.id, unsentTotal);
     
-    // Si es Mostrador o Llevar, cerramos toda la orden globalmente (porque nadie más se unirá)
     if (isLlevar || isVitrina) {
       await handleCheckout(paymentDetails, () => {
          setPaymentSuccessData({ title: '¡Cobro Exitoso!', message: `El total ha sido pagado exitosamente.` });
@@ -327,12 +278,7 @@ export const PosModal = ({
       return;
     }
 
-    // 🔥 FIX: Si es SALÓN, Iteramos cuenta por cuenta y pagamos silenciosamente.
-    // Así evitamos cerrar la Orden Global y evitamos que los nuevos clientes se vean como "Pagados".
-    const cuentasActivas = Array.from(new Set(
-      activeCart.filter(i => !cuentasPagadasReales.includes(i.cuenta || 'General'))
-          .map(i => i.cuenta || 'General')
-    ));
+    const cuentasActivas = Array.from(new Set(activeCart.filter(i => !cuentasPagadasReales.includes(i.cuenta || 'General')).map(i => i.cuenta || 'General')));
 
     setIsProcessingAction(true);
     try {
@@ -340,10 +286,9 @@ export const PosModal = ({
         const cName = cuentasActivas[i];
         const subtotalCuenta = getSubtotalByCuenta(cName);
         
-        // Fabricamos un paymentDetails por cada cuenta sin cerrar el checkout
         const partialPaymentDetails = {
           ...paymentDetails,
-          amountPaid: subtotalCuenta, // Paga exactamente lo que debe esa cuenta
+          amountPaid: subtotalCuenta, 
           targetType: 'silent_partial',
           cuentaName: cName,
           isLastInBatch: i === cuentasActivas.length - 1
@@ -361,7 +306,6 @@ export const PosModal = ({
       setTimeout(() => setPaymentSuccessData(null), 2000);
       setShowCheckout(false); 
     } catch (error) {
-      console.error("Error al cobrar cuentas por lote:", error);
       showToast("Error al cobrar algunas cuentas", "error");
     } finally {
       setIsProcessingAction(false);
@@ -372,20 +316,11 @@ export const PosModal = ({
     if (onPagoParcial && total > 0) onPagoParcial(mesa.id, total);
     try {
       await handleCloseTable(); 
-      
-      // 🔥 FIX: Si es venta de Mostrador (Vitrina), detenemos el proceso de cierre aquí.
-      // Esto limpia la orden en la base de datos y el carrito, pero deja la ventana 
-      // abierta y lista para el siguiente cliente en la fila.
-      if (isVitrina) {
-        return; 
-      }
-
-      // Si es una mesa de salón o para llevar, sí cerramos el modal y liberamos la mesa
+      if (isVitrina) return; 
       if (onTableRelease) await Promise.resolve(onTableRelease(mesa.id)); 
       if (!inline) onClose(); 
     } catch (error) {
       console.error("Error liberando mesa:", error);
-      throw error; 
     }
   };
 
@@ -400,7 +335,6 @@ export const PosModal = ({
     try { 
       await handlePrintTicket(targetCuenta); 
     } catch (error) { 
-      console.error("Fallo al imprimir:", error); 
       showToast('Error al intentar imprimir el ticket', 'error');
     } finally {
       setIsProcessingAction(false);
@@ -437,7 +371,7 @@ export const PosModal = ({
     nombreCliente: isLlevar ? nombreParaSidebar : null,
     onReleaseAccount: releaseAccount,
     showToast,
-    isProcessing: isProcessingAction // <- Delegando el estado asíncrono para su prevención de doble click
+    isProcessing: isProcessingAction
   };
 
   const totalItemsInCart = activeCart.reduce((acc, curr) => acc + curr.qty, 0);
@@ -611,6 +545,54 @@ export const PosModal = ({
 
             <div className="relative z-[9999]">
                 
+                {/* MODAL CÁPSULA: SELECCIÓN DE RECOMPENSA */}
+                <AnimatePresence>
+                  {pendingPromoReward && (
+                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-lg w-full rounded-[2.5rem] shadow-2xl p-6 md:p-8 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+                      >
+                        <div className="flex items-center gap-4 mb-6">
+                          <div className="h-14 w-14 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-[1.25rem] flex items-center justify-center shrink-0">
+                            <Gift size={28} strokeWidth={2.5} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight">¡Promoción Desbloqueada!</h3>
+                            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">Elige tu producto GRATIS (Base)</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
+                          {allGlobalProducts
+                            .filter(p => pendingPromoReward.poolProductIds.includes(String(p.id)) && (!p.controlarStock || p.stock > 0))
+                            .map(p => (
+                              <motion.button
+                                key={p.id}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => claimPromoReward(p, pendingPromoReward.promo, pendingPromoReward.targetCuenta, pendingPromoReward.earnedGhosts)}
+                                className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-400 dark:md:hover:border-emerald-500 transition-all outline-none"
+                              >
+                                <span className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text text-center line-clamp-2">{p.nombre}</span>
+                                <span className="text-xs font-bold text-emerald-500 mt-2">Seleccionar</span>
+                              </motion.button>
+                          ))}
+                        </div>
+
+                        <motion.button 
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setPendingPromoReward(null)}
+                          className="w-full py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
+                        >
+                          No, gracias
+                        </motion.button>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
+
                 <AnimatePresence>
                   {promoWarning?.isOpen && (
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
@@ -626,7 +608,6 @@ export const PosModal = ({
                         <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text text-center mb-2 line-clamp-2">
                           Ruptura de Promoción
                         </h3>
-                        {/* Pilar 4 Tipografía: text-justify para textos descriptivos */}
                         <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify mb-8 leading-relaxed">
                           {promoWarning.message}
                         </p>

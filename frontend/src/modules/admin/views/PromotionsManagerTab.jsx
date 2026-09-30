@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Tag, Plus, Edit2, Trash2, Power, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, Tag, Plus, Edit2, Trash2, Power, Loader2, AlertTriangle, Globe, ShoppingBag } from 'lucide-react';
 import api from '../../../api/client';
 import PromotionManagerModal from './PromotionManagerModal';
 
@@ -13,7 +13,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
   const [promoToDelete, setPromoToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isToggling, setIsToggling] = useState(null); // Estado para bloqueo por ítem
+  const [isToggling, setIsToggling] = useState(null); 
 
   const fetchPromotions = async () => {
     try {
@@ -73,7 +73,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       'FIXED': 'Rebaja Directa',
       'NTH_FIXED': 'Unidad Adicional',
       'COMBO': 'Combo Armado',
-      'TICKET_DISCOUNT': 'Regalo/Descuento por Monto',
+      'TICKET_DISCOUNT': 'Monto de Ticket',
       'BOGO': 'Compra X, Llévate Y'
     };
     return types[type] || type;
@@ -86,15 +86,15 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         {/* HEADER */}
         <div className="p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex justify-between items-center bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
           <div className="flex items-center gap-4">
-            <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-3 rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30">
+            <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-3 rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30 shrink-0">
               <Tag size={28} strokeWidth={2.5} />
             </div>
-            <div>
-              <h2 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight">Motor de Promociones</h2>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Combos, descuentos por volumen y rebajas directas.</p>
+            <div className="min-w-0">
+              <h2 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight truncate">Motor de Promociones</h2>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 truncate">Combos, descuentos por volumen y rebajas directas.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => { setEditingPromo(null); setIsWizardOpen(true); }} 
@@ -102,13 +102,17 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
             >
               <Plus size={20} /> <span className="hidden sm:inline">Nueva Promoción</span>
             </motion.button>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={onClose} className="p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none">
+            <motion.button 
+              whileTap={{ scale: 0.95 }} 
+              onClick={onClose} 
+              className="p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none"
+            >
               <X size={24} />
             </motion.button>
           </div>
         </div>
 
-        {/* LISTA */}
+        {/* LISTA DE PROMOCIONES */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
           {isLoading ? (
             <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-orange-500 lya:text-lya-primary" size={40} /></div>
@@ -116,113 +120,129 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
             <div className="flex flex-col items-center justify-center h-full text-center">
               <Tag size={64} className="text-gray-300 dark:text-gray-700 lya:text-lya-text/20 mb-4" />
               <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text">Sin Promociones</h3>
-              <p className="text-gray-500 dark:text-gray-500 lya:text-lya-text/60">Crea tu primer combo o descuento para incentivar tus ventas.</p>
+              <p className="text-gray-500 dark:text-gray-500 lya:text-lya-text/60 mt-2 max-w-sm">Crea tu primer combo o descuento para incentivar tus ventas.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {promotions.map(promo => (
-                <div key={promo.id} className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] p-5 border shadow-sm flex flex-col transition-all duration-300 ${
-                  promo.isActive 
-                    ? 'border-orange-200 dark:border-orange-900/50 lya:border-lya-primary/40 shadow-orange-500/10 lya:shadow-lya-primary/10' 
-                    : 'border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-60 grayscale-[50%]'
-                }`}>
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="min-w-0 pr-2">
-                      <span className={`inline-block text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md mb-2 ${
-                        promo.isActive
-                          ? 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20 lya:text-lya-primary lya:bg-lya-primary/10'
-                          : 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800 lya:text-lya-text/50 lya:bg-lya-border/20'
-                      }`}>
-                        {getTypeName(promo.type)}
-                      </span>
-                      <h4 className={`text-lg font-black truncate w-full ${
-                        promo.isActive
-                          ? 'text-gray-800 dark:text-gray-100 lya:text-lya-text'
-                          : 'text-gray-500 dark:text-gray-500 lya:text-lya-text/60'
-                      }`}>
-                        {promo.name || 'Promoción sin título'}
-                      </h4>
-                    </div>
-                    <motion.button 
-                      whileTap={!isToggling ? { scale: 0.9 } : {}}
-                      onClick={() => handleToggleStatus(promo.id)} 
-                      disabled={isToggling === promo.id}
-                      className={`p-2.5 rounded-xl transition-all outline-none shrink-0 ${
-                        isToggling === promo.id
-                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-50 cursor-wait'
-                          : promo.isActive 
-                            ? 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 shadow-sm border border-emerald-200 dark:border-emerald-800/30' 
-                            : 'bg-gray-100 text-gray-400 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:text-lya-text/40 lya:md:hover:bg-lya-border/40 border border-transparent'
-                      }`} 
-                      title={promo.isActive ? 'Apagar' : 'Encender'}
-                    >
-                      {isToggling === promo.id ? <Loader2 size={20} className="animate-spin" /> : <Power size={20} strokeWidth={promo.isActive ? 2.5 : 2} />}
-                    </motion.button>
-                  </div>
+              {promotions.map(promo => {
+                const productCount = promo.applyToProducts?.length || 0;
+                const isGlobal = promo.type === 'TICKET_DISCOUNT' || productCount === 0;
 
-                  <p className={`text-sm font-medium flex-1 mb-4 text-justify ${
+                return (
+                  <div key={promo.id} className={`bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] p-5 border shadow-sm flex flex-col transition-all duration-300 ${
                     promo.isActive 
-                      ? 'text-gray-600 dark:text-gray-400 lya:text-lya-text/80' 
-                      : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/50'
+                      ? 'border-orange-200 dark:border-orange-900/50 lya:border-lya-primary/40 shadow-orange-500/10 lya:shadow-lya-primary/10' 
+                      : 'border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-60 grayscale-[50%]'
                   }`}>
-                    {promo.type === 'NxM' && `Lleva ${promo.buyQty} y paga ${promo.payQty}.`}
-                    {promo.type === 'FIXED' && `Precio rebajado a $${Number(promo.discountValue).toFixed(2)}.`}
-                    {promo.type === 'NTH_FIXED' && `Lleva ${promo.buyQty} y el último a $${Number(promo.discountValue).toFixed(2)}.`}
-                    {promo.type === 'COMBO' && `Combo a $${Number(promo.discountValue).toFixed(2)}.`}
-                    {promo.type === 'TICKET_DISCOUNT' && `Recompensa por tickets arriba de $${Number(promo.minTicketAmount).toFixed(2)}.`}
-                    {promo.type === 'BOGO' && `Compra ${promo.buyQty} y llévate ${promo.payQty} a $${Number(promo.discountValue).toFixed(2)}.`}
-                  </p>
-
-                  <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
-                    <div className="flex gap-1">
-                      {['D','L','M','X','J','V','S'].map((day, i) => {
-                        const isActiveDay = promo.validDays.includes(i);
-                        return (
-                          <span key={i} className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold ${
-                            isActiveDay 
-                              ? promo.isActive
-                                ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900 lya:bg-lya-text lya:text-lya-bg' 
-                                : 'bg-gray-400 text-white dark:bg-gray-600 dark:text-gray-300 lya:bg-lya-text/50 lya:text-lya-surface'
-                              : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-text/30'
-                          }`}>
-                            {day}
-                          </span>
-                        );
-                      })}
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="min-w-0 pr-2">
+                        <span className={`inline-block text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md mb-2 ${
+                          promo.isActive
+                            ? 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20 lya:text-lya-primary lya:bg-lya-primary/10'
+                            : 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800 lya:text-lya-text/50 lya:bg-lya-border/20'
+                        }`}>
+                          {getTypeName(promo.type)}
+                        </span>
+                        <h4 className={`text-lg font-black line-clamp-2 w-full leading-tight ${
+                          promo.isActive
+                            ? 'text-gray-800 dark:text-gray-100 lya:text-lya-text'
+                            : 'text-gray-500 dark:text-gray-500 lya:text-lya-text/60'
+                        }`}>
+                          {promo.name || 'Promoción sin título'}
+                        </h4>
+                      </div>
+                      <motion.button 
+                        whileTap={!isToggling ? { scale: 0.9 } : {}}
+                        onClick={() => handleToggleStatus(promo.id)} 
+                        disabled={isToggling === promo.id}
+                        className={`p-2.5 rounded-xl transition-all outline-none shrink-0 ${
+                          isToggling === promo.id
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-50 cursor-wait'
+                            : promo.isActive 
+                              ? 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 shadow-sm border border-emerald-200 dark:border-emerald-800/30' 
+                              : 'bg-gray-100 text-gray-400 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:text-lya-text/40 lya:md:hover:bg-lya-border/40 border border-transparent'
+                        }`} 
+                        title={promo.isActive ? 'Apagar' : 'Encender'}
+                      >
+                        {isToggling === promo.id ? <Loader2 size={20} className="animate-spin" /> : <Power size={20} strokeWidth={promo.isActive ? 2.5 : 2} />}
+                      </motion.button>
                     </div>
-                    <div className="flex gap-2">
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }} 
-                        onClick={() => { setEditingPromo(promo); setIsWizardOpen(true); }} 
-                        className={`p-2 rounded-xl outline-none transition-colors ${
-                          promo.isActive
-                            ? 'text-blue-600 bg-blue-50 md:hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary lya:md:hover:bg-lya-secondary/20'
-                            : 'text-gray-400 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 lya:bg-lya-border/20 lya:text-lya-text/40'
-                        }`}
-                      >
-                        <Edit2 size={16} />
-                      </motion.button>
-                      <motion.button 
-                        whileTap={{ scale: 0.9 }} 
-                        onClick={() => requestDelete(promo.id)} 
-                        className={`p-2 rounded-xl outline-none transition-colors ${
-                          promo.isActive
-                            ? 'text-red-600 bg-red-50 md:hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 lya:bg-red-500/10 lya:text-red-500 lya:md:hover:bg-red-500/20'
-                            : 'text-gray-400 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 lya:bg-lya-border/20 lya:text-lya-text/40'
-                        }`}
-                      >
-                        <Trash2 size={16} />
-                      </motion.button>
+
+                    <div className="flex-1 flex flex-col justify-center mb-4">
+                      <p className={`text-sm font-medium text-justify leading-relaxed ${
+                        promo.isActive 
+                          ? 'text-gray-600 dark:text-gray-400 lya:text-lya-text/80' 
+                          : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/50'
+                      }`}>
+                        {promo.type === 'NxM' && `Lleva ${promo.buyQty} y paga ${promo.payQty}.`}
+                        {promo.type === 'FIXED' && `Precio rebajado a $${Number(promo.discountValue).toFixed(2)}.`}
+                        {promo.type === 'NTH_FIXED' && `Lleva ${promo.buyQty} y el último a $${Number(promo.discountValue).toFixed(2)}.`}
+                        {promo.type === 'COMBO' && `Combo a $${Number(promo.discountValue).toFixed(2)}.`}
+                        {promo.type === 'TICKET_DISCOUNT' && `Recompensa por tickets arriba de $${Number(promo.minTicketAmount).toFixed(2)}.`}
+                        {promo.type === 'BOGO' && `Compra ${promo.buyQty} y llévate ${promo.payQty} a $${Number(promo.discountValue).toFixed(2)}.`}
+                      </p>
+                      
+                      {/* 🌟 INDICADOR VISUAL DEL ALCANCE */}
+                      <div className={`mt-3 flex items-center gap-1.5 text-xs font-bold ${promo.isActive ? 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60' : 'text-gray-400/70 dark:text-gray-500/70 lya:text-lya-text/40'}`}>
+                        {isGlobal ? (
+                          <><Globe size={14} /> Todo el ticket</>
+                        ) : (
+                          <><ShoppingBag size={14} /> Aplica a {productCount} producto{productCount !== 1 ? 's' : ''}</>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                      <div className="flex gap-1">
+                        {['D','L','M','X','J','V','S'].map((day, i) => {
+                          const isActiveDay = promo.validDays.includes(i);
+                          return (
+                            <span key={i} className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold ${
+                              isActiveDay 
+                                ? promo.isActive
+                                  ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900 lya:bg-lya-text lya:text-lya-bg' 
+                                  : 'bg-gray-400 text-white dark:bg-gray-600 dark:text-gray-300 lya:bg-lya-text/50 lya:text-lya-surface'
+                                : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600 lya:bg-lya-border/20 lya:text-lya-text/30'
+                            }`}>
+                              {day}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }} 
+                          onClick={() => { setEditingPromo(promo); setIsWizardOpen(true); }} 
+                          className={`p-2 rounded-xl outline-none transition-colors ${
+                            promo.isActive
+                              ? 'text-blue-600 bg-blue-50 md:hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 lya:bg-lya-secondary/10 lya:text-lya-secondary lya:md:hover:bg-lya-secondary/20'
+                              : 'text-gray-400 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 lya:bg-lya-border/20 lya:text-lya-text/40'
+                          }`}
+                        >
+                          <Edit2 size={16} />
+                        </motion.button>
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }} 
+                          onClick={() => requestDelete(promo.id)} 
+                          className={`p-2 rounded-xl outline-none transition-colors ${
+                            promo.isActive
+                              ? 'text-red-600 bg-red-50 md:hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 lya:bg-red-500/10 lya:text-red-500 lya:md:hover:bg-red-500/20'
+                              : 'text-gray-400 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 lya:bg-lya-border/20 lya:text-lya-text/40'
+                          }`}
+                        >
+                          <Trash2 size={16} />
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </motion.div>
 
-      {/* MODAL DE CONFIRMACIÓN */}
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN NEO-BENTO */}
       <AnimatePresence>
         {promoToDelete && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -235,30 +255,32 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
               className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center text-center relative z-10"
             >
               <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
-                <AlertTriangle size={36} />
+                <AlertTriangle size={36} strokeWidth={2.5} />
               </div>
               <h3 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text mb-2 text-center">¿Eliminar Promoción?</h3>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 px-2 text-center leading-relaxed">
-                Esta acción no se puede deshacer. La promoción dejará de aplicarse inmediatamente.
+              <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-8 px-2 text-center leading-relaxed">
+                Esta acción no se puede deshacer. La promoción dejará de aplicarse inmediatamente en todos los puntos de venta.
               </p>
               
               <div className="flex w-full gap-3">
-                <button 
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   disabled={isDeleting}
                   onClick={cancelDelete} 
-                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-colors outline-none disabled:opacity-50"
+                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-2xl font-black transition-colors outline-none disabled:opacity-50"
                 >
                   Cancelar
-                </button>
-                <button 
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
                   disabled={isDeleting}
                   onClick={confirmDelete} 
-                  className={`flex-1 py-3.5 bg-red-500 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center outline-none ${
-                    isDeleting ? 'opacity-70 cursor-not-allowed shadow-none' : 'active:scale-95 md:hover:bg-red-600 md:hover:-translate-y-0.5'
+                  className={`flex-1 py-3.5 bg-red-500 text-white rounded-2xl font-black transition-all flex items-center justify-center outline-none ${
+                    isDeleting ? 'opacity-70 cursor-wait shadow-none' : 'md:hover:bg-red-600 shadow-lg shadow-red-500/30'
                   }`}
                 >
-                  {isDeleting ? <Loader2 size={18} className="animate-spin" /> : 'Eliminar'}
-                </button>
+                  {isDeleting ? <Loader2 size={20} className="animate-spin" /> : 'Eliminar'}
+                </motion.button>
               </div>
             </motion.div>
           </div>

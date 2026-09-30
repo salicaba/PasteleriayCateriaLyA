@@ -113,8 +113,21 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
     } else if (formData.type !== 'TICKET_DISCOUNT' && formData.applyToProducts.length === 0) {
       showError("Selecciona al menos un producto para aplicar la promoción."); return;
     }
+
+    // 🌟 PROTECCIÓN DE GANANCIAS NEO-BENTO PARA NxM MULTI-PRODUCTO
+    if (formData.type === 'NxM' && formData.applyToProducts.length > 1) {
+      const selectedProds = products.filter(p => formData.applyToProducts.includes(p.id));
+      if (selectedProds.length > 1) {
+        const firstPrice = Number(selectedProds[0].precioBase || selectedProds[0].precio || 0).toFixed(2);
+        const allSamePrice = selectedProds.every(p => Number(p.precioBase || p.precio || 0).toFixed(2) === firstPrice);
+        if (!allSamePrice) {
+          showError("Protección de Ganancias: Para promociones de Volumen (NxM) con varios productos, todos deben tener exactamente el mismo precio base.");
+          return;
+        }
+      }
+    }
     
-    const cleanBuyQty = parseInt(formData.buyQty) || 1; // Para BOGO puede ser 1
+    const cleanBuyQty = parseInt(formData.buyQty) || 1; 
     const cleanPayQty = parseInt(formData.payQty) || 1;
     const cleanDiscountValue = parseFloat(formData.discountValue) || 0;
     const cleanMinTicketAmount = parseFloat(formData.minTicketAmount) || 0;
@@ -197,7 +210,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-8">
               
-              {/* BLOQUE 1: NOMBRE */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">1</div>
@@ -210,7 +222,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 />
               </div>
 
-              {/* BLOQUE 2: TIPO */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">2</div>
@@ -237,7 +248,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </div>
               </div>
 
-              {/* BLOQUE 3: PRODUCTOS */}
               {formData.type !== 'TICKET_DISCOUNT' && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
@@ -247,7 +257,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                   
                   {formData.type === 'BOGO' ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* BOGO: LO QUE DEBE COMPRAR */}
                       <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-4 border border-gray-200 dark:border-gray-800">
                         <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2"><ShoppingBag size={16}/> Lo que debe comprar:</h4>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 px-4 py-2.5 rounded-xl mb-4 border border-gray-200 dark:border-gray-700">
@@ -269,7 +278,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         </div>
                       </div>
 
-                      {/* BOGO: EL PREMIO */}
                       <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-4 border border-emerald-200 dark:border-emerald-800 shadow-sm shadow-emerald-500/10">
                         <h4 className="font-bold text-sm text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Gift size={16}/> Lo que se lleva de premio:</h4>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 px-4 py-2.5 rounded-xl mb-4 border border-gray-200 dark:border-gray-700">
@@ -317,7 +325,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </div>
               )}
 
-              {/* BLOQUE 4: REGLAS MATEMÁTICAS */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
@@ -441,7 +448,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </motion.div>
               </div>
 
-              {/* BLOQUE 5: DÍAS Y ESTADO */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
@@ -475,7 +481,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
               </div>
             </div>
 
-            {/* FOOTER */}
             <div className="p-6 md:p-8 border-t border-gray-200 dark:border-gray-800 shrink-0 bg-white dark:bg-gray-900">
               <motion.button whileTap={{ scale: 0.98 }} onClick={handleSave} disabled={isProcessing} className={`w-full py-4 sm:py-5 bg-rose-500 text-white font-black text-lg rounded-2xl md:hover:bg-rose-600 transition-all flex items-center justify-center gap-3 shadow-xl shadow-rose-500/20 outline-none ${isProcessing ? 'opacity-70 cursor-wait shadow-none' : ''}`}>
                 {isProcessing ? <Loader2 className="animate-spin" size={24} strokeWidth={3} /> : <><Save size={24} strokeWidth={2.5} /> {editData ? 'Guardar Cambios' : 'Guardar Promoción'}</>}
