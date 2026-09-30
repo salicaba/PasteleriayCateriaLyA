@@ -568,25 +568,46 @@ export const PosModal = ({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
-                            {allGlobalProducts
-                              .filter(p => {
-                                // Comparamos forzando minúsculas por si los UUIDs vienen con diferente formato
-                                const isMatch = pendingPromoReward.poolProductIds.some(promoId => String(promoId).toLowerCase() === String(p.id).toLowerCase());
-                                const hasStock = !p.controlarStock || p.stock > 0;
-                                return isMatch && hasStock;
-                              })
-                              .map(p => (
-                              <motion.button
-                                key={p.id}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => claimPromoReward(p, pendingPromoReward.promo, pendingPromoReward.targetCuenta, pendingPromoReward.earnedGhosts)}
-                                className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-400 dark:md:hover:border-emerald-500 transition-all outline-none"
-                              >
-                                <span className="text-sm font-black text-gray-800 dark:text-white lya:text-lya-text text-center line-clamp-2">{p.nombre}</span>
-                                <span className="text-xs font-bold text-emerald-500 mt-2">Seleccionar</span>
-                              </motion.button>
-                          ))}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
+                          {allGlobalProducts
+                            .filter(p => {
+                              const isMatch = pendingPromoReward.poolProductIds.some(promoId => String(promoId).toLowerCase() === String(p.id).toLowerCase());
+                              const hasStock = !p.controlarStock || p.stock > 0;
+                              return isMatch && hasStock;
+                            })
+                            .map(p => {
+                              // 🌟 Soporte universal para el nombre y la imagen
+                              const pName = p.nombre || p.name || 'Producto';
+                              const pImage = p.imageUrl || p.imagen || p.image || null;
+
+                              return (
+                                <motion.button
+                                  key={p.id}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => claimPromoReward(p, pendingPromoReward.promo, pendingPromoReward.targetCuenta, pendingPromoReward.earnedGhosts)}
+                                  className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-400 dark:md:hover:border-emerald-500 transition-all outline-none group"
+                                >
+                                  {pImage ? (
+                                    <img 
+                                      src={pImage} 
+                                      alt={pName} 
+                                      className="w-14 h-14 rounded-full object-cover mb-2 border border-gray-200 dark:border-gray-700 shadow-sm"
+                                    />
+                                  ) : (
+                                    <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-700 mb-2 flex items-center justify-center shadow-sm">
+                                      <Gift size={24} className="text-gray-400 dark:text-gray-500" />
+                                    </div>
+                                  )}
+                                  
+                                  <span className="text-[11px] sm:text-xs font-black text-gray-800 dark:text-white lya:text-lya-text text-center line-clamp-2 w-full leading-tight">
+                                    {pName}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-emerald-500 mt-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                                    Seleccionar
+                                  </span>
+                                </motion.button>
+                              );
+                            })}
                         </div>
 
                         <motion.button 
