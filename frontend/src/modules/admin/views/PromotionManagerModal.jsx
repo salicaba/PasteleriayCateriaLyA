@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Tag, Loader2, Save, Calendar, Power, AlertTriangle, CheckCircle2, ArrowRight, DollarSign, CheckSquare, AlertCircle, ShoppingBag, Search } from 'lucide-react';
+import { X, Tag, Loader2, Save, Calendar, Power, AlertTriangle, CheckCircle2, ArrowRight, DollarSign, CheckSquare, AlertCircle, Search } from 'lucide-react';
 import api from '../../../api/client'; 
 
 const DAYS_OF_WEEK = [
@@ -111,7 +111,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
         payQty: cleanPayQty,
         discountValue: cleanDiscountValue,
         minTicketAmount: cleanMinTicketAmount,
-        productId: null // Aseguramos que sea global
+        productId: null 
       };
 
       let res;
@@ -145,7 +145,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
           
-          {/* NOTIFICACIÓN FLOTANTE */}
           <AnimatePresence>
             {errorToast && (
               <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className="fixed top-8 left-0 right-0 z-[110] flex justify-center px-4 pointer-events-none">
@@ -157,7 +156,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
             )}
           </AnimatePresence>
 
-          {/* CONTENEDOR RAÍZ */}
           <motion.div initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.98 }} transition={{ duration: 0.3 }} className="w-full max-w-4xl max-h-[95vh] bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800 lya:border-lya-border/40">
             
             {/* HEADER FIJO */}
@@ -168,29 +166,27 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text truncate tracking-tight">{editData ? 'Editar Promoción' : 'Nueva Promoción General'}</h2>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Configura reglas globales para el menú</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Configura reglas matemáticas a prueba de fallos</p>
                 </div>
               </div>
-              <button onClick={onClose} disabled={isProcessing} className="absolute top-6 right-6 sm:relative sm:top-auto sm:right-auto h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"><X size={24} strokeWidth={2.5} /></button>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} disabled={isProcessing} className="absolute top-6 right-6 sm:relative sm:top-auto sm:right-auto h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/60 flex items-center justify-center md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"><X size={24} strokeWidth={2.5} /></motion.button>
             </div>
 
             {/* BODY SCROLLEABLE */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-8">
               
-              {/* BLOQUE 1: NOMBRE */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">1</div>
                   <h3 className="text-lg font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight">Nombre de la Promoción</h3>
                 </div>
                 <input 
-                  type="text" placeholder="Ej: Lunes de Frappés 2x1" 
+                  type="text" placeholder="Ej: Jueves de Frappés 2x1 o -$10 en Postres" 
                   value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="w-full p-4 rounded-2xl bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 font-bold text-gray-800 dark:text-white lya:text-lya-text focus:ring-2 focus:ring-rose-500 outline-none"
                 />
               </div>
 
-              {/* BLOQUE 2: TIPO */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">2</div>
@@ -200,10 +196,10 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
                     { id: 'NxM', title: 'Volumen (NxM)', desc: 'Ej: 3x2. Lleva más, paga menos.' },
-                    { id: 'FIXED', title: 'Rebaja Directa', desc: 'Reduce el precio de cada unidad.' },
-                    { id: 'NTH_FIXED', title: 'Unidad Adicional', desc: 'Ej: El segundo a mitad de precio.' },
-                    { id: 'COMBO', title: 'Combo Armado', desc: 'Precio especial por llevar el conjunto.' },
-                    { id: 'TICKET_DISCOUNT', title: 'Promo por Monto', desc: 'Descuento si el ticket supera $X.' }
+                    { id: 'FIXED', title: 'Rebaja en Pesos', desc: 'Descuenta $X pesos a cada producto.' },
+                    { id: 'NTH_FIXED', title: 'Unidad Adicional', desc: 'Descuenta $X pesos en la segunda unidad.' },
+                    { id: 'COMBO', title: 'Combo Armado', desc: 'Precio cerrado al llevar ciertos productos.' },
+                    { id: 'TICKET_DISCOUNT', title: 'Promo por Monto', desc: 'Descuento si el ticket supera $X pesos.' }
                   ].map((t) => (
                     <motion.button key={t.id} whileTap={{ scale: 0.97 }} onClick={() => setFormData({ ...formData, type: t.id })} className={`p-4 rounded-[1.5rem] border text-left transition-all outline-none ${formData.type === t.id ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-500 shadow-md shadow-rose-500/10' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'}`}>
                       <div className="flex justify-between items-start mb-2">
@@ -216,7 +212,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </div>
               </div>
 
-              {/* BLOQUE 3: PRODUCTOS INVOLUCRADOS */}
               {formData.type !== 'TICKET_DISCOUNT' && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
@@ -236,7 +231,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                       {filteredProducts.map(p => {
                         const isSelected = formData.applyToProducts.includes(p.id);
                         return (
-                          <label key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800' : 'bg-gray-50 border-transparent dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                          <label key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800' : 'bg-gray-50 border-transparent dark:bg-gray-800 md:hover:bg-gray-100 dark:md:hover:bg-gray-700'}`}>
                             <input type="checkbox" className="w-4 h-4 text-rose-500 rounded focus:ring-rose-500 accent-rose-500" checked={isSelected} onChange={() => toggleProductSelection(p.id)} />
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm font-bold truncate ${isSelected ? 'text-rose-900 dark:text-rose-100' : 'text-gray-700 dark:text-gray-300'}`}>{p.nombre || p.name}</p>
@@ -250,22 +245,20 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </div>
               )}
 
-              {/* BLOQUE 4: REGLAS MATEMÁTICAS */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
                     {formData.type !== 'TICKET_DISCOUNT' ? '4' : '3'}
                   </div>
-                  <h3 className="text-lg font-black text-gray-800 dark:text-white tracking-tight">Reglas Matemáticas</h3>
+                  <h3 className="text-lg font-black text-gray-800 dark:text-white tracking-tight">Reglas Matemáticas en Pesos ($)</h3>
                 </div>
                 
                 <motion.div layout className="bg-white dark:bg-gray-900 rounded-[2rem] p-6 sm:p-8 border border-gray-200 dark:border-gray-800 shadow-sm">
                   
-                  {/* NxM LENGUAJE NATURAL */}
                   {formData.type === 'NxM' && (
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-4">
                       <div className="flex flex-col items-center w-full sm:w-auto">
-                        <span className="text-sm font-bold text-gray-500 mb-3">El cliente añade al carrito:</span>
+                        <span className="text-sm font-bold text-gray-500 mb-3 text-center">El cliente añade al carrito:</span>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 rounded-2xl border p-2 w-full sm:w-auto">
                           <input type="number" min="2" value={formData.buyQty === 0 ? '' : formData.buyQty} onChange={(e) => setFormData({...formData, buyQty: e.target.value})} className="w-20 bg-transparent text-center text-3xl font-black focus:outline-none focus:text-rose-500 dark:text-white" placeholder="2" />
                           <span className="text-sm font-bold text-gray-400 pr-4">unidades</span>
@@ -273,7 +266,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                       </div>
                       <div className="hidden sm:flex bg-gray-100 dark:bg-gray-800 rounded-full p-3 text-gray-400"><ArrowRight size={24} strokeWidth={3} /></div>
                       <div className="flex flex-col items-center w-full sm:w-auto">
-                        <span className="text-sm font-bold text-gray-500 mb-3">Pero el sistema solo cobra:</span>
+                        <span className="text-sm font-bold text-gray-500 mb-3 text-center">Pero el sistema solo cobra:</span>
                         <div className="flex items-center bg-rose-50 dark:bg-rose-900/10 rounded-2xl border border-rose-200 dark:border-rose-800 p-2 w-full sm:w-auto">
                           <input type="number" min="1" value={formData.payQty === 0 ? '' : formData.payQty} onChange={(e) => setFormData({...formData, payQty: e.target.value})} className="w-20 bg-transparent text-center text-3xl font-black text-rose-600 dark:text-rose-500 focus:outline-none" placeholder="1" />
                           <span className="text-sm font-bold text-rose-400 pr-4">unidades</span>
@@ -282,11 +275,11 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                     </div>
                   )}
 
-                  {/* FIXED & COMBO */}
-                  {(formData.type === 'FIXED' || formData.type === 'COMBO') && (
+                  {/* 🔥 NUEVO: FIXED AHORA ES DESCUENTO EN PESOS DIRECTO */}
+                  {formData.type === 'FIXED' && (
                     <div className="flex flex-col items-center">
                       <span className="text-sm font-bold text-gray-500 mb-4 text-center">
-                        {formData.type === 'COMBO' ? 'El precio total por todo el combo será de:' : 'El precio individual de los productos seleccionados bajará a:'}
+                        ¿Cuántos pesos se le restarán al precio de CADA producto seleccionado?
                       </span>
                       <div className="flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-[2rem] border px-6 py-4 w-full sm:w-1/2">
                         <DollarSign size={32} className="text-emerald-500 mr-2" strokeWidth={3} />
@@ -295,7 +288,17 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                     </div>
                   )}
 
-                  {/* NTH_FIXED */}
+                  {formData.type === 'COMBO' && (
+                    <div className="flex flex-col items-center">
+                      <span className="text-sm font-bold text-gray-500 mb-4 text-center">El precio TOTAL CERRADO por todo el combo será de:</span>
+                      <div className="flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-[2rem] border px-6 py-4 w-full sm:w-1/2">
+                        <DollarSign size={32} className="text-emerald-500 mr-2" strokeWidth={3} />
+                        <input type="number" min="0" step="any" placeholder="0.00" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-full bg-transparent text-center text-5xl font-black dark:text-white focus:outline-none focus:text-emerald-600" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🔥 NUEVO: NTH_FIXED AHORA DESCUENTA PESOS A LA SEGUNDA UNIDAD */}
                   {formData.type === 'NTH_FIXED' && (
                     <div className="flex flex-col items-center w-full">
                       <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
@@ -306,8 +309,8 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         <span className="text-sm font-bold text-gray-500">unidades...</span>
                       </div>
                       <div className="w-full h-px bg-gray-100 dark:bg-gray-800 my-6"></div>
-                      <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
-                        <span className="text-sm font-bold text-gray-500">...la <strong className="dark:text-white">ÚLTIMA</strong> unidad costará:</span>
+                      <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center text-center">
+                        <span className="text-sm font-bold text-gray-500">...a la <strong className="dark:text-white">ÚLTIMA</strong> unidad se le descontarán:</span>
                         <div className="flex items-center bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-200 dark:border-blue-800 px-4 py-2">
                           <DollarSign size={20} className="text-blue-500 mr-1" strokeWidth={3} />
                           <input type="number" min="0" step="any" placeholder="0.00" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-20 bg-transparent text-center text-3xl font-black text-blue-600 focus:outline-none" />
@@ -316,11 +319,10 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                     </div>
                   )}
 
-                  {/* TICKET DISCOUNT */}
                   {formData.type === 'TICKET_DISCOUNT' && (
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-4">
                       <div className="flex flex-col items-center w-full sm:w-auto">
-                        <span className="text-sm font-bold text-gray-500 mb-3">Si el ticket supera los:</span>
+                        <span className="text-sm font-bold text-gray-500 mb-3 text-center">Si el ticket supera los:</span>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 rounded-2xl border p-2 w-full sm:w-auto">
                           <DollarSign size={20} className="text-gray-400 ml-2" strokeWidth={3} />
                           <input type="number" min="1" value={formData.minTicketAmount === 0 ? '' : formData.minTicketAmount} onChange={(e) => setFormData({...formData, minTicketAmount: e.target.value})} className="w-24 bg-transparent text-center text-3xl font-black focus:outline-none focus:text-emerald-500 dark:text-white" placeholder="300" />
@@ -328,7 +330,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                       </div>
                       <div className="hidden sm:flex bg-gray-100 dark:bg-gray-800 rounded-full p-3 text-gray-400"><ArrowRight size={24} strokeWidth={3} /></div>
                       <div className="flex flex-col items-center w-full sm:w-auto">
-                        <span className="text-sm font-bold text-gray-500 mb-3">Descontar del total:</span>
+                        <span className="text-sm font-bold text-gray-500 mb-3 text-center">Descontar del total:</span>
                         <div className="flex items-center bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-2 w-full sm:w-auto">
                           <DollarSign size={20} className="text-emerald-500 ml-2" strokeWidth={3} />
                           <input type="number" min="1" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-24 bg-transparent text-center text-3xl font-black text-emerald-600 focus:outline-none" placeholder="50" />
@@ -339,10 +341,9 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </motion.div>
               </div>
 
-              {/* BLOQUE 5: DÍAS Y ESTADO */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gray-800 dark:bg-white text-white dark:text-gray-900 h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
+                  <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
                     {formData.type !== 'TICKET_DISCOUNT' ? '5' : '4'}
                   </div>
                   <h3 className="text-lg font-black text-gray-800 dark:text-white tracking-tight">Activación</h3>
@@ -375,8 +376,8 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
 
             {/* FOOTER */}
             <div className="p-6 md:p-8 border-t border-gray-200 dark:border-gray-800 shrink-0 bg-white dark:bg-gray-900">
-              <motion.button whileTap={{ scale: 0.98 }} onClick={handleSave} disabled={isProcessing} className={`w-full py-4 sm:py-5 bg-rose-500 text-white font-black text-lg rounded-2xl hover:bg-rose-600 transition-all flex items-center justify-center gap-3 shadow-xl shadow-rose-500/20 ${isProcessing ? 'opacity-70 cursor-wait' : ''}`}>
-                {isProcessing ? <Loader2 className="animate-spin" size={24} /> : <><Save size={24} /> {editData ? 'Guardar Cambios' : 'Guardar Promoción'}</>}
+              <motion.button whileTap={{ scale: 0.98 }} onClick={handleSave} disabled={isProcessing} className={`w-full py-4 sm:py-5 bg-rose-500 text-white font-black text-lg rounded-2xl md:hover:bg-rose-600 transition-all flex items-center justify-center gap-3 shadow-xl shadow-rose-500/20 ${isProcessing ? 'opacity-70 cursor-wait shadow-none' : ''}`}>
+                {isProcessing ? <Loader2 className="animate-spin" size={24} strokeWidth={3} /> : <><Save size={24} strokeWidth={2.5} /> {editData ? 'Guardar Cambios' : 'Guardar Promoción'}</>}
               </motion.button>
             </div>
 
