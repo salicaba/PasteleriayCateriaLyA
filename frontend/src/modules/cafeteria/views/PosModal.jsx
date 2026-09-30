@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
