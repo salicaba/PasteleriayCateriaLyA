@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../../config/database.js'; // 🔥 FIX: Importación por defecto sin llaves
+import sequelize from '../../config/database.js';
 import Product from './Product.model.js';
 
 const Promotion = sequelize.define('Promotion', {
@@ -8,43 +8,66 @@ const Promotion = sequelize.define('Promotion', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  // 🔥 AHORA OPCIONAL: Si es null, es una promoción global/general
   productId: {
     type: DataTypes.UUID,
-    allowNull: false,
-    //unique: true, // Un producto solo puede tener una promo activa a la vez
+    allowNull: true,
     references: {
       model: Product,
       key: 'id'
     },
     onDelete: 'CASCADE'
   },
+  // 🔥 NUEVOS CAMPOS: Arreglos para combos y volumen general
+  applyToProducts: {
+    type: DataTypes.ARRAY(DataTypes.UUID),
+    allowNull: true,
+    defaultValue: [], // Productos que activan la promo (Ej: Frappé Moka, Frappé Vainilla)
+  },
+  rewardProducts: {
+    type: DataTypes.ARRAY(DataTypes.UUID),
+    allowNull: true,
+    defaultValue: [], // Productos que se dan de regalo o con descuento (Ej: Rebanada de Pastel)
+  },
+  // 🔥 TIPOS ACTUALIZADOS: NxM, FIXED (Rebaja Directa), NTH_FIXED (Unidad Adicional), COMBO (Armado), TICKET_DISCOUNT (Regalo por Monto)
   type: {
-    type: DataTypes.ENUM('NxM', 'FIXED', 'NTH_FIXED'), // 🔥 ACTUALIZADO
+    type: DataTypes.ENUM('NxM', 'FIXED', 'NTH_FIXED', 'COMBO', 'TICKET_DISCOUNT'),
     allowNull: false,
     defaultValue: 'NxM',
   },
   buyQty: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 1, // Ej: Lleva 3
+    defaultValue: 1, 
   },
   payQty: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 1, // Ej: Paga 2
+    defaultValue: 1, 
   },
   discountValue: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
     defaultValue: 0.00,
   },
+  // 🔥 NUEVO CAMPO: Para la promo de Regalo/Descuento por Monto de Ticket
+  minTicketAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: 0.00, // Si el ticket suma más de X cantidad, se activa
+  },
   validDays: {
     type: DataTypes.ARRAY(DataTypes.INTEGER),
-    defaultValue: [0, 1, 2, 3, 4, 5, 6], // Días de la semana que aplica (0=Dom, 6=Sab)
+    defaultValue: [0, 1, 2, 3, 4, 5, 6], 
   },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
+  },
+  // 🔥 NUEVO CAMPO: Para darle un nombre descriptivo a la promoción en el Gestor Central (Ej: "Lunes de Frappés")
+  name: {
+    type: DataTypes.STRING,
+    allowNull: true,
   }
 }, {
   tableName: 'promotions',

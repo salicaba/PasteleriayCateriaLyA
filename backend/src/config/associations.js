@@ -38,11 +38,11 @@ export const setupAssociations = () => {
   Transaction.belongsTo(User, { foreignKey: 'cancelledBy', as: 'canceller' });
 
   // ==========================================
-  // RELACIONES: PROMOCIONES (MOTOR RAPPI/NUEVO)
+  // RELACIONES: PROMOCIONES (MOTOR GLOBAL Y ESPECÍFICO)
   // ==========================================
-  // Un Producto puede tener una Promoción activa configurada
-  Product.hasOne(Promotion, { foreignKey: 'productId', as: 'promotion' });
-  Promotion.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+  // Un Producto puede tener muchas promociones (o ninguna), y una promo puede no tener un producto padre (global)
+  Product.hasMany(Promotion, { foreignKey: 'productId', as: 'promotions' });
+  Promotion.belongsTo(Product, { foreignKey: 'productId', as: 'product', constraints: false });
 
   // ==========================================
   // RELACIONES: CONTROL DE INVENTARIO
