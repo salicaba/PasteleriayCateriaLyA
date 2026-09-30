@@ -29,9 +29,9 @@ const Promotion = sequelize.define('Promotion', {
     allowNull: true,
     defaultValue: [], // Productos que se dan de regalo o con descuento (Ej: Rebanada de Pastel)
   },
-  // 🔥 TIPOS ACTUALIZADOS: NxM, FIXED (Rebaja Directa), NTH_FIXED (Unidad Adicional), COMBO (Armado), TICKET_DISCOUNT (Regalo por Monto)
+  // 🔥 TIPOS ACTUALIZADOS: Agregamos 'BOGO' al final
   type: {
-    type: DataTypes.ENUM('NxM', 'FIXED', 'NTH_FIXED', 'COMBO', 'TICKET_DISCOUNT'),
+    type: DataTypes.ENUM('NxM', 'FIXED', 'NTH_FIXED', 'COMBO', 'TICKET_DISCOUNT', 'BOGO'),
     allowNull: false,
     defaultValue: 'NxM',
   },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Tag, Plus, Edit2, Trash2, Power, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Tag, Plus, Edit2, Trash2, Power, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import api from '../../../api/client';
 import PromotionManagerModal from './PromotionManagerModal';
 
@@ -13,6 +13,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
   const [promoToDelete, setPromoToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isToggling, setIsToggling] = useState(null); // Estado para bloqueo por ítem
 
   const fetchPromotions = async () => {
     try {
@@ -28,18 +29,23 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
   useEffect(() => {
     if (isOpen) fetchPromotions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const handleToggleStatus = async (id) => {
+    if (isToggling) return;
+    setIsToggling(id);
     try {
       await api.patch(`/promotions/${id}/toggle`);
-      fetchPromotions();
+      await fetchPromotions();
     } catch (error) {
       if (error.response?.status === 409) {
         showToast(error.response.data.message, "warning");
       } else {
         showToast("Error al cambiar estado", "error");
       }
+    } finally {
+      setIsToggling(null);
     }
   };
 
@@ -47,12 +53,12 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
   const cancelDelete = () => setPromoToDelete(null);
 
   const confirmDelete = async () => {
-    if (!promoToDelete) return;
+    if (!promoToDelete || isDeleting) return;
     setIsDeleting(true);
     try {
       await api.delete(`/promotions/${promoToDelete}`);
       showToast("Promoción eliminada", "success");
-      fetchPromotions();
+      await fetchPromotions();
     } catch (error) {
       showToast("Error al eliminar", "error");
     } finally {
@@ -67,17 +73,18 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       'FIXED': 'Rebaja Directa',
       'NTH_FIXED': 'Unidad Adicional',
       'COMBO': 'Combo Armado',
-      'TICKET_DISCOUNT': 'Regalo/Descuento por Monto'
+      'TICKET_DISCOUNT': 'Regalo/Descuento por Monto',
+      'BOGO': 'Compra X, Llévate Y'
     };
     return types[type] || type;
   };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[90vh]">
+      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} transition={{ duration: 0.4, ease: "easeOut" }} className="bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[90vh]">
         
         {/* HEADER */}
-        <div className="p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex justify-between items-center bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0">
+        <div className="p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex justify-between items-center bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
           <div className="flex items-center gap-4">
             <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-3 rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30">
               <Tag size={28} strokeWidth={2.5} />
@@ -137,20 +144,23 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                       </h4>
                     </div>
                     <motion.button 
-                      whileTap={{ scale: 0.9 }} 
+                      whileTap={!isToggling ? { scale: 0.9 } : {}}
                       onClick={() => handleToggleStatus(promo.id)} 
+                      disabled={isToggling === promo.id}
                       className={`p-2.5 rounded-xl transition-all outline-none shrink-0 ${
-                        promo.isActive 
-                          ? 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 shadow-sm border border-emerald-200 dark:border-emerald-800/30' 
-                          : 'bg-gray-100 text-gray-400 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:text-lya-text/40 lya:md:hover:bg-lya-border/40 border border-transparent'
+                        isToggling === promo.id
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-50 cursor-wait'
+                          : promo.isActive 
+                            ? 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20 shadow-sm border border-emerald-200 dark:border-emerald-800/30' 
+                            : 'bg-gray-100 text-gray-400 md:hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:text-lya-text/40 lya:md:hover:bg-lya-border/40 border border-transparent'
                       }`} 
                       title={promo.isActive ? 'Apagar' : 'Encender'}
                     >
-                      <Power size={20} strokeWidth={promo.isActive ? 2.5 : 2} />
+                      {isToggling === promo.id ? <Loader2 size={20} className="animate-spin" /> : <Power size={20} strokeWidth={promo.isActive ? 2.5 : 2} />}
                     </motion.button>
                   </div>
 
-                  <p className={`text-sm font-medium flex-1 mb-4 ${
+                  <p className={`text-sm font-medium flex-1 mb-4 text-justify ${
                     promo.isActive 
                       ? 'text-gray-600 dark:text-gray-400 lya:text-lya-text/80' 
                       : 'text-gray-400 dark:text-gray-500 lya:text-lya-text/50'
@@ -160,6 +170,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                     {promo.type === 'NTH_FIXED' && `Lleva ${promo.buyQty} y el último a $${Number(promo.discountValue).toFixed(2)}.`}
                     {promo.type === 'COMBO' && `Combo a $${Number(promo.discountValue).toFixed(2)}.`}
                     {promo.type === 'TICKET_DISCOUNT' && `Recompensa por tickets arriba de $${Number(promo.minTicketAmount).toFixed(2)}.`}
+                    {promo.type === 'BOGO' && `Compra ${promo.buyQty} y llévate ${promo.payQty} a $${Number(promo.discountValue).toFixed(2)}.`}
                   </p>
 
                   <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
