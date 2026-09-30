@@ -92,7 +92,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
 
   const showError = (message) => {
     setErrorToast(message);
-    setTimeout(() => setErrorToast(null), 4500);
+    setTimeout(() => setErrorToast(null), 5000);
   };
 
   const handleSave = async () => {
@@ -114,15 +114,22 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       showError("Selecciona al menos un producto para aplicar la promoción."); return;
     }
 
-    // 🌟 PROTECCIÓN DE GANANCIAS NEO-BENTO PARA NxM MULTI-PRODUCTO
+    // 🌟 PROTECCIÓN DE GANANCIAS NEO-BENTO EXTREMA
     if (formData.type === 'NxM' && formData.applyToProducts.length > 1) {
-      const selectedProds = products.filter(p => formData.applyToProducts.includes(p.id));
+      // Forzamos conversión a String para evitar fallos de ID numérico vs ID texto
+      const selectedIds = formData.applyToProducts.map(String);
+      const selectedProds = products.filter(p => selectedIds.includes(String(p.id)));
+      
       if (selectedProds.length > 1) {
-        const firstPrice = Number(selectedProds[0].precioBase || selectedProds[0].precio || 0).toFixed(2);
-        const allSamePrice = selectedProds.every(p => Number(p.precioBase || p.precio || 0).toFixed(2) === firstPrice);
+        // Buscamos el precio sin importar cómo venga del backend
+        const getPrice = (p) => Number(p.precio || p.basePrice || p.precioBase || 0).toFixed(2);
+        
+        const firstPrice = getPrice(selectedProds[0]);
+        const allSamePrice = selectedProds.every(p => getPrice(p) === firstPrice);
+        
         if (!allSamePrice) {
-          showError("Protección de Ganancias: Para promociones de Volumen (NxM) con varios productos, todos deben tener exactamente el mismo precio base.");
-          return;
+          showError(`ALERTA DE PÉRDIDA: Todos los productos en una promo NxM deben valer lo mismo. Seleccionaste productos con precios distintos.`);
+          return; // ⛔ BLOQUEO ESTRICTO DE GUARDADO
         }
       }
     }
@@ -182,12 +189,22 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
           
+          {/* CÁPSULA NEO-BENTO DE ERROR (ESTA ES LA QUE TE AVISARÁ SI HAY PRECIOS DISTINTOS) */}
           <AnimatePresence>
             {errorToast && (
-              <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className="fixed top-8 left-0 right-0 z-[110] flex justify-center px-4 pointer-events-none">
-                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-full shadow-2xl border border-red-100 dark:border-red-900/30 lya:border-red-500/30 px-6 py-4 flex items-center gap-3 max-w-md w-full sm:w-auto">
-                  <div className="bg-red-100 dark:bg-red-500/20 text-red-500 p-1.5 rounded-full shrink-0"><AlertTriangle size={20} /></div>
-                  <span className="text-sm font-bold text-gray-800 dark:text-gray-100 lya:text-lya-text text-center tracking-wide">{errorToast}</span>
+              <motion.div 
+                initial={{ opacity: 0, y: -20, scale: 0.9 }} 
+                animate={{ opacity: 1, y: 0, scale: 1 }} 
+                exit={{ opacity: 0, scale: 0.9, y: -20 }} 
+                className="fixed top-8 left-0 right-0 z-[150] flex justify-center px-4 pointer-events-none"
+              >
+                <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-full shadow-[0_20px_50px_-12px_rgba(244,63,94,0.35)] border border-red-200 dark:border-red-900/40 lya:border-red-500/40 px-6 py-4 flex items-center gap-3 max-w-lg w-full sm:w-auto">
+                  <div className="bg-red-100 dark:bg-red-500/20 text-red-500 p-1.5 rounded-full shrink-0">
+                    <AlertTriangle size={24} strokeWidth={2.5} />
+                  </div>
+                  <span className="text-[13px] sm:text-sm font-bold text-gray-800 dark:text-gray-100 lya:text-lya-text text-center tracking-wide leading-tight">
+                    {errorToast}
+                  </span>
                 </div>
               </motion.div>
             )}
@@ -314,7 +331,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                               <input type="checkbox" className="w-4 h-4 text-rose-500 rounded focus:ring-rose-500 accent-rose-500" checked={isSelected} onChange={() => toggleProductSelection(p.id)} />
                               <div className="flex-1 min-w-0">
                                 <p className={`text-sm font-bold truncate ${isSelected ? 'text-rose-900 dark:text-rose-100' : 'text-gray-700 dark:text-gray-300'}`}>{p.nombre || p.name}</p>
-                                <p className="text-xs text-gray-500">${Number(p.precio || p.basePrice || 0).toFixed(2)}</p>
+                                <p className="text-xs text-gray-500">${Number(p.precio || p.basePrice || p.precioBase || 0).toFixed(2)}</p>
                               </div>
                             </label>
                           )
