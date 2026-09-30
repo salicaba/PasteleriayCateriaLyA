@@ -86,15 +86,12 @@ export const PosModal = ({
   const isVitrina = mesa?.zona === 'vitrina' || mesa?.id === 'VITRINA-EXPRESS';
 
   const { 
-    dbCategories, activePromotions, filtroTexto, setFiltroTexto, 
+    dbProducts, dbCategories, activePromotions, filtroTexto, setFiltroTexto, 
     categoriaActiva, setCategoriaActiva, filteredProducts 
   } = usePosMenu(isVitrina);
 
-  // Aplanamos todas las categorías a prueba de fallos (Soporta Products, products o productos)
-  const allGlobalProducts = useMemo(() => {
-    if (!dbCategories || !Array.isArray(dbCategories)) return [];
-    return dbCategories.flatMap(cat => cat.productos || cat.Products || cat.products || []);
-  }, [dbCategories]);
+  // Esto le da acceso directo a la lista con nombres e imágenes reales
+  const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
   // Asegúrate de que usePosController esté retornando estos 3 nuevos campos
   const { 
