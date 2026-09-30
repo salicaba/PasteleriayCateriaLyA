@@ -90,8 +90,11 @@ export const PosModal = ({
     categoriaActiva, setCategoriaActiva, filteredProducts 
   } = usePosMenu(isVitrina);
 
-  // Aplanamos todas las categorías para tener acceso global a productos (necesario para el Modal de Recompensa)
-  const allGlobalProducts = useMemo(() => dbCategories.flatMap(cat => cat.productos || []), [dbCategories]);
+  // Aplanamos todas las categorías a prueba de fallos (Soporta Products, products o productos)
+  const allGlobalProducts = useMemo(() => {
+    if (!dbCategories || !Array.isArray(dbCategories)) return [];
+    return dbCategories.flatMap(cat => cat.productos || cat.Products || cat.products || []);
+  }, [dbCategories]);
 
   // Asegúrate de que usePosController esté retornando estos 3 nuevos campos
   const { 
@@ -566,9 +569,14 @@ export const PosModal = ({
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
-                          {allGlobalProducts
-                            .filter(p => pendingPromoReward.poolProductIds.includes(String(p.id)) && (!p.controlarStock || p.stock > 0))
-                            .map(p => (
+                            {allGlobalProducts
+                              .filter(p => {
+                                // Comparamos forzando minúsculas por si los UUIDs vienen con diferente formato
+                                const isMatch = pendingPromoReward.poolProductIds.some(promoId => String(promoId).toLowerCase() === String(p.id).toLowerCase());
+                                const hasStock = !p.controlarStock || p.stock > 0;
+                                return isMatch && hasStock;
+                              })
+                              .map(p => (
                               <motion.button
                                 key={p.id}
                                 whileTap={{ scale: 0.95 }}
