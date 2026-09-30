@@ -3,18 +3,16 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
-// 🔥 Agregamos TrendingUp para el botón de analíticas
 import { Plus, Edit2, LayoutGrid, Image as ImageIcon, Settings, X, Save, AlertTriangle, CheckCircle2, Loader2, AlertCircle, PauseCircle, PlayCircle, EyeOff, ArchiveRestore, Package, Tag, TrendingUp } from 'lucide-react';
+
 import { useMenuManagerController } from '../controllers/useMenuManagerController';
 import { SortableCategoryItem } from './SortableCategoryItem';
 import { ProductFormModal } from './ProductFormModal';
 import { SortableOptionItem } from './SortableOptionItem';
+import { PromotionsManagerTab } from './PromotionsManagerTab'; // 🔥 NUEVO COMPONENTE
 
 import api from '../../../api/client';
 import { socket } from '../../../api/socket';
-
-import PromotionManagerModal from './PromotionManagerModal'; 
-import PromotionListModal from './PromotionListModal';       
 
 const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, isActive }) => (
   <div 
@@ -34,12 +32,7 @@ const StatCard = ({ title, value, icon: Icon, borderClass, iconColors, onClick, 
 export const MenuManagerPage = () => {
   const [toast, setToast] = useState(null);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
-  
-  const [isPromoListOpen, setIsPromoListOpen] = useState(false);
-  const [isPromoWizardOpen, setIsPromoWizardOpen] = useState(false);
-  const [selectedProductForPromo, setSelectedProductForPromo] = useState(null);
-  const [editingPromoData, setEditingPromoData] = useState(null); 
-  const [allPromotions, setAllPromotions] = useState([]); 
+  const [isPromotionsManagerOpen, setIsPromotionsManagerOpen] = useState(false); // 🔥 NUEVO ESTADO
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -53,10 +46,7 @@ export const MenuManagerPage = () => {
     categoryToEdit, setCategoryToEdit,
     categoryToDelete, requestRemoveCategory, confirmRemoveCategory, cancelRemoveCategory,
     globalOptions, setGlobalOptions, saveGlobalOption, removeGlobalOption, handleDragEndOptionsAPI,
-    isLoading,
-    processingActions,
-    
-    // 🔥 Desestructuramos los nuevos estados del BI
+    isLoading, processingActions,
     isStatsModalOpen, setIsStatsModalOpen, 
     selectedProductForStats, productStats, 
     isFetchingStats, statsPeriod, 
@@ -67,7 +57,6 @@ export const MenuManagerPage = () => {
   const [isOptionsManagerOpen, setIsOptionsManagerOpen] = useState(false);
   const [newOpt, setNewOpt] = useState({ tipo: 'tamanos', nombre: '', precio: 0 });
 
-  // 🔥 ESTADOS DE CARGA ANTI-DOBLE CLIC:
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
 
@@ -76,110 +65,19 @@ export const MenuManagerPage = () => {
     else setNewCategoryName('');
   }, [categoryToEdit, isCategoryManagerOpen]);
 
-  // Carga inicial y escucha de WebSockets
-  useEffect(() => {
-    const fetchGlobalPromos = async () => {
-      try {
-        const res = await api.get('/promotions');
-        const raw = res.data;
-        const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
-        setAllPromotions(list);
-      } catch (error) {
-        console.error("Error cargando promociones globales:", error);
-      }
-    };
-
-    fetchGlobalPromos();
-    const handlePromoUpdate = () => fetchGlobalPromos();
-    
-    socket.on('menu:promotions_updated', handlePromoUpdate);
-    socket.on('promotion_created', handlePromoUpdate);
-    socket.on('promotion_updated', handlePromoUpdate);
-    socket.on('promotion_deleted', handlePromoUpdate);
-
-    return () => {
-      socket.off('menu:promotions_updated', handlePromoUpdate);
-      socket.off('promotion_created', handlePromoUpdate);
-      socket.off('promotion_updated', handlePromoUpdate);
-      socket.off('promotion_deleted', handlePromoUpdate);
-    };
-  }, []);
-
-  // 🔥 PERRO GUARDIÁN (Watchdog): Auto-Apagado en 2do Plano
-  const processingAutoDisable = useRef(new Set());
-
-  useEffect(() => {
-    if (products.length === 0 || allPromotions.length === 0) return;
-
-    const runWatchdog = async () => {
-      let didAutoDisable = false;
-      
-      for (const promo of allPromotions) {
-        const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
-        const isReallyActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
-
-        // Si ya está apagada o ya la estamos procesando, la saltamos
-        if (!isReallyActive || processingAutoDisable.current.has(promo.id)) continue;
-
-        const product = products.find(p => String(p.id) === String(promo.productId || promo.product_id));
-        
-        if (product && product.controlarStock) {
-          const currentStock = Number(product.stockQuantity ?? product.stock ?? 0);
-          let reqQty = 1;
-          
-          if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
-            reqQty = Number(promo.buyQty || promo.buy_qty || 2);
-          }
-
-          // CONDICIÓN DE RUPTURA: La promo exige más de lo que hay en inventario
-          if (currentStock < reqQty) {
-            processingAutoDisable.current.add(promo.id); // Bloqueamos para evitar bucles
-            try {
-              // Apagamos la promoción directo en el backend
-              await api.patch(`/promotions/${promo.id}/toggle`);
-              didAutoDisable = true;
-            } catch (e) {
-              console.error("Fallo el perro guardián al apagar promo:", e);
-              processingAutoDisable.current.delete(promo.id);
-            }
-          }
-        }
-      }
-
-      if (didAutoDisable) {
-        showToast('El sistema detectó quiebre de stock y apagó promociones en riesgo automáticamente.', 'warning');
-      }
-    };
-
-    runWatchdog();
-  }, [products, allPromotions, showToast]);
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleOpenPromoList = (product) => {
-    setSelectedProductForPromo(product);
-    setIsPromoListOpen(true);
-  };
-
   if (isLoading) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg overflow-hidden transition-colors duration-300">
-        <motion.div
-          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
-          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-        >
+        <motion.div animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }} className="w-24 h-24 bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
           <LayoutGrid size={40} className="text-orange-500 lya:text-lya-primary" />
         </motion.div>
-        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
-          Cargando Gestor de Menú
-        </h2>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2">
-          <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando catálogo...
-        </p>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">Cargando Gestor de Menú</h2>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-2"><Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> Sincronizando catálogo...</p>
       </div>
     );
   }
@@ -230,31 +128,13 @@ export const MenuManagerPage = () => {
   }).length;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }} 
-      animate={{ opacity: 1, y: 0 }} 
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
-    >
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden">
+      
       <AnimatePresence>
         {toast && (
           <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div 
-              initial={{ opacity: 0, y: -50, scale: 0.9 }} 
-              animate={{ opacity: 1, y: 0, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave
-              className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
-                toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' :
-                toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' :
-                'border-red-100 dark:border-red-900/30 lya:border-red-500/30'
-              }`}
-            >
-              <div className={`p-1.5 rounded-full shrink-0 ${
-                toast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
-                toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
-                'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
-              }`}>
+            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} transition={{ duration: 0.2, ease: "easeOut" }} className={`bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${toast.type === 'success' ? 'border-emerald-100 dark:border-emerald-900/30 lya:border-lya-primary/30' : toast.type === 'warning' ? 'border-amber-100 dark:border-amber-900/30 lya:border-amber-500/30' : 'border-red-100 dark:border-red-900/30 lya:border-red-500/30'}`}>
+              <div className={`p-1.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' : toast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' : 'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'}`}>
                 {toast.type === 'success' ? <CheckCircle2 size={20} /> : toast.type === 'warning' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}
               </div>
               <span className="text-sm tracking-wide">{toast.message}</span>
@@ -275,6 +155,11 @@ export const MenuManagerPage = () => {
         </div>
         
         <div className="grid grid-cols-2 md:flex md:flex-row gap-3 w-full md:w-auto">
+          {/* 🔥 NUEVO BOTÓN: GESTOR CENTRAL DE PROMOCIONES */}
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsPromotionsManagerOpen(true)} className="col-span-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 lya:bg-lya-primary/10 lya:hover:bg-lya-primary/20 text-rose-600 dark:text-rose-400 lya:text-lya-primary px-4 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-rose-100 dark:border-rose-800/50 lya:border-lya-primary/20 outline-none">
+            <Tag size={20} /> <span className="hidden sm:inline">Promociones</span>
+          </motion.button>
+
           <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsOptionsManagerOpen(true)} className="col-span-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 lya:bg-lya-secondary/10 lya:hover:bg-lya-secondary/20 text-blue-600 dark:text-blue-400 lya:text-lya-secondary px-4 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 border border-blue-100 dark:border-blue-800/50 lya:border-lya-secondary/20 outline-none">
             <Settings size={20} /> <span className="hidden sm:inline">Opciones Globales</span>
           </motion.button>
@@ -290,29 +175,9 @@ export const MenuManagerPage = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-8 shrink-0 z-10 relative">
-        <StatCard 
-          title="Total en Catálogo" 
-          value={products.length} 
-          icon={LayoutGrid} 
-          borderClass="border-blue-500 lya:border-lya-secondary" 
-          iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} 
-        />
-        <StatCard 
-          title="Productos Activos" 
-          value={productosRealmenteActivos} 
-          icon={CheckCircle2} 
-          borderClass="border-emerald-500 lya:border-emerald-400" 
-          iconColors={{ bg: "bg-emerald-500 lya:bg-emerald-500", text: "text-emerald-500 lya:text-emerald-500" }} 
-        />
-        <StatCard 
-          title="Papelera (Ocultos)" 
-          value={hiddenProducts.length} 
-          icon={ArchiveRestore} 
-          borderClass="border-red-500 lya:border-red-400" 
-          iconColors={{ bg: "bg-red-500 lya:bg-red-500", text: "text-red-500 lya:text-red-500" }} 
-          onClick={() => setIsTrashModalOpen(true)}
-          isActive={isTrashModalOpen}
-        />
+        <StatCard title="Total en Catálogo" value={products.length} icon={LayoutGrid} borderClass="border-blue-500 lya:border-lya-secondary" iconColors={{ bg: "bg-blue-500 lya:bg-lya-secondary", text: "text-blue-500 lya:text-lya-secondary" }} />
+        <StatCard title="Productos Activos" value={productosRealmenteActivos} icon={CheckCircle2} borderClass="border-emerald-500 lya:border-emerald-400" iconColors={{ bg: "bg-emerald-500 lya:bg-emerald-500", text: "text-emerald-500 lya:text-emerald-500" }} />
+        <StatCard title="Papelera (Ocultos)" value={hiddenProducts.length} icon={ArchiveRestore} borderClass="border-red-500 lya:border-red-400" iconColors={{ bg: "bg-red-500 lya:bg-red-500", text: "text-red-500 lya:text-red-500" }} onClick={() => setIsTrashModalOpen(true)} isActive={isTrashModalOpen} />
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
@@ -337,7 +202,6 @@ export const MenuManagerPage = () => {
                         
                         const isMathematicallyAgotado = hasStockControl && stockActual <= 0;
                         const isManuallyAgotado = product.isAgotado === true;
-                        
                         const isAgotado = isManuallyAgotado || isMathematicallyAgotado;
                         
                         const currentAction = processingActions?.[product.id];
@@ -345,30 +209,17 @@ export const MenuManagerPage = () => {
                         const isProcessingAgotado = currentAction === 'agotado';
                         const isProcessingAny = !!currentAction;
 
-                        const hasActivePromo = allPromotions.some(p => {
-                          const matches = String(p.productId || p.product_id) === String(product.id);
-                          if (!matches) return false;
-                          const rawActive = p.isActive ?? p.is_active ?? p.status;
-                          return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
-                        });
-
                         return (
                         <motion.div 
                           key={product.id} 
-                          layout="position" // 🔥 FIX 2: Anima solo la posición X/Y
-                          layoutId={`menu-card-${product.id}`} // 🔥 FIX 3: Rastreo estricto
+                          layout="position" 
+                          layoutId={`menu-card-${product.id}`} 
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                          transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.1) }} // 🔥 FIX 4: Adiós al resorte
-                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden transform-gpu antialiased ${
-                            isAgotado 
-                              ? 'border-gray-200 dark:border-neutral-800 opacity-70 grayscale-[40%]' 
-                              : hasActivePromo 
-                                ? 'border-rose-200 dark:border-rose-900/50 lya:border-lya-primary/40 md:hover:border-rose-300 shadow-[0_5px_15px_rgba(244,63,94,0.08)]' 
-                                : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-300 lya:md:hover:border-lya-secondary/40'
-                          }`}
+                          transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index * 0.02, 0.1) }}
+                          className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-3xl p-5 shadow-sm border transition-colors overflow-hidden transform-gpu antialiased ${isAgotado ? 'border-gray-200 dark:border-neutral-800 opacity-70 grayscale-[40%]' : 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 md:hover:border-gray-300 lya:md:hover:border-lya-secondary/40'}`}
                         >
 
                           {isAgotado && (
@@ -376,12 +227,6 @@ export const MenuManagerPage = () => {
                               <div className="bg-red-500/95 dark:bg-red-600/95 lya:bg-red-500/95 backdrop-blur-md text-white text-center py-1.5 font-black tracking-widest uppercase transform -rotate-12 shadow-2xl border-y border-red-400/50 text-[11px]">
                                 {isMathematicallyAgotado ? 'Sin Stock' : 'Agotado'}
                               </div>
-                            </div>
-                          )}
-
-                          {hasActivePromo && !isAgotado && (
-                            <div className="absolute top-3 right-3 z-20 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-lg shadow-rose-500/30 border border-rose-400 flex items-center gap-1 uppercase tracking-widest animate-pulse pointer-events-none">
-                              <Tag size={10} strokeWidth={3} /> Oferta
                             </div>
                           )}
 
@@ -413,7 +258,6 @@ export const MenuManagerPage = () => {
                           </div>
                           
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/20 mt-auto relative z-10">
-                            
                             <div className="flex flex-col gap-1.5 w-full mr-2">
                               {isMathematicallyAgotado ? (
                                 <button 
@@ -443,26 +287,12 @@ export const MenuManagerPage = () => {
                             </div>
                             
                             <div className="flex items-center space-x-1.5 shrink-0">
-                              
-                              {/* 🔥 BOTÓN DE ESTADÍSTICAS DEL PRODUCTO */}
                               <button 
                                 onClick={() => openStatsModal(product)} 
                                 className="p-2.5 rounded-xl transition-colors active:scale-90 outline-none text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 lya:text-lya-secondary lya:bg-lya-secondary/10 md:hover:bg-indigo-100 dark:md:hover:bg-indigo-900/40"
                                 title="Estadísticas de Venta"
                               >
                                 <TrendingUp size={16} />
-                              </button>
-
-                              <button 
-                                onClick={() => handleOpenPromoList(product)} 
-                                className={`p-2.5 rounded-xl transition-colors active:scale-90 outline-none ${
-                                  hasActivePromo 
-                                    ? 'text-rose-600 bg-rose-100 dark:bg-rose-900/40 dark:text-rose-300 md:hover:bg-rose-200 shadow-inner' 
-                                    : 'text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400 md:hover:bg-rose-100'
-                                }`}
-                                title="Configurar Promociones (Motor de Ofertas)"
-                              >
-                                <Tag size={16} />
                               </button>
 
                               <button onClick={() => openModal(product)} className="p-2.5 text-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 lya:text-lya-secondary lya:bg-lya-secondary/10 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 rounded-xl transition-colors active:scale-90 outline-none" title="Editar">
@@ -498,6 +328,7 @@ export const MenuManagerPage = () => {
         </div>
       </div>
 
+      {/* MODALES SECUNDARIOS */}
       <AnimatePresence>
         {isModalOpen && <ProductFormModal isOpen={isModalOpen} onClose={closeModal} onSave={saveProduct} initialData={editingProduct} categories={categories} globalOptions={globalOptions} />}
       </AnimatePresence>
@@ -505,48 +336,27 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {isTrashModalOpen && (
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-            {/* 🔥 FIX 1: Fondo suave */}
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              onClick={() => setIsTrashModalOpen(false)} 
-              className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" 
-            />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} onClick={() => setIsTrashModalOpen(false)} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm transition-colors" />
             
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX 2: Sin resorte
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative z-10 transition-colors"
-            >
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 relative z-10 transition-colors">
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-500">
-                    <ArchiveRestore size={24} />
-                  </div>
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl text-red-500"><ArchiveRestore size={24} /></div>
                   <div>
                     <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">Papelera de Productos</h3>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5">Productos inactivos ocultos del menú principal</p>
                   </div>
                 </div>
-                <button onClick={() => setIsTrashModalOpen(false)} className="p-2.5 text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/40 rounded-xl transition-colors outline-none">
-                  <X size={20} strokeWidth={2.5} />
-                </button>
+                <button onClick={() => setIsTrashModalOpen(false)} className="p-2.5 text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/40 rounded-xl transition-colors outline-none"><X size={20} strokeWidth={2.5} /></button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-gray-50/30 dark:bg-gray-950/20 lya:bg-lya-bg/30">
                 {hiddenProducts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4 transition-colors">
-                      <ArchiveRestore size={40} className="text-gray-400 dark:text-gray-600 lya:text-lya-text/30" strokeWidth={1.5} />
-                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-800 lya:bg-lya-surface p-6 rounded-[2rem] shadow-inner mb-4 transition-colors"><ArchiveRestore size={40} className="text-gray-400 dark:text-gray-600 lya:text-lya-text/30" strokeWidth={1.5} /></div>
                     <p className="text-gray-500 dark:text-gray-400 font-bold text-lg">La papelera está vacía.</p>
                   </div>
                 ) : (
-                  // 🔥 FIX 3: Grid de 1 columna
                   <div className="grid grid-cols-1 gap-4">
                     {hiddenProducts.map((product) => {
                       const isProcessingAvailability = processingActions?.[product.id] === 'availability';
@@ -554,39 +364,21 @@ export const MenuManagerPage = () => {
 
                       return (
                         <div key={product.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[1.5rem] shadow-sm border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 opacity-80 md:hover:opacity-100 transition-opacity gap-4">
-                          
                           <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
                             <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700 overflow-hidden shadow-inner">
-                              {product.image || product.imageUrl ? (
-                                <img src={product.image || product.imageUrl} className="h-full w-full object-cover" />
-                              ) : (
-                                <ImageIcon size={24} className="text-gray-400" />
-                              )}
+                              {product.image || product.imageUrl ? <img src={product.image || product.imageUrl} className="h-full w-full object-cover" /> : <ImageIcon size={24} className="text-gray-400" />}
                             </div>
                             <div className="min-w-0 flex-1">
                               <h4 className="font-bold text-base text-gray-800 dark:text-gray-200 lya:text-lya-text w-full line-clamp-2">{product.nombre || product.name}</h4>
-                              <p className="text-xs font-bold text-gray-500 lya:text-lya-text/60 mt-1 uppercase tracking-wider">
-                                {categoriaReal}
-                              </p>
+                              <p className="text-xs font-bold text-gray-500 lya:text-lya-text/60 mt-1 uppercase tracking-wider">{categoriaReal}</p>
                             </div>
                           </div>
-                          
                           <div className="flex w-full sm:w-auto justify-end border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 mt-2 sm:mt-0">
-                            <motion.button 
-                              whileTap={!isProcessingAvailability ? { scale: 0.95 } : {}}
-                              onClick={() => !isProcessingAvailability && toggleAvailability(product.id)}
-                              disabled={isProcessingAvailability}
-                              className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 outline-none ${
-                                isProcessingAvailability 
-                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-50 cursor-wait'
-                                  : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20'
-                              }`}
-                            >
+                            <motion.button whileTap={!isProcessingAvailability ? { scale: 0.95 } : {}} onClick={() => !isProcessingAvailability && toggleAvailability(product.id)} disabled={isProcessingAvailability} className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 outline-none ${isProcessingAvailability ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 opacity-50 cursor-wait' : 'bg-emerald-50 text-emerald-600 md:hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:md:hover:bg-emerald-900/40 lya:bg-emerald-500/10 lya:text-emerald-500 lya:md:hover:bg-emerald-500/20'}`}>
                               {isProcessingAvailability ? <Loader2 size={16} className="animate-spin" /> : <ArchiveRestore size={16} />}
                               <span>{isProcessingAvailability ? 'Restaurando...' : 'Restaurar'}</span>
                             </motion.button>
                           </div>
-
                         </div>
                       )
                     })}
@@ -601,61 +393,19 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {isCategoryManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 bg-black/50 lya:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]"
-            >
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col max-h-[80vh]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text">Administrar Categorías</h3>
-                <button onClick={() => { setIsCategoryManagerOpen(false); setCategoryToEdit(null); }} className="text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/40 p-2 rounded-full transition-colors outline-none">
-                  <X size={20} />
-                </button>
+                <button onClick={() => { setIsCategoryManagerOpen(false); setCategoryToEdit(null); }} className="text-gray-400 md:hover:text-gray-600 dark:md:hover:text-gray-300 lya:text-lya-text/50 lya:md:hover:text-lya-text bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/40 p-2 rounded-full transition-colors outline-none"><X size={20} /></button>
               </div>
 
               <div className="flex space-x-2 mb-6">
-                <input 
-                  type="text" 
-                  value={newCategoryName} 
-                  disabled={isSavingCategory}
-                  onChange={(e) => setNewCategoryName(e.target.value)} 
-                  placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} 
-                  className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 font-medium transition-all ${
-                    categoryToEdit 
-                      ? 'border-blue-200 dark:border-blue-900 lya:border-lya-secondary focus:ring-blue-500 lya:focus:ring-lya-secondary' 
-                      : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:ring-orange-500 lya:focus:ring-lya-primary'
-                  } ${isSavingCategory ? 'opacity-60 cursor-not-allowed' : ''}`} 
-                  onKeyDown={(e) => e.key === 'Enter' && !isSavingCategory && handleCreateOrUpdateCategory()} 
-                />
-                
+                <input type="text" value={newCategoryName} disabled={isSavingCategory} onChange={(e) => setNewCategoryName(e.target.value)} placeholder={categoryToEdit ? "Nuevo nombre..." : "Ej: Bebidas Calientes"} className={`flex-1 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text outline-none focus:ring-2 font-medium transition-all ${categoryToEdit ? 'border-blue-200 dark:border-blue-900 lya:border-lya-secondary focus:ring-blue-500 lya:focus:ring-lya-secondary' : 'border-gray-200 dark:border-gray-700 lya:border-lya-border/50 focus:ring-orange-500 lya:focus:ring-lya-primary'} ${isSavingCategory ? 'opacity-60 cursor-not-allowed' : ''}`} onKeyDown={(e) => e.key === 'Enter' && !isSavingCategory && handleCreateOrUpdateCategory()} />
                 {categoryToEdit && (
-                  <button 
-                    disabled={isSavingCategory}
-                    onClick={() => setCategoryToEdit(null)} 
-                    className="bg-gray-200 md:hover:bg-gray-300 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-border/40 lya:md:hover:bg-lya-border/60 transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text px-3 py-3 rounded-xl font-bold outline-none disabled:opacity-50"
-                  >
-                    <X size={20} />
-                  </button>
+                  <button disabled={isSavingCategory} onClick={() => setCategoryToEdit(null)} className="bg-gray-200 md:hover:bg-gray-300 dark:bg-gray-700 dark:md:hover:bg-gray-600 lya:bg-lya-border/40 lya:md:hover:bg-lya-border/60 transition-colors text-gray-600 dark:text-gray-300 lya:text-lya-text px-3 py-3 rounded-xl font-bold outline-none disabled:opacity-50"><X size={20} /></button>
                 )}
-
-                {/* 🔥 BOTÓN NARANJA CON SPINNER SIN TEXTO Y BLOQUEO */}
-                <button 
-                  type="button"
-                  disabled={isSavingCategory || !newCategoryName.trim()}
-                  onClick={handleCreateOrUpdateCategory} 
-                  className={`${
-                    categoryToEdit 
-                      ? 'bg-blue-500 md:hover:bg-blue-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90' 
-                      : 'bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90'
-                  } transition-all text-white lya:text-lya-surface px-4 py-3 rounded-xl font-bold outline-none flex items-center justify-center min-w-[48px] disabled:opacity-50 disabled:cursor-not-allowed active:scale-95`}
-                >
-                  {isSavingCategory ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    categoryToEdit ? <Save size={20} /> : <Plus size={20} />
-                  )}
+                <button type="button" disabled={isSavingCategory || !newCategoryName.trim()} onClick={handleCreateOrUpdateCategory} className={`${categoryToEdit ? 'bg-blue-500 md:hover:bg-blue-600 lya:bg-lya-secondary lya:md:hover:bg-lya-secondary/90' : 'bg-orange-500 md:hover:bg-orange-600 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90'} transition-all text-white lya:text-lya-surface px-4 py-3 rounded-xl font-bold outline-none flex items-center justify-center min-w-[48px] disabled:opacity-50 disabled:cursor-not-allowed active:scale-95`}>
+                  {isSavingCategory ? <Loader2 size={20} className="animate-spin" /> : (categoryToEdit ? <Save size={20} /> : <Plus size={20} />)}
                 </button>
               </div>
 
@@ -664,11 +414,7 @@ export const MenuManagerPage = () => {
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                     {categories.map((cat) => (
-                      <SortableCategoryItem 
-                        key={cat.id} id={cat.id} category={cat} isActive={categoryToEdit?.id === cat.id} onClick={() => {}}
-                        onEdit={(c) => setCategoryToEdit(c)}
-                        onDelete={(id) => requestRemoveCategory(id)} 
-                      />
+                      <SortableCategoryItem key={cat.id} id={cat.id} category={cat} isActive={categoryToEdit?.id === cat.id} onClick={() => {}} onEdit={(c) => setCategoryToEdit(c)} onDelete={(id) => requestRemoveCategory(id)} />
                     ))}
                   </SortableContext>
                 </DndContext>
@@ -681,50 +427,14 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {categoryToDelete && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center"
-            >
-              <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500">
-                <AlertTriangle size={36} />
-              </div>
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 text-center flex flex-col items-center">
+              <div className="bg-red-100 dark:bg-red-500/20 p-4 rounded-full mb-4 text-red-500"><AlertTriangle size={36} /></div>
               <h3 className="text-2xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text mb-2 text-center">¿Eliminar Categoría?</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed px-2 text-center text-justify">
-                Esta acción no se puede deshacer. Recuerda que <strong className="text-gray-700 dark:text-gray-300 lya:text-lya-text">no puedes eliminar una categoría si aún tiene productos</strong> dentro.
-              </p>
-              
+              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-lya-text/70 mb-8 leading-relaxed px-2 text-center text-justify">Esta acción no se puede deshacer. Recuerda que <strong className="text-gray-700 dark:text-gray-300 lya:text-lya-text">no puedes eliminar una categoría si aún tiene productos</strong> dentro.</p>
               <div className="flex w-full gap-3">
-                <button 
-                  disabled={isDeletingCategory}
-                  onClick={cancelRemoveCategory} 
-                  className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-colors outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancelar
-                </button>
-                
-                {/* 🔥 BOTÓN ELIMINAR: Solo circulito girando cuando está cargando */}
-                <button 
-                  disabled={isDeletingCategory}
-                  onClick={async () => {
-                    setIsDeletingCategory(true);
-                    try {
-                      await confirmRemoveCategory();
-                    } finally {
-                      setIsDeletingCategory(false);
-                    }
-                  }} 
-                  className={`flex-1 py-3.5 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center outline-none ${
-                    isDeletingCategory ? 'opacity-70 cursor-not-allowed shadow-none' : 'active:scale-95 md:hover:-translate-y-0.5'
-                  }`}
-                >
-                  {isDeletingCategory ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    'Eliminar'
-                  )}
+                <button disabled={isDeletingCategory} onClick={cancelRemoveCategory} className="flex-1 py-3.5 text-gray-600 dark:text-gray-300 lya:text-lya-text/80 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 rounded-xl font-bold transition-colors outline-none disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</button>
+                <button disabled={isDeletingCategory} onClick={async () => { setIsDeletingCategory(true); try { await confirmRemoveCategory(); } finally { setIsDeletingCategory(false); } }} className={`flex-1 py-3.5 bg-red-500 md:hover:bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center outline-none ${isDeletingCategory ? 'opacity-70 cursor-not-allowed shadow-none' : 'active:scale-95 md:hover:-translate-y-0.5'}`}>
+                  {isDeletingCategory ? <Loader2 size={18} className="animate-spin" /> : 'Eliminar'}
                 </button>
               </div>
             </motion.div>
@@ -735,56 +445,23 @@ export const MenuManagerPage = () => {
       <AnimatePresence>
         {isOptionsManagerOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            >
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50">
                 <div>
-                  <h3 className="text-xl font-black dark:text-gray-100 lya:text-lya-text flex items-center gap-2">
-                    <Settings size={20} className="text-blue-500 lya:text-lya-secondary" />
-                    Catálogo de Opciones
-                  </h3>
+                  <h3 className="text-xl font-black dark:text-gray-100 lya:text-lya-text flex items-center gap-2"><Settings size={20} className="text-blue-500 lya:text-lya-secondary" />Catálogo de Opciones</h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Crea y ordena modificadores globales (Ej: Tamaños, Leches, Extras)</p>
                 </div>
                 <button onClick={() => setIsOptionsManagerOpen(false)} className="p-2 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/30 text-gray-500 dark:text-gray-400 lya:text-lya-text/50 lya:md:hover:text-lya-text rounded-full transition-colors outline-none"><X size={20} /></button>
               </div>
 
               <div className="p-6 bg-white dark:bg-gray-900 lya:bg-lya-surface grid grid-cols-1 md:grid-cols-4 gap-3 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shadow-sm z-10">
-                <select 
-                  value={newOpt.tipo} 
-                  onChange={e => setNewOpt({...newOpt, tipo: e.target.value})}
-                  className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all"
-                >
+                <select value={newOpt.tipo} onChange={e => setNewOpt({...newOpt, tipo: e.target.value})} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all">
                   <option value="tamanos">Tamaño</option>
                   <option value="leches">Leche</option>
                   <option value="extras">Extra</option>
                 </select>
-                <input 
-                  type="text" placeholder="Nombre (Ej: Deslactosada)" 
-                  value={newOpt.nombre} onChange={e => setNewOpt({...newOpt, nombre: e.target.value})}
-                  className="md:col-span-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all"
-                  onKeyDown={e => {
-                    if(e.key === 'Enter' && newOpt.nombre.trim()){
-                      saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); 
-                      setNewOpt({...newOpt, nombre: '', precio: 0});
-                    }
-                  }}
-                />
-                <button 
-                  onClick={() => { 
-                    if(newOpt.nombre.trim()){
-                      saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); 
-                      setNewOpt({...newOpt, nombre: '', precio: 0}); 
-                    }
-                  }}
-                  className="bg-blue-500 md:hover:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface font-bold rounded-xl lya:md:hover:opacity-90 transition-all shadow-lg shadow-blue-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 outline-none"
-                >
-                  <Plus size={18} /> Añadir
-                </button>
+                <input type="text" placeholder="Nombre (Ej: Deslactosada)" value={newOpt.nombre} onChange={e => setNewOpt({...newOpt, nombre: e.target.value})} className="md:col-span-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg dark:text-white lya:text-lya-text border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 outline-none text-sm focus:ring-2 focus:ring-blue-500 lya:focus:ring-lya-secondary focus:border-transparent transition-all" onKeyDown={e => { if(e.key === 'Enter' && newOpt.nombre.trim()){ saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); setNewOpt({...newOpt, nombre: '', precio: 0}); } }} />
+                <button onClick={() => { if(newOpt.nombre.trim()){ saveGlobalOption(newOpt.tipo, newOpt.nombre, newOpt.precio); setNewOpt({...newOpt, nombre: '', precio: 0}); } }} className="bg-blue-500 md:hover:bg-blue-600 lya:bg-lya-secondary text-white lya:text-lya-surface font-bold rounded-xl lya:md:hover:opacity-90 transition-all shadow-lg shadow-blue-500/30 lya:shadow-lya-secondary/30 flex items-center justify-center gap-2 outline-none"><Plus size={18} /> Añadir</button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-gray-50/50 dark:bg-gray-950/20 lya:bg-lya-bg/50">
@@ -792,25 +469,14 @@ export const MenuManagerPage = () => {
                   const opcionesDelTipo = globalOptions.filter(o => o.tipo === tipo);
                   return (
                     <div key={tipo}>
-                      <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 pb-2 text-center">
-                        {tipo === 'tamanos' ? 'TAMAÑOS' : tipo}
-                      </h4>
+                      <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mb-3 tracking-widest px-2 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 pb-2 text-center">{tipo === 'tamanos' ? 'TAMAÑOS' : tipo}</h4>
                       {opcionesDelTipo.length === 0 ? (
-                        <p className="text-sm text-gray-400 dark:text-gray-600 lya:text-lya-text/60 italic px-2 bg-white/50 dark:bg-gray-900/50 lya:bg-lya-surface p-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40 text-center">
-                          Aún no has registrado {tipo}.
-                        </p>
+                        <p className="text-sm text-gray-400 dark:text-gray-600 lya:text-lya-text/60 italic px-2 bg-white/50 dark:bg-gray-900/50 lya:bg-lya-surface p-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 lya:border-lya-border/40 text-center">Aún no has registrado {tipo}.</p>
                       ) : (
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEndOptions(e, tipo)}>
                           <SortableContext items={opcionesDelTipo.map(o => o.id)} strategy={rectSortingStrategy}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {opcionesDelTipo.map(opt => (
-                                <SortableOptionItem 
-                                  key={opt.id} 
-                                  id={opt.id} 
-                                  option={opt} 
-                                  onRemove={removeGlobalOption} 
-                                />
-                              ))}
+                              {opcionesDelTipo.map(opt => <SortableOptionItem key={opt.id} id={opt.id} option={opt} onRemove={removeGlobalOption} />)}
                             </div>
                           </SortableContext>
                         </DndContext>
@@ -824,112 +490,49 @@ export const MenuManagerPage = () => {
         )}
       </AnimatePresence>
 
-      {/* 🔥 CÁPSULA NEO-BENTO: ANALÍTICAS DE PRODUCTO */}
       <AnimatePresence>
         {isStatsModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Sin resorte
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative overflow-hidden"
-            >
-              {/* Decoración de fondo */}
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} transition={{ duration: 0.2, ease: "easeOut" }} className="bg-white dark:bg-gray-900 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-6 border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col items-center relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-32 bg-indigo-50 dark:bg-indigo-900/20 lya:bg-lya-secondary/10 z-0"></div>
-
-              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-500/20 lya:bg-lya-secondary/20 text-indigo-600 dark:text-indigo-400 lya:text-lya-secondary rounded-full flex items-center justify-center mb-4 z-10 border-4 border-white dark:border-gray-900 lya:border-lya-surface shadow-sm">
-                <TrendingUp size={28} strokeWidth={2.5} />
-              </div>
-              
-              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text text-center z-10 w-full truncate px-4">
-                {selectedProductForStats?.nombre || 'Producto'}
-              </h3>
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-500/20 lya:bg-lya-secondary/20 text-indigo-600 dark:text-indigo-400 lya:text-lya-secondary rounded-full flex items-center justify-center mb-4 z-10 border-4 border-white dark:border-gray-900 lya:border-lya-surface shadow-sm"><TrendingUp size={28} strokeWidth={2.5} /></div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text text-center z-10 w-full truncate px-4">{selectedProductForStats?.nombre || 'Producto'}</h3>
               <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 uppercase tracking-widest mb-6 z-10">Métricas de Venta</p>
 
-              {/* Filtros de Fecha (Píldoras) */}
               <div className="flex flex-wrap justify-center gap-2 mb-6 w-full z-10">
-                {[
-                  { id: 'today', label: 'Hoy' },
-                  { id: 'yesterday', label: 'Ayer' },
-                  { id: 'week', label: 'Semana' },
-                  { id: 'month', label: 'Mes' },
-                  { id: 'all', label: 'Siempre' }
-                ].map(period => (
-                  <button
-                    key={period.id}
-                    disabled={isFetchingStats}
-                    onClick={() => fetchProductStats(selectedProductForStats?.id, period.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all outline-none ${
-                      statsPeriod === period.id
-                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 md:hover:bg-gray-200 dark:md:hover:bg-gray-700'
-                    } ${isFetchingStats ? 'opacity-50 cursor-wait' : 'active:scale-95'}`}
-                  >
-                    {period.label}
-                  </button>
+                {[{ id: 'today', label: 'Hoy' }, { id: 'yesterday', label: 'Ayer' }, { id: 'week', label: 'Semana' }, { id: 'month', label: 'Mes' }, { id: 'all', label: 'Siempre' }].map(period => (
+                  <button key={period.id} disabled={isFetchingStats} onClick={() => fetchProductStats(selectedProductForStats?.id, period.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all outline-none ${statsPeriod === period.id ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 md:hover:bg-gray-200 dark:md:hover:bg-gray-700'} ${isFetchingStats ? 'opacity-50 cursor-wait' : 'active:scale-95'}`}>{period.label}</button>
                 ))}
               </div>
 
-              {/* Tarjetas de Datos */}
               <div className="w-full grid grid-cols-2 gap-3 mb-6 z-10">
                 <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 p-4 rounded-2xl flex flex-col items-center justify-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Unidades</p>
-                  {isFetchingStats ? (
-                    <Loader2 size={24} className="animate-spin text-indigo-500" />
-                  ) : (
-                    <span className="text-2xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">{productStats.cantidad}</span>
-                  )}
+                  {isFetchingStats ? <Loader2 size={24} className="animate-spin text-indigo-500" /> : <span className="text-2xl font-black text-gray-800 dark:text-gray-100 lya:text-lya-text">{productStats.cantidad}</span>}
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg/50 p-4 rounded-2xl flex flex-col items-center justify-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ingreso Bruto</p>
-                  {isFetchingStats ? (
-                    <Loader2 size={24} className="animate-spin text-emerald-500" />
-                  ) : (
-                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">${productStats.ingreso.toFixed(2)}</span>
-                  )}
+                  {isFetchingStats ? <Loader2 size={24} className="animate-spin text-emerald-500" /> : <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">${productStats.ingreso.toFixed(2)}</span>}
                 </div>
               </div>
 
-              <button 
-                onClick={() => setIsStatsModalOpen(false)}
-                className="w-full py-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 outline-none z-10"
-              >
-                Cerrar
-              </button>
+              <button onClick={() => setIsStatsModalOpen(false)} className="w-full py-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/20 lya:md:hover:bg-lya-border/40 text-gray-700 dark:text-gray-300 lya:text-lya-text rounded-2xl font-bold transition-all active:scale-95 outline-none z-10">Cerrar</button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <PromotionListModal
-        isOpen={isPromoListOpen}
-        onClose={() => {
-          setIsPromoListOpen(false);
-          setSelectedProductForPromo(null);
-          setEditingPromoData(null);
-        }}
-        product={selectedProductForPromo}
-        onOpenWizard={(promoToEdit = null) => {
-          setEditingPromoData(promoToEdit); 
-          setIsPromoListOpen(false); 
-          setIsPromoWizardOpen(true); 
-        }}
-      />
-
-      <PromotionManagerModal 
-        isOpen={isPromoWizardOpen}
-        onClose={() => {
-          setIsPromoWizardOpen(false);
-          setIsPromoListOpen(true); 
-          setEditingPromoData(null); 
-        }}
-        product={selectedProductForPromo}
-        editData={editingPromoData} 
-        onPromotionSaved={(promoInfo) => {
-          showToast(`¡Promoción guardada exitosamente!`, 'success');
-        }}
-      />
+      {/* 🔥 NUEVO: GESTOR DE PROMOCIONES CENTRALIZADO */}
+      <AnimatePresence>
+        {isPromotionsManagerOpen && (
+          <PromotionsManagerTab 
+            isOpen={isPromotionsManagerOpen} 
+            onClose={() => setIsPromotionsManagerOpen(false)} 
+            products={products}
+            showToast={showToast}
+          />
+        )}
+      </AnimatePresence>
 
     </motion.div>
   );
