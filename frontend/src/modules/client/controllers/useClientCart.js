@@ -8,16 +8,12 @@ const parseValidDays = (daysData) => {
   if (!daysData) return [];
   if (Array.isArray(daysData)) return daysData.map(Number);
   if (typeof daysData === 'string') {
-    try {
-      return JSON.parse(daysData).map(Number);
-    } catch (e) {
-      return daysData.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim()));
-    }
+    try { return JSON.parse(daysData).map(Number); } 
+    catch (e) { return daysData.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
   }
   return [];
 };
 
-// 🔥 HELPER GLOBAL: Obtiene los productos confirmados para fusionarlos virtualmente
 const getConfirmedItems = () => {
   try {
     const saved = localStorage.getItem('lya_client_snapshot');
@@ -40,7 +36,6 @@ export const useClientCart = (triggerNotification) => {
     isOpen: false, message: '', onConfirm: null, onCancel: null
   });
 
-  // 1. CARGA INICIAL Y LISTENERS DE PROMO POR SOCKET
   useEffect(() => {
     const fetchPromos = async () => {
       try {
@@ -48,7 +43,6 @@ export const useClientCart = (triggerNotification) => {
         const raw = res.data;
         const list = Array.isArray(raw) ? raw : (raw?.data || raw?.promotions || []);
         
-        // 🔥 BLINDAJE DE ZONA HORARIA
         const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
         const today = new Date(nowInChiapasStr).getDay();
 
@@ -62,7 +56,7 @@ export const useClientCart = (triggerNotification) => {
 
         setPromotions(activeToday);
       } catch (error) {
-        console.error("Error cargando promociones en el carrito del cliente:", error);
+        console.error("Error cargando promociones:", error);
       }
     };
 
@@ -84,13 +78,6 @@ export const useClientCart = (triggerNotification) => {
     };
   }, []);
 
-  const getActivePromo = (productId, currentStock = null, controlarStock = false) => {
-    if (!promotions || promotions.length === 0) return null;
-    const promo = promotions.find(p => String(p.productId || p.product_id) === String(productId));
-    return promo || null;
-  };
-
-  // 🔥 ACTUALIZADO: Para detectar ofertas globales visualmente en el Menú
   const getPromoBadge = (productId, originalPrice = 0) => {
     const promo = promotions.find(p => (p.applyToProducts || []).includes(productId));
     if (!promo) return null;
@@ -118,7 +105,6 @@ export const useClientCart = (triggerNotification) => {
     };
   };
 
-  // 🔥 NUEVO CEREBRO MATEMÁTICO CLIENTE (Fusiona Historial + Actual)
   const syncPromotions = (cartState, promosList) => {
     if (!promosList || !promosList.length) return cartState;
 
@@ -188,20 +174,41 @@ export const useClientCart = (triggerNotification) => {
             }
         }
 
+        // 🔥 MAGIA DE AUTO-AGREGADO (NxM) PARA EL CLIENTE
         if (promo.type === 'NxM') {
             let eligible = allItems.filter(i => !i._promoLocked && applyTo.includes(i.id));
-            while(eligible.length >= buyQty) {
+            while(eligible.length >= payQty) {
                 for(let i=0; i<payQty; i++) eligible[i]._promoLocked = true;
-                for(let i=payQty; i<buyQty; i++) {
-                    let r = eligible[i];
-                    if (!r._isConfirmed) {
-                        r.precioOriginal = r.precioUnitario;
-                        r.precioUnitario = 0;
-                        r.isAutoPromo = true;
-                        r.promoLabel = 'GRATIS';
-                        r.promoId = promo.id;
+                
+                let missingGhosts = buyQty - payQty;
+                let ghostCandidates = allItems.filter(i => !i._promoLocked && applyTo.includes(i.id));
+                
+                for(let i=0; i<missingGhosts; i++) {
+                    if (ghostCandidates.length > 0) {
+                        let r = ghostCandidates[0];
+                        if (!r._isConfirmed) {
+                            r.precioOriginal = r.precioUnitario;
+                            r.precioUnitario = 0;
+                            r.isAutoPromo = true;
+                            r.promoLabel = 'GRATIS';
+                            r.promoId = promo.id;
+                        }
+                        r._promoLocked = true;
+                        ghostCandidates.shift();
+                    } else {
+                        const template = eligible[0];
+                        allItems.push({
+                            ...template,
+                            cartItemId: template.cartItemId, // Usa la misma firma para agruparse mágicamente
+                            precioOriginal: template.precioUnitario,
+                            precioUnitario: 0,
+                            isAutoPromo: true,
+                            promoLabel: 'GRATIS',
+                            promoId: promo.id,
+                            _promoLocked: true,
+                            _isConfirmed: false 
+                        });
                     }
-                    r._promoLocked = true;
                 }
                 newlyAppliedPromos.add(promo.id);
                 eligible = allItems.filter(i => !i._promoLocked && applyTo.includes(i.id));
@@ -316,10 +323,11 @@ export const useClientCart = (triggerNotification) => {
         newlyAppliedPromos.forEach(promoId => {
             if (!notifiedPromos.current[promoId]) {
                 const promoInfo = promosList.find(p => p.id === promoId);
-                setTimeout(() => triggerNotification(`¡Promo Aplicada! ${promoInfo?.name || 'Oferta'}`, 'success'), 50);
+                setTimeout(() => triggerNotification(`¡Promo Aplicada Automáticamente! ${promoInfo?.name || 'Oferta'}`, 'success'), 50);
                 notifiedPromos.current[promoId] = true;
             }
         });
+        
         Object.keys(notifiedPromos.current).forEach(id => {
            if (!newlyAppliedPromos.has(id)) delete notifiedPromos.current[id];
         });
@@ -343,7 +351,6 @@ export const useClientCart = (triggerNotification) => {
     });
   };
 
-  // 🔥 RESTO DEL CÓDIGO 100% INTACTO A PARTIR DE AQUÍ
   const checkRuptureAndExecute = (actionToCalculateRawNextCart) => {
     _setCart(prev => {
       const rawNextCart = actionToCalculateRawNextCart(prev);
@@ -406,73 +413,12 @@ export const useClientCart = (triggerNotification) => {
     }
   };
 
-  const breakPromoItems = (prevCart, cartItemIdBase, qtyToRemove) => {
-      let newCart = [...prevCart];
-      const itemToRemove = prevCart.find(i => i.cartItemId === cartItemIdBase);
-      if (!itemToRemove) return prevCart;
-
-      const productId = itemToRemove.id;
-      const sampleItem = prevCart.find(p => String(p.id) === String(productId));
-      const activePromo = getActivePromo(productId, sampleItem?.stock, sampleItem?.controlarStock, promotions);
-
-      if (activePromo && activePromo.type === 'NxM') {
-          const payQty = Number(activePromo.payQty || 1);
-          const buyQty = Number(activePromo.buyQty || 2);
-          const ghostsPerPromo = buyQty - payQty;
-          const promosToBreak = Math.ceil(qtyToRemove / ghostsPerPromo);
-          let parentsToRemove = promosToBreak * payQty;
-
-          for (let i = newCart.length - 1; i >= 0; i--) {
-              if (parentsToRemove <= 0) break;
-              const item = newCart[i];
-              if (String(item.id) === String(productId) && !item.isAutoPromo && !item.enviadoCocina) {
-                  if (item.qty <= parentsToRemove) {
-                      parentsToRemove -= item.qty;
-                      newCart.splice(i, 1);
-                  } else {
-                      newCart[i] = { ...item, qty: item.qty - parentsToRemove };
-                      parentsToRemove = 0;
-                  }
-              }
-          }
-      } else {
-          let toRemove = qtyToRemove;
-          for (let i = newCart.length - 1; i >= 0; i--) {
-              if (toRemove <= 0) break;
-              const item = newCart[i];
-              if (item.cartItemId === cartItemIdBase && item.isAutoPromo && !item.enviadoCocina) {
-                  if (item.qty <= toRemove) {
-                      toRemove -= item.qty;
-                      newCart.splice(i, 1);
-                  } else {
-                      newCart[i] = { ...item, qty: item.qty - toRemove };
-                      toRemove = 0;
-                  }
-              }
-          }
-      }
-      return newCart;
-  };
-
   const removeFromCart = (cartItemIdOrObj) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
     try {
       let cartItemId = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj.cartItemId : cartItemIdOrObj;
-      let breakQty = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj._breakPromoQty : null;
-
-      if (typeof cartItemId === 'string' && cartItemId.includes('::BREAK::')) {
-          const parts = cartItemId.split('::BREAK::');
-          cartItemId = parts[0];
-          breakQty = parseInt(parts[1], 10);
-      }
-
-      if (breakQty) {
-          setCart(prev => breakPromoItems(prev, cartItemId, breakQty));
-          return;
-      }
-
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
@@ -491,19 +437,6 @@ export const useClientCart = (triggerNotification) => {
 
     try {
       let cartItemId = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj.cartItemId : cartItemIdOrObj;
-      let breakQty = typeof cartItemIdOrObj === 'object' ? cartItemIdOrObj._breakPromoQty : null;
-
-      if (typeof cartItemId === 'string' && cartItemId.includes('::BREAK::')) {
-          const parts = cartItemId.split('::BREAK::');
-          cartItemId = parts[0];
-          breakQty = parseInt(parts[1], 10);
-      }
-
-      if (breakQty) {
-          setCart(prev => breakPromoItems(prev, cartItemId, breakQty));
-          return;
-      }
-
       checkRuptureAndExecute(prev => {
         const existing = prev.find(item => item.cartItemId === cartItemId);
         if (!existing || (existing.isAutoPromo && existing.promoLabel !== 'OFERTA')) return prev; 
