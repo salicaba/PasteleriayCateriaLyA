@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getAllPromotions, setupPromotion, togglePromotionStatus, updatePromotion, deletePromotion } from './promotions.controller.js';
-import { verifyToken, isAdmin } from '../../middlewares/auth.middleware.js';
+import { verifyToken } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -8,18 +8,18 @@ const router = Router();
 router.get('/', getAllPromotions);
 
 // 🔥 NUEVA RUTA: Crear promoción global
-router.post('/', [verifyToken, isAdmin], setupPromotion);
+router.post('/', [verifyToken], setupPromotion);
 
 // Crear promoción específica a un producto (Mantenemos por si acaso)
-router.post('/product/:productId', [verifyToken, isAdmin], setupPromotion);
+router.post('/product/:productId', [verifyToken], setupPromotion);
 
 // Alternar estado (encender/apagar)
-router.patch('/:id/toggle', [verifyToken, isAdmin], togglePromotionStatus);
+router.patch('/:id/toggle', [verifyToken], togglePromotionStatus);
 
 // Editar promoción
-router.put('/:id', [verifyToken, isAdmin], updatePromotion);
+router.put('/:id', [verifyToken], updatePromotion);
 
 // Eliminar promoción
-router.delete('/:id', [verifyToken, isAdmin], deletePromotion);
+router.delete('/:id', [verifyToken], deletePromotion);
 
 export default router;
