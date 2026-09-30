@@ -28,6 +28,14 @@ async function startServer() {
     setupAssociations(); 
     console.log('🔗 Asociaciones de Sequelize configuradas correctamente.');
     
+    // 🔥 FIX QUIRÚRGICO: Forzamos a PostgreSQL a quitar el candado NOT NULL
+    try {
+      await sequelize.query('ALTER TABLE promotions ALTER COLUMN "productId" DROP NOT NULL;');
+      console.log('🔓 Candado NOT NULL removido de productId con éxito.');
+    } catch (err) {
+      // Lo ignoramos silenciosamente si el candado ya no existe
+    }
+
     // 3. Sincronizar esquemas (Bloquea hasta que termine)
     console.log('⏳ Sincronizando esquemas con la nube...');
     await sequelize.sync({ alter: true });
