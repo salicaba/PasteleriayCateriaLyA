@@ -57,8 +57,12 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     if (promosArray.length === 0) return null;
 
     const promo = promosArray.find(p => {
-      const matchesProduct = String(p.productId || p.product_id) === String(product.id);
-      if (!matchesProduct) return false;
+      // 🔥 EL FIX: Ahora busca tanto en el ID único como en el nuevo arreglo múltiple
+      const pIdStr = String(product.id);
+      const matchesSingle = String(p.productId || p.product_id) === pIdStr;
+      const matchesMulti = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
+      
+      if (!matchesSingle && !matchesMulti) return false;
 
       const rawActive = p.isActive ?? p.is_active ?? p.status;
       return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
