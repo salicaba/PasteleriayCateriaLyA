@@ -1,51 +1,43 @@
-// src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
-// 🎨 MOTOR DE PALETAS DE COLORES PARA PROMOCIONES MÚLTIPLES
+// 🎨 MOTOR DE PALETAS DE COLORES PREMIUM (Neón Sutil para Modo Oscuro)
 const PROMO_COLORS = [
-  { // 0: Rosa
-    border: 'border-rose-200 dark:border-rose-900/60',
-    shadowHover: 'shadow-[0_5px_20px_rgba(244,63,94,0.15)] md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.25)]',
-    badge: 'bg-gradient-to-r from-rose-500 to-rose-600 border-rose-400',
-    btn: 'bg-gradient-to-r from-rose-500 to-rose-600 shadow-rose-500/30 md:hover:from-rose-600 md:hover:to-rose-700',
+  { // 0: Ruby (Rojo/Rosa)
+    border: 'border-rose-400/60 dark:border-rose-500/30',
+    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)]',
+    badge: 'bg-rose-500 text-white',
+    btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600',
     text: 'text-rose-600 dark:text-rose-400'
   },
-  { // 1: Azul
-    border: 'border-blue-200 dark:border-blue-900/60',
-    shadowHover: 'shadow-[0_5px_20px_rgba(59,130,246,0.15)] md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.25)]',
-    badge: 'bg-gradient-to-r from-blue-500 to-blue-600 border-blue-400',
-    btn: 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-blue-500/30 md:hover:from-blue-600 md:hover:to-blue-700',
+  { // 1: Sapphire (Azul)
+    border: 'border-blue-400/60 dark:border-blue-500/30',
+    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.2)]',
+    badge: 'bg-blue-500 text-white',
+    btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600',
     text: 'text-blue-600 dark:text-blue-400'
   },
-  { // 2: Esmeralda
-    border: 'border-emerald-200 dark:border-emerald-900/60',
-    shadowHover: 'shadow-[0_5px_20px_rgba(16,185,129,0.15)] md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.25)]',
-    badge: 'bg-gradient-to-r from-emerald-500 to-emerald-600 border-emerald-400',
-    btn: 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-emerald-500/30 md:hover:from-emerald-600 md:hover:to-emerald-700',
+  { // 2: Emerald (Verde)
+    border: 'border-emerald-400/60 dark:border-emerald-500/30',
+    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.2)]',
+    badge: 'bg-emerald-500 text-white',
+    btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600',
     text: 'text-emerald-600 dark:text-emerald-400'
   },
-  { // 3: Púrpura
-    border: 'border-purple-200 dark:border-purple-900/60',
-    shadowHover: 'shadow-[0_5px_20px_rgba(168,85,247,0.15)] md:hover:shadow-[0_10px_30px_rgba(168,85,247,0.25)]',
-    badge: 'bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400',
-    btn: 'bg-gradient-to-r from-purple-500 to-purple-600 shadow-purple-500/30 md:hover:from-purple-600 md:hover:to-purple-700',
-    text: 'text-purple-600 dark:text-purple-400'
+  { // 3: Amethyst (Púrpura)
+    border: 'border-violet-400/60 dark:border-violet-500/30',
+    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(139,92,246,0.2)]',
+    badge: 'bg-violet-500 text-white',
+    btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600',
+    text: 'text-violet-600 dark:text-violet-400'
   },
-  { // 4: Ámbar
-    border: 'border-amber-200 dark:border-amber-900/60',
-    shadowHover: 'shadow-[0_5px_20px_rgba(245,158,11,0.15)] md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.25)]',
-    badge: 'bg-gradient-to-r from-amber-500 to-amber-600 border-amber-400',
-    btn: 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-amber-500/30 md:hover:from-amber-600 md:hover:to-amber-700',
+  { // 4: Amber (Naranja/Oro)
+    border: 'border-amber-400/60 dark:border-amber-500/30',
+    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.2)]',
+    badge: 'bg-amber-500 text-white',
+    btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600',
     text: 'text-amber-600 dark:text-amber-400'
-  },
-  { // 5: Cyan
-    border: 'border-cyan-200 dark:border-cyan-900/60',
-    shadowHover: 'shadow-[0_5px_20px_rgba(6,182,212,0.15)] md:hover:shadow-[0_10px_30px_rgba(6,182,212,0.25)]',
-    badge: 'bg-gradient-to-r from-cyan-500 to-cyan-600 border-cyan-400',
-    btn: 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-cyan-500/30 md:hover:from-cyan-600 md:hover:to-cyan-700',
-    text: 'text-cyan-600 dark:text-cyan-400'
   }
 ];
 
@@ -111,7 +103,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     if (promosArray.length === 0) return null;
 
     const promo = promosArray.find(p => {
-      // 🔥 EL FIX: Busca en el ID único o en el grupo de applyToProducts
       const pIdStr = String(product.id);
       const matchesSingle = String(p.productId || p.product_id) === pIdStr;
       const matchesMulti = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
@@ -155,7 +146,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return promo;
   }, [activePromotions, product.id, product.stock, product.controlarStock]);
 
-  // Asignamos el esquema de color exacto según el ID de la promo (siempre será el mismo color para la misma promo)
+  // Asignamos el esquema de color exacto según el ID de la promo
   const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
 
   const promoFixedPrice = useMemo(() => {
@@ -267,7 +258,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
             : isLimitReached
               ? 'border-amber-200 dark:border-amber-900/50 lya:border-amber-500/30 opacity-80 shadow-inner'
               : activePromo 
-                ? `${colorScheme.border}${colorScheme.shadowHover} cursor-pointer md:hover:-translate-y-1 md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)]`
+                ? `${colorScheme.border}${colorScheme.shadowHover} cursor-pointer md:hover:-translate-y-1`
                 : 'border-transparent dark:border-transparent lya:border-lya-border/20 shadow-[0_5px_15px_rgba(0,0,0,0.03)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,139,49,0.15)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
       }`}
     >
@@ -282,7 +273,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       <div className="h-28 w-full rounded-[1.25rem] bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group transition-colors shadow-inner shrink-0">
         
         {activePromo && !isAgotado && (
-          <div className={`absolute top-2 left-2 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg border flex items-center gap-1 uppercase tracking-widest ${colorScheme.badge}`}>
+          <div className={`absolute top-2 left-2 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-widest ${colorScheme.badge}`}>
             <Tag size={10} strokeWidth={3} />
             {promoBadgeText}
           </div>
@@ -354,7 +345,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                   : isLimitReached
                     ? 'bg-gray-100 dark:bg-gray-800 text-amber-500'
                     : activePromo 
-                      ? `${colorScheme.btn} text-white active:scale-90 disabled:opacity-50`
+                      ? `${colorScheme.btn} active:scale-90 disabled:opacity-50`
                       : 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 active:scale-90 disabled:opacity-50 md:hover:bg-orange-600 md:dark:hover:bg-orange-500 md:lya:hover:bg-lya-primary/90'
               }`}
               title={activePromo ? 'Añadir Oferta' : 'Añadir directo a la orden'}
