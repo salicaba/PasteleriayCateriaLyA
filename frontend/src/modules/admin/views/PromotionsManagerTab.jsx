@@ -15,20 +15,21 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
   const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(null); 
 
-  const fetchPromotions = async () => {
+  // 🌟 FIX UX: Agregamos "silentLoad" para evitar que la pantalla parpadee al hacer cambios
+  const fetchPromotions = async (silentLoad = false) => {
     try {
-      setIsLoading(true);
+      if (!silentLoad) setIsLoading(true);
       const res = await api.get('/promotions');
       setPromotions(res.data.data || res.data || []);
     } catch (error) {
       showToast("Error al cargar promociones", "error");
     } finally {
-      setIsLoading(false);
+      if (!silentLoad) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen) fetchPromotions();
+    if (isOpen) fetchPromotions(); // La primera carga sí muestra el círculo grande
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -37,7 +38,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     setIsToggling(id);
     try {
       await api.patch(`/promotions/${id}/toggle`);
-      await fetchPromotions();
+      await fetchPromotions(true); // 🌟 Actualización silenciosa
     } catch (error) {
       if (error.response?.status === 409) {
         showToast(error.response.data.message, "warning");
@@ -58,7 +59,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     try {
       await api.delete(`/promotions/${promoToDelete}`);
       showToast("Promoción eliminada", "success");
-      await fetchPromotions();
+      await fetchPromotions(true); // 🌟 Actualización silenciosa
     } catch (error) {
       showToast("Error al eliminar", "error");
     } finally {
@@ -182,7 +183,6 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                         {promo.type === 'BOGO' && `Compra ${promo.buyQty} y llévate ${promo.payQty} a $${Number(promo.discountValue).toFixed(2)}.`}
                       </p>
                       
-                      {/* 🌟 INDICADOR VISUAL DEL ALCANCE */}
                       <div className={`mt-3 flex items-center gap-1.5 text-xs font-bold ${promo.isActive ? 'text-gray-500 dark:text-gray-400 lya:text-lya-text/60' : 'text-gray-400/70 dark:text-gray-500/70 lya:text-lya-text/40'}`}>
                         {isGlobal ? (
                           <><Globe size={14} /> Todo el ticket</>
@@ -242,7 +242,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         </div>
       </motion.div>
 
-      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN NEO-BENTO */}
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
       <AnimatePresence>
         {promoToDelete && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -294,7 +294,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         products={products}
         onPromotionSaved={() => {
           setIsWizardOpen(false);
-          fetchPromotions();
+          fetchPromotions(true); // 🌟 Actualización silenciosa al terminar de crear/editar
           showToast("Promoción guardada exitosamente", "success");
         }}
       />
