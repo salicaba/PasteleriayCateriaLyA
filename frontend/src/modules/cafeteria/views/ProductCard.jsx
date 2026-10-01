@@ -3,6 +3,62 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
+// 🎨 MOTOR DE PALETAS DE COLORES PARA PROMOCIONES MÚLTIPLES
+const PROMO_COLORS = [
+  { // 0: Rosa
+    border: 'border-rose-200 dark:border-rose-900/60',
+    shadowHover: 'shadow-[0_5px_20px_rgba(244,63,94,0.15)] md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.25)]',
+    badge: 'bg-gradient-to-r from-rose-500 to-rose-600 border-rose-400',
+    btn: 'bg-gradient-to-r from-rose-500 to-rose-600 shadow-rose-500/30 md:hover:from-rose-600 md:hover:to-rose-700',
+    text: 'text-rose-600 dark:text-rose-400'
+  },
+  { // 1: Azul
+    border: 'border-blue-200 dark:border-blue-900/60',
+    shadowHover: 'shadow-[0_5px_20px_rgba(59,130,246,0.15)] md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.25)]',
+    badge: 'bg-gradient-to-r from-blue-500 to-blue-600 border-blue-400',
+    btn: 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-blue-500/30 md:hover:from-blue-600 md:hover:to-blue-700',
+    text: 'text-blue-600 dark:text-blue-400'
+  },
+  { // 2: Esmeralda
+    border: 'border-emerald-200 dark:border-emerald-900/60',
+    shadowHover: 'shadow-[0_5px_20px_rgba(16,185,129,0.15)] md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.25)]',
+    badge: 'bg-gradient-to-r from-emerald-500 to-emerald-600 border-emerald-400',
+    btn: 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-emerald-500/30 md:hover:from-emerald-600 md:hover:to-emerald-700',
+    text: 'text-emerald-600 dark:text-emerald-400'
+  },
+  { // 3: Púrpura
+    border: 'border-purple-200 dark:border-purple-900/60',
+    shadowHover: 'shadow-[0_5px_20px_rgba(168,85,247,0.15)] md:hover:shadow-[0_10px_30px_rgba(168,85,247,0.25)]',
+    badge: 'bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400',
+    btn: 'bg-gradient-to-r from-purple-500 to-purple-600 shadow-purple-500/30 md:hover:from-purple-600 md:hover:to-purple-700',
+    text: 'text-purple-600 dark:text-purple-400'
+  },
+  { // 4: Ámbar
+    border: 'border-amber-200 dark:border-amber-900/60',
+    shadowHover: 'shadow-[0_5px_20px_rgba(245,158,11,0.15)] md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.25)]',
+    badge: 'bg-gradient-to-r from-amber-500 to-amber-600 border-amber-400',
+    btn: 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-amber-500/30 md:hover:from-amber-600 md:hover:to-amber-700',
+    text: 'text-amber-600 dark:text-amber-400'
+  },
+  { // 5: Cyan
+    border: 'border-cyan-200 dark:border-cyan-900/60',
+    shadowHover: 'shadow-[0_5px_20px_rgba(6,182,212,0.15)] md:hover:shadow-[0_10px_30px_rgba(6,182,212,0.25)]',
+    badge: 'bg-gradient-to-r from-cyan-500 to-cyan-600 border-cyan-400',
+    btn: 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-cyan-500/30 md:hover:from-cyan-600 md:hover:to-cyan-700',
+    text: 'text-cyan-600 dark:text-cyan-400'
+  }
+];
+
+// Generador de índice determinista basado en el ID de la promo
+const getPromoColor = (promoId) => {
+  if (!promoId) return PROMO_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < promoId.length; i++) {
+    hash = promoId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return PROMO_COLORS[Math.abs(hash) % PROMO_COLORS.length];
+};
+
 export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, cartQty = 0, onLimitReached, activePromotions = [] }) => {
   const [imgError, setImgError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -11,7 +67,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
   const isLimitReached = product.controlarStock === true && cartQty >= product.stock && product.stock > 0;
   const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
   
-  const imageUrl = product.image || product.imagen;
+  const imageUrl = product.image || product.imagen || product.imageUrl;
 
   const parsedOptions = useMemo(() => {
     try {
@@ -24,10 +80,8 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
   const hasOptions = parsedOptions && (parsedOptions.tamanos?.length > 0 || parsedOptions.leches?.length > 0 || parsedOptions.extras?.length > 0);
 
-  // 🔥 CEREBRO DE AUTOCOMPLETADO (Fallback a la primera opción si no hay default)
   const autoDefaults = useMemo(() => {
     if (!hasOptions) return null;
-    // Si no existe 'defaults.tamano', tomamos el primer elemento de la lista 'tamanos'
     const tamano = parsedOptions.defaults?.tamano || parsedOptions.tamanos?.[0]?.nombre;
     const leche = parsedOptions.defaults?.leche || parsedOptions.leches?.[0]?.nombre;
     const extras = parsedOptions.defaults?.extras || [];
@@ -57,7 +111,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     if (promosArray.length === 0) return null;
 
     const promo = promosArray.find(p => {
-      // 🔥 EL FIX: Ahora busca tanto en el ID único como en el nuevo arreglo múltiple
+      // 🔥 EL FIX: Busca en el ID único o en el grupo de applyToProducts
       const pIdStr = String(product.id);
       const matchesSingle = String(p.productId || p.product_id) === pIdStr;
       const matchesMulti = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
@@ -100,6 +154,9 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
     return promo;
   }, [activePromotions, product.id, product.stock, product.controlarStock]);
+
+  // Asignamos el esquema de color exacto según el ID de la promo (siempre será el mismo color para la misma promo)
+  const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
 
   const promoFixedPrice = useMemo(() => {
     if (!activePromo || activePromo.type !== 'FIXED') return 0;
@@ -155,11 +212,9 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       return;
     }
 
-    // Evaluamos si el primer tamaño del sistema dice "elegir" como placeholder
     const isPlaceholderTamano = autoDefaults?.tamano && autoDefaults.tamano.toLowerCase().includes('elegir');
     const requiresSizeSelection = parsedOptions?.tamanos?.length > 0 && (!autoDefaults?.tamano || isPlaceholderTamano);
 
-    // Si tiene tamaños obligatorios y no hay uno default/valido que el sistema pueda tomar, abre el modal
     if (hasOptions && requiresSizeSelection) {
       if (onClick) onClick(product); 
       return;
@@ -187,6 +242,8 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     }
   };
 
+  const pName = product.nombre || product.name || 'Producto';
+
   return (
     <motion.div
       layout
@@ -210,7 +267,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
             : isLimitReached
               ? 'border-amber-200 dark:border-amber-900/50 lya:border-amber-500/30 opacity-80 shadow-inner'
               : activePromo 
-                ? 'border-rose-200 dark:border-rose-900/40 lya:border-lya-primary/40 shadow-[0_5px_20px_rgba(244,63,94,0.1)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
+                ? `${colorScheme.border}${colorScheme.shadowHover} cursor-pointer md:hover:-translate-y-1 md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)]`
                 : 'border-transparent dark:border-transparent lya:border-lya-border/20 shadow-[0_5px_15px_rgba(0,0,0,0.03)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,139,49,0.15)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
       }`}
     >
@@ -225,7 +282,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       <div className="h-28 w-full rounded-[1.25rem] bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group transition-colors shadow-inner shrink-0">
         
         {activePromo && !isAgotado && (
-          <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg border border-rose-400 flex items-center gap-1 uppercase tracking-widest">
+          <div className={`absolute top-2 left-2 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg border flex items-center gap-1 uppercase tracking-widest ${colorScheme.badge}`}>
             <Tag size={10} strokeWidth={3} />
             {promoBadgeText}
           </div>
@@ -240,7 +297,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         {imageUrl && !imgError ? (
           <img 
             src={imageUrl} 
-            alt={product.nombre} 
+            alt={pName} 
             onError={() => setImgError(true)}
             className={`w-full h-full object-contain drop-shadow-md transition-transform duration-500 ease-out ${!isLocked && !isLimitReached && 'md:group-hover:scale-110'}`} 
           />
@@ -252,7 +309,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       <div className="flex flex-col flex-1 relative z-0 text-center justify-between">
         <div>
           <h3 className="font-black text-gray-800 dark:text-gray-100 lya:text-lya-text text-sm leading-tight line-clamp-2 mb-1 px-1 h-10 flex items-center justify-center tracking-tight">
-            {product.nombre}
+            {pName}
           </h3>
           
           <div className="h-6 mb-2 flex justify-center items-center">
@@ -276,7 +333,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 line-through leading-none">
                   ${realBasePrice.toFixed(2)}
                 </span>
-                <span className="font-black text-base tracking-tight text-rose-600 dark:text-rose-400 lya:text-lya-primary leading-tight">
+                <span className={`font-black text-base tracking-tight leading-tight ${colorScheme.text}`}>
                   ${promoFixedPrice.toFixed(2)}
                 </span>
               </>
@@ -297,7 +354,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                   : isLimitReached
                     ? 'bg-gray-100 dark:bg-gray-800 text-amber-500'
                     : activePromo 
-                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg shadow-rose-500/30 active:scale-90 disabled:opacity-50 md:hover:from-rose-600 md:hover:to-rose-700'
+                      ? `${colorScheme.btn} text-white active:scale-90 disabled:opacity-50`
                       : 'bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 active:scale-90 disabled:opacity-50 md:hover:bg-orange-600 md:dark:hover:bg-orange-500 md:lya:hover:bg-lya-primary/90'
               }`}
               title={activePromo ? 'Añadir Oferta' : 'Añadir directo a la orden'}
