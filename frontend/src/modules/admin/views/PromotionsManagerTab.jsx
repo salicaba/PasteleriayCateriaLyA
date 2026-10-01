@@ -15,7 +15,6 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
   const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(null); 
 
-  // 🌟 FIX UX: Agregamos "silentLoad" para evitar que la pantalla parpadee al hacer cambios
   const fetchPromotions = async (silentLoad = false) => {
     try {
       if (!silentLoad) setIsLoading(true);
@@ -29,7 +28,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
   };
 
   useEffect(() => {
-    if (isOpen) fetchPromotions(); // La primera carga sí muestra el círculo grande
+    if (isOpen) fetchPromotions(); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -38,7 +37,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     setIsToggling(id);
     try {
       await api.patch(`/promotions/${id}/toggle`);
-      await fetchPromotions(true); // 🌟 Actualización silenciosa
+      await fetchPromotions(true); 
     } catch (error) {
       if (error.response?.status === 409) {
         showToast(error.response.data.message, "warning");
@@ -59,7 +58,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     try {
       await api.delete(`/promotions/${promoToDelete}`);
       showToast("Promoción eliminada", "success");
-      await fetchPromotions(true); // 🌟 Actualización silenciosa
+      await fetchPromotions(true); 
     } catch (error) {
       showToast("Error al eliminar", "error");
     } finally {
@@ -84,41 +83,44 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} transition={{ duration: 0.4, ease: "easeOut" }} className="bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[90vh]">
         
-        {/* HEADER */}
-        <div className="p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex justify-between items-center bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
-          <div className="flex items-center gap-4">
-            <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-3 rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30 shrink-0">
-              <Tag size={28} strokeWidth={2.5} />
+        {/* HEADER RESPONSIVO NEO-BENTO */}
+        <div className="p-5 sm:p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-6 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
+          
+          <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
+            <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30 shrink-0">
+              <Tag size={24} className="sm:w-7 sm:h-7" strokeWidth={2.5} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight truncate">Motor de Promociones</h2>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 truncate">Combos, descuentos por volumen y rebajas directas.</p>
+              <h2 className="text-lg sm:text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight truncate">Motor de Promociones</h2>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 truncate">Combos, descuentos por volumen y rebajas directas.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          
+          <div className="flex items-center shrink-0 w-full sm:w-auto">
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => { setEditingPromo(null); setIsWizardOpen(true); }} 
-              className="bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none"
+              className="w-full sm:w-auto bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-3.5 sm:py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none"
             >
-              <Plus size={20} /> <span className="hidden sm:inline">Nueva Promoción</span>
-            </motion.button>
-            <motion.button 
-              whileTap={{ scale: 0.95 }} 
-              onClick={onClose} 
-              className="p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none"
-            >
-              <X size={24} />
+              <Plus size={20} /> <span>Nueva Promoción</span>
             </motion.button>
           </div>
+
+          <motion.button 
+            whileTap={{ scale: 0.95 }} 
+            onClick={onClose} 
+            className="absolute top-5 right-5 sm:relative sm:top-auto sm:right-auto p-2 sm:p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none"
+          >
+            <X size={20} className="sm:w-6 sm:h-6" />
+          </motion.button>
         </div>
 
         {/* LISTA DE PROMOCIONES */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 md:p-8 custom-scrollbar">
           {isLoading ? (
             <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-orange-500 lya:text-lya-primary" size={40} /></div>
           ) : promotions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <Tag size={64} className="text-gray-300 dark:text-gray-700 lya:text-lya-text/20 mb-4" />
               <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 lya:text-lya-text">Sin Promociones</h3>
               <p className="text-gray-500 dark:text-gray-500 lya:text-lya-text/60 mt-2 max-w-sm">Crea tu primer combo o descuento para incentivar tus ventas.</p>
@@ -242,7 +244,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         </div>
       </motion.div>
 
-      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN NEO-BENTO */}
       <AnimatePresence>
         {promoToDelete && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -294,7 +296,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         products={products}
         onPromotionSaved={() => {
           setIsWizardOpen(false);
-          fetchPromotions(true); // 🌟 Actualización silenciosa al terminar de crear/editar
+          fetchPromotions(true);
           showToast("Promoción guardada exitosamente", "success");
         }}
       />
