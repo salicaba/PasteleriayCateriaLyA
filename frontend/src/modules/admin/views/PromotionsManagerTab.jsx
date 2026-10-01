@@ -86,6 +86,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         {/* HEADER RESPONSIVO NEO-BENTO */}
         <div className="p-5 sm:p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex flex-col sm:flex-row justify-between sm:items-center gap-4 sm:gap-6 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
           
+          {/* Lado Izquierdo: Títulos */}
           <div className="flex items-center gap-3 sm:gap-4 pr-10 sm:pr-0">
             <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30 shrink-0">
               <Tag size={24} className="sm:w-7 sm:h-7" strokeWidth={2.5} />
@@ -96,7 +97,8 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
             </div>
           </div>
           
-          <div className="flex items-center shrink-0 w-full sm:w-auto">
+          {/* Lado Derecho: Botones */}
+          <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-end">
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => { setEditingPromo(null); setIsWizardOpen(true); }} 
@@ -104,15 +106,16 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
             >
               <Plus size={20} /> <span>Nueva Promoción</span>
             </motion.button>
-          </div>
 
-          <motion.button 
-            whileTap={{ scale: 0.95 }} 
-            onClick={onClose} 
-            className="absolute top-5 right-5 sm:relative sm:top-auto sm:right-auto p-2 sm:p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none"
-          >
-            <X size={20} className="sm:w-6 sm:h-6" />
-          </motion.button>
+            <motion.button 
+              whileTap={{ scale: 0.95 }} 
+              onClick={onClose} 
+              className="absolute top-5 right-5 sm:relative sm:top-auto sm:right-auto p-2 sm:p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none"
+            >
+              <X size={20} className="sm:w-6 sm:h-6" />
+            </motion.button>
+          </div>
+          
         </div>
 
         {/* LISTA DE PROMOCIONES */}
