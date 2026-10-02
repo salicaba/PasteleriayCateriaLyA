@@ -97,7 +97,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const finalDetails = defaultCustoms?.detalles || {};
     const ghostOriginalPrice = defaultCustoms?.precioFinal || baseProduct.precioBase || baseProduct.precio || 0;
 
-    const finalPromoPrice = promo.type === 'BOGO' ? parseFloat(promo.discountValue || 0) : 0;
+    const finalPromoPrice = promo.type === 'BOGO' ? parseFloat(promo.discountValue || promo.discount_value || 0) : 0;
     const promoLabelStr = finalPromoPrice === 0 ? 'GRATIS' : 'PROMO';
 
     setCart(prev => {
@@ -194,7 +194,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const rewardGiven = Number(group.activePromo.payQty || 1);
             
             if (triggerIds.length > 0) {
-                // LÓGICA DE PISCINA CORREGIDA: Sumamos TODOS los disparadores juntos
                 const totalTriggerQty = triggerIds.reduce((sum, tId) => sum + (group.triggerQtys[tId] || 0), 0);
                 const bundles = Math.floor(totalTriggerQty / buyReq);
                 expectedGhosts = bundles * rewardGiven;
@@ -317,6 +316,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 ? activePromo.applyToProducts.map(String) 
                 : [String(activePromo.productId || activePromo.product_id)];
             
+            // 🔥 PARSEO SEGURO PARA EL MODAL: Convertimos discountValue a Number para evitar el TypeError
+            const safeDiscountValue = Number(activePromo.discountValue || activePromo.discount_value || 0);
+
+            // Creamos un objeto de promo sanitizado para pasarlo al Modal sin riesgos
+            const safeActivePromo = {
+              ...activePromo,
+              discountValue: safeDiscountValue
+            };
+
             if (activePromo.type === 'NxM') {
                 const normalQtyInAccount = newCart
                     .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
@@ -328,9 +336,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 if (normalQtyInAccount > 0 && normalQtyInAccount % pay === 0) {
                     const earnedGhosts = buy - pay;
                     if (triggerIds.length > 1) {
-                        rewardToTrigger = { promo: activePromo, earnedGhosts, targetCuenta, poolProductIds: triggerIds };
+                        rewardToTrigger = { promo: safeActivePromo, earnedGhosts, targetCuenta, poolProductIds: triggerIds };
                     } else {
-                        autoClaimNxM = { productWithDetails, activePromo, targetCuenta, earnedGhosts };
+                        autoClaimNxM = { productWithDetails, activePromo: safeActivePromo, targetCuenta, earnedGhosts };
                     }
                 } else if (normalQtyInAccount % pay > 0) {
                     const missing = pay - (normalQtyInAccount % pay);
@@ -342,7 +350,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const rewardQty = Number(activePromo.payQty || 1);
                 const rewardIds = activePromo.rewardProducts || [];
 
-                // LÓGICA DE PISCINA CORREGIDA: Sumamos todos los disparadores mezclados
                 const totalTriggerQty = newCart
                     .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
                     .reduce((a, b) => a + b.qty, 0);
@@ -357,11 +364,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 if (expectedGhosts > currentGhosts) {
                     const earnedGhosts = expectedGhosts - currentGhosts;
                     rewardToTrigger = {
-                        promo: activePromo,
+                        promo: safeActivePromo,
                         earnedGhosts: earnedGhosts,
                         targetCuenta,
                         poolProductIds: rewardIds.map(String),
-                        discountValue: activePromo.discountValue || 0
+                        discountValue: safeDiscountValue
                     };
                 } else {
                     const remainder = totalTriggerQty % reqQty;
