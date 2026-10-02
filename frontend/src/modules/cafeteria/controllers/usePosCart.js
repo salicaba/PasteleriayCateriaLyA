@@ -1,4 +1,3 @@
-// src/modules/pos/controllers/usePosCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
@@ -27,6 +26,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const [promoWarning, setPromoWarning] = useState({
     isOpen: false, message: '', onConfirm: null, onCancel: null
   });
+
+  // 🌟 NUEVO: Estado para mantener en pantalla las promos caídas
+  const [suspendedPromos, setSuspendedPromos] = useState([]);
+  const alertedPromosRef = useRef(new Set());
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -90,13 +93,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       .reduce((acc, item) => acc + item.qty, 0);
   };
 
-  // 🌟 RECOMPENSAS: Inyecta el premio adaptado a NxM o BOGO
   const claimPromoReward = (baseProduct, promo, cuenta, qty) => {
     const defaultCustoms = getDefaultCustomizations(baseProduct);
     const finalDetails = defaultCustoms?.detalles || {};
     const ghostOriginalPrice = defaultCustoms?.precioFinal || baseProduct.precioBase || baseProduct.precio || 0;
 
-    // Calcular precio y etiqueta en base al tipo de promo
     const finalPromoPrice = promo.type === 'BOGO' ? parseFloat(promo.discountValue || 0) : 0;
     const promoLabelStr = finalPromoPrice === 0 ? 'GRATIS' : 'PROMO';
 
@@ -104,7 +105,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         const newCart = [...prev];
         const existingGhostIdx = newCart.findIndex(p => 
             p.id === baseProduct.id && p.cuenta === cuenta && 
-            p.isAutoPromo && p.promoId === promo.id && // Aseguramos match exacto por promo
+            p.isAutoPromo && p.promoId === promo.id && 
             !p.enviadoCocina && p.status !== 'CANCELLED'
         );
 
@@ -145,7 +146,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     setPendingPromoReward(null);
   };
 
-  // 🔥 MOTOR ANTI-RUPTURA MULTI-PROMO
   const syncPromotions = (cartState) => {
     let cleanCart = [...cartState];
     const promoGroups = {}; 
@@ -162,17 +162,19 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         
         if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'BOGO')) {
             const key = `${activePromo.id}::${item.cuenta}`;
-            if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, ghosts: [], activePromo, cuenta: item.cuenta };
+            if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, triggerQtys: {}, ghosts: [], activePromo, cuenta: item.cuenta };
             
             if (item.isAutoPromo && item.promoId === activePromo.id) {
                 promoGroups[key].ghosts.push(item);
             } else if (!item.isAutoPromo || item.promoLabel === 'OFERTA') {
-                // Confirmamos si realmente es un disparador (applyToProducts)
                 const isTrigger = Array.isArray(activePromo.applyToProducts) 
                     ? activePromo.applyToProducts.map(String).includes(String(item.id))
                     : String(activePromo.productId || activePromo.product_id) === String(item.id);
                 
-                if (isTrigger) promoGroups[key].normalQty += item.qty;
+                if (isTrigger) {
+                    promoGroups[key].normalQty += item.qty;
+                    promoGroups[key].triggerQtys[item.id] = (promoGroups[key].triggerQtys[item.id] || 0) + item.qty;
+                }
             }
         }
     });
@@ -185,9 +187,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const buy = Number(group.activePromo.buyQty || 2);
             expectedGhosts = Math.floor(group.normalQty / pay) * (buy - pay);
         } else if (group.activePromo.type === 'BOGO') {
+            const triggerIds = group.activePromo.applyToProducts.map(String);
             const buyReq = Number(group.activePromo.buyQty || 1);
             const rewardGiven = Number(group.activePromo.payQty || 1);
-            expectedGhosts = Math.floor(group.normalQty / buyReq) * rewardGiven;
+            
+            if (triggerIds.length > 0) {
+                const qtysByTrigger = triggerIds.map(tId => Math.floor((group.triggerQtys[tId] || 0) / buyReq));
+                const bundles = Math.min(...qtysByTrigger);
+                expectedGhosts = bundles * rewardGiven;
+            }
         }
 
         const currentGhostQty = group.ghosts.reduce((sum, g) => sum + g.qty, 0);
@@ -297,15 +305,14 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             });
         }
 
-        // 🌟 EVALUADOR DE PROMOCIONES (NxM y BOGO)
         if (activePromo) {
             const triggerIds = activePromo.applyToProducts?.length > 0 ? activePromo.applyToProducts.map(String) : [String(activePromo.productId || activePromo.product_id)];
             
-            const normalQtyInAccount = newCart
-                .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
-                .reduce((a, b) => a + b.qty, 0);
-
             if (activePromo.type === 'NxM') {
+                const normalQtyInAccount = newCart
+                    .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .reduce((a, b) => a + b.qty, 0);
+
                 const pay = Number(activePromo.payQty || 1);
                 const buy = Number(activePromo.buyQty || 2);
                 
@@ -324,11 +331,23 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const rewardQty = Number(activePromo.payQty || 1);
                 const rewardIds = activePromo.rewardProducts || [];
 
-                if (normalQtyInAccount > 0 && normalQtyInAccount % reqQty === 0) {
-                    // En BOGO siempre usamos el modal para garantizar que extraemos la data pura del producto premio
+                const triggerQtys = triggerIds.map(tId => {
+                    const qty = newCart
+                        .filter(p => String(p.id) === tId && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                        .reduce((a, b) => a + b.qty, 0);
+                    return Math.floor(qty / reqQty);
+                });
+                
+                const bundles = triggerIds.length > 0 ? Math.min(...triggerQtys) : 0;
+                const expectedGhosts = bundles * rewardQty;
+                
+                const currentGhosts = newCart.filter(p => p.isAutoPromo && p.promoId === activePromo.id && p.cuenta === targetCuenta).reduce((a, b) => a + b.qty, 0);
+
+                if (expectedGhosts > currentGhosts) {
+                    const earnedGhosts = expectedGhosts - currentGhosts;
                     setPendingPromoReward({
                         promo: activePromo,
-                        earnedGhosts: rewardQty,
+                        earnedGhosts: earnedGhosts,
                         targetCuenta,
                         poolProductIds: rewardIds.map(String),
                         discountValue: activePromo.discountValue || 0
@@ -356,10 +375,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           let totalUnsentQty = getUnsentQtyOfProduct(modifiedCart, update.id);
           if (totalUnsentQty > update.stock) {
             if (update.stock === 0) {
-              notificationsToFire.add({ msg: `El producto se agotó y fue retirado de tu carrito.`, type: 'error' });
+              notificationsToFire.add(JSON.stringify({ msg: `El producto se agotó y fue retirado de tu carrito.`, type: 'error' }));
               modifiedCart = modifiedCart.filter(item => !(item.id === update.id && !item.enviadoCocina && item.status !== 'CANCELLED'));
             } else {
-              notificationsToFire.add({ msg: `Se redujo la cantidad en tu carrito por disponibilidad de stock.`, type: 'warning' });
+              notificationsToFire.add(JSON.stringify({ msg: `Se redujo la cantidad en tu carrito por disponibilidad de stock.`, type: 'warning' }));
               for (let i = modifiedCart.length - 1; i >= 0; i--) {
                 const item = modifiedCart[i];
                 if (item.id === update.id && !item.enviadoCocina && item.status !== 'CANCELLED') {
@@ -376,15 +395,57 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
               }
             }
           }
+
+          // 🌟 RADAR DE PROMOCIONES INTELIGENTE
+          promotions.forEach(promo => {
+            const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
+            const isPActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+            
+            if (isPActive) {
+              const isTrigger = promo.applyToProducts?.map(String).includes(String(update.id)) || String(promo.productId) === String(update.id);
+              const isReward = promo.rewardProducts?.map(String).includes(String(update.id));
+              
+              if (isTrigger || isReward) {
+                const threshold = Number(promo.minStockThreshold || promo.min_stock_threshold || 0);
+                
+                if (update.stock <= threshold) {
+                  // 1. Añade a la lista visible de suspendidas
+                  setSuspendedPromos(prev => {
+                    if (!prev.find(p => p.id === promo.id)) return [...prev, promo];
+                    return prev;
+                  });
+
+                  // 2. Dispara la alerta roja UNA SOLA VEZ
+                  if (!alertedPromosRef.current.has(promo.id)) {
+                    notificationsToFire.add(JSON.stringify({ 
+                      msg: `🚨 Promoción Suspendida: "${promo.name}" se ocultó por llegar al límite de stock de seguridad.`, 
+                      type: 'error' 
+                    }));
+                    alertedPromosRef.current.add(promo.id);
+                  }
+                } else {
+                  // 🌟 MAGIA: Si hicieron restock, quita la alerta y permite que la promo reviva
+                  setSuspendedPromos(prev => prev.filter(p => p.id !== promo.id));
+                  alertedPromosRef.current.delete(promo.id);
+                }
+              }
+            }
+          });
         }
-        if (triggerNotification) notificationsToFire.forEach(notif => triggerNotification(notif.msg, notif.type));
+        
+        if (triggerNotification) {
+          notificationsToFire.forEach(notifStr => {
+            const notif = JSON.parse(notifStr);
+            triggerNotification(notif.msg, notif.type);
+          });
+        }
         return modifiedCart; 
       });
     };
 
     socket.on('stock:update', handleStockAdjustment);
     return () => socket.off('stock:update', handleStockAdjustment);
-  }, [triggerNotification]); 
+  }, [triggerNotification, promotions]); 
 
   const removeFromCart = (itemToRemove) => { 
     if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
@@ -472,6 +533,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     cart: _cart, setCart, addToCart, removeFromCart, deleteLine, toggleItemTakeaway, total, unsentTotal, hasUnsentItems, getSubtotalByCuenta, getProductQty,
     clearCartByAccount, clearEntireCart,
     promoWarning, confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(), cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel(),
-    pendingPromoReward, setPendingPromoReward, claimPromoReward
+    pendingPromoReward, setPendingPromoReward, claimPromoReward,
+    suspendedPromos // 🌟 Exponemos el estado persistente al orquestador
   };
 };

@@ -100,7 +100,8 @@ export const PosModal = ({
     moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
     releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture,
-    pendingPromoReward, setPendingPromoReward, claimPromoReward 
+    pendingPromoReward, setPendingPromoReward, claimPromoReward,
+    suspendedPromos // 🌟 AQUÍ EXTRAEMOS LA VARIABLE DE PROMOS SUSPENDIDAS
   } = usePosController(mesa, isOpen, todasLasMesas, showToast, onTableRelease, onClose, inline); 
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
@@ -163,7 +164,7 @@ export const PosModal = ({
     
     if (cuentaName && cuentaName !== 'Todas') shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
 
-    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
+    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
     let textoCuenta = '';
     if (isVitrina) {
@@ -404,6 +405,33 @@ export const PosModal = ({
                 className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-[1.5rem] text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/10 lya:focus:ring-lya-secondary/20 border-2 border-transparent focus:border-orange-500 dark:focus:border-orange-500 lya:focus:border-lya-secondary transition-all text-gray-800 dark:text-white lya:text-lya-text placeholder-gray-400 dark:placeholder-gray-500 lya:placeholder-lya-text/40" 
               />
             </div>
+            
+            {/* 🌟 AQUÍ ESTÁ EL BOTÓN DE ALERTA DE PROMOS SUSPENDIDAS (PING ROJO) */}
+            <AnimatePresence>
+              {suspendedPromos?.length > 0 && (
+                <motion.div 
+                  initial={{ scale: 0.8, opacity: 0 }} 
+                  animate={{ scale: 1, opacity: 1 }} 
+                  exit={{ scale: 0.8, opacity: 0 }}
+                >
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => {
+                      showToast(`⚠️ Promos suspendidas por falta de stock: ${suspendedPromos.map(p => p.name).join(', ')}`, 'warning');
+                    }}
+                    className="p-3 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-[1.25rem] border border-red-200 dark:border-red-800/30 flex items-center justify-center relative shadow-sm outline-none md:hover:bg-red-100 dark:md:hover:bg-red-900/40 transition-colors shrink-0"
+                    title="Promociones Suspendidas"
+                  >
+                    <span className="absolute top-0 right-0 flex h-3 w-3 -mt-1 -mr-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    <AlertTriangle size={20} />
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {!inline && (
               <motion.button 
                 whileTap={{ scale: 0.95 }}

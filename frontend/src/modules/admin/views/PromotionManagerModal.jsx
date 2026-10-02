@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Tag, Loader2, Save, Calendar, Power, AlertTriangle, CheckCircle2, ArrowRight, DollarSign, CheckSquare, AlertCircle, Search, ShoppingBag, Gift } from 'lucide-react';
+import { X, Tag, Loader2, Save, Calendar, Power, AlertTriangle, CheckCircle2, ArrowRight, DollarSign, CheckSquare, AlertCircle, Search, ShoppingBag, Gift, PackageMinus } from 'lucide-react';
 import api from '../../../api/client'; 
 
 const DAYS_OF_WEEK = [
@@ -24,6 +24,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
     payQty: 1,
     discountValue: '',
     minTicketAmount: '',
+    minStockThreshold: 0, // 🌟 NUEVO: Umbral de seguridad de stock
     validDays: [0, 1, 2, 3, 4, 5, 6],
     isActive: true
   });
@@ -42,6 +43,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
           payQty: editData.payQty || 1,
           discountValue: Number(editData.discountValue) === 0 ? '' : editData.discountValue,
           minTicketAmount: Number(editData.minTicketAmount) === 0 ? '' : editData.minTicketAmount,
+          minStockThreshold: editData.minStockThreshold || editData.min_stock_threshold || 0,
           validDays: editData.validDays || [0, 1, 2, 3, 4, 5, 6],
           isActive: editData.isActive !== undefined ? editData.isActive : true
         });
@@ -55,6 +57,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
           payQty: 1, 
           discountValue: '', 
           minTicketAmount: '',
+          minStockThreshold: 0,
           validDays: [0, 1, 2, 3, 4, 5, 6], 
           isActive: true
         });
@@ -131,7 +134,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       }
     }
 
-    // 3. ESCUDO ANTI-COLISIONES NIVEL PRODUCCIÓN (Evalúa Triggers y Rewards)
+    // 3. ESCUDO ANTI-COLISIONES NIVEL PRODUCCIÓN (Ignora los Premios)
     if (formData.isActive) {
       const overlappingPromo = allPromotions.find(p => {
         if (editData && p.id === editData.id) return false;
@@ -155,15 +158,13 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
            return true; 
         } else if (formData.type !== 'TICKET_DISCOUNT' && p.type !== 'TICKET_DISCOUNT') {
            
-           // Recopilamos absolutamente TODOS los productos de la promo iterada
+           // 🌟 CORRECCIÓN BOGO: SOLO Recopilamos los DISPARADORES de la promo iterada
            let pProducts = [];
            if (Array.isArray(p.applyToProducts)) pProducts.push(...p.applyToProducts.map(String));
-           if (Array.isArray(p.rewardProducts)) pProducts.push(...p.rewardProducts.map(String));
            if (p.productId || p.product_id) pProducts.push(String(p.productId || p.product_id));
 
-           // Recopilamos absolutamente TODOS los productos de la promo que estamos creando
+           // 🌟 CORRECCIÓN BOGO: SOLO Recopilamos los DISPARADORES de la promo que estamos creando
            let formProducts = [...formData.applyToProducts.map(String)];
-           if (formData.type === 'BOGO') formProducts.push(...formData.rewardProducts.map(String));
 
            const hasProductOverlap = formProducts.some(id => pProducts.includes(id));
            return hasProductOverlap;
@@ -182,6 +183,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
     const cleanPayQty = parseInt(formData.payQty) || 1;
     const cleanDiscountValue = parseFloat(formData.discountValue) || 0;
     const cleanMinTicketAmount = parseFloat(formData.minTicketAmount) || 0;
+    const cleanMinStockThreshold = parseInt(formData.minStockThreshold) || 0;
 
     if (formData.type === 'NxM' && cleanBuyQty <= cleanPayQty) {
       showError("Error lógico: La cantidad que 'lleva' debe ser mayor a la que 'paga'."); return;
@@ -195,6 +197,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
         payQty: cleanPayQty,
         discountValue: cleanDiscountValue,
         minTicketAmount: cleanMinTicketAmount,
+        minStockThreshold: cleanMinStockThreshold,
         productId: null 
       };
 
@@ -508,33 +511,53 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </motion.div>
               </div>
 
+              {/* 🌟 SECCIÓN 5: SEGURIDAD Y ACTIVACIÓN (CON LÍMITE DE STOCK) */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
                     {formData.type !== 'TICKET_DISCOUNT' ? '5' : '4'}
                   </div>
-                  <h3 className="text-lg font-black text-gray-800 dark:text-white tracking-tight">Activación</h3>
+                  <h3 className="text-lg font-black text-gray-800 dark:text-white tracking-tight">Seguridad y Activación</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2 bg-white dark:bg-gray-900 rounded-[2rem] p-6 border shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Umbral de Stock */}
+                  <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-2 mb-2">
+                        <PackageMinus size={16} /> Límite de Stock
+                      </label>
+                      <p className="text-[10px] text-gray-400 lya:text-lya-text/50 mb-4 leading-tight">
+                        La promo se ocultará si el stock de un producto cae a este número. (0 = Agotado).
+                      </p>
+                    </div>
+                    <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 p-2 w-full">
+                      <input type="number" min="0" value={formData.minStockThreshold} onChange={(e) => setFormData({...formData, minStockThreshold: e.target.value})} className="w-full bg-transparent text-center text-2xl font-black focus:outline-none focus:text-amber-500 dark:text-white lya:text-lya-text" placeholder="0" />
+                      <span className="text-xs font-bold text-gray-400 pr-3">unid.</span>
+                    </div>
+                  </div>
+
+                  {/* Días Válidos */}
+                  <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-sm">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2 mb-4"><Calendar size={16} /> ¿Qué días aplica?</label>
                     <div className="flex flex-wrap gap-2">
                       {DAYS_OF_WEEK.map((day) => {
                         const isActiveDay = formData.validDays.includes(day.id);
                         return (
-                          <motion.button key={day.id} whileTap={{ scale: 0.9 }} onClick={() => toggleDay(day.id)} className={`flex-1 min-w-[70px] py-3 rounded-2xl text-sm font-black transition-all border outline-none ${isActiveDay ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent shadow-md' : 'bg-gray-50 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700'}`}>
-                            {day.label}
+                          <motion.button key={day.id} whileTap={{ scale: 0.9 }} onClick={() => toggleDay(day.id)} className={`flex-1 min-w-[30%] py-2.5 rounded-2xl text-xs font-black transition-all border outline-none ${isActiveDay ? 'bg-gray-900 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg border-transparent shadow-md' : 'bg-gray-50 dark:bg-gray-800 lya:bg-lya-border/20 text-gray-400 border-gray-200 dark:border-gray-700 lya:border-transparent'}`}>
+                            {day.label.substring(0, 3)}
                           </motion.button>
                         );
                       })}
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-6 border shadow-sm flex flex-col">
+
+                  {/* Estado */}
+                  <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-sm flex flex-col">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2 mb-4"><Power size={16} /> Estado</label>
-                    <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-2xl p-1.5 flex flex-col gap-1.5">
-                       <motion.button whileTap={{ scale: 0.95 }} onClick={() => setFormData({...formData, isActive: true})} className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-black text-sm transition-all outline-none ${formData.isActive ? 'bg-white dark:bg-gray-900 text-emerald-600 shadow-sm border' : 'text-gray-400 border border-transparent'}`}><CheckSquare size={16} /> Encendido</motion.button>
-                       <motion.button whileTap={{ scale: 0.95 }} onClick={() => setFormData({...formData, isActive: false})} className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-black text-sm transition-all outline-none ${!formData.isActive ? 'bg-white dark:bg-gray-900 text-gray-800 dark:text-white shadow-sm border' : 'text-gray-400 border border-transparent'}`}><AlertCircle size={16} /> Apagado</motion.button>
+                    <div className="flex-1 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl p-1.5 flex flex-col gap-1.5 border border-gray-200 dark:border-gray-700 lya:border-lya-border/30">
+                       <motion.button whileTap={{ scale: 0.95 }} onClick={() => setFormData({...formData, isActive: true})} className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-black text-sm transition-all outline-none ${formData.isActive ? 'bg-white dark:bg-gray-900 lya:bg-lya-surface text-emerald-600 shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' : 'text-gray-400 border border-transparent'}`}><CheckSquare size={16} /> Encendido</motion.button>
+                       <motion.button whileTap={{ scale: 0.95 }} onClick={() => setFormData({...formData, isActive: false})} className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-black text-sm transition-all outline-none ${!formData.isActive ? 'bg-white dark:bg-gray-900 lya:bg-lya-surface text-gray-800 dark:text-white lya:text-lya-text shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/40' : 'text-gray-400 border border-transparent'}`}><AlertCircle size={16} /> Apagado</motion.button>
                     </div>
                   </div>
                 </div>

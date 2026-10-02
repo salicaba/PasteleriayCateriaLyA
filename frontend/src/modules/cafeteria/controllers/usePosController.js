@@ -310,6 +310,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     promoWarning: cartLogic.promoWarning,
     confirmPromoRupture: cartLogic.confirmPromoRupture,
     cancelPromoRupture: cartLogic.cancelPromoRupture,
+
+    suspendedPromos: cartLogic.suspendedPromos, // <---- AÑADE ESTA LÍNEA
     
     pendingPromoReward: cartLogic.pendingPromoReward,
     setPendingPromoReward: cartLogic.setPendingPromoReward,

@@ -95,66 +95,67 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return base;
   }, [product.precioBase, product.precio, parsedOptions, autoDefaults]);
 
-  const activePromo = useMemo(() => {
+  // 🌟 NUEVA LÓGICA: Determina si es Disparador, Premio, o Ambos, e incluye Umbral de Stock
+  const promoData = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
       : (activePromotions?.data || activePromotions?.promotions || []);
 
     if (promosArray.length === 0) return null;
 
-    const promo = promosArray.find(p => {
+    const validPromos = promosArray.map(p => {
       const pIdStr = String(product.id);
-      
-      // 1. Coincidencia Clásica (Producto único)
-      const matchesSingle = String(p.productId || p.product_id) === pIdStr;
-      
-      // 2. Coincidencia Múltiple (Disparadores de NxM o BOGO)
-      const matchesMulti = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
-      
-      // 3. 🌟 NUEVO: Coincidencia de Premio (Recompensas de BOGO)
+      const isSingle = String(p.productId || p.product_id) === pIdStr;
+      const isTrigger = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
       const isReward = Array.isArray(p.rewardProducts) && p.rewardProducts.map(String).includes(pIdStr);
       
+      return { promo: p, isTrigger: isSingle || isTrigger, isReward };
+    }).filter(data => {
       // Si no cumple NINGUNO de los roles, se descarta
-      if (!matchesSingle && !matchesMulti && !isReward) return false;
-
-      const rawActive = p.isActive ?? p.is_active ?? p.status;
+      if (!data.isTrigger && !data.isReward) return false;
+      
+      const rawActive = data.promo.isActive ?? data.promo.is_active ?? data.promo.status;
       if (rawActive !== true && rawActive !== 1 && rawActive !== 'true' && rawActive !== '1') return false;
-
+      
       const today = new Date().getDay(); 
+      const daysRaw = data.promo.validDays || data.promo.valid_days;
       let validDaysAsNumbers = [];
-      const daysRaw = p.validDays || p.valid_days;
-
+      
       if (Array.isArray(daysRaw)) {
         validDaysAsNumbers = daysRaw.map(Number);
       } else if (typeof daysRaw === 'string') {
-        try { 
-          validDaysAsNumbers = JSON.parse(daysRaw).map(Number); 
-        } catch (e) { 
-          validDaysAsNumbers = daysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+        try { validDaysAsNumbers = JSON.parse(daysRaw).map(Number); } 
+        catch (e) { validDaysAsNumbers = daysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
+      }
+      
+      if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) return false;
+
+      // 🌟 EVALUACIÓN DE STOCK Y UMBRAL DE SEGURIDAD
+      if (product.controlarStock) {
+        const threshold = Number(data.promo.minStockThreshold || data.promo.min_stock_threshold || 0);
+        
+        let requiredQty = 1;
+        if (data.isTrigger && (data.promo.type === 'NxM' || data.promo.type === 'NTH_FIXED')) {
+            requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 2);
+        } else if (data.isReward && data.promo.type === 'BOGO') {
+            requiredQty = Number(data.promo.payQty || data.promo.pay_qty || 1);
+        }
+        
+        // La promo se oculta si no alcanza la cantidad requerida para activarla,
+        // O si cruza el límite de seguridad impuesto por el admin.
+        if (product.stock < requiredQty || product.stock <= threshold) {
+            return false;
         }
       }
-
-      if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) {
-        return false;
-      }
-
       return true;
     });
 
-    if (!promo) return null;
-    
-    if (product.controlarStock) {
-      let requiredQty = 1;
-      if (promo.type === 'NxM' || promo.type === 'NTH_FIXED') {
-        requiredQty = Number(promo.buyQty || promo.buy_qty || 2);
-      }
-      if (product.stock < requiredQty) {
-        return null; 
-      }
-    }
-
-    return promo;
+    return validPromos.length > 0 ? validPromos[0] : null;
   }, [activePromotions, product.id, product.stock, product.controlarStock]);
+
+  const activePromo = promoData?.promo;
+  const isTrigger = promoData?.isTrigger;
+  const isReward = promoData?.isReward;
 
   // Asignamos el esquema de color exacto según el ID de la promo
   const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
@@ -201,12 +202,14 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       return `${nth}ª a $${formattedPrice}`;
     }
 
+    // 🌟 TEXTO INTELIGENTE PARA BOGO
     if (type === 'BOGO') {
-      return `Compra ${activePromo.buyQty} Llevate ${activePromo.payQty}`;
+      if (isTrigger) return `COMPRA ${activePromo.buyQty || 1} LLEVATE ${activePromo.payQty || 1}`;
+      if (isReward && !isTrigger) return `🎁 ELEGIBLE PREMIO`;
     }
     
     return activePromo.name || 'Promo';
-  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
+  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio, isTrigger, isReward]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 

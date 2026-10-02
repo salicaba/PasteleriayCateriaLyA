@@ -69,21 +69,19 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         const hasDayOverlap = toggleDays.some(d => pDays.includes(d));
         if (!hasDayOverlap) return false;
 
-        // Lógica de colisión por productos
+        // Lógica de colisión por productos (IGNORANDO LOS PREMIOS)
         if (promoToToggle.type === 'TICKET_DISCOUNT' && p.type === 'TICKET_DISCOUNT') {
            return true; 
         } else if (promoToToggle.type !== 'TICKET_DISCOUNT' && p.type !== 'TICKET_DISCOUNT') {
            
-           // Productos de la promo iterada
+           // SOLO Productos disparadores de la promo iterada
            let pProducts = [];
            if (Array.isArray(p.applyToProducts)) pProducts.push(...p.applyToProducts.map(String));
-           if (Array.isArray(p.rewardProducts)) pProducts.push(...p.rewardProducts.map(String));
            if (p.productId || p.product_id) pProducts.push(String(p.productId || p.product_id));
 
-           // Productos de la promo que se intenta encender
+           // SOLO Productos disparadores de la promo que se intenta encender
            let toggleProducts = [];
            if (Array.isArray(promoToToggle.applyToProducts)) toggleProducts.push(...promoToToggle.applyToProducts.map(String));
-           if (Array.isArray(promoToToggle.rewardProducts)) toggleProducts.push(...promoToToggle.rewardProducts.map(String));
            if (promoToToggle.productId || promoToToggle.product_id) toggleProducts.push(String(promoToToggle.productId || promoToToggle.product_id));
 
            return toggleProducts.some(pid => pProducts.includes(pid));
