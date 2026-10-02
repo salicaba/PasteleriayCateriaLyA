@@ -239,9 +239,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId, mesaActual?.status]);
+  }, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId, mesaActual?.status]);
 
-// 🔥 WRAPPERS CON ANIMACIÓN DE CARGA Y ACTUALIZACIÓN FLUIDA
+  // 🔥 WRAPPERS CON ANIMACIÓN DE CARGA Y ACTUALIZACIÓN FLUIDA
   const wrappedCancelFullOrder = async (motivo) => {
       await mutations.cancelFullOrder(motivo);
       if (clearEntireCart) clearEntireCart();
@@ -311,7 +311,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     confirmPromoRupture: cartLogic.confirmPromoRupture,
     cancelPromoRupture: cartLogic.cancelPromoRupture,
     
-    // 🔥 ESTADOS DEL MODAL DE SELECCIÓN DE RECOMPENSA EXPUESTOS AQUÍ
     pendingPromoReward: cartLogic.pendingPromoReward,
     setPendingPromoReward: cartLogic.setPendingPromoReward,
     claimPromoReward: cartLogic.claimPromoReward,

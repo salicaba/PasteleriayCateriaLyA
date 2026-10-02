@@ -90,10 +90,8 @@ export const PosModal = ({
     categoriaActiva, setCategoriaActiva, filteredProducts 
   } = usePosMenu(isVitrina);
 
-  // Esto le da acceso directo a la lista con nombres e imágenes reales
   const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
-  // Asegúrate de que usePosController esté retornando estos 3 nuevos campos
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
@@ -545,7 +543,7 @@ export const PosModal = ({
 
             <div className="relative z-[9999]">
                 
-                {/* MODAL CÁPSULA: SELECCIÓN DE RECOMPENSA */}
+                {/* 🌟 MODAL CÁPSULA: SELECCIÓN DE RECOMPENSA (Adaptado a BOGO y NxM) */}
                 <AnimatePresence>
                   {pendingPromoReward && (
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
@@ -561,7 +559,12 @@ export const PosModal = ({
                           </div>
                           <div>
                             <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight">¡Promoción Desbloqueada!</h3>
-                            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">Elige tu producto GRATIS (Base)</p>
+                            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
+                              {pendingPromoReward.discountValue === 0 || pendingPromoReward.discountValue === undefined 
+                                ? 'Elige tu producto GRATIS (Base)' 
+                                : `Elige tu recompensa a $${pendingPromoReward.discountValue.toFixed(2)}`
+                              }
+                            </p>
                           </div>
                         </div>
 
@@ -573,9 +576,9 @@ export const PosModal = ({
                               return isMatch && hasStock;
                             })
                             .map(p => {
-                              // 🌟 Soporte universal para el nombre y la imagen
                               const pName = p.nombre || p.name || 'Producto';
                               const pImage = p.imageUrl || p.imagen || p.image || null;
+                              const isFree = pendingPromoReward.discountValue === 0 || pendingPromoReward.discountValue === undefined;
 
                               return (
                                 <motion.button
@@ -600,7 +603,7 @@ export const PosModal = ({
                                     {pName}
                                   </span>
                                   <span className="text-[10px] font-bold text-emerald-500 mt-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                                    Seleccionar
+                                    {isFree ? 'Seleccionar GRATIS' : `Añadir por $${pendingPromoReward.discountValue.toFixed(2)}`}
                                   </span>
                                 </motion.button>
                               );
@@ -619,6 +622,7 @@ export const PosModal = ({
                   )}
                 </AnimatePresence>
 
+                {/* MODAL CÁPSULA: ALERTA DE RUPTURA DE PROMOCIÓN */}
                 <AnimatePresence>
                   {promoWarning?.isOpen && (
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">

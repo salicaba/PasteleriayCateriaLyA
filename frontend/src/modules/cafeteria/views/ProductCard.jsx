@@ -104,13 +104,41 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
 
     const promo = promosArray.find(p => {
       const pIdStr = String(product.id);
+      
+      // 1. Coincidencia Clásica (Producto único)
       const matchesSingle = String(p.productId || p.product_id) === pIdStr;
+      
+      // 2. Coincidencia Múltiple (Disparadores de NxM o BOGO)
       const matchesMulti = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
       
-      if (!matchesSingle && !matchesMulti) return false;
+      // 3. 🌟 NUEVO: Coincidencia de Premio (Recompensas de BOGO)
+      const isReward = Array.isArray(p.rewardProducts) && p.rewardProducts.map(String).includes(pIdStr);
+      
+      // Si no cumple NINGUNO de los roles, se descarta
+      if (!matchesSingle && !matchesMulti && !isReward) return false;
 
       const rawActive = p.isActive ?? p.is_active ?? p.status;
-      return rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+      if (rawActive !== true && rawActive !== 1 && rawActive !== 'true' && rawActive !== '1') return false;
+
+      const today = new Date().getDay(); 
+      let validDaysAsNumbers = [];
+      const daysRaw = p.validDays || p.valid_days;
+
+      if (Array.isArray(daysRaw)) {
+        validDaysAsNumbers = daysRaw.map(Number);
+      } else if (typeof daysRaw === 'string') {
+        try { 
+          validDaysAsNumbers = JSON.parse(daysRaw).map(Number); 
+        } catch (e) { 
+          validDaysAsNumbers = daysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+        }
+      }
+
+      if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) {
+        return false;
+      }
+
+      return true;
     });
 
     if (!promo) return null;
@@ -123,24 +151,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       if (product.stock < requiredQty) {
         return null; 
       }
-    }
-
-    const today = new Date().getDay(); 
-    let validDaysAsNumbers = [];
-    const daysRaw = promo.validDays || promo.valid_days;
-
-    if (Array.isArray(daysRaw)) {
-      validDaysAsNumbers = daysRaw.map(Number);
-    } else if (typeof daysRaw === 'string') {
-      try { 
-        validDaysAsNumbers = JSON.parse(daysRaw).map(Number); 
-      } catch (e) { 
-        validDaysAsNumbers = daysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
-      }
-    }
-
-    if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) {
-      return null;
     }
 
     return promo;
@@ -189,6 +199,10 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
       return `${nth}ª a $${formattedPrice}`;
+    }
+
+    if (type === 'BOGO') {
+      return `Compra ${activePromo.buyQty} Llevate ${activePromo.payQty}`;
     }
     
     return activePromo.name || 'Promo';
