@@ -2,46 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
-// 🎨 MOTOR DE PALETAS DE COLORES PREMIUM (Neón Sutil para Modo Oscuro)
 const PROMO_COLORS = [
-  { // 0: Ruby (Rojo/Rosa)
-    border: 'border-rose-400/60 dark:border-rose-500/30',
-    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)]',
-    badge: 'bg-rose-500 text-white',
-    btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600',
-    text: 'text-rose-600 dark:text-rose-400'
-  },
-  { // 1: Sapphire (Azul)
-    border: 'border-blue-400/60 dark:border-blue-500/30',
-    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.2)]',
-    badge: 'bg-blue-500 text-white',
-    btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600',
-    text: 'text-blue-600 dark:text-blue-400'
-  },
-  { // 2: Emerald (Verde)
-    border: 'border-emerald-400/60 dark:border-emerald-500/30',
-    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.2)]',
-    badge: 'bg-emerald-500 text-white',
-    btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600',
-    text: 'text-emerald-600 dark:text-emerald-400'
-  },
-  { // 3: Amethyst (Púrpura)
-    border: 'border-violet-400/60 dark:border-violet-500/30',
-    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(139,92,246,0.2)]',
-    badge: 'bg-violet-500 text-white',
-    btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600',
-    text: 'text-violet-600 dark:text-violet-400'
-  },
-  { // 4: Amber (Naranja/Oro)
-    border: 'border-amber-400/60 dark:border-amber-500/30',
-    shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.2)]',
-    badge: 'bg-amber-500 text-white',
-    btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600',
-    text: 'text-amber-600 dark:text-amber-400'
-  }
+  { border: 'border-rose-400/60 dark:border-rose-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)]', badge: 'bg-rose-500 text-white', btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600', text: 'text-rose-600 dark:text-rose-400' },
+  { border: 'border-blue-400/60 dark:border-blue-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.2)]', badge: 'bg-blue-500 text-white', btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600', text: 'text-blue-600 dark:text-blue-400' },
+  { border: 'border-emerald-400/60 dark:border-emerald-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.2)]', badge: 'bg-emerald-500 text-white', btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600', text: 'text-emerald-600 dark:text-emerald-400' },
+  { border: 'border-violet-400/60 dark:border-violet-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(139,92,246,0.2)]', badge: 'bg-violet-500 text-white', btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600', text: 'text-violet-600 dark:text-violet-400' },
+  { border: 'border-amber-400/60 dark:border-amber-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.2)]', badge: 'bg-amber-500 text-white', btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600', text: 'text-amber-600 dark:text-amber-400' }
 ];
 
-// Generador de índice determinista basado en el ID de la promo
 const getPromoColor = (promoId) => {
   if (!promoId) return PROMO_COLORS[0];
   let hash = 0;
@@ -95,7 +63,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return base;
   }, [product.precioBase, product.precio, parsedOptions, autoDefaults]);
 
-  // 🌟 NUEVA LÓGICA: Determina si es Disparador, Premio, o Ambos, e incluye Umbral de Stock
+  // 🌟 EL FILTRO: Solo pasamos promos activas a la UI si el producto es un DISPARADOR.
   const promoData = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
@@ -106,13 +74,14 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     const validPromos = promosArray.map(p => {
       const pIdStr = String(product.id);
       const isSingle = String(p.productId || p.product_id) === pIdStr;
-      const isTrigger = Array.isArray(p.applyToProducts) && p.applyToProducts.map(String).includes(pIdStr);
-      const isReward = Array.isArray(p.rewardProducts) && p.rewardProducts.map(String).includes(pIdStr);
+      const isTrigger = Array.isArray(p.applyToProducts) && p.applyToProducts.length > 0
+        ? p.applyToProducts.map(String).includes(pIdStr)
+        : isSingle;
       
-      return { promo: p, isTrigger: isSingle || isTrigger, isReward };
+      return { promo: p, isTrigger };
     }).filter(data => {
-      // Si no cumple NINGUNO de los roles, se descarta
-      if (!data.isTrigger && !data.isReward) return false;
+      // Ocultar ADN del Premio: Excluimos visualmente los premios que no son disparadores.
+      if (!data.isTrigger) return false;
       
       const rawActive = data.promo.isActive ?? data.promo.is_active ?? data.promo.status;
       if (rawActive !== true && rawActive !== 1 && rawActive !== 'true' && rawActive !== '1') return false;
@@ -130,19 +99,16 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       
       if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) return false;
 
-      // 🌟 EVALUACIÓN DE STOCK Y UMBRAL DE SEGURIDAD
       if (product.controlarStock) {
         const threshold = Number(data.promo.minStockThreshold || data.promo.min_stock_threshold || 0);
         
         let requiredQty = 1;
-        if (data.isTrigger && (data.promo.type === 'NxM' || data.promo.type === 'NTH_FIXED')) {
+        if (data.promo.type === 'NxM' || data.promo.type === 'NTH_FIXED') {
             requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 2);
-        } else if (data.isReward && data.promo.type === 'BOGO') {
-            requiredQty = Number(data.promo.payQty || data.promo.pay_qty || 1);
+        } else if (data.promo.type === 'BOGO') {
+            requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 1);
         }
         
-        // La promo se oculta si no alcanza la cantidad requerida para activarla,
-        // O si cruza el límite de seguridad impuesto por el admin.
         if (product.stock < requiredQty || product.stock <= threshold) {
             return false;
         }
@@ -154,10 +120,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
   }, [activePromotions, product.id, product.stock, product.controlarStock]);
 
   const activePromo = promoData?.promo;
-  const isTrigger = promoData?.isTrigger;
-  const isReward = promoData?.isReward;
-
-  // Asignamos el esquema de color exacto según el ID de la promo
   const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
 
   const promoFixedPrice = useMemo(() => {
@@ -185,31 +147,24 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       const pay = activePromo.payQty || activePromo.pay_qty || 2;
       return `${buy}x${pay}`;
     }
-    
     if (type === 'FIXED') {
       return `-${discountPercent}% OFF`;
     }
-    
     if (type === 'NTH_FIXED') {
       const nth = activePromo.buyQty || activePromo.buy_qty || 2;
       const rawDiscountPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-      
       const originalDbPrice = Number(product.precioBase || product.precio || 0);
       const costoExtras = realBasePrice - originalDbPrice;
       const finalPromoPrice = rawDiscountPrice + (costoExtras > 0 ? costoExtras : 0);
-      
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
       return `${nth}ª a $${formattedPrice}`;
     }
-
-    // 🌟 TEXTO INTELIGENTE PARA BOGO
     if (type === 'BOGO') {
-      if (isTrigger) return `COMPRA ${activePromo.buyQty || 1} LLEVATE ${activePromo.payQty || 1}`;
-      if (isReward && !isTrigger) return `🎁 ELEGIBLE PREMIO`;
+      return `COMPRA ${activePromo.buyQty || 1} LLÉVATE ${activePromo.payQty || 1}`;
     }
     
     return activePromo.name || 'Promo';
-  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio, isTrigger, isReward]);
+  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 

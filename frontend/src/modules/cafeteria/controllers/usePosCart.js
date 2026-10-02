@@ -27,7 +27,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     isOpen: false, message: '', onConfirm: null, onCancel: null
   });
 
-  // 🌟 NUEVO: Estado para mantener en pantalla las promos caídas
   const [suspendedPromos, setSuspendedPromos] = useState([]);
   const alertedPromosRef = useRef(new Set());
 
@@ -187,7 +186,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const buy = Number(group.activePromo.buyQty || 2);
             expectedGhosts = Math.floor(group.normalQty / pay) * (buy - pay);
         } else if (group.activePromo.type === 'BOGO') {
-            const triggerIds = group.activePromo.applyToProducts.map(String);
+            const triggerIds = Array.isArray(group.activePromo.applyToProducts) && group.activePromo.applyToProducts.length > 0 
+                ? group.activePromo.applyToProducts.map(String) 
+                : [String(group.activePromo.productId || group.activePromo.product_id)];
+            
             const buyReq = Number(group.activePromo.buyQty || 1);
             const rewardGiven = Number(group.activePromo.payQty || 1);
             
@@ -283,6 +285,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
       }
 
+      let rewardToTrigger = null;
+      let autoClaimNxM = null;
+      let upsellNotification = null;
+
       setCart(prev => {
         const detailStr = JSON.stringify(finalDetails);
         let newCart = [...prev];
@@ -306,7 +312,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
 
         if (activePromo) {
-            const triggerIds = activePromo.applyToProducts?.length > 0 ? activePromo.applyToProducts.map(String) : [String(activePromo.productId || activePromo.product_id)];
+            const triggerIds = Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 0 
+                ? activePromo.applyToProducts.map(String) 
+                : [String(activePromo.productId || activePromo.product_id)];
             
             if (activePromo.type === 'NxM') {
                 const normalQtyInAccount = newCart
@@ -319,13 +327,15 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 if (normalQtyInAccount > 0 && normalQtyInAccount % pay === 0) {
                     const earnedGhosts = buy - pay;
                     if (triggerIds.length > 1) {
-                        setPendingPromoReward({
-                            promo: activePromo, earnedGhosts, targetCuenta, poolProductIds: triggerIds
-                        });
+                        rewardToTrigger = { promo: activePromo, earnedGhosts, targetCuenta, poolProductIds: triggerIds };
                     } else {
-                        setTimeout(() => claimPromoReward(productWithDetails, activePromo, targetCuenta, earnedGhosts), 0);
+                        autoClaimNxM = { productWithDetails, activePromo, targetCuenta, earnedGhosts };
                     }
+                } else if (normalQtyInAccount % pay > 0) {
+                    const missing = pay - (normalQtyInAccount % pay);
+                    upsellNotification = `¡Agrega ${missing} más para completar la promo ${buy}x${pay}!`;
                 }
+
             } else if (activePromo.type === 'BOGO') {
                 const reqQty = Number(activePromo.buyQty || 1);
                 const rewardQty = Number(activePromo.payQty || 1);
@@ -345,19 +355,46 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
                 if (expectedGhosts > currentGhosts) {
                     const earnedGhosts = expectedGhosts - currentGhosts;
-                    setPendingPromoReward({
+                    rewardToTrigger = {
                         promo: activePromo,
                         earnedGhosts: earnedGhosts,
                         targetCuenta,
                         poolProductIds: rewardIds.map(String),
                         discountValue: activePromo.discountValue || 0
-                    });
+                    };
+                } else {
+                    if (triggerIds.length === 1) {
+                        const currentQty = newCart.filter(p => String(p.id) === triggerIds[0] && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                        const remainder = currentQty % reqQty;
+                        if (remainder > 0) {
+                            const missing = reqQty - remainder;
+                            upsellNotification = `¡Agrega ${missing} "${productWithDetails.nombre}" más para desbloquear tu regalo!`;
+                        }
+                    } else {
+                        const rawQtys = triggerIds.map(tId => newCart.filter(p => String(p.id) === tId && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0));
+                        const maxQty = Math.max(...rawQtys);
+                        const minQty = Math.min(...rawQtys);
+                        if (maxQty > minQty) {
+                            upsellNotification = `Combo incompleto: ¡Agrega los productos faltantes de "${activePromo.name}" para desbloquear el premio!`;
+                        }
+                    }
                 }
             }
         }
 
         return newCart;
       });
+
+      // 🌟 Side Effects extraídos para evitar bloqueos del ciclo de Renderizado de React
+      if (rewardToTrigger) {
+          setPendingPromoReward(rewardToTrigger);
+      }
+      if (autoClaimNxM) {
+          setTimeout(() => claimPromoReward(autoClaimNxM.productWithDetails, autoClaimNxM.activePromo, autoClaimNxM.targetCuenta, autoClaimNxM.earnedGhosts), 0);
+      }
+      if (upsellNotification && triggerNotification) {
+          triggerNotification(upsellNotification, 'info');
+      }
 
       return true; 
     } finally {
@@ -396,7 +433,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             }
           }
 
-          // 🌟 RADAR DE PROMOCIONES INTELIGENTE
           promotions.forEach(promo => {
             const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
             const isPActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
@@ -409,13 +445,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const threshold = Number(promo.minStockThreshold || promo.min_stock_threshold || 0);
                 
                 if (update.stock <= threshold) {
-                  // 1. Añade a la lista visible de suspendidas
                   setSuspendedPromos(prev => {
                     if (!prev.find(p => p.id === promo.id)) return [...prev, promo];
                     return prev;
                   });
 
-                  // 2. Dispara la alerta roja UNA SOLA VEZ
                   if (!alertedPromosRef.current.has(promo.id)) {
                     notificationsToFire.add(JSON.stringify({ 
                       msg: `🚨 Promoción Suspendida: "${promo.name}" se ocultó por llegar al límite de stock de seguridad.`, 
@@ -424,7 +458,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     alertedPromosRef.current.add(promo.id);
                   }
                 } else {
-                  // 🌟 MAGIA: Si hicieron restock, quita la alerta y permite que la promo reviva
                   setSuspendedPromos(prev => prev.filter(p => p.id !== promo.id));
                   alertedPromosRef.current.delete(promo.id);
                 }
@@ -534,6 +567,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     clearCartByAccount, clearEntireCart,
     promoWarning, confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(), cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel(),
     pendingPromoReward, setPendingPromoReward, claimPromoReward,
-    suspendedPromos // 🌟 Exponemos el estado persistente al orquestador
+    suspendedPromos
   };
 };
