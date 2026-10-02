@@ -194,8 +194,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const rewardGiven = Number(group.activePromo.payQty || 1);
             
             if (triggerIds.length > 0) {
-                const qtysByTrigger = triggerIds.map(tId => Math.floor((group.triggerQtys[tId] || 0) / buyReq));
-                const bundles = Math.min(...qtysByTrigger);
+                // LÓGICA DE PISCINA CORREGIDA: Sumamos TODOS los disparadores juntos
+                const totalTriggerQty = triggerIds.reduce((sum, tId) => sum + (group.triggerQtys[tId] || 0), 0);
+                const bundles = Math.floor(totalTriggerQty / buyReq);
                 expectedGhosts = bundles * rewardGiven;
             }
         }
@@ -341,17 +342,17 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const rewardQty = Number(activePromo.payQty || 1);
                 const rewardIds = activePromo.rewardProducts || [];
 
-                const triggerQtys = triggerIds.map(tId => {
-                    const qty = newCart
-                        .filter(p => String(p.id) === tId && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
-                        .reduce((a, b) => a + b.qty, 0);
-                    return Math.floor(qty / reqQty);
-                });
+                // LÓGICA DE PISCINA CORREGIDA: Sumamos todos los disparadores mezclados
+                const totalTriggerQty = newCart
+                    .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .reduce((a, b) => a + b.qty, 0);
                 
-                const bundles = triggerIds.length > 0 ? Math.min(...triggerQtys) : 0;
+                const bundles = Math.floor(totalTriggerQty / reqQty);
                 const expectedGhosts = bundles * rewardQty;
                 
-                const currentGhosts = newCart.filter(p => p.isAutoPromo && p.promoId === activePromo.id && p.cuenta === targetCuenta).reduce((a, b) => a + b.qty, 0);
+                const currentGhosts = newCart
+                    .filter(p => p.isAutoPromo && p.promoId === activePromo.id && p.cuenta === targetCuenta)
+                    .reduce((a, b) => a + b.qty, 0);
 
                 if (expectedGhosts > currentGhosts) {
                     const earnedGhosts = expectedGhosts - currentGhosts;
@@ -363,20 +364,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                         discountValue: activePromo.discountValue || 0
                     };
                 } else {
-                    if (triggerIds.length === 1) {
-                        const currentQty = newCart.filter(p => String(p.id) === triggerIds[0] && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-                        const remainder = currentQty % reqQty;
-                        if (remainder > 0) {
-                            const missing = reqQty - remainder;
-                            upsellNotification = `¡Agrega ${missing} "${productWithDetails.nombre}" más para desbloquear tu regalo!`;
-                        }
-                    } else {
-                        const rawQtys = triggerIds.map(tId => newCart.filter(p => String(p.id) === tId && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0));
-                        const maxQty = Math.max(...rawQtys);
-                        const minQty = Math.min(...rawQtys);
-                        if (maxQty > minQty) {
-                            upsellNotification = `Combo incompleto: ¡Agrega los productos faltantes de "${activePromo.name}" para desbloquear el premio!`;
-                        }
+                    const remainder = totalTriggerQty % reqQty;
+                    if (remainder > 0) {
+                        const missing = reqQty - remainder;
+                        upsellNotification = `¡Agrega ${missing} producto(s) más para desbloquear el premio de "${activePromo.name}"!`;
                     }
                 }
             }
@@ -385,7 +376,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         return newCart;
       });
 
-      // 🌟 Side Effects extraídos para evitar bloqueos del ciclo de Renderizado de React
       if (rewardToTrigger) {
           setPendingPromoReward(rewardToTrigger);
       }
