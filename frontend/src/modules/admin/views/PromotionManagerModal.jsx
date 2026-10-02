@@ -8,7 +8,7 @@ const DAYS_OF_WEEK = [
   { id: 4, label: 'Jueves' }, { id: 5, label: 'Viernes' }, { id: 6, label: 'Sábado' }, { id: 0, label: 'Domingo' }
 ];
 
-export default function PromotionManagerModal({ isOpen, onClose, products = [], editData, onPromotionSaved }) {
+export default function PromotionManagerModal({ isOpen, onClose, products = [], allPromotions = [], editData, onPromotionSaved }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorToast, setErrorToast] = useState(null);
   
@@ -96,13 +96,13 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
   };
 
   const handleSave = async () => {
+    // 1. Validaciones Básicas
     if (!formData.name.trim()) {
       showError("Por favor, asigna un nombre a la promoción."); return;
     }
     if (formData.validDays.length === 0) {
       showError("Debes seleccionar al menos un día válido."); return;
     }
-    
     if (formData.type === 'BOGO') {
       if (formData.applyToProducts.length === 0) {
         showError("Selecciona al menos un producto que el cliente deba comprar."); return;
@@ -114,26 +114,70 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       showError("Selecciona al menos un producto para aplicar la promoción."); return;
     }
 
-    // 🌟 PROTECCIÓN DE GANANCIAS NEO-BENTO EXTREMA
+    // 2. PROTECCIÓN DE GANANCIAS: Precios idénticos en NxM
     if (formData.type === 'NxM' && formData.applyToProducts.length > 1) {
-      // Forzamos conversión a String para evitar fallos de ID numérico vs ID texto
       const selectedIds = formData.applyToProducts.map(String);
       const selectedProds = products.filter(p => selectedIds.includes(String(p.id)));
       
       if (selectedProds.length > 1) {
-        // Buscamos el precio sin importar cómo venga del backend
         const getPrice = (p) => Number(p.precio || p.basePrice || p.precioBase || 0).toFixed(2);
-        
         const firstPrice = getPrice(selectedProds[0]);
         const allSamePrice = selectedProds.every(p => getPrice(p) === firstPrice);
         
         if (!allSamePrice) {
           showError(`ALERTA DE PÉRDIDA: Todos los productos en una promo NxM deben valer lo mismo. Seleccionaste productos con precios distintos.`);
-          return; // ⛔ BLOQUEO ESTRICTO DE GUARDADO
+          return; 
         }
       }
     }
+
+    // 3. ESCUDO ANTI-COLISIONES NIVEL PRODUCCIÓN (Evalúa Triggers y Rewards)
+    if (formData.isActive) {
+      const overlappingPromo = allPromotions.find(p => {
+        if (editData && p.id === editData.id) return false;
+        
+        const rawActive = p.isActive ?? p.is_active ?? p.status;
+        const isPActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+        if (!isPActive) return false;
+
+        const pDaysRaw = p.validDays || p.valid_days;
+        let pDays = [];
+        if (Array.isArray(pDaysRaw)) pDays = pDaysRaw.map(Number);
+        else if (typeof pDaysRaw === 'string') {
+          try { pDays = JSON.parse(pDaysRaw).map(Number); } 
+          catch(e) { pDays = pDaysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
+        }
+        
+        const hasDayOverlap = formData.validDays.some(d => pDays.includes(d));
+        if (!hasDayOverlap) return false;
+
+        if (formData.type === 'TICKET_DISCOUNT' && p.type === 'TICKET_DISCOUNT') {
+           return true; 
+        } else if (formData.type !== 'TICKET_DISCOUNT' && p.type !== 'TICKET_DISCOUNT') {
+           
+           // Recopilamos absolutamente TODOS los productos de la promo iterada
+           let pProducts = [];
+           if (Array.isArray(p.applyToProducts)) pProducts.push(...p.applyToProducts.map(String));
+           if (Array.isArray(p.rewardProducts)) pProducts.push(...p.rewardProducts.map(String));
+           if (p.productId || p.product_id) pProducts.push(String(p.productId || p.product_id));
+
+           // Recopilamos absolutamente TODOS los productos de la promo que estamos creando
+           let formProducts = [...formData.applyToProducts.map(String)];
+           if (formData.type === 'BOGO') formProducts.push(...formData.rewardProducts.map(String));
+
+           const hasProductOverlap = formProducts.some(id => pProducts.includes(id));
+           return hasProductOverlap;
+        }
+        return false;
+      });
+
+      if (overlappingPromo) {
+        showError(`COLISIÓN DETECTADA: Hay productos que ya forman parte de "${overlappingPromo.name}" en los días elegidos. Apaga esa promoción primero o guarda esta como Inactiva.`);
+        return; 
+      }
+    }
     
+    // 4. Saneamiento de Datos
     const cleanBuyQty = parseInt(formData.buyQty) || 1; 
     const cleanPayQty = parseInt(formData.payQty) || 1;
     const cleanDiscountValue = parseFloat(formData.discountValue) || 0;
@@ -189,7 +233,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
           
-          {/* CÁPSULA NEO-BENTO DE ERROR (ESTA ES LA QUE TE AVISARÁ SI HAY PRECIOS DISTINTOS) */}
           <AnimatePresence>
             {errorToast && (
               <motion.div 

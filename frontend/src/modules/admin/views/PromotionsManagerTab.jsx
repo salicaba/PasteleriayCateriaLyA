@@ -34,6 +34,70 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
   const handleToggleStatus = async (id) => {
     if (isToggling) return;
+
+    const promoToToggle = promotions.find(p => p.id === id);
+    const isTurningOn = !promoToToggle.isActive;
+
+    // 🛡️ ESCUDO ANTI-COLISIONES PARA EL BOTÓN RÁPIDO DE LA LISTA
+    if (isTurningOn) {
+      const overlappingPromo = promotions.find(p => {
+        if (p.id === id) return false; // No compararse consigo misma
+        
+        const rawActive = p.isActive ?? p.is_active ?? p.status;
+        const isPActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+        if (!isPActive) return false; // Solo choca si la otra está encendida
+
+        // Extraer días de la promo iterada
+        const pDaysRaw = p.validDays || p.valid_days;
+        let pDays = [];
+        if (Array.isArray(pDaysRaw)) pDays = pDaysRaw.map(Number);
+        else if (typeof pDaysRaw === 'string') {
+          try { pDays = JSON.parse(pDaysRaw).map(Number); } 
+          catch(e) { pDays = pDaysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
+        }
+
+        // Extraer días de la promo que queremos encender
+        const toggleDaysRaw = promoToToggle.validDays || promoToToggle.valid_days;
+        let toggleDays = [];
+        if (Array.isArray(toggleDaysRaw)) toggleDays = toggleDaysRaw.map(Number);
+        else if (typeof toggleDaysRaw === 'string') {
+          try { toggleDays = JSON.parse(toggleDaysRaw).map(Number); } 
+          catch(e) { toggleDays = toggleDaysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
+        }
+        
+        // ¿Chocan en días?
+        const hasDayOverlap = toggleDays.some(d => pDays.includes(d));
+        if (!hasDayOverlap) return false;
+
+        // Lógica de colisión por productos
+        if (promoToToggle.type === 'TICKET_DISCOUNT' && p.type === 'TICKET_DISCOUNT') {
+           return true; 
+        } else if (promoToToggle.type !== 'TICKET_DISCOUNT' && p.type !== 'TICKET_DISCOUNT') {
+           
+           // Productos de la promo iterada
+           let pProducts = [];
+           if (Array.isArray(p.applyToProducts)) pProducts.push(...p.applyToProducts.map(String));
+           if (Array.isArray(p.rewardProducts)) pProducts.push(...p.rewardProducts.map(String));
+           if (p.productId || p.product_id) pProducts.push(String(p.productId || p.product_id));
+
+           // Productos de la promo que se intenta encender
+           let toggleProducts = [];
+           if (Array.isArray(promoToToggle.applyToProducts)) toggleProducts.push(...promoToToggle.applyToProducts.map(String));
+           if (Array.isArray(promoToToggle.rewardProducts)) toggleProducts.push(...promoToToggle.rewardProducts.map(String));
+           if (promoToToggle.productId || promoToToggle.product_id) toggleProducts.push(String(promoToToggle.productId || promoToToggle.product_id));
+
+           return toggleProducts.some(pid => pProducts.includes(pid));
+        }
+        return false;
+      });
+
+      if (overlappingPromo) {
+        showToast(`Colisión: Esta promoción comparte productos con "${overlappingPromo.name}". Apágala primero.`, "error");
+        return; // ⛔ BLOQUEA LA PETICIÓN AL SERVIDOR
+      }
+    }
+
+    // Si pasó el escudo, hace la petición
     setIsToggling(id);
     try {
       await api.patch(`/promotions/${id}/toggle`);
@@ -297,6 +361,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         onClose={() => setIsWizardOpen(false)} 
         editData={editingPromo} 
         products={products}
+        allPromotions={promotions} // <--- Este es el prop vital para que el escudo funcione
         onPromotionSaved={() => {
           setIsWizardOpen(false);
           fetchPromotions(true);
