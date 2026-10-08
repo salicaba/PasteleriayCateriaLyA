@@ -1,3 +1,4 @@
+//frontend/src/modules/cafeteria/controllers/usePosCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
@@ -97,7 +98,19 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const finalDetails = defaultCustoms?.detalles || {};
     const ghostOriginalPrice = defaultCustoms?.precioFinal || baseProduct.precioBase || baseProduct.precio || 0;
 
-    const finalPromoPrice = promo.type === 'BOGO' ? parseFloat(promo.discountValue || promo.discount_value || 0) : 0;
+    // 🔥 CÁLCULO PRECISO DEL PRECIO PROMOCIONAL (Respetando costo de extras si los hay)
+    const finalPromoPrice = (() => {
+        if (promo.type === 'BOGO') {
+            return parseFloat(promo.discountValue || promo.discount_value || 0);
+        } else if (promo.type === 'NTH_FIXED') {
+            const rawDiscount = parseFloat(promo.discountValue || promo.discount_value || 0);
+            const originalDbPrice = Number(baseProduct.precioBase || baseProduct.precio || 0);
+            const costoExtras = ghostOriginalPrice - originalDbPrice;
+            return rawDiscount + (costoExtras > 0 ? costoExtras : 0);
+        }
+        return 0; // Para NxM, el ghost siempre es 0 (Gratis)
+    })();
+
     const promoLabelStr = finalPromoPrice === 0 ? 'GRATIS' : 'PROMO';
 
     setCart(prev => {
@@ -159,7 +172,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             activePromo = getActivePromo(item.id, item.stock, item.controlarStock);
         }
         
-        if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'BOGO')) {
+        // 🔥 POOLING: Agrupamos NxM, BOGO y NTH_FIXED
+        if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'BOGO' || activePromo.type === 'NTH_FIXED')) {
             const key = `${activePromo.id}::${item.cuenta}`;
             if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, triggerQtys: {}, ghosts: [], activePromo, cuenta: item.cuenta };
             
@@ -178,6 +192,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
     });
 
+    // 🔥 ESCUDO ANTI-ROBOS: Evaluamos si hay más premios de los permitidos
     Object.values(promoGroups).forEach(group => {
         let expectedGhosts = 0;
 
@@ -198,10 +213,17 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const bundles = Math.floor(totalTriggerQty / buyReq);
                 expectedGhosts = bundles * rewardGiven;
             }
+        } else if (group.activePromo.type === 'NTH_FIXED') {
+            const buyTotal = Number(group.activePromo.buyQty || 2);
+            const normalReq = Math.max(1, buyTotal - 1);
+            if (normalReq > 0) {
+                expectedGhosts = Math.floor(group.normalQty / normalReq);
+            }
         }
 
         const currentGhostQty = group.ghosts.reduce((sum, g) => sum + g.qty, 0);
 
+        // Destrucción asíncrona de clones si el cajero quitó disparadores
         if (currentGhostQty > expectedGhosts) {
             let toRemove = currentGhostQty - expectedGhosts;
             for (let i = cleanCart.length - 1; i >= 0; i--) {
@@ -300,6 +322,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             p.preparaciones.every(prep => JSON.stringify(prep) === detailStr)
         );
 
+        // Agregamos el producto base normal (no es el ghost aún)
         if (index !== -1) {
             newCart[index] = { ...newCart[index], qty: newCart[index].qty + 1, preparaciones: [...newCart[index].preparaciones, finalDetails] };
         } else {
@@ -311,19 +334,14 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             });
         }
 
+        // Evaluación de disparo de promociones
         if (activePromo) {
             const triggerIds = Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 0 
                 ? activePromo.applyToProducts.map(String) 
                 : [String(activePromo.productId || activePromo.product_id)];
             
-            // 🔥 PARSEO SEGURO PARA EL MODAL: Convertimos discountValue a Number para evitar el TypeError
             const safeDiscountValue = Number(activePromo.discountValue || activePromo.discount_value || 0);
-
-            // Creamos un objeto de promo sanitizado para pasarlo al Modal sin riesgos
-            const safeActivePromo = {
-              ...activePromo,
-              discountValue: safeDiscountValue
-            };
+            const safeActivePromo = { ...activePromo, discountValue: safeDiscountValue };
 
             if (activePromo.type === 'NxM') {
                 const normalQtyInAccount = newCart
@@ -376,6 +394,27 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                         const missing = reqQty - remainder;
                         upsellNotification = `¡Agrega ${missing} producto(s) más para desbloquear el premio de "${activePromo.name}"!`;
                     }
+                }
+
+            // 🔥 NUEVA INTEGRACIÓN: UNIDAD ADICIONAL (NTH_FIXED)
+            } else if (activePromo.type === 'NTH_FIXED') {
+                const normalQtyInAccount = newCart
+                    .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .reduce((a, b) => a + b.qty, 0);
+
+                const buyTotal = Number(activePromo.buyQty || 2);
+                const normalReq = Math.max(1, buyTotal - 1);
+
+                if (normalQtyInAccount > 0 && normalQtyInAccount % normalReq === 0) {
+                    const earnedGhosts = 1;
+                    if (triggerIds.length > 1) {
+                        rewardToTrigger = { promo: safeActivePromo, earnedGhosts, targetCuenta, poolProductIds: triggerIds, discountValue: safeDiscountValue };
+                    } else {
+                        autoClaimNxM = { productWithDetails, activePromo: safeActivePromo, targetCuenta, earnedGhosts };
+                    }
+                } else if (normalQtyInAccount % normalReq > 0) {
+                    const missing = normalReq - (normalQtyInAccount % normalReq);
+                    upsellNotification = `¡Agrega ${missing} producto(s) más para llevarte la ${buyTotal}ª unidad a $${safeDiscountValue.toFixed(2)}!`;
                 }
             }
         }

@@ -1,3 +1,4 @@
+//frontend/src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
@@ -157,7 +158,9 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       const costoExtras = realBasePrice - originalDbPrice;
       const finalPromoPrice = rawDiscountPrice + (costoExtras > 0 ? costoExtras : 0);
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
-      return `${nth}ª a $${formattedPrice}`;
+      
+      const ordinal = nth === 3 ? '3ª' : nth === 4 ? '4ª' : `${nth}ª`;
+      return `${ordinal} a $${formattedPrice}`;
     }
     if (type === 'BOGO') {
       return `COMPRA ${activePromo.buyQty || 1} LLÉVATE ${activePromo.payQty || 1}`;
