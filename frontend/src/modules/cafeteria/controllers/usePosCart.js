@@ -98,15 +98,13 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const finalDetails = defaultCustoms?.detalles || {};
     const ghostOriginalPrice = defaultCustoms?.precioFinal || baseProduct.precioBase || baseProduct.precio || 0;
 
-    // 🔥 CÁLCULO PRECISO DEL PRECIO PROMOCIONAL (Respetando costo de extras si los hay)
+    // 🔥 CORRECCIÓN: El descuento se RESTA al precio original, no se establece como el precio final
     const finalPromoPrice = (() => {
         if (promo.type === 'BOGO') {
             return parseFloat(promo.discountValue || promo.discount_value || 0);
         } else if (promo.type === 'NTH_FIXED') {
             const rawDiscount = parseFloat(promo.discountValue || promo.discount_value || 0);
-            const originalDbPrice = Number(baseProduct.precioBase || baseProduct.precio || 0);
-            const costoExtras = ghostOriginalPrice - originalDbPrice;
-            return rawDiscount + (costoExtras > 0 ? costoExtras : 0);
+            return Math.max(0, ghostOriginalPrice - rawDiscount); // Mínimo de $0 si el descuento supera el valor
         }
         return 0; // Para NxM, el ghost siempre es 0 (Gratis)
     })();
@@ -396,7 +394,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     }
                 }
 
-            // 🔥 NUEVA INTEGRACIÓN: UNIDAD ADICIONAL (NTH_FIXED)
+            // 🔥 INTEGRACIÓN: UNIDAD ADICIONAL (NTH_FIXED)
             } else if (activePromo.type === 'NTH_FIXED') {
                 const normalQtyInAccount = newCart
                     .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
@@ -414,7 +412,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     }
                 } else if (normalQtyInAccount % normalReq > 0) {
                     const missing = normalReq - (normalQtyInAccount % normalReq);
-                    upsellNotification = `¡Agrega ${missing} producto(s) más para llevarte la ${buyTotal}ª unidad a $${safeDiscountValue.toFixed(2)}!`;
+                    upsellNotification = `¡Agrega ${missing} producto(s) más para llevarte la ${buyTotal}ª unidad con $${safeDiscountValue.toFixed(2)} de descuento!`;
                 }
             }
         }

@@ -154,9 +154,9 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     if (type === 'NTH_FIXED') {
       const nth = activePromo.buyQty || activePromo.buy_qty || 2;
       const rawDiscountPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-      const originalDbPrice = Number(product.precioBase || product.precio || 0);
-      const costoExtras = realBasePrice - originalDbPrice;
-      const finalPromoPrice = rawDiscountPrice + (costoExtras > 0 ? costoExtras : 0);
+      
+      // 🔥 CORRECCIÓN: El descuento se RESTA del precio real (que incluye extras), no se impone como precio final.
+      const finalPromoPrice = Math.max(0, realBasePrice - rawDiscountPrice);
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
       
       const ordinal = nth === 3 ? '3ª' : nth === 4 ? '4ª' : `${nth}ª`;
