@@ -101,8 +101,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const finalPromoPrice = (() => {
         if (promo.type === 'BOGO') {
             return parseFloat(promo.discountValue || promo.discount_value || 0);
+        } else if (promo.type === 'NTH_FIXED') {
+            const rawDiscount = parseFloat(promo.discountValue || promo.discount_value || 0);
+            return Math.max(0, ghostOriginalPrice - rawDiscount); 
         }
-        return 0; // NxM siempre es 0
+        return 0; 
     })();
 
     const promoLabelStr = finalPromoPrice === 0 ? 'GRATIS' : 'PROMO';
@@ -166,13 +169,17 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             activePromo = getActivePromo(item.id, item.stock, item.controlarStock);
         }
         
-        // 🔥 POOLING: Agrupamos NxM, BOGO y NTH_FIXED
-        if (activePromo && (activePromo.type === 'NxM' || activePromo.type === 'BOGO' || activePromo.type === 'NTH_FIXED')) {
+        // 🔥 POOLING: Agrupamos NxM, BOGO, NTH_FIXED y COMBO
+        if (activePromo && ['NxM', 'BOGO', 'NTH_FIXED', 'COMBO'].includes(activePromo.type)) {
             const key = `${activePromo.id}::${item.cuenta}`;
             if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, triggerQtys: {}, ghosts: [], activePromo, cuenta: item.cuenta };
             
             if (item.isAutoPromo && item.promoId === activePromo.id) {
                 promoGroups[key].ghosts.push(item);
+                // 🌟 PROTECCIÓN COMBO: Los fantasmas del combo SÍ cuentan como disparadores para completar el grupo
+                if (activePromo.type === 'COMBO') {
+                    promoGroups[key].triggerQtys[item.id] = (promoGroups[key].triggerQtys[item.id] || 0) + item.qty;
+                }
             } else if (!item.isAutoPromo || item.promoLabel === 'OFERTA') {
                 const isTrigger = Array.isArray(activePromo.applyToProducts) 
                     ? activePromo.applyToProducts.map(String).includes(String(item.id))
@@ -212,6 +219,13 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const normalReq = Math.max(1, buyTotal - 1);
             if (normalReq > 0) {
                 expectedGhosts = Math.floor(group.normalQty / normalReq);
+            }
+        // 🌟 EVALUACIÓN DE DESTRUCCIÓN PARA COMBO
+        } else if (group.activePromo.type === 'COMBO') {
+            const triggerIds = Array.isArray(group.activePromo.applyToProducts) ? group.activePromo.applyToProducts.map(String) : [];
+            if (triggerIds.length > 0) {
+                // El combo sobrevive solo si existe al menos 1 unidad de TODOS sus componentes requeridos
+                expectedGhosts = Math.min(...triggerIds.map(id => group.triggerQtys[id] || 0));
             }
         }
 
@@ -309,11 +323,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         const detailStr = JSON.stringify(finalDetails);
         let newCart = [...prev];
         
-        // 🔥 INYECCIÓN DIRECTA SIN MODAL PARA NTH_FIXED
         let isNthGhost = false;
         let finalPromoPrice = 0;
         let safeActivePromo = null;
 
+        // 🔥 EVALUACIÓN DE INYECCIÓN DIRECTA (NTH_FIXED y COMBO)
         if (activePromo) {
             const safeDiscountValue = Number(activePromo.discountValue || activePromo.discount_value || 0);
             safeActivePromo = { ...activePromo, discountValue: safeDiscountValue };
@@ -332,8 +346,53 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
                     if ((totalInCart + 1) % buyTotal === 0) {
                         isNthGhost = true;
-                        // RESTAMOS el descuento al precio real del producto (incluyendo los extras)
                         finalPromoPrice = Math.max(0, finalPrice - safeDiscountValue);
+                    }
+                }
+            } 
+            // 🌟 INYECCIÓN PARA COMBO
+            else if (activePromo.type === 'COMBO') {
+                const triggerIds = Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 0 
+                    ? activePromo.applyToProducts.map(String) 
+                    : [];
+
+                if (triggerIds.includes(String(productWithDetails.id))) {
+                    // ¿Cuántos combos completos tenemos ANTES de agregar este?
+                    const currentBundles = Math.min(...triggerIds.map(id => 
+                        prev.filter(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0)
+                    ));
+
+                    // ¿Cuántos combos completos tendremos DESPUÉS de agregarlo?
+                    const triggerQtysAfter = {};
+                    triggerIds.forEach(id => {
+                        let qty = prev.filter(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0);
+                        if (id === String(productWithDetails.id)) qty += 1;
+                        triggerQtysAfter[id] = qty;
+                    });
+                    
+                    const newBundles = Math.min(...triggerIds.map(id => triggerQtysAfter[id]));
+
+                    if (newBundles > currentBundles) {
+                        isNthGhost = true;
+                        
+                        // Calculamos cuánto suman los OTROS productos del combo que ya están en el carrito
+                        let otherItemsSum = 0;
+                        triggerIds.forEach(id => {
+                            if (id !== String(productWithDetails.id)) {
+                                const item = prev.find(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED');
+                                if (item) otherItemsSum += Number(item.precioOriginal || item.precio);
+                            }
+                        });
+
+                        // El fantasma asume la diferencia para que el total sume exactamente el precio cerrado del Combo
+                        finalPromoPrice = safeDiscountValue - otherItemsSum;
+                        successNotification = `Promo: ¡Combo "${activePromo.name}" completado por $${safeDiscountValue.toFixed(2)}!`;
+                    } else {
+                        // Upselling de Combo: Avisar al cajero qué le falta para el precio cerrado
+                        const missingIds = triggerIds.filter(id => triggerQtysAfter[id] === 0);
+                        if (missingIds.length > 0) {
+                            upsellNotification = `¡Agrega los productos faltantes para llevarte el combo "${activePromo.name}" por $${safeDiscountValue.toFixed(2)}!`;
+                        }
                     }
                 }
             }
@@ -371,7 +430,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     promoType: safeActivePromo.type
                 });
             }
-            successNotification = `Promo: ¡${productWithDetails.nombre} añadido con descuento a $${finalPromoPrice.toFixed(2)}!`;
+            if (activePromo?.type === 'NTH_FIXED') {
+                successNotification = `Promo: ¡${productWithDetails.nombre} añadido con descuento a $${finalPromoPrice.toFixed(2)}!`;
+            }
         } else {
             const index = newCart.findIndex(p => 
                 p.id === productWithDetails.id && Number(p.precio).toFixed(2) === Number(finalPrice).toFixed(2) && !p.enviadoCocina && 
@@ -392,7 +453,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             }
         }
 
-        // Evaluación de disparo de otras promociones o upselling
+        // Evaluación de disparo (Modales) o upselling para las demás promos
         if (activePromo && !isNthGhost) {
             const triggerIds = Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 0 
                 ? activePromo.applyToProducts.map(String) 

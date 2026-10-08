@@ -81,7 +81,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       
       return { promo: p, isTrigger };
     }).filter(data => {
-      // Ocultar ADN del Premio: Excluimos visualmente los premios que no son disparadores.
       if (!data.isTrigger) return false;
       
       const rawActive = data.promo.isActive ?? data.promo.is_active ?? data.promo.status;
@@ -108,6 +107,8 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
             requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 2);
         } else if (data.promo.type === 'BOGO') {
             requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 1);
+        } else if (data.promo.type === 'COMBO') {
+            requiredQty = 1; 
         }
         
         if (product.stock < requiredQty || product.stock <= threshold) {
@@ -154,20 +155,22 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     if (type === 'NTH_FIXED') {
       const nth = activePromo.buyQty || activePromo.buy_qty || 2;
       const rawDiscountPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
-      
-      // 🔥 RESTAMOS EL DESCUENTO DEL PRECIO REAL (En lugar de imponerlo como precio final)
       const finalPromoPrice = Math.max(0, realBasePrice - rawDiscountPrice);
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
       
       const ordinal = nth === 3 ? '3ª' : nth === 4 ? '4ª' : `${nth}ª`;
       return `${ordinal} a $${formattedPrice}`;
     }
+    if (type === 'COMBO') {
+      const comboPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
+      return `COMBO A $${comboPrice.toFixed(2)}`;
+    }
     if (type === 'BOGO') {
       return `COMPRA ${activePromo.buyQty || 1} LLÉVATE ${activePromo.payQty || 1}`;
     }
     
     return activePromo.name || 'Promo';
-  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
+  }, [activePromo, discountPercent, realBasePrice]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
@@ -301,6 +304,15 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                 </span>
                 <span className={`font-black text-base tracking-tight leading-tight ${colorScheme.text}`}>
                   ${promoFixedPrice.toFixed(2)}
+                </span>
+              </>
+            ) : (activePromo && activePromo.type === 'COMBO') ? (
+              <>
+                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 leading-none">
+                  Llevando el combo
+                </span>
+                <span className={`font-black text-sm sm:text-base tracking-tight leading-tight ${colorScheme.text}`}>
+                  Arma tu Combo
                 </span>
               </>
             ) : (
