@@ -54,7 +54,13 @@ const Promotion = sequelize.define('Promotion', {
   minTicketAmount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
-    defaultValue: 0.00, // Si el ticket suma más de X cantidad, se activa
+    defaultValue: 0.00,
+  },
+  // 🔥 NUEVO CAMPO: Límite de stock agregado
+  minStockThreshold: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
   },
   validDays: {
     type: DataTypes.ARRAY(DataTypes.INTEGER),

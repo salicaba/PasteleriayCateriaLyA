@@ -45,7 +45,8 @@ export const setupPromotion = async (req, res) => {
     
     const { 
       type, buyQty, payQty, discountValue, validDays, isActive, 
-      applyToProducts, rewardProducts, minTicketAmount, name 
+      applyToProducts, rewardProducts, minTicketAmount, name,
+      minStockThreshold // 🔥 AQUÍ LO EXTRAEMOS DEL FRONTEND
     } = req.body;
 
     // Solo validamos colisiones de producto individual si trae un productId definido
@@ -64,6 +65,7 @@ export const setupPromotion = async (req, res) => {
       applyToProducts,
       rewardProducts,
       minTicketAmount,
+      minStockThreshold, // 🔥 AQUÍ LO GUARDAMOS AL CREAR
       validDays, 
       isActive, 
       type, 
@@ -121,7 +123,8 @@ export const updatePromotion = async (req, res) => {
     const { id } = req.params;
     const { 
       type, buyQty, payQty, discountValue, validDays, isActive, 
-      applyToProducts, rewardProducts, minTicketAmount, name, productId
+      applyToProducts, rewardProducts, minTicketAmount, name, productId,
+      minStockThreshold // 🔥 AQUÍ LO EXTRAEMOS AL EDITAR
     } = req.body;
     
     const promotion = await Promotion.findByPk(id);
@@ -145,6 +148,7 @@ export const updatePromotion = async (req, res) => {
         applyToProducts,
         rewardProducts,
         minTicketAmount,
+        minStockThreshold, // 🔥 AQUÍ LO ACTUALIZAMOS EN LA BD
         type, 
         buyQty, 
         payQty, 
