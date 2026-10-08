@@ -1,6 +1,6 @@
 //frontend/src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
 const PROMO_COLORS = [
@@ -155,7 +155,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       const nth = activePromo.buyQty || activePromo.buy_qty || 2;
       const rawDiscountPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
       
-      // 🔥 CORRECCIÓN: El descuento se RESTA del precio real (que incluye extras), no se impone como precio final.
+      // 🔥 RESTAMOS EL DESCUENTO DEL PRECIO REAL (En lugar de imponerlo como precio final)
       const finalPromoPrice = Math.max(0, realBasePrice - rawDiscountPrice);
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
       
