@@ -149,11 +149,11 @@ export const KitchenPage = () => {
               {filteredOrders.map(order => (
                 <motion.div
                   key={order.id}
-                  layout="position"
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  // 🔥 FIX: Eliminamos layout="position" porque pelea con las columnas CSS
+                  initial={{ opacity: 0, scale: 0.9, y: 15 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }} 
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="break-inside-avoid mb-4 md:mb-6"
                 >
                   <KitchenOrderCard 
