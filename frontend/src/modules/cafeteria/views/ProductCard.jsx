@@ -1,6 +1,6 @@
 //frontend/src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
 const PROMO_COLORS = [
@@ -81,6 +81,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       
       return { promo: p, isTrigger };
     }).filter(data => {
+      // Ocultar ADN del Premio: Excluimos visualmente los premios que no son disparadores.
       if (!data.isTrigger) return false;
       
       const rawActive = data.promo.isActive ?? data.promo.is_active ?? data.promo.status;
@@ -108,7 +109,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         } else if (data.promo.type === 'BOGO') {
             requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 1);
         } else if (data.promo.type === 'COMBO') {
-            requiredQty = 1; 
+            requiredQty = 1; // El combo solo exige que haya 1 unidad en stock para mostrarse
         }
         
         if (product.stock < requiredQty || product.stock <= threshold) {
@@ -155,6 +156,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     if (type === 'NTH_FIXED') {
       const nth = activePromo.buyQty || activePromo.buy_qty || 2;
       const rawDiscountPrice = Number(activePromo.discountValue || activePromo.discount_value || 0);
+      
       const finalPromoPrice = Math.max(0, realBasePrice - rawDiscountPrice);
       const formattedPrice = finalPromoPrice % 1 === 0 ? finalPromoPrice : finalPromoPrice.toFixed(2);
       
@@ -170,7 +172,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     }
     
     return activePromo.name || 'Promo';
-  }, [activePromo, discountPercent, realBasePrice]);
+  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
@@ -304,15 +306,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
                 </span>
                 <span className={`font-black text-base tracking-tight leading-tight ${colorScheme.text}`}>
                   ${promoFixedPrice.toFixed(2)}
-                </span>
-              </>
-            ) : (activePromo && activePromo.type === 'COMBO') ? (
-              <>
-                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/50 leading-none">
-                  Llevando el combo
-                </span>
-                <span className={`font-black text-sm sm:text-base tracking-tight leading-tight ${colorScheme.text}`}>
-                  Arma tu Combo
                 </span>
               </>
             ) : (
