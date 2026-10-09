@@ -1,36 +1,58 @@
 // src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag, Loader2, AlertCircle, Trash2, UtensilsCrossed, Store } from 'lucide-react';
+import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag, Loader2, AlertCircle, Trash2, UtensilsCrossed } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const KitchenOrderCard = ({ 
   order, 
-  category, // 'salon' | 'llevar' | 'mostrador'
+  category, // 'salon' | 'llevar'
   onToggleItem, 
   onComplete, 
   onMarkAllReady,
   processingItems = new Set(),
   processingOrders = new Set() 
 }) => {
-  // 🔥 CANDADO ASÍNCRONO ANTI-PARPADEO (RACE CONDITIONS)
-  const [actionLocks, setActionLocks] = useState({});
+  
+  // 🔥 CANDADO INFINITO ANTI-PARPADEO
+  // Si le da a "Entregar" o "Descartar", la tarjeta muere cargando hasta que el backend la borre de la pantalla
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [localProcessingItems, setLocalProcessingItems] = useState(new Set());
 
-  const executeWithLock = async (e, lockKey, actionFn) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const isOrderProcessing = processingOrders.has(order.id);
-    if (actionLocks[lockKey] || isOrderProcessing) return;
-
-    setActionLocks(prev => ({ ...prev, [lockKey]: true }));
+  const handleComplete = async () => {
+    if (isLeaving) return;
+    setIsLeaving(true);
     try {
-      await actionFn();
+      await onComplete(order.id);
+      // 🔥 IMPORTANTE: NO hacemos setIsLeaving(false) si tiene éxito.
+      // La tarjeta se quedará cargando hasta que el componente se desmonte automáticamente.
+    } catch (error) {
+      setIsLeaving(false); // Solo se libera si falló la petición al backend
+    }
+  };
+
+  const handleMarkAllReady = async () => {
+    if (isMarkingAll || isLeaving) return;
+    setIsMarkingAll(true);
+    try {
+      await onMarkAllReady(order.id);
     } finally {
-      // Debounce artificial de 500ms para asegurar que el server sincronice y la UI no parpadee
-      setTimeout(() => {
-        setActionLocks(prev => ({ ...prev, [lockKey]: false }));
-      }, 500); 
+      setIsMarkingAll(false); // Este sí se libera porque la tarjeta no desaparece
+    }
+  };
+
+  const handleToggle = async (itemId) => {
+    if (isLeaving || localProcessingItems.has(itemId)) return;
+    
+    setLocalProcessingItems(prev => new Set(prev).add(itemId));
+    try {
+      await onToggleItem(order.id, itemId);
+    } finally {
+      setLocalProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
     }
   };
 
@@ -47,7 +69,7 @@ export const KitchenOrderCard = ({
   const activeItems = order.items.filter(i => i.status !== 'CANCELLED');
   const allReady = activeItems.length > 0 && activeItems.every(i => i.kitchenStatus === 'PREPARING');
   
-  const isOrderProcessing = processingOrders.has(order.id);
+  const isOrderProcessing = processingOrders.has(order.id) || isLeaving;
 
   // CONFIGURACIÓN DE COLORES POR CATEGORÍA
   const catStyles = {
@@ -58,10 +80,6 @@ export const KitchenOrderCard = ({
     llevar: {
       bg: 'bg-orange-500 dark:bg-orange-600 lya:bg-orange-500',
       icon: ShoppingBag
-    },
-    mostrador: {
-      bg: 'bg-purple-500 dark:bg-purple-600 lya:bg-purple-600',
-      icon: Store
     }
   };
   const activeStyle = catStyles[category] || catStyles.salon;
@@ -75,9 +93,6 @@ export const KitchenOrderCard = ({
         folio = String(order.id).split('-').pop().slice(-4).toUpperCase();
       }
       return `LLEVAR #${folio}`;
-    } else if (category === 'mostrador') {
-      const folio = String(order.id).split('-').pop().slice(-4).toUpperCase();
-      return `EXPRESS #${folio}`;
     } else {
       let tableNum = rawMesa.replace(/Mesa\s*/i, '').replace('#', '').trim();
       return `MESA #${tableNum}`;
@@ -144,7 +159,7 @@ export const KitchenOrderCard = ({
 
   return (
     <div
-      className={`relative flex flex-col rounded-3xl bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow}`}
+      className={`relative flex flex-col rounded-3xl bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow} ${isLeaving ? 'opacity-80 scale-[0.98]' : ''}`}
     >
       {/* BARRA DE PROGRESO DE TIEMPO SUPERIOR */}
       <div className="absolute top-0 left-0 w-full h-1.5 bg-gray-100 dark:bg-gray-800 z-20">
@@ -172,7 +187,7 @@ export const KitchenOrderCard = ({
       </div>
 
       {/* LISTA DE ITEMS */}
-      <div className="flex-1 p-3 space-y-2">
+      <div className="flex-1 p-3 space-y-2 pointer-events-auto">
         {order.items.slice().sort((a, b) => {
             const idA = String(a.id || '');
             const idB = String(b.id || '');
@@ -180,22 +195,19 @@ export const KitchenOrderCard = ({
         }).map(item => {
           const isCancelled = item.status === 'CANCELLED';
           const isReady = item.kitchenStatus === 'PREPARING' && !isCancelled;
-          const isItemProcessing = processingItems.has(item.id) || isOrderProcessing || actionLocks[item.id];
+          const isItemProcessing = processingItems.has(item.id) || localProcessingItems.has(item.id) || isOrderProcessing;
           
           return (
             <motion.div 
               layout="position"
               key={item.id} 
-              onClick={(e) => {
+              onClick={() => {
                 if (!isItemProcessing && !isCancelled) {
-                  // 🔥 EJECUCIÓN PROTEGIDA ANTI-PARPADEO
-                  executeWithLock(e, item.id, async () => {
-                    await onToggleItem(order.id, item.id);
-                  });
+                  handleToggle(item.id);
                 }
               }}
               className={`group flex items-start gap-3 p-3 rounded-2xl transition-all duration-300 ${
-                isItemProcessing || isCancelled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+                isItemProcessing || isCancelled ? 'opacity-70 cursor-wait' : 'cursor-pointer'
               } ${
                 isCancelled
                   ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/50 border-2 border-dashed'
@@ -292,40 +304,40 @@ export const KitchenOrderCard = ({
         })}
       </div>
 
-      {/* BOTONERA INFERIOR */}
+      {/* BOTONERA INFERIOR PROTEGIDA */}
       <div className="p-3 bg-gray-50/50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800 rounded-b-[1.8rem]">
         {allCancelled ? (
           <button 
-            onClick={(e) => executeWithLock(e, 'complete', async () => await onComplete(order.id))}
-            disabled={isOrderProcessing || actionLocks['complete']}
+            onClick={handleComplete}
+            disabled={isOrderProcessing}
             className={`w-full py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-black rounded-2xl text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 transition-all border border-transparent dark:border-red-500/50 ${
-              isOrderProcessing || actionLocks['complete'] ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
+              isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing || actionLocks['complete'] ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
-            {isOrderProcessing || actionLocks['complete'] ? 'Descartando...' : 'Descartar Comanda'}
+            {isOrderProcessing ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+            {isOrderProcessing ? 'Descartando...' : 'Descartar Comanda'}
           </button>
         ) : allReady ? (
           <button 
-            onClick={(e) => executeWithLock(e, 'complete', async () => await onComplete(order.id))}
-            disabled={isOrderProcessing || actionLocks['complete']}
+            onClick={handleComplete}
+            disabled={isOrderProcessing}
             className={`w-full py-4 bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-black rounded-2xl text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 transition-all border border-transparent dark:border-emerald-500/50 ${
-              isOrderProcessing || actionLocks['complete'] ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
+              isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing || actionLocks['complete'] ? <Loader2 size={20} className="animate-spin" /> : <BellRing size={20} className="animate-pulse" />}
-            {isOrderProcessing || actionLocks['complete'] ? 'Procesando...' : 'Entregar a Mesero'}
+            {isOrderProcessing ? <Loader2 size={20} className="animate-spin" /> : <BellRing size={20} className="animate-pulse" />}
+            {isOrderProcessing ? 'Entregando...' : 'Entregar a Mesero'}
           </button>
         ) : (
           <button 
-            onClick={(e) => executeWithLock(e, 'markAll', async () => await onMarkAllReady(order.id))}
-            disabled={isOrderProcessing || actionLocks['markAll']}
+            onClick={handleMarkAllReady}
+            disabled={isOrderProcessing || isMarkingAll}
             className={`w-full py-4 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-black rounded-2xl text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all border-2 border-gray-200 dark:border-gray-700 shadow-sm ${
-              isOrderProcessing || actionLocks['markAll'] ? 'opacity-70 cursor-wait' : 'active:scale-[0.98] hover:border-blue-300 dark:hover:border-gray-500'
+              isOrderProcessing || isMarkingAll ? 'opacity-70 cursor-wait' : 'active:scale-[0.98] hover:border-blue-300 dark:hover:border-gray-500'
             }`}
           >
-            {isOrderProcessing || actionLocks['markAll'] ? <Loader2 size={18} className="animate-spin text-blue-500" /> : <ChefHat size={18} strokeWidth={2.5} />}
-            {isOrderProcessing || actionLocks['markAll'] ? 'Procesando...' : 'Todo Preparado'}
+            {isOrderProcessing || isMarkingAll ? <Loader2 size={18} className="animate-spin text-blue-500" /> : <ChefHat size={18} strokeWidth={2.5} />}
+            {isOrderProcessing || isMarkingAll ? 'Procesando...' : 'Todo Preparado'}
           </button>
         )}
       </div>

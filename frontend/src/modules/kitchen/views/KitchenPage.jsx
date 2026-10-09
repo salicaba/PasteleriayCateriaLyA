@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKitchenController } from '../controllers/useKitchenController';
 import { KitchenOrderCard } from './KitchenOrderCard';
-import { Flame, UtensilsCrossed, ShoppingBag, Loader2, CheckCircle2, AlertCircle, Store, Filter } from 'lucide-react';
+import { Flame, UtensilsCrossed, ShoppingBag, Loader2, CheckCircle2, AlertCircle, Filter } from 'lucide-react';
 
 export const KitchenPage = () => {
   const { 
@@ -37,24 +37,30 @@ export const KitchenPage = () => {
   }
 
   // ==========================================
-  // LÓGICA DE CATEGORIZACIÓN A PRUEBA DE FALLOS
+  // FILTRADO ESTRICTO: IGNORAR MOSTRADOR/EXPRESS
   // ==========================================
-  const getOrderCategory = (order) => {
+  const validOrders = orders.filter(order => {
     const rawMesa = String(order.mesa || '').toUpperCase();
     const rawTipo = String(order.tipo || '').toLowerCase();
     
-    if (rawMesa.includes('MOSTRADOR') || rawMesa === 'S/N' || rawTipo === 'express') return 'mostrador';
+    // Si es de mostrador, pasa de largo (no se muestra en cocina)
+    const isExpress = rawMesa.includes('MOSTRADOR') || rawMesa === 'S/N' || rawTipo === 'express';
+    return !isExpress;
+  });
+
+  const getOrderCategory = (order) => {
+    const rawMesa = String(order.mesa || '').toUpperCase();
+    const rawTipo = String(order.tipo || '').toLowerCase();
     if (rawTipo === 'llevar' || rawMesa.includes('LLEVAR')) return 'llevar';
-    return 'salon'; // Todo lo demás cae en salón por defecto
+    return 'salon'; // Todo lo demás es salón
   };
 
-  const filteredOrders = orders.filter(o => filtroActivo === 'todos' || getOrderCategory(o) === filtroActivo);
+  const filteredOrders = validOrders.filter(o => filtroActivo === 'todos' || getOrderCategory(o) === filtroActivo);
 
   const conteos = {
-    todos: orders.length,
-    salon: orders.filter(o => getOrderCategory(o) === 'salon').length,
-    llevar: orders.filter(o => getOrderCategory(o) === 'llevar').length,
-    mostrador: orders.filter(o => getOrderCategory(o) === 'mostrador').length,
+    todos: validOrders.length,
+    salon: validOrders.filter(o => getOrderCategory(o) === 'salon').length,
+    llevar: validOrders.filter(o => getOrderCategory(o) === 'llevar').length,
   };
 
   return (
@@ -126,13 +132,6 @@ export const KitchenPage = () => {
             colorClass="bg-orange-500 text-white"
             inactiveClass="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400"
           />
-          <FilterButton 
-            active={filtroActivo === 'mostrador'} 
-            onClick={() => setFiltroActivo('mostrador')}
-            icon={Store} label="Mostrador" count={conteos.mostrador}
-            colorClass="bg-purple-500 text-white"
-            inactiveClass="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400"
-          />
         </div>
       </header>
 
@@ -167,7 +166,7 @@ export const KitchenPage = () => {
                 >
                   <KitchenOrderCard 
                     order={order} 
-                    category={getOrderCategory(order)} // 🔥 Pasamos la categoría para los colores
+                    category={getOrderCategory(order)} 
                     onToggleItem={toggleItemReady} 
                     onComplete={completeOrder} 
                     onMarkAllReady={markAllReady}
