@@ -311,13 +311,12 @@ export const TicketCartGroup = ({
         {sortedDisplayItems.map((item, index) => {
           
           const isCero = Number(item.precio) === 0;
-          // 🔥 CORRECCIÓN: Los combos NUNCA deben tratarse como regalos, aunque su precio final sea 0.
           const isGhostPromo = item.isAutoPromo && isCero && item.promoType !== 'COMBO';
-          
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-          
-          // 🔥 LÓGICA DE BLOQUEO ACTUALIZADA
-          const isLockedPromo = isGhostPromo || isNthPromo;
+          const isComboPromo = item.isAutoPromo && item.promoType === 'COMBO';
+
+          // 🔥 LÓGICA DE BLOQUEO ACTUALIZADA BLINDADA
+          const isLockedPromo = isGhostPromo || isNthPromo || isComboPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
           const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
@@ -570,7 +569,20 @@ export const TicketCartGroup = ({
                                 <motion.button 
                                     whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
                                     disabled={isRemovingLocal}
-                                    onClick={(e) => executeWithLock(e, lockKeyRemove, async () => await handleRemoveUnsent(item))} 
+                                    onClick={(e) => executeWithLock(e, lockKeyRemove, async () => {
+                                        if (isLockedPromo) {
+                                            openConfirmModal({
+                                                title: 'Romper Promoción',
+                                                message: `Vas a restar un producto de la promoción "${item.nombre}". Se restarán también los productos que la activan. ¿Confirmas?`,
+                                                icon: AlertTriangle,
+                                                color: 'red',
+                                                confirmText: 'Confirmar',
+                                                onConfirm: async () => await handleRemoveUnsent(createBreakFlag(item, 1))
+                                            });
+                                        } else {
+                                            await handleRemoveUnsent(item);
+                                        }
+                                    })} 
                                     className={clsx(
                                         "rounded-lg transition-colors outline-none", 
                                         isRemovingLocal ? "opacity-50 cursor-wait text-gray-400" : "md:hover:bg-gray-100 dark:md:hover:bg-gray-800 text-gray-400 md:hover:text-red-500",
@@ -658,7 +670,43 @@ export const TicketCartGroup = ({
                     <motion.button 
                         whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
                         disabled={isCancelingLocal}
-                        onClick={(e) => executeWithLock(e, lockKeyCancel, async () => await handleCancelItem(item))}
+                        onClick={(e) => executeWithLock(e, lockKeyCancel, async () => {
+                            if (isLockedPromo) {
+                                if (item.qty > 1) {
+                                    openConfirmModal({
+                                        title: 'Anular Promoción',
+                                        message: `Vas a anular la promoción de "${item.nombre}". Se anularán también los productos que la activan. ¿Cuántas promociones deseas anular?`,
+                                        icon: AlertTriangle,
+                                        color: 'red',
+                                        confirmText: 'Anular',
+                                        requireInput: true,
+                                        inputType: 'number',
+                                        inputMax: item.qty,
+                                        inputDefault: item.qty.toString(),
+                                        onConfirm: async (val) => { 
+                                            const qty = parseInt(val, 10);
+                                            if (qty > 0) {
+                                                // Inyectamos la cantidad en el flag para que el controlador la procese correctamente
+                                                const itemToCancel = createBreakFlag(item, qty);
+                                                itemToCancel.qty = qty; 
+                                                await handleCancelItem(itemToCancel);
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    openConfirmModal({
+                                        title: 'Anular Promoción',
+                                        message: `Vas a anular la promoción de "${item.nombre}". Se anularán también los productos que la activan. ¿Confirmas?`,
+                                        icon: AlertTriangle,
+                                        color: 'red',
+                                        confirmText: 'Anular',
+                                        onConfirm: async () => await handleCancelItem(createBreakFlag(item, 1))
+                                    });
+                                }
+                            } else {
+                                await handleCancelItem(item);
+                            }
+                        })}
                         className={clsx(
                             "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
                             isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 
@@ -669,10 +717,10 @@ export const TicketCartGroup = ({
                         )} 
                         title={isAnyPromo ? "Anular Promoción" : "Cancelar Producto"}
                     >
-                      {isCancelingLocal ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-                      <span className="text-[10px] font-black uppercase tracking-wider">
-                          {isAnyPromo ? "Quitar Promo" : "Anular"}
-                      </span>
+                        {isCancelingLocal ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                        <span className="text-[10px] font-black uppercase tracking-wider">
+                            {isAnyPromo ? "Quitar Promo" : "Anular"}
+                        </span>
                     </motion.button>
                 )}
               </div>
