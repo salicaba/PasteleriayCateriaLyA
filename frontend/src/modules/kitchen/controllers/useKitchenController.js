@@ -135,14 +135,14 @@ export const useKitchenController = () => {
         const isCancelled = item.status === 'CANCELLED';
         const newStatus = isCancelled ? 'READY' : (item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING');
         
-        // 1. PETICIÓN A LA API (Dejamos que Socket.io actualice la UI)
+        // 🔥 ELIMINADA LA ACTUALIZACIÓN OPTIMISTA. Solo esperamos al backend.
+
         try {
             await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
             if(isCancelled) showToast('Producto cancelado descartado', 'success');
         } catch(e){ 
             console.error("Error al cambiar estado individual"); 
             showToast('Error al actualizar producto', 'error');
-            fetchKitchenOrders(true); 
         } finally {
             setProcessingItems(prev => { const next = new Set(prev); next.delete(itemId); return next; });
         }
@@ -156,7 +156,8 @@ export const useKitchenController = () => {
           return;
         }
 
-        // 1. PETICIÓN A LA API (Dejamos que Socket.io actualice la UI)
+        // 🔥 ELIMINADA LA ACTUALIZACIÓN OPTIMISTA. Solo esperamos al backend.
+
         try {
             const promises = order.items
                 .filter(i => i.kitchenStatus !== 'PREPARING' && i.status !== 'CANCELLED')
@@ -166,8 +167,8 @@ export const useKitchenController = () => {
         } catch(e){ 
             console.error("Error al marcar todo preparado"); 
             showToast('Error al procesar comanda', 'error');
-            fetchKitchenOrders(true); 
         } finally {
+            // Liberamos la tarjeta para que el botón pase a "Entregar" cuando el socket responda
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
         }
     },
@@ -180,20 +181,22 @@ export const useKitchenController = () => {
           return;
         }
 
-        // 1. PETICIÓN A LA API (Dejamos que Socket.io elimine la orden de la UI)
         try {
             const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
             await Promise.all(promises);
             
             const allCancelled = order.items.every(i => i.status === 'CANCELLED');
             showToast(allCancelled ? 'Comanda cancelada descartada' : '¡Comanda despachada con éxito!');
+            
+            // 🔥 AQUÍ NO LIMPIAMOS NADA. La tarjeta muere bloqueada ("Procesando...")
+            // garantizando que no haya destellos visuales antes de desaparecer.
+            
         } catch(e){ 
             console.error("Error al enviar pedido a meseros"); 
             showToast('Error al despachar la comanda', 'error');
             fetchKitchenOrders(true);
-        } finally {
-            // Nota: Podrías quitar esta línea si la orden desaparece exitosamente,
-            // pero es buena práctica dejarla por si falla y la orden sigue en pantalla.
+            
+            // 🔥 SOLO SI HAY ERROR liberamos la tarjeta para que el usuario pueda reintentar
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
         }
     }

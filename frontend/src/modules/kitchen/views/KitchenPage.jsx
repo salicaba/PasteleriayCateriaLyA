@@ -152,16 +152,17 @@ export const KitchenPage = () => {
                 {ordersMesa.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-400 lya:text-lya-text/50 text-sm font-medium">Sin comandas de salón</div>
                 ) : (
-                  <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start auto-rows-max">
+                  <motion.div layout className="columns-1 lg:columns-2 gap-4"> {/* 🔥 1. Cambiamos grid por columns */}
                     <AnimatePresence mode="popLayout">
                       {ordersMesa.map(order => (
                         <motion.div
                           key={order.id}
-                          layout="position" // 🔥 FIX: Estabiliza la lista al marcar completadas
+                          layout="position"
+                          className="break-inside-avoid mb-4" // 🔥 2. Esto evita que la tarjeta se corte a la mitad de la columna y da espacio abajo
                           initial={{ opacity: 0, scale: 0.8, y: 20 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.8 }} // 🔥 FIX: Quitada la transition anidada aquí
-                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición lineal sin resorte
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
                         >
                           <KitchenOrderCard 
                             order={order} 
@@ -193,16 +194,17 @@ export const KitchenPage = () => {
                 {ordersLlevar.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-gray-400 lya:text-lya-text/50 text-sm font-medium">Sin pedidos para llevar</div>
                 ) : (
-                  <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start auto-rows-max">
+                  <motion.div layout className="columns-1 lg:columns-2 gap-4"> {/* 🔥 1. Cambiamos grid por columns */}
                     <AnimatePresence mode="popLayout">
                       {ordersLlevar.map(order => (
                         <motion.div
                           key={order.id}
-                          layout="position" // 🔥 FIX: Estabiliza la lista al marcar completadas
+                          layout="position"
+                          className="break-inside-avoid mb-4" // 🔥 2. Esto evita que la tarjeta se corte a la mitad de la columna y da espacio abajo
                           initial={{ opacity: 0, scale: 0.8, y: 20 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.8 }} // 🔥 FIX: Quitada la transition anidada aquí
-                          transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición lineal sin resorte
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
                         >
                           <KitchenOrderCard 
                             order={order} 
