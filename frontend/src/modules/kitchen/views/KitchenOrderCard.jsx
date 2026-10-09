@@ -118,12 +118,13 @@ export const KitchenOrderCard = ({
     return () => clearInterval(timer);
   }, [order.oldestItemTime, order.createdAt, allReady, allCancelled]);
 
-  return (
+ return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.95, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      className={`relative flex flex-col rounded-[2rem] bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow}`}
+      // 🔥 Agregamos opacidad y pointer-events para feedback visual y evitar dobles clics
+      className={`relative flex flex-col rounded-[2rem] bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow} ${isOrderProcessing ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <div className="absolute top-0 left-0 w-full h-1.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg">
         <div 

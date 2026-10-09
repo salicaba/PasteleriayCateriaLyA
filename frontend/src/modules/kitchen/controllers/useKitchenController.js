@@ -116,7 +116,6 @@ export const useKitchenController = () => {
   }, [fetchKitchenOrders]);
 
   return {
-    // 🔥 Ahora ordenamos (FIFO) basados estrictamente en el producto activo más antiguo
     orders: [...orders].sort((a, b) => a.oldestItemTime - b.oldestItemTime),
     loading,
     processingItems,
@@ -136,30 +135,13 @@ export const useKitchenController = () => {
         const isCancelled = item.status === 'CANCELLED';
         const newStatus = isCancelled ? 'READY' : (item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING');
         
-        // 1. ACTUALIZACIÓN OPTIMISTA (Instantánea en UI)
-        if (isCancelled) {
-             setOrders(prev => prev.map(o => {
-                if (o.id === orderId) {
-                    return { ...o, items: o.items.filter(i => i.id !== itemId) };
-                }
-                return o;
-             }).filter(o => o.items.length > 0));
-        } else {
-             setOrders(prev => prev.map(o => o.id === orderId ? {
-                ...o,
-                items: o.items.map(i => i.id === itemId ? { ...i, kitchenStatus: newStatus } : i)
-             } : o));
-        }
-
-        // 2. PETICIÓN A LA API (SIN RECARGAR INMEDIATAMENTE)
+        // 1. PETICIÓN A LA API (Dejamos que Socket.io actualice la UI)
         try {
             await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
-            // Ya NO llamamos a fetchKitchenOrders(true) aquí
             if(isCancelled) showToast('Producto cancelado descartado', 'success');
         } catch(e){ 
             console.error("Error al cambiar estado individual"); 
             showToast('Error al actualizar producto', 'error');
-            // Si falla, sí recargamos para revertir la acción optimista
             fetchKitchenOrders(true); 
         } finally {
             setProcessingItems(prev => { const next = new Set(prev); next.delete(itemId); return next; });
@@ -174,19 +156,12 @@ export const useKitchenController = () => {
           return;
         }
 
-        // 1. ACTUALIZACIÓN OPTIMISTA
-        setOrders(prev => prev.map(o => o.id === orderId ? {
-            ...o,
-            items: o.items.map(i => i.status === 'CANCELLED' ? i : { ...i, kitchenStatus: 'PREPARING' })
-        } : o));
-
-        // 2. PETICIÓN A LA API
+        // 1. PETICIÓN A LA API (Dejamos que Socket.io actualice la UI)
         try {
             const promises = order.items
                 .filter(i => i.kitchenStatus !== 'PREPARING' && i.status !== 'CANCELLED')
                 .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'PREPARING' }));
             await Promise.all(promises);
-            // Ya NO llamamos a fetchKitchenOrders(true) aquí
             showToast('Productos activos preparados');
         } catch(e){ 
             console.error("Error al marcar todo preparado"); 
@@ -205,24 +180,20 @@ export const useKitchenController = () => {
           return;
         }
 
-        // 1. ACTUALIZACIÓN OPTIMISTA (Oculta la orden)
-        setOrders(prev => prev.filter(o => o.id !== orderId));
-
-        // 2. PETICIÓN A LA API
+        // 1. PETICIÓN A LA API (Dejamos que Socket.io elimine la orden de la UI)
         try {
             const promises = order.items.map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'READY' }));
             await Promise.all(promises);
-            
-            // Ya NO llamamos a fetchKitchenOrders(true) aquí
             
             const allCancelled = order.items.every(i => i.status === 'CANCELLED');
             showToast(allCancelled ? 'Comanda cancelada descartada' : '¡Comanda despachada con éxito!');
         } catch(e){ 
             console.error("Error al enviar pedido a meseros"); 
             showToast('Error al despachar la comanda', 'error');
-            // Si falla, recargamos para que vuelva a aparecer
             fetchKitchenOrders(true);
         } finally {
+            // Nota: Podrías quitar esta línea si la orden desaparece exitosamente,
+            // pero es buena práctica dejarla por si falla y la orden sigue en pantalla.
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
         }
     }
