@@ -37,30 +37,22 @@ export const KitchenPage = () => {
   }
 
   // ==========================================
-  // FILTRADO ESTRICTO: IGNORAR MOSTRADOR/EXPRESS
+  // LÓGICA ORIGINAL DE CATEGORÍAS
   // ==========================================
-  const validOrders = orders.filter(order => {
-    const rawMesa = String(order.mesa || '').toUpperCase();
-    const rawTipo = String(order.tipo || '').toLowerCase();
-    
-    // Si es de mostrador, pasa de largo (no se muestra en cocina)
-    const isExpress = rawMesa.includes('MOSTRADOR') || rawMesa === 'S/N' || rawTipo === 'express';
-    return !isExpress;
-  });
-
   const getOrderCategory = (order) => {
     const rawMesa = String(order.mesa || '').toUpperCase();
-    const rawTipo = String(order.tipo || '').toLowerCase();
-    if (rawTipo === 'llevar' || rawMesa.includes('LLEVAR')) return 'llevar';
+    const tipo = String(order.tipo || '').toLowerCase();
+    
+    if (tipo === 'llevar' || rawMesa.includes('LLEVAR')) return 'llevar';
     return 'salon'; // Todo lo demás es salón
   };
 
-  const filteredOrders = validOrders.filter(o => filtroActivo === 'todos' || getOrderCategory(o) === filtroActivo);
+  const filteredOrders = orders.filter(o => filtroActivo === 'todos' || getOrderCategory(o) === filtroActivo);
 
   const conteos = {
-    todos: validOrders.length,
-    salon: validOrders.filter(o => getOrderCategory(o) === 'salon').length,
-    llevar: validOrders.filter(o => getOrderCategory(o) === 'llevar').length,
+    todos: orders.length,
+    salon: orders.filter(o => getOrderCategory(o) === 'salon').length,
+    llevar: orders.filter(o => getOrderCategory(o) === 'llevar').length,
   };
 
   return (

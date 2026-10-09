@@ -85,15 +85,23 @@ export const KitchenOrderCard = ({
   const activeStyle = catStyles[category] || catStyles.salon;
   const CategoryIcon = activeStyle.icon;
 
+  // LÓGICA ORIGINAL DE TÍTULOS
   const getDisplayTitle = () => {
+    const tipo = order.tipo || 'salon';
     const rawMesa = String(order.mesa || '');
-    if (category === 'llevar') {
-      let folio = rawMesa.split(' - ')[0].split(' | ')[0].replace('#', '');
-      if (['para', 'llevar', 's/n', 'express'].includes(folio.toLowerCase().trim())) {
+    
+    if (tipo === 'llevar' || rawMesa.toUpperCase().includes('LLEVAR')) {
+      if (rawMesa.toUpperCase().startsWith('LLEVAR #')) {
+        return rawMesa.split(' - ')[0].split(' | ')[0];
+      }
+      let folio = rawMesa.split(' - ')[0].split(' | ')[0];
+      folio = folio.split(' ')[0].replace('#', '');
+      if (folio.toLowerCase() === 'para' || folio.toLowerCase() === 'llevar' || folio.toLowerCase() === 's/n') {
         folio = String(order.id).split('-').pop().slice(-4).toUpperCase();
       }
       return `LLEVAR #${folio}`;
     } else {
+      if (rawMesa.toUpperCase().startsWith('MESA #')) return rawMesa;
       let tableNum = rawMesa.replace(/Mesa\s*/i, '').replace('#', '').trim();
       return `MESA #${tableNum}`;
     }
