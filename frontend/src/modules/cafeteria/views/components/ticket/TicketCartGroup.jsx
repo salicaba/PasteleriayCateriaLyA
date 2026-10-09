@@ -311,10 +311,12 @@ export const TicketCartGroup = ({
         {sortedDisplayItems.map((item, index) => {
           
           const isCero = Number(item.precio) === 0;
-          const isGhostPromo = item.isAutoPromo && isCero;
+          // 🔥 CORRECCIÓN: Los combos NUNCA deben tratarse como regalos, aunque su precio final sea 0.
+          const isGhostPromo = item.isAutoPromo && isCero && item.promoType !== 'COMBO';
           
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-          // 🔥 LÓGICA DE BLOQUEO: Solo bloqueamos fantasmas (GRATIS) o Nth (Rebajado)
+          
+          // 🔥 LÓGICA DE BLOQUEO ACTUALIZADA
           const isLockedPromo = isGhostPromo || isNthPromo;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
@@ -605,7 +607,6 @@ export const TicketCartGroup = ({
                             </>
                         )}
                         
-                        {/* 🔥 FIX AQUÍ: Async/Await para conectar el modal de confirmación y eliminar promos */}
                         <motion.button 
                             whileTap={!isDeletingLocal ? { scale: 0.9 } : {}} 
                             disabled={isDeletingLocal}
@@ -622,9 +623,9 @@ export const TicketCartGroup = ({
                                             inputType: 'number',
                                             inputMax: item.qty,
                                             inputDefault: item.qty.toString(),
-                                            onConfirm: async (val) => { // 🔥 Agregado async
+                                            onConfirm: async (val) => { 
                                                 const qty = parseInt(val, 10);
-                                                if (qty > 0) await handleDeleteUnsent(createBreakFlag(item, qty)); // 🔥 Agregado await
+                                                if (qty > 0) await handleDeleteUnsent(createBreakFlag(item, qty)); 
                                             }
                                         });
                                     } else {
@@ -634,11 +635,11 @@ export const TicketCartGroup = ({
                                             icon: AlertTriangle,
                                             color: 'red',
                                             confirmText: 'Confirmar',
-                                            onConfirm: async () => await handleDeleteUnsent(createBreakFlag(item, 1)) // 🔥 Agregado async/await
+                                            onConfirm: async () => await handleDeleteUnsent(createBreakFlag(item, 1)) 
                                         });
                                     }
                                 } else {
-                                    await handleDeleteUnsent(item); // 🔥 Agregado await para eliminación normal
+                                    await handleDeleteUnsent(item); 
                                 }
                             })} 
                             className={clsx(
@@ -657,7 +658,7 @@ export const TicketCartGroup = ({
                     <motion.button 
                         whileTap={!isCancelingLocal ? { scale: 0.95 } : {}} 
                         disabled={isCancelingLocal}
-                        onClick={(e) => executeWithLock(e, lockKeyCancel, async () => await handleCancelItem(item))} // 🔥 Agregado async/await
+                        onClick={(e) => executeWithLock(e, lockKeyCancel, async () => await handleCancelItem(item))}
                         className={clsx(
                             "rounded-xl transition-all outline-none border shadow-sm flex items-center justify-center gap-1.5", 
                             isCancelingLocal ? "opacity-50 cursor-wait bg-gray-100 text-gray-400 border-gray-200" : 
