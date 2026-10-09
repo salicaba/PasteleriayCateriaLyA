@@ -169,14 +169,12 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             activePromo = getActivePromo(item.id, item.stock, item.controlarStock);
         }
         
-        // 🔥 POOLING: Agrupamos NxM, BOGO, NTH_FIXED y COMBO
         if (activePromo && ['NxM', 'BOGO', 'NTH_FIXED', 'COMBO'].includes(activePromo.type)) {
             const key = `${activePromo.id}::${item.cuenta}`;
             if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, triggerQtys: {}, ghosts: [], activePromo, cuenta: item.cuenta };
             
             if (item.isAutoPromo && item.promoId === activePromo.id) {
                 promoGroups[key].ghosts.push(item);
-                // 🌟 PROTECCIÓN COMBO: Los fantasmas del combo SÍ cuentan como disparadores para completar el grupo
                 if (activePromo.type === 'COMBO') {
                     promoGroups[key].triggerQtys[item.id] = (promoGroups[key].triggerQtys[item.id] || 0) + item.qty;
                 }
@@ -193,7 +191,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
     });
 
-    // 🔥 ESCUDO ANTI-ROBOS
     Object.values(promoGroups).forEach(group => {
         let expectedGhosts = 0;
 
@@ -220,11 +217,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             if (normalReq > 0) {
                 expectedGhosts = Math.floor(group.normalQty / normalReq);
             }
-        // 🌟 EVALUACIÓN DE DESTRUCCIÓN PARA COMBO
         } else if (group.activePromo.type === 'COMBO') {
             const triggerIds = Array.isArray(group.activePromo.applyToProducts) ? group.activePromo.applyToProducts.map(String) : [];
             if (triggerIds.length > 0) {
-                // El combo sobrevive solo si existe al menos 1 unidad de TODOS sus componentes requeridos
                 expectedGhosts = Math.min(...triggerIds.map(id => group.triggerQtys[id] || 0));
             }
         }
@@ -259,26 +254,30 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
   };
 
-  const checkRuptureAndExecute = (actionToCalculateNextCart) => {
+  // 🔥 NUEVO MOTOR DE DETECCIÓN DE RUPTURAS
+  // Simula el futuro del carrito para saber si un cambio eliminará beneficios de forma secundaria.
+  const checkRuptureAndExecute = (actionToCalculateNextCart, explicitlyDeletedGhost = false) => {
     setCart(prev => {
-      const nextCart = actionToCalculateNextCart(prev);
+      const rawNextCart = actionToCalculateNextCart(prev);
+      const syncedNextCart = syncPromotions(rawNextCart);
       
       const prevGhosts = prev.filter(p => p.isAutoPromo && ['GRATIS', 'PROMO'].includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
-      const nextGhosts = nextCart.filter(p => p.isAutoPromo && ['GRATIS', 'PROMO'].includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
+      const nextGhosts = syncedNextCart.filter(p => p.isAutoPromo && ['GRATIS', 'PROMO'].includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
 
-      if (nextGhosts < prevGhosts) {
+      // Si la sincronización destruirá un premio y NO fue porque el usuario lo borró directamente
+      if (nextGhosts < prevGhosts && !explicitlyDeletedGhost) {
         setPromoWarning({
           isOpen: true,
-          message: `Al reducir la cantidad de este artículo, se romperá una promoción y perderás un beneficio asociado. ¿Deseas continuar?`,
+          message: `Al reducir o eliminar este artículo, se romperá una promoción y perderás un beneficio asociado. ¿Deseas continuar?`,
           onConfirm: () => {
-            setCart(currentCart => actionToCalculateNextCart(currentCart));
+            _setCart(syncedNextCart); // Bypasseamos el chequeo guardando el estado final
             setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
           },
           onCancel: () => setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null })
         });
-        return prev; 
+        return prev; // Abortamos la acción actual esperando confirmación
       }
-      return nextCart;
+      return rawNextCart;
     });
   };
 
@@ -327,7 +326,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         let finalPromoPrice = 0;
         let safeActivePromo = null;
 
-        // 🔥 EVALUACIÓN DE INYECCIÓN DIRECTA (NTH_FIXED y COMBO)
         if (activePromo) {
             const safeDiscountValue = Number(activePromo.discountValue || activePromo.discount_value || 0);
             safeActivePromo = { ...activePromo, discountValue: safeDiscountValue };
@@ -350,19 +348,16 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     }
                 }
             } 
-            // 🌟 INYECCIÓN PARA COMBO
             else if (activePromo.type === 'COMBO') {
                 const triggerIds = Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 0 
                     ? activePromo.applyToProducts.map(String) 
                     : [];
 
                 if (triggerIds.includes(String(productWithDetails.id))) {
-                    // ¿Cuántos combos completos tenemos ANTES de agregar este?
                     const currentBundles = Math.min(...triggerIds.map(id => 
                         prev.filter(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0)
                     ));
 
-                    // ¿Cuántos combos completos tendremos DESPUÉS de agregarlo?
                     const triggerQtysAfter = {};
                     triggerIds.forEach(id => {
                         let qty = prev.filter(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0);
@@ -375,7 +370,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     if (newBundles > currentBundles) {
                         isNthGhost = true;
                         
-                        // Calculamos cuánto suman los OTROS productos del combo que ya están en el carrito
                         let otherItemsSum = 0;
                         triggerIds.forEach(id => {
                             if (id !== String(productWithDetails.id)) {
@@ -384,11 +378,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                             }
                         });
 
-                        // El fantasma asume la diferencia para que el total sume exactamente el precio cerrado del Combo
                         finalPromoPrice = safeDiscountValue - otherItemsSum;
                         successNotification = `Promo: ¡Combo "${activePromo.name}" completado por $${safeDiscountValue.toFixed(2)}!`;
                     } else {
-                        // Upselling de Combo: Avisar al cajero qué le falta para el precio cerrado
                         const missingIds = triggerIds.filter(id => triggerQtysAfter[id] === 0);
                         if (missingIds.length > 0) {
                             upsellNotification = `¡Agrega los productos faltantes para llevarte el combo "${activePromo.name}" por $${safeDiscountValue.toFixed(2)}!`;
@@ -453,7 +445,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             }
         }
 
-        // Evaluación de disparo (Modales) o upselling para las demás promos
         if (activePromo && !isNthGhost) {
             const triggerIds = Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 0 
                 ? activePromo.applyToProducts.map(String) 
@@ -631,17 +622,19 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
     isProcessingRef.current = true;
     try {
+      // 🔥 Pasamos true si el usuario intenta borrar directamente el producto de la promo
+      const isDeletingPromo = Boolean(itemToRemove.isAutoPromo);
+      
       checkRuptureAndExecute((prev) => {
           const newCart = [...prev];
           const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
           const idx = newCart.findIndex(p => p.id === itemToRemove.id && Number(p.precio).toFixed(2) === Number(itemToRemove.precio).toFixed(2) && p.cuenta === itemToRemove.cuenta && !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
           if (idx !== -1) {
-              if (newCart[idx].isAutoPromo && ['GRATIS', 'PROMO'].includes(newCart[idx].promoLabel)) return prev;
               newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - 1, preparaciones: newCart[idx].preparaciones.slice(0, -1) };
               if (newCart[idx].qty <= 0) newCart.splice(idx, 1);
           }
           return newCart;
-      });
+      }, isDeletingPromo);
     } finally {
       isProcessingRef.current = false;
     }
@@ -651,11 +644,13 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
     isProcessingRef.current = true;
     try {
+      // 🔥 Pasamos true si el usuario intenta borrar directamente el producto de la promo
+      const isDeletingPromo = Boolean(itemToRemove.isAutoPromo);
+
       checkRuptureAndExecute((prev) => {
-        if (itemToRemove.isAutoPromo && ['GRATIS', 'PROMO'].includes(itemToRemove.promoLabel)) return prev;
         const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
         return prev.filter(p => !(p.id === itemToRemove.id && p.cuenta === itemToRemove.cuenta && !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr));
-      });
+      }, isDeletingPromo);
     } finally {
       isProcessingRef.current = false;
     }
@@ -663,7 +658,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
   const toggleItemTakeaway = (itemToToggle) => {
     if (isProcessingRef.current || itemToToggle.enviadoCocina) return;
-    if (itemToToggle.isAutoPromo && ['GRATIS', 'PROMO'].includes(itemToToggle.promoLabel)) return;
     isProcessingRef.current = true;
 
     try {
