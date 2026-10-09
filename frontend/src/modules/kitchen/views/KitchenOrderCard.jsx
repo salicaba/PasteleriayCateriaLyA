@@ -1,91 +1,33 @@
 // src/modules/kitchen/views/KitchenOrderCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag, Loader2, AlertCircle, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Timer, Check, ChefHat, Flame, BellRing, ShoppingBag, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const KitchenOrderCard = ({ 
   order, 
-  category, // 'salon' | 'llevar'
   onToggleItem, 
   onComplete, 
   onMarkAllReady,
   processingItems = new Set(),
   processingOrders = new Set() 
 }) => {
-  
-  // 🔥 CANDADO INFINITO ANTI-PARPADEO
-  // Si le da a "Entregar" o "Descartar", la tarjeta muere cargando hasta que el backend la borre de la pantalla
-  const [isLeaving, setIsLeaving] = useState(false);
-  const [isMarkingAll, setIsMarkingAll] = useState(false);
-  const [localProcessingItems, setLocalProcessingItems] = useState(new Set());
-
-  const handleComplete = async () => {
-    if (isLeaving) return;
-    setIsLeaving(true);
-    try {
-      await onComplete(order.id);
-      // 🔥 IMPORTANTE: NO hacemos setIsLeaving(false) si tiene éxito.
-      // La tarjeta se quedará cargando hasta que el componente se desmonte automáticamente.
-    } catch (error) {
-      setIsLeaving(false); // Solo se libera si falló la petición al backend
-    }
-  };
-
-  const handleMarkAllReady = async () => {
-    if (isMarkingAll || isLeaving) return;
-    setIsMarkingAll(true);
-    try {
-      await onMarkAllReady(order.id);
-    } finally {
-      setIsMarkingAll(false); // Este sí se libera porque la tarjeta no desaparece
-    }
-  };
-
-  const handleToggle = async (itemId) => {
-    if (isLeaving || localProcessingItems.has(itemId)) return;
-    
-    setLocalProcessingItems(prev => new Set(prev).add(itemId));
-    try {
-      await onToggleItem(order.id, itemId);
-    } finally {
-      setLocalProcessingItems(prev => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-    }
-  };
-
   const [elapsed, setElapsed] = useState('');
   const [progress, setProgress] = useState(0);
   const [urgency, setUrgency] = useState({
-    border: 'border-gray-200 dark:border-gray-800 lya:border-lya-border/40',
+    theme: 'normal',
+    textGlow: 'from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 lya:from-lya-primary lya:to-lya-secondary',
+    border: 'border-gray-100 dark:border-gray-800 lya:border-lya-border/40',
     shadow: 'shadow-lg shadow-gray-200/50 dark:shadow-none lya:shadow-lya-primary/5',
-    bar: 'bg-gray-300 dark:bg-gray-700',
-    timeBg: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+    bar: 'bg-blue-500 lya:bg-lya-primary',
+    timeBg: 'bg-blue-50 dark:bg-blue-900/20 lya:bg-lya-primary/10 text-blue-600 dark:text-blue-400 lya:text-lya-primary'
   });
 
   const allCancelled = order.items.every(i => i.status === 'CANCELLED');
   const activeItems = order.items.filter(i => i.status !== 'CANCELLED');
   const allReady = activeItems.length > 0 && activeItems.every(i => i.kitchenStatus === 'PREPARING');
   
-  const isOrderProcessing = processingOrders.has(order.id) || isLeaving;
+  const isOrderProcessing = processingOrders.has(order.id);
 
-  // CONFIGURACIÓN DE COLORES POR CATEGORÍA
-  const catStyles = {
-    salon: {
-      bg: 'bg-emerald-500 dark:bg-emerald-600 lya:bg-lya-primary',
-      icon: UtensilsCrossed
-    },
-    llevar: {
-      bg: 'bg-orange-500 dark:bg-orange-600 lya:bg-orange-500',
-      icon: ShoppingBag
-    }
-  };
-  const activeStyle = catStyles[category] || catStyles.salon;
-  const CategoryIcon = activeStyle.icon;
-
-  // LÓGICA ORIGINAL DE TÍTULOS
   const getDisplayTitle = () => {
     const tipo = order.tipo || 'salon';
     const rawMesa = String(order.mesa || '');
@@ -109,6 +51,7 @@ export const KitchenOrderCard = ({
 
   useEffect(() => {
     const calculateTime = () => {
+      // 🔥 CRONÓMETRO BASADO EN EL PRODUCTO MÁS ANTIGUO DE ESTA TANDA
       const start = new Date(order.oldestItemTime || order.createdAt);
       const now = new Date();
       const diffMs = now.getTime() - start.getTime();
@@ -122,38 +65,48 @@ export const KitchenOrderCard = ({
 
       if (allCancelled) {
         setUrgency({
-          border: 'border-red-500',
-          shadow: 'shadow-xl shadow-red-500/30 animate-pulse',
-          bar: 'bg-red-500 animate-pulse',
-          timeBg: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+          theme: 'cancelled',
+          textGlow: 'from-red-600 to-red-800 dark:from-red-400 dark:to-red-600 lya:from-red-500 lya:to-red-700',
+          border: 'border-red-500 dark:border-red-700 lya:border-red-500',
+          shadow: 'shadow-xl shadow-red-500/30 dark:shadow-red-900/50 animate-pulse',
+          bar: 'bg-red-600 lya:bg-red-500 animate-pulse',
+          timeBg: 'bg-red-100 dark:bg-red-900/40 lya:bg-red-500/20 text-red-700 dark:text-red-400 lya:text-red-400'
         });
       } else if (allReady) {
         setUrgency({
-          border: 'border-emerald-400',
-          shadow: 'shadow-xl shadow-emerald-500/20',
-          bar: 'bg-emerald-500',
-          timeBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+          theme: 'ready',
+          textGlow: 'from-emerald-600 to-teal-500 dark:from-emerald-400 dark:to-teal-400 lya:from-emerald-400 lya:to-emerald-600',
+          border: 'border-emerald-400 dark:border-emerald-500/50 lya:border-emerald-500/50',
+          shadow: 'shadow-xl shadow-emerald-500/20 dark:shadow-emerald-900/40 lya:shadow-emerald-500/20',
+          bar: 'bg-emerald-500 lya:bg-emerald-500',
+          timeBg: 'bg-emerald-100 dark:bg-emerald-900/40 lya:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 lya:text-emerald-400'
         });
       } else if (diffMins >= 15) {
         setUrgency({
-          border: 'border-red-500',
-          shadow: 'shadow-xl shadow-red-500/30 animate-pulse',
+          theme: 'critical',
+          textGlow: 'from-red-600 to-rose-600 dark:from-red-400 dark:to-rose-400 lya:from-red-400 lya:to-rose-400',
+          border: 'border-red-500 dark:border-red-500/70 lya:border-red-500/70',
+          shadow: 'shadow-xl shadow-red-500/30 dark:shadow-red-900/50 animate-pulse',
           bar: 'bg-red-600 animate-pulse',
-          timeBg: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 animate-pulse'
+          timeBg: 'bg-red-100 dark:bg-red-900/40 lya:bg-red-500/20 text-red-700 dark:text-red-400 lya:text-red-400 animate-pulse'
         });
       } else if (diffMins >= 10) {
         setUrgency({
-          border: 'border-orange-400',
-          shadow: 'shadow-lg shadow-orange-500/20',
-          bar: 'bg-orange-500',
-          timeBg: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'
+          theme: 'warning',
+          textGlow: 'from-orange-500 to-amber-500 dark:from-orange-400 dark:to-amber-400 lya:from-amber-400 lya:to-orange-400',
+          border: 'border-orange-300 dark:border-orange-700/50 lya:border-amber-500/50',
+          shadow: 'shadow-lg shadow-orange-500/10 dark:shadow-none lya:shadow-amber-500/10',
+          bar: 'bg-orange-500 lya:bg-amber-500',
+          timeBg: 'bg-orange-50 dark:bg-orange-900/30 lya:bg-amber-500/20 text-orange-600 dark:text-orange-400 lya:text-amber-500'
         });
       } else {
         setUrgency({
-          border: 'border-gray-200 dark:border-gray-700',
-          shadow: 'shadow-xl shadow-gray-200/50 dark:shadow-none',
-          bar: activeStyle.bg,
-          timeBg: 'bg-white/20 text-white backdrop-blur-sm'
+          theme: 'normal',
+          textGlow: 'from-gray-800 to-gray-600 dark:from-white dark:to-gray-300 lya:from-lya-text lya:to-lya-text/80',
+          border: 'border-gray-200 dark:border-gray-800 lya:border-lya-border/40',
+          shadow: 'shadow-lg shadow-gray-200/50 dark:shadow-none lya:shadow-lya-primary/5',
+          bar: 'bg-blue-500 lya:bg-lya-primary',
+          timeBg: 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-700 dark:text-gray-300 lya:text-lya-text'
         });
       }
 
@@ -163,39 +116,34 @@ export const KitchenOrderCard = ({
     calculateTime();
     const timer = setInterval(calculateTime, 1000);
     return () => clearInterval(timer);
-  }, [order.oldestItemTime, order.createdAt, allReady, allCancelled, activeStyle.bg]);
+  }, [order.oldestItemTime, order.createdAt, allReady, allCancelled]);
 
   return (
-    <div
-      className={`relative flex flex-col rounded-3xl bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow} ${isLeaving ? 'opacity-80 scale-[0.98]' : ''}`}
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      className={`relative flex flex-col rounded-[2rem] bg-white dark:bg-gray-900 lya:bg-lya-surface border-2 transition-all duration-500 overflow-hidden ${urgency.border} ${urgency.shadow}`}
     >
-      {/* BARRA DE PROGRESO DE TIEMPO SUPERIOR */}
-      <div className="absolute top-0 left-0 w-full h-1.5 bg-gray-100 dark:bg-gray-800 z-20">
+      <div className="absolute top-0 left-0 w-full h-1.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg">
         <div 
           className={`h-full transition-all duration-1000 ease-linear ${urgency.bar}`} 
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      {/* CABECERA CON COLOR DE CATEGORÍA */}
-      <div className={`pt-5 pb-4 px-5 flex justify-between items-center relative z-10 ${activeStyle.bg} text-white`}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-            <CategoryIcon size={20} className="text-white" />
-          </div>
-          <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white drop-shadow-sm">
-            {getDisplayTitle()}
-          </h3>
-        </div>
+      <div className="pt-5 pb-3 px-5 flex justify-between items-center relative z-10">
+        <h3 className={`text-xl sm:text-2xl font-black uppercase tracking-tighter bg-gradient-to-br bg-clip-text text-transparent ${urgency.textGlow}`}>
+          {getDisplayTitle()}
+        </h3>
         
         <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold text-xs transition-colors duration-300 shadow-sm ${urgency.timeBg}`}>
-          {allCancelled || progress >= 100 ? <Flame size={14} /> : <Timer size={14} />}
+          {urgency.theme === 'critical' || urgency.theme === 'cancelled' ? <Flame size={14} /> : <Timer size={14} />}
           {elapsed}
         </div>
       </div>
 
-      {/* LISTA DE ITEMS */}
-      <div className="flex-1 p-3 space-y-2 pointer-events-auto">
+      <div className="flex-1 px-3 pb-3 space-y-2">
         {order.items.slice().sort((a, b) => {
             const idA = String(a.id || '');
             const idB = String(b.id || '');
@@ -203,61 +151,59 @@ export const KitchenOrderCard = ({
         }).map(item => {
           const isCancelled = item.status === 'CANCELLED';
           const isReady = item.kitchenStatus === 'PREPARING' && !isCancelled;
-          const isItemProcessing = processingItems.has(item.id) || localProcessingItems.has(item.id) || isOrderProcessing;
+          const isItemProcessing = processingItems.has(item.id) || isOrderProcessing;
           
           return (
             <motion.div 
-              layout="position"
+              layout
               key={item.id} 
               onClick={() => {
-                if (!isItemProcessing && !isCancelled) {
-                  handleToggle(item.id);
-                }
+                if (!isItemProcessing && !isCancelled) onToggleItem(order.id, item.id);
               }}
               className={`group flex items-start gap-3 p-3 rounded-2xl transition-all duration-300 ${
-                isItemProcessing || isCancelled ? 'opacity-70 cursor-wait' : 'cursor-pointer'
+                isItemProcessing || isCancelled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
               } ${
                 isCancelled
-                  ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/50 border-2 border-dashed'
+                  ? 'bg-red-50/50 dark:bg-red-900/10 lya:bg-red-500/5 border-red-200 dark:border-red-900/50 lya:border-red-500/30 border-2 border-dashed'
                   : isReady 
-                    ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-60' 
-                    : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700/50 hover:shadow-md hover:border-blue-300 dark:hover:border-gray-500'
+                    ? 'bg-gray-50/50 dark:bg-gray-800/30 lya:bg-lya-bg/30 opacity-60' 
+                    : 'bg-white dark:bg-gray-800 lya:bg-lya-bg border border-gray-100 dark:border-gray-700/50 lya:border-lya-border/40 hover:shadow-sm hover:border-blue-200 dark:hover:border-gray-600 lya:hover:border-lya-primary/40'
               }`}
             >
-              <div className={`relative w-9 h-9 mt-0.5 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm ${
+              <div className={`relative w-8 h-8 mt-0.5 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm ${
                 isItemProcessing
-                  ? 'bg-gray-200 text-gray-500 dark:bg-gray-700'
+                  ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 lya:bg-lya-border/40'
                   : isCancelled
-                    ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400'
+                    ? 'bg-red-100 dark:bg-red-900/50 lya:bg-red-500/20 text-red-600 dark:text-red-400 lya:text-red-500'
                     : isReady 
-                      ? 'bg-emerald-500 text-white shadow-emerald-500/30 scale-95 rounded-full' 
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 group-hover:bg-blue-500 group-hover:text-white'
+                      ? 'bg-emerald-500 text-white shadow-emerald-500/30 scale-95' 
+                      : 'bg-gray-100 dark:bg-gray-700 lya:bg-lya-surface text-gray-800 dark:text-gray-200 lya:text-lya-primary group-hover:bg-blue-100 dark:group-hover:bg-gray-600 lya:group-hover:bg-lya-primary/20'
               }`}>
                 {isItemProcessing ? (
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" />
                 ) : isCancelled ? (
-                  <Trash2 size={18} />
+                  <Trash2 size={16} />
                 ) : isReady ? (
-                  <Check size={18} strokeWidth={3} />
+                  <Check size={16} strokeWidth={3} />
                 ) : (
-                  <span className="text-base font-black">{item.qty}</span>
+                  <span className="text-sm font-black">{item.qty}</span>
                 )}
               </div>
               
               <div className="flex-1 min-w-0">
-                <p className={`text-[15px] sm:text-base font-bold uppercase leading-snug break-words transition-all duration-300 ${
+                <p className={`text-sm sm:text-[15px] font-bold uppercase leading-snug break-words transition-all duration-300 ${
                   isCancelled
-                    ? 'line-through text-red-600 dark:text-red-400 decoration-2 decoration-red-400/50'
+                    ? 'line-through text-red-600 dark:text-red-400 lya:text-red-500 decoration-2 decoration-red-400/50'
                     : isReady 
-                      ? 'line-through text-gray-400 dark:text-gray-500 decoration-2 decoration-gray-400/50' 
-                      : 'text-gray-900 dark:text-white'
+                      ? 'line-through text-gray-400 dark:text-gray-500 lya:text-lya-text/40 decoration-2 decoration-gray-400/50' 
+                      : 'text-gray-800 dark:text-gray-100 lya:text-lya-text'
                 }`}>
                   {item.nombre}
                 </p>
 
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {isCancelled && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-800/50 text-red-600 dark:text-red-400">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-red-100 dark:bg-red-900/40 lya:bg-red-500/10 border-red-300 dark:border-red-800/50 lya:border-red-500/30 text-red-600 dark:text-red-400 lya:text-red-500">
                       <AlertCircle size={10} /> Cancelado
                     </span>
                   )}
@@ -265,8 +211,8 @@ export const KitchenOrderCard = ({
                   {item.isTakeaway && (
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
                         isCancelled || isReady 
-                          ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
-                          : 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800/50 text-orange-600 dark:text-orange-400'
+                          ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 lya:text-lya-text/50' 
+                          : 'bg-orange-50 dark:bg-orange-900/30 lya:bg-lya-secondary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-secondary/30 text-orange-600 dark:text-orange-400 lya:text-lya-secondary'
                     }`}>
                       <ShoppingBag size={10} /> Empacar Llevar
                     </span>
@@ -275,8 +221,8 @@ export const KitchenOrderCard = ({
                   {!item.requiereCocina && (
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
                        isCancelled || isReady 
-                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500' 
-                        : 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400'
+                        ? 'bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 lya:text-lya-text/50' 
+                        : 'bg-blue-50 dark:bg-blue-900/30 lya:bg-blue-500/10 border-blue-200 dark:border-blue-800/50 lya:border-blue-500/30 text-blue-600 dark:text-blue-400 lya:text-blue-500'
                     }`}>
                       Solo Servir
                     </span>
@@ -284,21 +230,21 @@ export const KitchenOrderCard = ({
                 </div>
                 
                 {item.preparaciones && item.preparaciones.length > 0 && (
-                  <div className={`mt-2 flex flex-wrap gap-1.5 transition-opacity duration-300 ${isReady || isCancelled ? 'opacity-50' : 'opacity-100'}`}>
+                  <div className={`mt-1.5 flex flex-wrap gap-1 transition-opacity duration-300 ${isReady || isCancelled ? 'opacity-50' : 'opacity-100'}`}>
                     {item.preparaciones.slice(0, 1).map((prep, idx) => (
                       <React.Fragment key={idx}>
                         {prep.tamano && prep.tamano !== 'Estándar' && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 shadow-sm">
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
                             {prep.tamano}
                           </span>
                         )}
                         {prep.leche && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-900/20 shadow-sm">
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border border-blue-200 dark:border-blue-900/50 lya:border-lya-secondary/40 text-blue-600 dark:text-blue-400 lya:text-lya-secondary bg-blue-50/50 dark:bg-blue-900/10 lya:bg-lya-secondary/5">
                             {prep.leche}
                           </span>
                         )}
                         {prep.extras && prep.extras.length > 0 && (
-                          <span className="text-[11px] font-black text-orange-500 dark:text-orange-400 flex items-center before:content-['+'] before:mr-0.5 mt-0.5">
+                          <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 lya:text-lya-primary italic flex items-center before:content-['+'] before:mr-0.5">
                             {prep.extras.join(', ')}
                           </span>
                         )}
@@ -312,43 +258,42 @@ export const KitchenOrderCard = ({
         })}
       </div>
 
-      {/* BOTONERA INFERIOR PROTEGIDA */}
-      <div className="p-3 bg-gray-50/50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800 rounded-b-[1.8rem]">
+      <div className="p-3 bg-transparent pt-0">
         {allCancelled ? (
           <button 
-            onClick={handleComplete}
+            onClick={() => onComplete(order.id)}
             disabled={isOrderProcessing}
-            className={`w-full py-4 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-black rounded-2xl text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 transition-all border border-transparent dark:border-red-500/50 ${
+            className={`w-full py-3.5 bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 lya:bg-red-500 lya:hover:bg-red-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 transition-all border border-transparent dark:border-red-500/50 ${
               isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+            {isOrderProcessing ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             {isOrderProcessing ? 'Descartando...' : 'Descartar Comanda'}
           </button>
         ) : allReady ? (
           <button 
-            onClick={handleComplete}
+            onClick={() => onComplete(order.id)}
             disabled={isOrderProcessing}
-            className={`w-full py-4 bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-black rounded-2xl text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 transition-all border border-transparent dark:border-emerald-500/50 ${
+            className={`w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 lya:bg-lya-primary lya:hover:bg-lya-primary/90 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 lya:shadow-lya-primary/30 transition-all border border-transparent dark:border-emerald-500/50 lya:border-lya-primary ${
               isOrderProcessing ? 'opacity-70 cursor-wait shadow-none' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing ? <Loader2 size={20} className="animate-spin" /> : <BellRing size={20} className="animate-pulse" />}
-            {isOrderProcessing ? 'Entregando...' : 'Entregar a Mesero'}
+            {isOrderProcessing ? <Loader2 size={18} className="animate-spin" /> : <BellRing size={18} className="animate-pulse" />}
+            {isOrderProcessing ? 'Procesando...' : 'Entregar'}
           </button>
         ) : (
           <button 
-            onClick={handleMarkAllReady}
-            disabled={isOrderProcessing || isMarkingAll}
-            className={`w-full py-4 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-black rounded-2xl text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all border-2 border-gray-200 dark:border-gray-700 shadow-sm ${
-              isOrderProcessing || isMarkingAll ? 'opacity-70 cursor-wait' : 'active:scale-[0.98] hover:border-blue-300 dark:hover:border-gray-500'
+            onClick={() => onMarkAllReady(order.id)}
+            disabled={isOrderProcessing}
+            className={`w-full py-3.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 lya:bg-lya-surface lya:hover:bg-lya-border/20 text-gray-600 dark:text-gray-300 lya:text-lya-text font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-all border-2 border-gray-200 dark:border-gray-700 lya:border-lya-border/40 ${
+              isOrderProcessing ? 'opacity-70 cursor-wait' : 'active:scale-[0.98]'
             }`}
           >
-            {isOrderProcessing || isMarkingAll ? <Loader2 size={18} className="animate-spin text-blue-500" /> : <ChefHat size={18} strokeWidth={2.5} />}
-            {isOrderProcessing || isMarkingAll ? 'Procesando...' : 'Todo Preparado'}
+            {isOrderProcessing ? <Loader2 size={16} className="animate-spin text-orange-500 lya:text-lya-primary" /> : <ChefHat size={16} strokeWidth={2.5} />}
+            {isOrderProcessing ? 'Procesando...' : 'Todo Preparado'}
           </button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
