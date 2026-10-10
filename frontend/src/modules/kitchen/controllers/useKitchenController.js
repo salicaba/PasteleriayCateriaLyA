@@ -135,15 +135,32 @@ export const useKitchenController = () => {
         const isCancelled = item.status === 'CANCELLED';
         const newStatus = isCancelled ? 'READY' : (item.kitchenStatus === 'PREPARING' ? 'PENDING' : 'PREPARING');
         
-        // 🔥 ELIMINADA LA ACTUALIZACIÓN OPTIMISTA. Solo esperamos al backend.
-
         try {
+            // 1. ESPERAMOS EL SÍ DEL BACKEND (Sigue cargando...)
             await client.put(`/kitchen/tickets/${itemId}/status`, { status: newStatus });
+            
+            // 🔥 2. EL BACKEND DIJO SÍ: Actualizamos la UI inmediatamente (Actualización Pesimista)
+            if (isCancelled) {
+                setOrders(prev => prev.map(o => {
+                    if (o.id === orderId) {
+                        return { ...o, items: o.items.filter(i => i.id !== itemId) };
+                    }
+                    return o;
+                }).filter(o => o.items.length > 0));
+            } else {
+                setOrders(prev => prev.map(o => o.id === orderId ? {
+                    ...o,
+                    items: o.items.map(i => i.id === itemId ? { ...i, kitchenStatus: newStatus } : i)
+                } : o));
+            }
+
             if(isCancelled) showToast('Producto cancelado descartado', 'success');
         } catch(e){ 
             console.error("Error al cambiar estado individual"); 
             showToast('Error al actualizar producto', 'error');
+            fetchKitchenOrders(true); // Solo recargamos si falló
         } finally {
+            // 3. Ya está actualizado, quitamos el loader
             setProcessingItems(prev => { const next = new Set(prev); next.delete(itemId); return next; });
         }
     },
@@ -156,19 +173,26 @@ export const useKitchenController = () => {
           return;
         }
 
-        // 🔥 ELIMINADA LA ACTUALIZACIÓN OPTIMISTA. Solo esperamos al backend.
-
         try {
+            // 1. ESPERAMOS EL SÍ DEL BACKEND A TODOS LOS PRODUCTOS
             const promises = order.items
                 .filter(i => i.kitchenStatus !== 'PREPARING' && i.status !== 'CANCELLED')
                 .map(i => client.put(`/kitchen/tickets/${i.id}/status`, { status: 'PREPARING' }));
             await Promise.all(promises);
+
+            // 🔥 2. EL BACKEND DIJO SÍ: Actualizamos la UI inmediatamente
+            setOrders(prev => prev.map(o => o.id === orderId ? {
+                ...o,
+                items: o.items.map(i => i.status === 'CANCELLED' ? i : { ...i, kitchenStatus: 'PREPARING' })
+            } : o));
+
             showToast('Productos activos preparados');
         } catch(e){ 
             console.error("Error al marcar todo preparado"); 
             showToast('Error al procesar comanda', 'error');
+            fetchKitchenOrders(true);
         } finally {
-            // Liberamos la tarjeta para que el botón pase a "Entregar" cuando el socket responda
+            // 3. Ya está actualizado, quitamos el loader y el botón pasa a "Entregar"
             setProcessingOrders(prev => { const next = new Set(prev); next.delete(orderId); return next; });
         }
     },
