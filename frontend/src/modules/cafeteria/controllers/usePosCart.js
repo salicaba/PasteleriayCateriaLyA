@@ -160,7 +160,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const promoGroups = {}; 
 
     cleanCart.forEach(item => {
-        if (item.status === 'CANCELLED' || item.enviadoCocina) return;
+        if (item.status === 'CANCELLED' || item.enviadoCocina || item.isVirtualDiscount) return;
         
         let activePromo = null;
         if (item.isAutoPromo && item.promoId) {
@@ -244,6 +244,81 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
     });
 
+    // 🔥 EL JEFE FINAL: EVALUACIÓN DE ÚLTIMA MILLA (TICKET_DISCOUNT)
+    const ticketPromos = promotions.filter(p => {
+        const rawActive = p.isActive ?? p.is_active ?? p.status;
+        const isActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+        const daysRaw = p.validDays || p.valid_days;
+        const validDays = parseValidDays(daysRaw);
+        const today = new Date().getDay();
+        const validToday = validDays.length === 0 || validDays.includes(today);
+        return isActive && validToday && p.type === 'TICKET_DISCOUNT';
+    });
+
+    if (ticketPromos.length > 0) {
+        const cuentasEnCarrito = [...new Set(cleanCart.map(item => item.cuenta))];
+
+        cuentasEnCarrito.forEach(cuenta => {
+            // Calculamos el subtotal de la cuenta ignorando el fantasma previo
+            const itemsCuenta = cleanCart.filter(item => item.cuenta === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT');
+            const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (item.precio * item.qty), 0);
+
+            // Filtramos las promos de ticket que cumplan el umbral y agarramos la más jugosa
+            const qualifyingPromos = ticketPromos
+                .filter(p => subtotalCuenta >= Number(p.minPurchaseAmount || p.min_purchase_amount || 0))
+                .sort((a, b) => Number(b.minPurchaseAmount || b.min_purchase_amount || 0) - Number(a.minPurchaseAmount || a.min_purchase_amount || 0));
+
+            const bestTicketPromo = qualifyingPromos[0];
+            const ghostIdx = cleanCart.findIndex(item => item.cuenta === cuenta && item.promoType === 'TICKET_DISCOUNT');
+
+            if (bestTicketPromo) {
+                const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
+                const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
+                
+                let finalDiscountPrice = isPercentage ? (subtotalCuenta * (rawDiscount / 100)) : rawDiscount;
+                finalDiscountPrice = -Math.abs(finalDiscountPrice); // Blindaje: Siempre negativo
+
+                if (ghostIdx !== -1) {
+                    // Refrescar si el monto o el ID de la promo cambió
+                    if (cleanCart[ghostIdx].precio !== finalDiscountPrice || cleanCart[ghostIdx].promoId !== bestTicketPromo.id) {
+                        cleanCart[ghostIdx] = {
+                            ...cleanCart[ghostIdx],
+                            nombre: bestTicketPromo.name || 'Descuento Global',
+                            precio: finalDiscountPrice,
+                            precioOriginal: finalDiscountPrice,
+                            promoId: bestTicketPromo.id
+                        };
+                    }
+                } else {
+                    // Inyección del Fantasma
+                    cleanCart.push({
+                        id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
+                        nombre: bestTicketPromo.name || 'Descuento Global',
+                        precioOriginal: finalDiscountPrice,
+                        precio: finalDiscountPrice,
+                        qty: 1,
+                        preparaciones: [{}], // Blindaje contra iteradores
+                        enviadoCocina: true, // Ignorado en vista de cocina
+                        kitchenStatus: 'DELIVERED', // Congelado
+                        status: 'ACTIVE',
+                        cuenta: cuenta,
+                        isAutoPromo: true,
+                        isVirtualDiscount: true, // Bandera maestra
+                        requiereCocina: false,
+                        promoId: bestTicketPromo.id,
+                        promoType: 'TICKET_DISCOUNT',
+                        promoLabel: 'DESCUENTO EXTRA'
+                    });
+                }
+            } else {
+                // El subtotal cayó por debajo del umbral, destruir fantasma
+                if (ghostIdx !== -1) {
+                    cleanCart.splice(ghostIdx, 1);
+                }
+            }
+        });
+    }
+
     return cleanCart;
   };
 
@@ -254,28 +329,26 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
   };
 
-  // 🔥 NUEVO MOTOR DE DETECCIÓN DE RUPTURAS
-  // Simula el futuro del carrito para saber si un cambio eliminará beneficios de forma secundaria.
   const checkRuptureAndExecute = (actionToCalculateNextCart, explicitlyDeletedGhost = false) => {
     setCart(prev => {
       const rawNextCart = actionToCalculateNextCart(prev);
       const syncedNextCart = syncPromotions(rawNextCart);
       
-      const prevGhosts = prev.filter(p => p.isAutoPromo && ['GRATIS', 'PROMO'].includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
-      const nextGhosts = syncedNextCart.filter(p => p.isAutoPromo && ['GRATIS', 'PROMO'].includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
+      const ghostLabels = ['GRATIS', 'PROMO', 'DESCUENTO EXTRA'];
+      const prevGhosts = prev.filter(p => p.isAutoPromo && ghostLabels.includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
+      const nextGhosts = syncedNextCart.filter(p => p.isAutoPromo && ghostLabels.includes(p.promoLabel)).reduce((sum, p) => sum + p.qty, 0);
 
-      // Si la sincronización destruirá un premio y NO fue porque el usuario lo borró directamente
       if (nextGhosts < prevGhosts && !explicitlyDeletedGhost) {
         setPromoWarning({
           isOpen: true,
           message: `Al reducir o eliminar este artículo, se romperá una promoción y perderás un beneficio asociado. ¿Deseas continuar?`,
           onConfirm: () => {
-            _setCart(syncedNextCart); // Bypasseamos el chequeo guardando el estado final
+            _setCart(syncedNextCart); 
             setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
           },
           onCancel: () => setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null })
         });
-        return prev; // Abortamos la acción actual esperando confirmación
+        return prev; 
       }
       return rawNextCart;
     });
@@ -622,7 +695,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
     isProcessingRef.current = true;
     try {
-      // 🔥 Pasamos true si el usuario intenta borrar directamente el producto de la promo
       const isDeletingPromo = Boolean(itemToRemove.isAutoPromo);
       
       checkRuptureAndExecute((prev) => {
@@ -644,7 +716,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     if (isProcessingRef.current || itemToRemove.enviadoCocina) return;
     isProcessingRef.current = true;
     try {
-      // 🔥 Pasamos true si el usuario intenta borrar directamente el producto de la promo
       const isDeletingPromo = Boolean(itemToRemove.isAutoPromo);
 
       checkRuptureAndExecute((prev) => {
@@ -693,7 +764,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
   const total = useMemo(() => _cart.filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General') && item.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [_cart, cuentasPagadasReales]);
   const unsentTotal = useMemo(() => _cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0), [_cart]);
-  const hasUnsentItems = useMemo(() => _cart.some(p => !p.enviadoCocina), [_cart]);
+  const hasUnsentItems = useMemo(() => _cart.some(p => !p.enviadoCocina && !p.isVirtualDiscount), [_cart]);
   const getSubtotalByCuenta = (nombreCuenta) => {
     if (cuentasPagadasReales.includes(nombreCuenta)) return 0;
     return _cart.filter(item => item.cuenta === nombreCuenta && item.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);

@@ -133,6 +133,7 @@ export const TicketCartGroup = ({
   // 🔥 ORDEN COMBO BLINDADO: Prioridad -> Alfabético -> Ancla por ID
   const sortedDisplayItems = [...displayItems].sort((a, b) => {
     const getPriority = (item) => {
+      if (item.isVirtualDiscount) return 3; // El descuento global va al final de todo
       const status = (item.kitchenStatus || '').toUpperCase();
       if (!item.enviadoCocina) return 0;
       if (status === 'READY' || status === 'DELIVERED') return 2;
@@ -160,7 +161,6 @@ export const TicketCartGroup = ({
   const isCobrarProcessing = actionLocks[`${cuentaName}-cobrar`];
   const isOcultarProcessing = actionLocks[`${cuentaName}-ocultar`];
 
-  // 🔥 CREACIÓN DE FLAG SEGURO PARA ELIMINACIÓN DE PROMOS
   const createBreakFlag = (item, qty) => {
       return {
           ...item,
@@ -238,7 +238,7 @@ export const TicketCartGroup = ({
             </div>
             {isCuentaPagada 
                 ? <span className="text-[9px] text-emerald-600 dark:text-emerald-400 lya:text-lya-primary font-bold uppercase tracking-wider flex items-center gap-1"><Lock size={8}/> Cobrada</span> 
-                : <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-wide">{displayItems.length} productos</span>}
+                : <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60 uppercase tracking-wide">{displayItems.filter(i => !i.isVirtualDiscount).length} productos</span>}
           </div>
         </div>
         
@@ -310,20 +310,20 @@ export const TicketCartGroup = ({
       <div className="px-2 pb-2 space-y-2">
         {sortedDisplayItems.map((item, index) => {
           
+          const isVirtualDiscount = item.isVirtualDiscount === true; // 🔥 Identificador Jefe Final
           const isCero = Number(item.precio) === 0;
           const isGhostPromo = item.isAutoPromo && isCero && item.promoType !== 'COMBO';
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
           const isComboPromo = item.isAutoPromo && item.promoType === 'COMBO';
 
-          // 🔥 LÓGICA DE BLOQUEO ACTUALIZADA BLINDADA
-          const isLockedPromo = isGhostPromo || isNthPromo || isComboPromo;
+          const isLockedPromo = isGhostPromo || isNthPromo || isComboPromo || isVirtualDiscount;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
           const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
           
           let promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
 
-          if (pOriginal && Number(pOriginal) > Number(item.precio) && !isGhostPromo && !item.promoLabel?.includes('º')) {
+          if (pOriginal && Number(pOriginal) > Number(item.precio) && !isGhostPromo && !item.promoLabel?.includes('º') && !isVirtualDiscount) {
               const originalNum = Number(pOriginal);
               const actualNum = Number(item.precio);
               const discountAmt = originalNum - actualNum;
@@ -369,7 +369,10 @@ export const TicketCartGroup = ({
               containerClasses += "opacity-100 ";
           }
 
-          if (isAnyPromo) {
+          if (isVirtualDiscount) {
+              // 🔥 TICKET DISCOUNT STYLING
+              containerClasses += "bg-emerald-50/80 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700/50 shadow-sm ";
+          } else if (isAnyPromo) {
              if (item.enviadoCocina) {
                  containerClasses += "bg-rose-50/70 dark:bg-rose-900/10 border-rose-200/60 dark:border-rose-800/30 ";
              } else {
@@ -411,9 +414,12 @@ export const TicketCartGroup = ({
             <div className="flex gap-3">
               <div className={clsx(
                 "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
+                isVirtualDiscount ? "bg-emerald-100/50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50" :
                 isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
               )}>
-                {item.imagen || item.image ? (
+                {isVirtualDiscount ? (
+                  <Tag className="text-emerald-500" size={24} />
+                ) : item.imagen || item.image ? (
                   <img src={item.imagen || item.image} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={20} />
@@ -424,7 +430,7 @@ export const TicketCartGroup = ({
                         <GripVertical size={16} className="text-white drop-shadow-md" />
                     </div>
                 )}
-                {item.enviadoCocina && availableAccs.length <= 1 && !isVitrina && (
+                {item.enviadoCocina && availableAccs.length <= 1 && !isVitrina && !isVirtualDiscount && (
                     <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[1px] flex items-center justify-center">
                         <Lock size={14} className="text-orange-600 drop-shadow-sm" />
                     </div>
@@ -434,11 +440,15 @@ export const TicketCartGroup = ({
               <div className="flex-1 min-w-0 flex flex-col justify-center">
                 <div className="flex justify-between items-start mb-0.5 gap-2">
                   <div className="flex flex-col min-w-0">
-                    <h5 className="text-sm font-black text-gray-800 dark:text-gray-100 lya:text-lya-text truncate pr-2 tracking-tight">
+                    <h5 className={clsx("text-sm font-black truncate pr-2 tracking-tight", 
+                        isVirtualDiscount ? "text-emerald-700 dark:text-emerald-400" : "text-gray-800 dark:text-gray-100 lya:text-lya-text"
+                    )}>
                       {item.nombre}
                     </h5>
                     {isAnyPromo && (
-                       <span className="text-[9px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm">
+                       <span className={clsx("text-[9px] font-black text-white px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm",
+                           isVirtualDiscount ? "bg-emerald-500 dark:bg-emerald-600" : "bg-rose-500 dark:bg-rose-600"
+                       )}>
                          <Tag size={10} strokeWidth={3} /> 
                          <span>{promoText}</span>
                        </span>
@@ -446,27 +456,32 @@ export const TicketCartGroup = ({
                   </div>
                   
                   <div className="flex flex-col items-end">
-                    {pOriginal && Number(pOriginal) > Number(item.precio) && (
+                    {pOriginal && Number(pOriginal) > Number(item.precio) && !isVirtualDiscount && (
                       <span className="text-[10px] md:text-[11px] font-bold text-gray-400 dark:text-gray-500 line-through leading-none mb-0.5">
                         ${(Number(pOriginal) * item.qty).toFixed(2)}
                       </span>
                     )}
-                    <span className={clsx("text-sm font-black", isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text")}>
-                      ${(Number(item.precio) * item.qty).toFixed(2)}
+                    <span className={clsx("text-sm font-black", 
+                        isVirtualDiscount ? "text-emerald-600 dark:text-emerald-400" : 
+                        isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text"
+                    )}>
+                      {isVirtualDiscount ? `-$${Math.abs(item.precio * item.qty).toFixed(2)}` : `$${(Number(item.precio) * item.qty).toFixed(2)}`}
                     </span>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5 mt-1">
-                    {item.qty > 1 && <span className={clsx("px-1.5 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
-                    {item.isTakeaway && item.enviadoCocina && !isVitrina && (
-                        <span className="text-[9px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1.5 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
-                            <ShoppingBag size={10} /> Empacar
-                        </span>
-                    )}
-                </div>
+                {!isVirtualDiscount && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/60 font-bold mb-0.5 mt-1">
+                      {item.qty > 1 && <span className={clsx("px-1.5 py-0.5 rounded border", isAnyPromo ? "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/30 dark:border-rose-800" : "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 lya:text-lya-primary lya:bg-lya-primary/10 border-orange-200 dark:border-orange-800/50 lya:border-lya-primary/20")}>{item.qty}x</span>}
+                      {item.isTakeaway && item.enviadoCocina && !isVitrina && (
+                          <span className="text-[9px] font-black bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-lya-secondary/10 lya:text-lya-secondary px-1.5 py-0.5 rounded uppercase border border-orange-200/50 dark:border-orange-800/50 lya:border-lya-secondary/30 inline-flex items-center gap-1 shadow-sm">
+                              <ShoppingBag size={10} /> Empacar
+                          </span>
+                      )}
+                    </div>
+                )}
 
-                {hasRealPreparations && (
+                {!isVirtualDiscount && hasRealPreparations && (
                   <div className="space-y-1 pointer-events-none mt-1.5">
                     {item.preparaciones?.map((prep, pIdx) => {
                       if (!prep || Object.keys(prep).length === 0 || prep._isPromoMeta || (prep.tamano === 'Estándar' && !prep.leche && (!prep.extras || prep.extras.length === 0))) return null;
@@ -482,7 +497,8 @@ export const TicketCartGroup = ({
               </div>
             </div>
 
-            {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && (
+            {/* 🔥 BLINDAJE FINAL: ESCONDER ACCIONES PARA DESCUENTO VIRTUAL */}
+            {(!isVitrina || (!item.enviadoCocina && !isCuentaPagada) || (item.enviadoCocina && onCancelItem)) && !isVirtualDiscount && (
               <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800/60 lya:border-lya-border/30">
                 
                 {!isVitrina && (
@@ -686,7 +702,6 @@ export const TicketCartGroup = ({
                                         onConfirm: async (val) => { 
                                             const qty = parseInt(val, 10);
                                             if (qty > 0) {
-                                                // Inyectamos la cantidad en el flag para que el controlador la procese correctamente
                                                 const itemToCancel = createBreakFlag(item, qty);
                                                 itemToCancel.qty = qty; 
                                                 await handleCancelItem(itemToCancel);
