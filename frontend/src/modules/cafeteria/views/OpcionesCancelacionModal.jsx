@@ -85,6 +85,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                   initial={{ opacity: 0, y: -50, scale: 0.9 }} 
                   animate={{ opacity: 1, y: 0, scale: 1 }} 
                   exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX 1: Agregamos esto para quitar el resorte por defecto
                   className="bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-6 py-4 rounded-full shadow-2xl flex items-center justify-center gap-3 font-bold border border-red-200 dark:border-red-900/50 lya:border-red-500/30 pointer-events-auto text-center"
                 >
                   <div className="bg-red-100 dark:bg-red-500/20 lya:bg-red-500/20 p-1.5 rounded-full shrink-0">
@@ -101,7 +102,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
             initial={{ scale: 0.95, y: 20, opacity: 0 }} 
             animate={{ scale: 1, y: 0, opacity: 1 }} 
             exit={{ scale: 0.95, y: 20, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX 2: Reemplazamos el 'spring' por un 'tween' lineal
             className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-6 sm:p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 transition-colors"
           >
             <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-red-50 dark:bg-red-900/20 lya:bg-red-500/10 shadow-sm">
@@ -172,6 +173,7 @@ const OpcionesCancelacionModal = ({ isOpen, onClose, cuentas, onConfirmar }) => 
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX 3: Estabiliza la animación de altura
                         className="overflow-hidden"
                       >
                         <div className="pt-2 mb-4">
