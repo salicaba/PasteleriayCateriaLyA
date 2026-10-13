@@ -401,7 +401,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                             type="number" min="2" placeholder="2"
                             value={formData.buyQty === 0 ? '' : formData.buyQty} 
                             onChange={(e) => setFormData({...formData, buyQty: e.target.value === '' ? 0 : Number(e.target.value)})} 
-                            className="w-20 bg-transparent text-center text-3xl font-black focus:outline-none focus:text-rose-500 dark:text-white" 
+                            className="w-24 bg-transparent text-center text-3xl font-black focus:outline-none focus:text-rose-500 dark:text-white" 
                           />
                           <span className="text-sm font-bold text-gray-400 pr-4">unidades</span>
                         </div>
@@ -414,7 +414,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                             type="number" min="1" placeholder="1"
                             value={formData.payQty === 0 ? '' : formData.payQty} 
                             onChange={(e) => setFormData({...formData, payQty: e.target.value === '' ? 0 : Number(e.target.value)})} 
-                            className="w-20 bg-transparent text-center text-3xl font-black text-rose-600 dark:text-rose-500 focus:outline-none" 
+                            className="w-24 bg-transparent text-center text-3xl font-black text-rose-600 dark:text-rose-500 focus:outline-none" 
                           />
                           <span className="text-sm font-bold text-rose-400 pr-4">unidades</span>
                         </div>
@@ -431,7 +431,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                             type="number" min="1" placeholder="1"
                             value={formData.buyQty === 0 ? '' : formData.buyQty} 
                             onChange={(e) => setFormData({...formData, buyQty: e.target.value === '' ? 0 : Number(e.target.value)})} 
-                            className="w-16 bg-transparent text-center text-2xl font-black focus:outline-none focus:text-rose-500 dark:text-white" 
+                            className="w-20 bg-transparent text-center text-2xl font-black focus:outline-none focus:text-rose-500 dark:text-white" 
                           />
                           <span className="text-sm font-bold text-gray-400 pr-3">unid.</span>
                         </div>
@@ -444,7 +444,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                             type="number" min="1" placeholder="1"
                             value={formData.payQty === 0 ? '' : formData.payQty} 
                             onChange={(e) => setFormData({...formData, payQty: e.target.value === '' ? 0 : Number(e.target.value)})} 
-                            className="w-16 bg-transparent text-center text-2xl font-black text-emerald-600 dark:text-emerald-500 focus:outline-none" 
+                            className="w-20 bg-transparent text-center text-2xl font-black text-emerald-600 dark:text-emerald-500 focus:outline-none" 
                           />
                           <span className="text-sm font-bold text-emerald-400 pr-3">unid.</span>
                         </div>
@@ -457,8 +457,8 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                           <input 
                             type="number" min="0" step="any" placeholder="0.00"
                             value={formData.discountValue === 0 ? '' : formData.discountValue} 
-                            onChange={(e) => setFormData({...formData, discountValue: e.target.value === '' ? 0 : Number(e.target.value)})} 
-                            className="w-20 bg-transparent text-center text-2xl font-black focus:outline-none dark:text-white" 
+                            onChange={(e) => setFormData({...formData, discountValue: e.target.value})} 
+                            className="w-24 bg-transparent text-center text-2xl font-black focus:outline-none dark:text-white" 
                           />
                         </div>
                         <span className="text-[10px] text-gray-400 mt-1">($0 = Gratis)</span>
@@ -476,7 +476,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         <input 
                           type="number" min="0" step="any" placeholder="0.00" 
                           value={formData.discountValue === 0 ? '' : formData.discountValue} 
-                          onChange={(e) => setFormData({...formData, discountValue: e.target.value === '' ? 0 : Number(e.target.value)})} 
+                          onChange={(e) => setFormData({...formData, discountValue: e.target.value})} 
                           className="w-full bg-transparent text-center text-5xl font-black dark:text-white focus:outline-none focus:text-emerald-600" 
                         />
                       </div>
@@ -491,7 +491,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         <input 
                           type="number" min="0" step="any" placeholder="0.00" 
                           value={formData.discountValue === 0 ? '' : formData.discountValue} 
-                          onChange={(e) => setFormData({...formData, discountValue: e.target.value === '' ? 0 : Number(e.target.value)})} 
+                          onChange={(e) => setFormData({...formData, discountValue: e.target.value})} 
                           className="w-full bg-transparent text-center text-5xl font-black dark:text-white focus:outline-none focus:text-emerald-600" 
                         />
                       </div>
@@ -507,7 +507,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                             type="number" min="2" placeholder="2" 
                             value={formData.buyQty === 0 ? '' : formData.buyQty} 
                             onChange={(e) => setFormData({...formData, buyQty: e.target.value === '' ? 0 : Number(e.target.value)})} 
-                            className="w-14 bg-transparent text-center text-2xl font-black dark:text-white focus:outline-none focus:text-blue-500" 
+                            className="w-16 bg-transparent text-center text-2xl font-black dark:text-white focus:outline-none focus:text-blue-500" 
                           />
                         </div>
                         <span className="text-sm font-bold text-gray-500">unidades...</span>
@@ -517,7 +517,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         <span className="text-sm font-bold text-gray-500">...a la <strong className="dark:text-white">ÚLTIMA</strong> unidad se le descontarán:</span>
                         <div className="flex items-center bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-200 dark:border-blue-800 px-4 py-2">
                           <DollarSign size={20} className="text-blue-500 mr-1" strokeWidth={3} />
-                          <input type="number" min="0" step="any" placeholder="0.00" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-20 bg-transparent text-center text-3xl font-black text-blue-600 focus:outline-none" />
+                          <input type="number" min="0" step="any" placeholder="0.00" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-24 bg-transparent text-center text-3xl font-black text-blue-600 focus:outline-none" />
                         </div>
                       </div>
                     </div>
@@ -529,7 +529,8 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         <span className="text-sm font-bold text-gray-500 mb-3 text-center">Si el ticket supera los:</span>
                         <div className="flex items-center bg-gray-50 dark:bg-gray-800 rounded-2xl border p-2 w-full sm:w-auto">
                           <DollarSign size={20} className="text-gray-400 ml-2" strokeWidth={3} />
-                          <input type="number" min="1" value={formData.minTicketAmount === 0 ? '' : formData.minTicketAmount} onChange={(e) => setFormData({...formData, minTicketAmount: e.target.value})} className="w-24 bg-transparent text-center text-3xl font-black focus:outline-none focus:text-emerald-500 dark:text-white" placeholder="300" />
+                          {/* 🌟 FIX APLICADO: placeholder="300.00", step="any" y e.target.value */}
+                          <input type="number" min="1" step="any" value={formData.minTicketAmount === 0 ? '' : formData.minTicketAmount} onChange={(e) => setFormData({...formData, minTicketAmount: e.target.value})} className="w-28 bg-transparent text-center text-3xl font-black focus:outline-none focus:text-emerald-500 dark:text-white" placeholder="300.00" />
                         </div>
                       </div>
                       <div className="hidden sm:flex bg-gray-100 dark:bg-gray-800 rounded-full p-3 text-gray-400"><ArrowRight size={24} strokeWidth={3} /></div>
@@ -537,7 +538,8 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                         <span className="text-sm font-bold text-gray-500 mb-3 text-center">Descontar del total:</span>
                         <div className="flex items-center bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-2 w-full sm:w-auto">
                           <DollarSign size={20} className="text-emerald-500 ml-2" strokeWidth={3} />
-                          <input type="number" min="1" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-24 bg-transparent text-center text-3xl font-black text-emerald-600 focus:outline-none" placeholder="50" />
+                          {/* 🌟 FIX APLICADO: placeholder="50.00", step="any" y e.target.value */}
+                          <input type="number" min="1" step="any" value={formData.discountValue === 0 ? '' : formData.discountValue} onChange={(e) => setFormData({...formData, discountValue: e.target.value})} className="w-28 bg-transparent text-center text-3xl font-black text-emerald-600 focus:outline-none" placeholder="50.00" />
                         </div>
                       </div>
                     </div>
@@ -545,7 +547,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </motion.div>
               </div>
 
-              {/* 🌟 SECCIÓN 5/4: SEGURIDAD Y ACTIVACIÓN (CON LÍMITE DE STOCK DINÁMICO) */}
+              {/* 🌟 SECCIÓN 5/4: SEGURIDAD Y ACTIVACIÓN */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
