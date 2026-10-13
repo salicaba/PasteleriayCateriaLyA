@@ -263,10 +263,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const itemsCuenta = cleanCart.filter(item => item.cuenta === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT');
             const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (item.precio * item.qty), 0);
 
-            // Filtramos las promos de ticket que cumplan el umbral y agarramos la más jugosa
+            // 🔥 CORRECCIÓN CLAVE: Lectura usando minTicketAmount
             const qualifyingPromos = ticketPromos
-                .filter(p => subtotalCuenta >= Number(p.minPurchaseAmount || p.min_purchase_amount || 0))
-                .sort((a, b) => Number(b.minPurchaseAmount || b.min_purchase_amount || 0) - Number(a.minPurchaseAmount || a.min_purchase_amount || 0));
+                .filter(p => subtotalCuenta >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
+                .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
 
             const bestTicketPromo = qualifyingPromos[0];
             const ghostIdx = cleanCart.findIndex(item => item.cuenta === cuenta && item.promoType === 'TICKET_DISCOUNT');

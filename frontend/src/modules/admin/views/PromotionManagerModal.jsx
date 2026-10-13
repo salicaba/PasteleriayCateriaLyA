@@ -1,3 +1,4 @@
+//frontend/src/modules/admin/views/PromotionManagerModal.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Tag, Loader2, Save, Calendar, Power, AlertTriangle, CheckCircle2, ArrowRight, DollarSign, CheckSquare, AlertCircle, Search, ShoppingBag, Gift, PackageMinus } from 'lucide-react';
@@ -24,7 +25,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
     payQty: 1,
     discountValue: '',
     minTicketAmount: '',
-    minStockThreshold: 0, // 🌟 NUEVO: Umbral de seguridad de stock
+    minStockThreshold: 0, 
     validDays: [0, 1, 2, 3, 4, 5, 6],
     isActive: true
   });
@@ -99,7 +100,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
   };
 
   const handleSave = async () => {
-    // 1. Validaciones Básicas
     if (!formData.name.trim()) {
       showError("Por favor, asigna un nombre a la promoción."); return;
     }
@@ -117,7 +117,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       showError("Selecciona al menos un producto para aplicar la promoción."); return;
     }
 
-    // 2. PROTECCIÓN DE GANANCIAS: Precios idénticos en NxM
     if (formData.type === 'NxM' && formData.applyToProducts.length > 1) {
       const selectedIds = formData.applyToProducts.map(String);
       const selectedProds = products.filter(p => selectedIds.includes(String(p.id)));
@@ -134,7 +133,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       }
     }
 
-    // 3. ESCUDO ANTI-COLISIONES NIVEL PRODUCCIÓN (Ignora los Premios)
     if (formData.isActive) {
       const overlappingPromo = allPromotions.find(p => {
         if (editData && p.id === editData.id) return false;
@@ -157,13 +155,10 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
         if (formData.type === 'TICKET_DISCOUNT' && p.type === 'TICKET_DISCOUNT') {
            return true; 
         } else if (formData.type !== 'TICKET_DISCOUNT' && p.type !== 'TICKET_DISCOUNT') {
-           
-           // 🌟 CORRECCIÓN BOGO: SOLO Recopilamos los DISPARADORES de la promo iterada
            let pProducts = [];
            if (Array.isArray(p.applyToProducts)) pProducts.push(...p.applyToProducts.map(String));
            if (p.productId || p.product_id) pProducts.push(String(p.productId || p.product_id));
 
-           // 🌟 CORRECCIÓN BOGO: SOLO Recopilamos los DISPARADORES de la promo que estamos creando
            let formProducts = [...formData.applyToProducts.map(String)];
 
            const hasProductOverlap = formProducts.some(id => pProducts.includes(id));
@@ -178,7 +173,6 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
       }
     }
     
-    // 4. Saneamiento de Datos
     const cleanBuyQty = parseInt(formData.buyQty) || 1; 
     const cleanPayQty = parseInt(formData.payQty) || 1;
     const cleanDiscountValue = parseFloat(formData.discountValue) || 0;
@@ -197,7 +191,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
         payQty: cleanPayQty,
         discountValue: cleanDiscountValue,
         minTicketAmount: cleanMinTicketAmount,
-        minStockThreshold: cleanMinStockThreshold,
+        minStockThreshold: formData.type === 'TICKET_DISCOUNT' ? 0 : cleanMinStockThreshold,
         productId: null 
       };
 
@@ -551,7 +545,7 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </motion.div>
               </div>
 
-              {/* 🌟 SECCIÓN 5: SEGURIDAD Y ACTIVACIÓN (CON LÍMITE DE STOCK) */}
+              {/* 🌟 SECCIÓN 5/4: SEGURIDAD Y ACTIVACIÓN (CON LÍMITE DE STOCK DINÁMICO) */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-800 dark:bg-white lya:bg-lya-text text-white dark:text-gray-900 lya:text-lya-bg h-8 w-8 rounded-full flex items-center justify-center font-black text-sm">
@@ -561,28 +555,30 @@ export default function PromotionManagerModal({ isOpen, onClose, products = [], 
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Umbral de Stock */}
-                  <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-2 mb-2">
-                        <PackageMinus size={16} /> Límite de Stock
-                      </label>
-                      <p className="text-[10px] text-gray-400 lya:text-lya-text/50 mb-4 leading-tight">
-                        La promo se ocultará si el stock de un producto cae a este número. (0 = Agotado).
-                      </p>
+                  {/* Umbral de Stock: Se oculta si es TICKET_DISCOUNT */}
+                  {formData.type !== 'TICKET_DISCOUNT' && (
+                    <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-2 mb-2">
+                          <PackageMinus size={16} /> Límite de Stock
+                        </label>
+                        <p className="text-[10px] text-gray-400 lya:text-lya-text/50 mb-4 leading-tight">
+                          La promo se ocultará si el stock de un producto cae a este número. (0 = Agotado).
+                        </p>
+                      </div>
+                      <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 p-2 w-full">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            placeholder="0"
+                            value={formData.minStockThreshold === 0 ? '' : formData.minStockThreshold} 
+                            onChange={(e) => setFormData({...formData, minStockThreshold: e.target.value === '' ? 0 : Number(e.target.value)})}
+                            className="w-full bg-transparent text-center text-4xl font-black dark:text-white focus:outline-none" 
+                          />
+                        <span className="text-xs font-bold text-gray-400 pr-3">unid.</span>
+                      </div>
                     </div>
-                    <div className="flex items-center bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-2xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 p-2 w-full">
-                        <input 
-                          type="number" 
-                          min="0" 
-                          placeholder="0"
-                          value={formData.minStockThreshold === 0 ? '' : formData.minStockThreshold} 
-                          onChange={(e) => setFormData({...formData, minStockThreshold: e.target.value === '' ? 0 : Number(e.target.value)})}
-                          className="w-full bg-transparent text-center text-4xl font-black dark:text-white focus:outline-none" 
-                        />
-                      <span className="text-xs font-bold text-gray-400 pr-3">unid.</span>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Días Válidos */}
                   <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-6 border border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-sm">
