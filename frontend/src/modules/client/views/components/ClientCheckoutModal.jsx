@@ -1,7 +1,7 @@
-// frontend/src/modules/client/views/components/ClientCheckoutModal.js
+// frontend/src/modules/client/views/components/ClientCheckoutModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2 } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2, BadgePercent } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
@@ -13,9 +13,9 @@ export default function ClientCheckoutModal({
   removeFromCart,
   incrementInCart,
   deleteLine,
-  promoWarning,          // Recibimos estado de advertencia de promoción
-  confirmPromoRupture,   // Recibimos función para confirmar ruptura
-  cancelPromoRupture     // Recibimos función para cancelar ruptura
+  promoWarning,          
+  confirmPromoRupture,   
+  cancelPromoRupture     
 }) {
   const [actionLoading, setActionLoading] = useState(null);
   
@@ -39,19 +39,15 @@ export default function ClientCheckoutModal({
       if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
       
       if (actionType === 'increment') {
-        incrementInCart(cartItemId);
+        incrementInCart(item); // Pasamos el ítem completo
       } else if (actionType === 'decrement') {
-        removeFromCart(cartItemId);
+        removeFromCart(item);
       } else if (actionType === 'delete') {
-        // 🔥 MOTOR ANTI-ZOMBIE: Inyectamos el flag de ruptura para que el controlador lo detecte
+        // Motor Anti-Zombie para forzar la eliminación en cascada si es un regalo
         if (item && item.isAutoPromo && item.promoLabel !== 'OFERTA') {
-            // Pasamos un objeto simulado con el flag de ruptura
-            deleteLine({
-                cartItemId: cartItemId,
-                _breakPromoQty: item.qty // Queremos eliminar toda la promoción
-            });
+            deleteLine({ cartItemId: cartItemId, _breakPromoQty: item.qty });
         } else {
-            deleteLine(cartItemId);
+            deleteLine(item);
         }
       }
 
@@ -68,6 +64,10 @@ export default function ClientCheckoutModal({
       setActionLoading(null);
     }
   };
+
+  // Separar los items regulares de los Descuentos Globales (Ticket)
+  const regularItems = cart.filter(i => !i.isVirtualDiscount);
+  const ticketDiscounts = cart.filter(i => i.isVirtualDiscount);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex flex-col justify-end p-4">
@@ -86,7 +86,7 @@ export default function ClientCheckoutModal({
         </div>
 
         <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1">
-          {cart?.map(item => {
+          {regularItems.map(item => {
             if (!item) return null;
             
             const isThisItemLoading = actionLoading?.id === item.cartItemId;
@@ -94,16 +94,20 @@ export default function ClientCheckoutModal({
             const qty = item.qty || 0;
             const precioTotalItem = precioUnitario * qty;
             
-            // 🔥 DETERMINAMOS SI LA PROMOCIÓN ESTÁ BLOQUEADA
+            // Detectar bloqueos (Gratis, Combos o ítems Rebajados vinculados a promos conjuntas)
             const isGhost = item.isAutoPromo && precioUnitario === 0; 
+            const isCombo = item.isAutoPromo && item.promoType === 'COMBO';
             const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-            const isLockedPromo = isGhost || isNthPromo;
+            const isLockedPromo = isGhost || isNthPromo || isCombo;
 
             const currentTotalQty = cart.filter(i => i.id === item.id && !i.isAutoPromo).reduce((acc, i) => acc + i.qty, 0);
             const isLimitReached = item.controlarStock && currentTotalQty >= item.stock && item.stock > 0;
 
             return (
-              <div key={item.cartItemId} className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-4 rounded-3xl border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm transition-colors">
+              <div key={item.cartItemId} className={clsx(
+                "flex items-center justify-between p-4 rounded-3xl border shadow-sm transition-colors",
+                isLockedPromo ? "bg-orange-50/50 dark:bg-orange-900/10 lya:bg-orange-50 border-orange-200 dark:border-orange-800/30" : "bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]"
+              )}>
                 <div className="min-w-0 flex-1 pr-3">
                   <h4 className="font-bold text-gray-900 dark:text-white lya:text-[#3E2723] text-sm truncate">
                     {item.nombre || 'Producto'}
@@ -112,8 +116,8 @@ export default function ClientCheckoutModal({
                   {item.detalles && !isGhost && (
                     <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-0.5 leading-tight text-justify">
                       {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
-                      {item.detalles.leche && <span> • {item.detalles.leche}</span>}
-                      {item.detalles.extras && item.detalles.extras.length > 0 && <span> • +{item.detalles.extras.join(', ')}</span>}
+                      {item.detalles.leche && <span> | {item.detalles.leche}</span>}
+                      {item.detalles.extras && item.detalles.extras.length > 0 && <span> + {item.detalles.extras.join(', ')}</span>}
                       {item.isTakeaway && <span className="block text-orange-500 dark:text-orange-400 mt-0.5">Empaque P/Llevar</span>}
                     </div>
                   )}
@@ -152,7 +156,6 @@ export default function ClientCheckoutModal({
                   </div>
                 </div>
                 
-                {/* 🔥 LÓGICA DE VISUALIZACIÓN: Si es Promo Bloqueada, mostramos Botón Único de Eliminación */}
                 {isLockedPromo ? (
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
@@ -189,7 +192,7 @@ export default function ClientCheckoutModal({
 
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleAction(e, item.cartItemId, 'decrement')} 
+                      onClick={(e) => handleAction(e, item.cartItemId, 'decrement', item)} 
                       className="w-8 h-8 flex items-center justify-center rounded-[1rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-50 shadow-sm font-bold border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] outline-none select-none touch-manipulation transition-colors relative overflow-hidden"
                     >
                       {isThisItemLoading && actionLoading?.action === 'decrement' ? (
@@ -207,10 +210,10 @@ export default function ClientCheckoutModal({
                         if (isLimitReached) {
                           e.preventDefault();
                           e.stopPropagation();
-                          incrementInCart(item.cartItemId); // Dispara el warning
+                          incrementInCart(item);
                           return;
                         }
-                        handleAction(e, item.cartItemId, 'increment');
+                        handleAction(e, item.cartItemId, 'increment', item);
                       }} 
                       className={clsx(
                         "w-8 h-8 flex items-center justify-center rounded-[1rem] shadow-sm font-bold outline-none select-none touch-manipulation transition-colors relative overflow-hidden",
@@ -233,6 +236,29 @@ export default function ClientCheckoutModal({
             );
           })}
         </div>
+
+        {/* 🔥 SECCIÓN DE TICKET DISCOUNT (DESCUENTO GLOBAL) */}
+        {ticketDiscounts.map(discount => (
+            <motion.div 
+                key={discount.cartItemId} 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-[1.5rem] p-4 flex items-center justify-between shadow-sm shrink-0"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-800/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
+                        <BadgePercent size={20} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                        <h4 className="text-emerald-800 dark:text-emerald-300 font-black text-sm">{discount.nombre}</h4>
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Descuento Global Aplicado</span>
+                    </div>
+                </div>
+                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                    -${Math.abs(discount.precioUnitario).toFixed(2)}
+                </div>
+            </motion.div>
+        ))}
 
         <div className="flex justify-between items-center py-4 border-y border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] text-gray-900 dark:text-white lya:text-[#3E2723] shrink-0 relative overflow-hidden h-16">
           <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] z-10">Total Bruto</span>
@@ -275,7 +301,7 @@ export default function ClientCheckoutModal({
         </motion.button>
       </motion.div>
 
-      {/* 🔥 MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN (CLIENTE) */}
+      {/* MODAL DE ADVERTENCIA DE PÉRDIDA DE PROMOCIÓN */}
       <AnimatePresence>
         {promoWarning?.isOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
