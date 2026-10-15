@@ -6,10 +6,11 @@ import { getInitialTheme, getInitialSize, THEME_CLASSES, SIZES } from '../views/
 import { useClientCart } from './useClientCart';
 
 // ⏱️ CONFIGURACIÓN DE TIEMPOS DE SESIÓN
-// 10 minutos de inactividad en el menú sin confirmar pedido (puedes ajustarlo a 5, 10 o 15 min)
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; 
-// 24 horas para purgar caché residual de sesiones antiguas olvidadas
-const CACHE_PURGE_TTL_MS = 24 * 60 * 60 * 1000; 
+// 25 minutos: (25 minutos * 60 segundos * 1000 milisegundos = 1,500,000 ms)
+const INACTIVITY_TIMEOUT_MS = 25 * 60 * 1000; 
+
+// 12 horas: (12 horas * 60 minutos * 60 segundos * 1000 milisegundos = 43,200,000 ms)
+const CACHE_PURGE_TTL_MS = 12 * 60 * 60 * 1000;
 
 export function useClientMenuController({ clientData, type, tableId, tableNumber, onLogout, setActiveOrdersCount }) {
   const [categories, setCategories] = useState([]);
