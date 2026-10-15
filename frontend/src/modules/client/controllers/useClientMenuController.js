@@ -5,6 +5,12 @@ import { socket } from '../../../api/socket';
 import { getInitialTheme, getInitialSize, THEME_CLASSES, SIZES } from '../views/utils/clientMenuUtils';
 import { useClientCart } from './useClientCart';
 
+// ⏱️ CONFIGURACIÓN DE TIEMPOS DE SESIÓN
+// 10 minutos de inactividad en el menú sin confirmar pedido (puedes ajustarlo a 5, 10 o 15 min)
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; 
+// 24 horas para purgar caché residual de sesiones antiguas olvidadas
+const CACHE_PURGE_TTL_MS = 24 * 60 * 60 * 1000; 
+
 export function useClientMenuController({ clientData, type, tableId, tableNumber, onLogout, setActiveOrdersCount }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -67,7 +73,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   }, [isConfirmed]);
 
   const isReadOnly = !!finalizedStatus;
-  const initialActivity = parseInt(localStorage.getItem('lya_client_last_activity')) || Date.now();
+  const initialActivity = parseInt(localStorage.getItem('lya_client_last_activity'), 10) || Date.now();
   const lastActivityRef = useRef(initialActivity);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
@@ -76,12 +82,16 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🛡️ PURGADO DE CACHÉ VIEJA (Ajustado a 24 Horas)
+  // 🛡️ PURGADO DE CACHÉ VIEJA (24 Horas para basura de días anteriores)
   useEffect(() => {
-    const lastAct = parseInt(localStorage.getItem('lya_client_last_activity'));
-    // 24 * 60 * 60 * 1000 = 86400000 ms
-    if (lastAct && (Date.now() - lastAct > 86400000)) { 
-        handleLogout();
+    const lastAct = parseInt(localStorage.getItem('lya_client_last_activity'), 10);
+    if (lastAct && (Date.now() - lastAct > CACHE_PURGE_TTL_MS)) { 
+      handleLogout();
+    } else {
+      // Si la sesión es válida al montar el menú, refrescamos el reloj de actividad
+      const now = Date.now();
+      lastActivityRef.current = now;
+      localStorage.setItem('lya_client_last_activity', now.toString());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -148,7 +158,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }
   }, []);
 
-  // 🔥 TEMPORIZADOR DE INACTIVIDAD EXTENDIDO A 24 HORAS
+  // 🔥 GUARDIÁN DE INACTIVIDAD INTELIGENTE (10 MINUTOS EN MENÚ SIN CONFIRMAR)
   useEffect(() => {
     const updateActivity = () => {
       if (sessionExpired || finalizedStatus) return; 
@@ -161,12 +171,33 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInactivity = () => {
+      // Si ya está viendo "Mi Nota", pagó, está enviando a cocina o ya expiró, no interrumpimos
       if (isConfirmed || isOrderPaid || isSubmitting || finalizedStatus || sessionExpired) return; 
+      
       const now = Date.now();
-      // 24 horas = 24 * 60 * 60 * 1000 = 86400000 ms
-      if (now - lastActivityRef.current > 86400000) { 
-        localStorage.setItem('lya_client_session_expired', 'true');
-        setSessionExpired(true);
+      const elapsed = now - lastActivityRef.current;
+
+      if (elapsed > INACTIVITY_TIMEOUT_MS) { 
+        const hasConfirmedOrders = (confirmedSnapshot?.items?.length || 0) > 0 || Boolean(activeOrderId);
+
+        if (hasConfirmedOrders) {
+          // 🛡️ BLINDAJE DE CUENTA ACTIVA:
+          // Si el cliente YA tiene un pedido confirmado en cocina y solo había regresado al menú,
+          // no lo expulsamos de su cuenta; limpiamos su borrador y lo devolvemos a "Mi Nota".
+          setCart([]);
+          setShowCheckout(false);
+          setSelectedProduct(null);
+          setIsConfirmed(true);
+          triggerNotification('Regresamos a tu nota por inactividad en el menú.', 'warning');
+        } else {
+          // 🚨 EXPULSIÓN POR INACTIVIDAD:
+          // El cliente entró al menú pero no pidió ni confirmó ningún producto en el tiempo límite.
+          setCart([]);
+          setShowCheckout(false);
+          setSelectedProduct(null);
+          localStorage.setItem('lya_client_session_expired', 'true');
+          setSessionExpired(true);
+        }
       }
     };
 
@@ -183,7 +214,18 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       events.forEach(event => window.removeEventListener(event, updateActivity));
     };
-  }, [isConfirmed, isOrderPaid, isSubmitting, finalizedStatus, sessionExpired]);
+  }, [
+    isConfirmed, 
+    isOrderPaid, 
+    isSubmitting, 
+    finalizedStatus, 
+    sessionExpired, 
+    confirmedSnapshot?.items?.length, 
+    activeOrderId, 
+    setCart, 
+    setIsConfirmed, 
+    triggerNotification
+  ]);
 
   // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO
   useEffect(() => {
@@ -208,7 +250,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
         } else if (globalStatus === 'PAID') {
-            // Si la orden completa está pagada, la cuenta automáticamente lo está.
             finalStatus = 'PAID';
         } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') { 
             finalStatus = accountStatus;
@@ -287,7 +328,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       }
     };
 
-    // 🔥 NUEVO: Atrapamos el evento Socket A NIVEL CONTROLADOR para garantizar el LocalStorage.
     const handleOrderPaid = (data) => {
       const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
       const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
@@ -312,7 +352,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
        socket.off('pos:update', checkStatus);
        socket.off('orderPaid', handleOrderPaid);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName]);
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed]);
 
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {
@@ -331,7 +371,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
 
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Esta lista se mantiene por compatibilidad, aunque el Login ya limpia todo
     const keysToRemove = [
       'lya_client_order_id', 'lya_client_snapshot', 'lya_client_data', 
       'lya_client_session', 'lya_client_finalized_at', 'lya_client_finalized_status', 
@@ -358,10 +397,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }
     const shortId = activeOrderId.split('-')[0];
     
-    // 🔥 FIX DEFINITIVO Y BLINDADO:
-    // Si es "Llevar", NO filtramos por cuenta. Pedimos la orden completa.
-    // El backend sumará todo y usará el nombre real del cliente (guardado en ticketId).
-    // Si es "Mesa", SÍ filtramos por su nombre para no cobrarle lo de los demás comensales.
     const queryParam = type === 'llevar' 
       ? '' 
       : `?cuenta=${encodeURIComponent(clientData?.name || '')}`;
@@ -557,10 +592,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       // 🔥 ESCUDO ANTI RED FANTASMA (TIMEOUT)
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message === 'Network Error') {
         triggerNotification("Conexión inestable. El pedido no se envió, intenta de nuevo.", "error");
-        return; // Salimos de inmediato para no limpiar el carrito ni la pantalla
+        return;
       }
 
-      // Si es un error normal de backend (ej. 400 o 500)
       setDiagnosticError({
         endpoint: error.config?.url || "/pos/orders",
         statusCode: error.response?.status || "Error de Red",
@@ -586,6 +620,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     isLoggingOut, displayName, displayPhone, visibleProducts,
     triggerNotification, handleLogout, handleDownloadTicket, cycleTheme, 
     cycleSize, handleAddDirectly, handleConfirmOrder, getCategoryName,
+    diagnosticError,
     cartUtils
   };
 }

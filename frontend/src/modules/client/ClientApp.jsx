@@ -5,7 +5,7 @@ import { Toaster, toast } from 'react-hot-toast';
 import { 
   QrCode, ShieldAlert, UserCheck, MonitorSmartphone, Utensils, 
   Coffee, Loader2, ArrowLeft, Download, WifiOff, AlertTriangle,
-  Settings, Moon, Sun, Droplet, Type, X // 🚀 Iconos Inyectados
+  Settings, Moon, Sun, Droplet, Type, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,12 +21,29 @@ import { usePWA } from '../../hooks/usePWA';
 
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 
-// 🚀 Tamaños de Letra Dinámicos
 const SIZES = [
   { label: 'Normal', val: '16px' },
   { label: 'Mediana', val: '18px' },
   { label: 'Grande', val: '20px' }
 ];
+
+// Lista maestra de llaves de sesión para purgado limpio
+const SESSION_STORAGE_KEYS = [
+  'lya_client_order_id',
+  'lya_client_snapshot',
+  'lya_client_data',
+  'lya_client_session',
+  'lya_client_finalized_at',
+  'lya_client_finalized_status',
+  'lya_client_order_paid',
+  'lya_client_is_confirmed',
+  'lya_client_last_activity',
+  'lya_client_session_expired'
+];
+
+const purgeClientSessionStorage = () => {
+  SESSION_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+};
 
 const getInitialTheme = () => {
   const saved = localStorage.getItem('lya_client_theme');
@@ -50,35 +67,29 @@ export default function ClientApp({ type }) {
   
   const [isSessionChecked, setIsSessionChecked] = useState(false);
 
-  // 🚀 Estados del Modal de Ajustes
   const [showSettings, setShowSettings] = useState(false);
   const [themeIndex, setThemeIndex] = useState(getInitialTheme);
-  const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0'));
+  const [sizeIndex, setSizeIndex] = useState(() => parseInt(localStorage.getItem('lya_client_size') || '0', 10));
 
-  // Limpieza de Sesiones Fantasma al arrancar
+  // Limpieza profunda de Sesiones Fantasma al arrancar
   const [clientData, setClientData] = useState(() => {
     const isExpired = localStorage.getItem('lya_client_session_expired') === 'true';
     if (isExpired) {
-      localStorage.removeItem('lya_client_session');
-      localStorage.removeItem('lya_client_order_id');
-      localStorage.removeItem('lya_client_session_expired');
+      purgeClientSessionStorage();
       return null;
     }
     const saved = localStorage.getItem('lya_client_session');
     return saved ? JSON.parse(saved) : null;
   });
 
-  // 🚀 Funciones de Ajustes
   const cycleTheme = () => setThemeIndex((prev) => (prev + 1) % 3);
   const cycleSize = () => setSizeIndex((prev) => (prev + 1) % 3);
 
-  // Aplicar Tamaño de Letra
   useEffect(() => {
     document.documentElement.style.fontSize = SIZES[sizeIndex].val;
     localStorage.setItem('lya_client_size', sizeIndex);
   }, [sizeIndex]);
 
-  // Aplicar Tema
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark', 'theme-lya');
@@ -86,7 +97,6 @@ export default function ClientApp({ type }) {
     localStorage.setItem('lya_client_theme', themeIndex);
   }, [themeIndex]);
 
-  // Meta Color
   useEffect(() => {
     const updateMetaColor = () => {
       let metaThemeColor = document.querySelector("meta[name='theme-color']");
@@ -154,7 +164,6 @@ export default function ClientApp({ type }) {
     ? String(standaloneSelection.tableId) 
     : (urlTableId ? String(urlTableId) : undefined);
 
-  // Mapeo Inteligente de ID
   const mesaActivaObj = activeTables.find(t => 
     String(t.id) === String(effectiveTableId) || 
     String(t.numero) === String(effectiveTableId) || 
@@ -165,15 +174,12 @@ export default function ClientApp({ type }) {
   const realDbTableId = mesaActivaObj ? String(mesaActivaObj.id) : effectiveTableId;
   const visualTableNumber = mesaActivaObj ? (mesaActivaObj.name || mesaActivaObj.numero || mesaActivaObj.number) : effectiveTableId;
 
-  // 🔥 TÍTULO DINÁMICO DE PESTAÑA (Pilar UX)
   useEffect(() => {
-    // isGridMode es true cuando el usuario no ha escogido si es mesa o llevar
     const isGridMode = !clientData && !urlTableId && !isScannedQr && !standaloneSelection && type !== 'llevar' && window.location.pathname !== '/llevar';
     
     if (isGridMode) {
       document.title = "Lya | Menú Digital";
     } else if (effectiveType === 'mesa' && visualTableNumber) {
-      // Si visualTableNumber ya incluye la palabra "Mesa", evitamos ponerla doble
       const tableTitle = String(visualTableNumber).toLowerCase().includes('mesa') 
         ? visualTableNumber 
         : `Mesa ${visualTableNumber}`;
@@ -181,7 +187,7 @@ export default function ClientApp({ type }) {
     } else if (effectiveType === 'llevar') {
       document.title = "Lya | Para Llevar";
     }
-  }, [clientData, urlTableId, isScannedQr, standaloneSelection, effectiveType, visualTableNumber]);
+  }, [clientData, urlTableId, isScannedQr, standaloneSelection, effectiveType, visualTableNumber, type]);
 
   const [isQrValid, setIsQrValid] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -242,9 +248,7 @@ export default function ClientApp({ type }) {
   }, [fetchStoreData]);
 
   const handleClientLogout = React.useCallback(() => {
-    localStorage.removeItem('lya_client_session');
-    localStorage.removeItem('lya_client_order_id');
-    localStorage.removeItem('lya_client_session_expired');
+    purgeClientSessionStorage();
     setClientData(null);
     setActiveOrdersCount(0);
     setStandaloneSelection(null); 
@@ -280,7 +284,6 @@ export default function ClientApp({ type }) {
             });
             const { status, accountStatus } = res.data || {};
             
-            // 🔥 LA CIRUGÍA MAYOR: Si la mesa fue LIBERADA o CANCELADA, cortamos la sesión de tajo
             if (status === 'CLOSED' || status === 'CANCELLED' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') {
                 handleClientLogout();
                 setIsGuarding(false);
@@ -293,7 +296,6 @@ export default function ClientApp({ type }) {
             const hasFinalized = localStorage.getItem('lya_client_finalized_status');
 
             if (status === 'OPEN' || accountStatus === 'PAID' || hasLocalConfirm || hasLocalPaid || hasFinalized) {
-              
               const mesaEncontrada = activeTables.find(t => String(t.id) === String(sessionTableId));
               const numeroMesaMostrar = mesaEncontrada ? (mesaEncontrada.name || mesaEncontrada.numero || mesaEncontrada.number) : (sessionTableNumber || sessionTableId);
               
@@ -311,16 +313,14 @@ export default function ClientApp({ type }) {
             }
           } catch (error) {
             console.error("Fallo al validar sesión con backend.", error);
-            // 🔥 FIX: No purgamos la sesión si es una caída de red o el servidor está inalcanzable
             if (!navigator.onLine || !error.response || error.response.status >= 500) {
               setGuardMessage("Conexión inestable. Reintentando...");
               setTimeout(() => window.location.reload(), 3000);
-              return; // Cortamos la ejecución para salvar la sesión
+              return;
             }
           }
         }
         
-        // Si no hubo error de red, entonces sí es un cierre legítimo o una cuenta ajena
         handleClientLogout();
         setIsGuarding(false);
         setIsSessionChecked(true);
@@ -473,7 +473,7 @@ export default function ClientApp({ type }) {
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+                transition={{ duration: 0.25, ease: "easeOut" }}
                 className="bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2.5rem] p-8 max-w-sm w-full text-center flex flex-col items-center shadow-2xl border border-gray-100 dark:border-gray-800"
               >
                 <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-inner animate-bounce">
@@ -532,7 +532,6 @@ export default function ClientApp({ type }) {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex flex-col overflow-y-auto custom-scrollbar p-6 w-full"
                   >
-                    {/* 🚀 BOTÓN FLOTANTE DE AJUSTES EN EL MAPEO */}
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setShowSettings(true)}
@@ -651,7 +650,6 @@ export default function ClientApp({ type }) {
                       </div>
                     )}
 
-                    {/* 🚀 BOTÓN FLOTANTE EN EL LOGIN TAMBIÉN */}
                     <div className="absolute top-6 right-6 z-50">
                       <motion.button
                         whileTap={{ scale: 0.95 }}
@@ -664,14 +662,17 @@ export default function ClientApp({ type }) {
 
                     <ClientLogin 
                       onLogin={(data) => {
+                        const now = Date.now();
                         const sessionData = { 
                           ...data, 
                           type: effectiveType, 
                           tableId: realDbTableId,
                           tableNumber: visualTableNumber 
                         };
-                        setClientData(sessionData);
+                        purgeClientSessionStorage();
+                        localStorage.setItem('lya_client_last_activity', now.toString());
                         localStorage.setItem('lya_client_session', JSON.stringify(sessionData));
+                        setClientData(sessionData);
                       }} 
                       type={effectiveType} 
                       tableId={{ id: realDbTableId, numero: visualTableNumber }} 
@@ -728,7 +729,7 @@ export default function ClientApp({ type }) {
                   initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                   animate={{ scale: 1, opacity: 1, y: 0 }} 
                   exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-                  transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="bg-white dark:bg-gray-800 lya:bg-lya-surface w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border border-gray-200 dark:border-gray-700 flex flex-col items-center text-center overflow-hidden"
                 >
                   <div className="relative mb-6 flex items-center justify-center">
@@ -746,13 +747,12 @@ export default function ClientApp({ type }) {
             )}
           </AnimatePresence>
 
-          {/* 🚀 MODAL NEO-BENTO DE AJUSTES */}
           <AnimatePresence>
             {showSettings && (
               <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
                 <motion.div 
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición de fondo suave
+                  transition={{ duration: 0.2, ease: "easeOut" }}
                   onClick={() => setShowSettings(false)}
                   className="absolute inset-0 bg-gray-900/60 dark:bg-black/80 lya:bg-[#3E2723]/70 backdrop-blur-md transition-colors"
                 />
@@ -760,7 +760,7 @@ export default function ClientApp({ type }) {
                   initial={{ scale: 0.95, opacity: 0, y: 15 }} 
                   animate={{ scale: 1, opacity: 1, y: 0 }} 
                   exit={{ scale: 0.95, opacity: 0, y: 15 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }} // 🔥 FIX: Transición suave, sin resorte
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="bg-white dark:bg-gray-900 lya:bg-[#F3EBE0] p-8 rounded-[2.5rem] shadow-2xl relative z-10 w-full max-w-[340px] flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]"
                 >
                   <div className="flex items-center justify-between mb-8">
