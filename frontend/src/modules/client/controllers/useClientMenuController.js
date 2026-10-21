@@ -6,11 +6,10 @@ import { getInitialTheme, getInitialSize, THEME_CLASSES, SIZES } from '../views/
 import { useClientCart } from './useClientCart';
 
 // ⏱️ CONFIGURACIÓN DE TIEMPOS DE SESIÓN
-// 25 minutos: (25 minutos * 60 segundos * 1000 milisegundos = 1,500,000 ms)
+// 25 minutos de inactividad en el menú sin confirmar pedido
 const INACTIVITY_TIMEOUT_MS = 25 * 60 * 1000; 
-
-// 12 horas: (12 horas * 60 minutos * 60 segundos * 1000 milisegundos = 43,200,000 ms)
-const CACHE_PURGE_TTL_MS = 12 * 60 * 60 * 1000;
+// 12 horas para purgar caché residual de sesiones antiguas olvidadas
+const CACHE_PURGE_TTL_MS = 12 * 60 * 60 * 1000; 
 
 export function useClientMenuController({ clientData, type, tableId, tableNumber, onLogout, setActiveOrdersCount }) {
   const [categories, setCategories] = useState([]);
@@ -44,7 +43,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     !(type === 'llevar' && disabledQrs.includes('llevar')) && 
     !(type === 'mesa' && disabledQrs.includes(`mesa-${tableNumber || tableId}`));
 
-  // 🔥 FIX: Wrapper para actualizar isConfirmed y REINICIAR el reloj
   const [internalIsConfirmed, setInternalIsConfirmed] = useState(() => {
     if (localStorage.getItem('lya_client_order_paid') === 'true') return true;
     return localStorage.getItem('lya_client_is_confirmed') === 'true';
@@ -83,13 +81,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🛡️ PURGADO DE CACHÉ VIEJA (24 Horas para basura de días anteriores)
+  // 🛡️ PURGADO DE CACHÉ VIEJA (12 Horas para basura de sesiones olvidadas)
   useEffect(() => {
     const lastAct = parseInt(localStorage.getItem('lya_client_last_activity'), 10);
     if (lastAct && (Date.now() - lastAct > CACHE_PURGE_TTL_MS)) { 
       handleLogout();
     } else {
-      // Si la sesión es válida al montar el menú, refrescamos el reloj de actividad
       const now = Date.now();
       lastActivityRef.current = now;
       localStorage.setItem('lya_client_last_activity', now.toString());
@@ -159,7 +156,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }
   }, []);
 
-  // 🔥 GUARDIÁN DE INACTIVIDAD INTELIGENTE (10 MINUTOS EN MENÚ SIN CONFIRMAR)
+  // 🔥 GUARDIÁN DE INACTIVIDAD INTELIGENTE (25 MINUTOS EN MENÚ SIN CONFIRMAR)
   useEffect(() => {
     const updateActivity = () => {
       if (sessionExpired || finalizedStatus) return; 
@@ -172,7 +169,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
     const checkInactivity = () => {
-      // Si ya está viendo "Mi Nota", pagó, está enviando a cocina o ya expiró, no interrumpimos
       if (isConfirmed || isOrderPaid || isSubmitting || finalizedStatus || sessionExpired) return; 
       
       const now = Date.now();
@@ -182,20 +178,17 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         const hasConfirmedOrders = (confirmedSnapshot?.items?.length || 0) > 0 || Boolean(activeOrderId);
 
         if (hasConfirmedOrders) {
-          // 🛡️ BLINDAJE DE CUENTA ACTIVA:
-          // Si el cliente YA tiene un pedido confirmado en cocina y solo había regresado al menú,
-          // no lo expulsamos de su cuenta; limpiamos su borrador y lo devolvemos a "Mi Nota".
           setCart([]);
           setShowCheckout(false);
           setSelectedProduct(null);
+          cartUtils.setPendingPromoReward(null);
           setIsConfirmed(true);
           triggerNotification('Regresamos a tu nota por inactividad en el menú.', 'warning');
         } else {
-          // 🚨 EXPULSIÓN POR INACTIVIDAD:
-          // El cliente entró al menú pero no pidió ni confirmó ningún producto en el tiempo límite.
           setCart([]);
           setShowCheckout(false);
           setSelectedProduct(null);
+          cartUtils.setPendingPromoReward(null);
           localStorage.setItem('lya_client_session_expired', 'true');
           setSessionExpired(true);
         }
@@ -225,7 +218,8 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     activeOrderId, 
     setCart, 
     setIsConfirmed, 
-    triggerNotification
+    triggerNotification,
+    cartUtils
   ]);
 
   // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO
@@ -246,7 +240,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         const accountStatus = data.accountStatus;
         const serverItems = data.items; 
         
-        // 🔥 FIX ESTRUCTURAL: Mapeo correcto para "Para Llevar" donde el pago es Total (globalStatus === 'PAID')
         let finalStatus = 'OPEN';
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
             finalStatus = globalStatus;
@@ -266,7 +259,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                 const precioUnitario = Number(serverItem.subtotal) / (serverItem.quantity || 1);
                 
                 for(let i = 0; i < serverItem.quantity; i++) {
-                    const note = parsedNotes[i] || {};
+                    const note = parsedNotes[i] || parsedNotes[0] || {};
                     const newItem = {
                         id: serverItem.productId,
                         backendItemId: serverItem.id, 
@@ -287,6 +280,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                         x.id === newItem.id && 
                         x.isTakeaway === newItem.isTakeaway && 
                         !!x.isAutoPromo === !!newItem.isAutoPromo &&
+                        Number(x.precioUnitario).toFixed(2) === Number(newItem.precioUnitario).toFixed(2) &&
                         x.status === newItem.status && 
                         JSON.stringify(x.detalles || {}) === detailStr
                     );
@@ -304,10 +298,13 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                     return prev;
                 }
 
-                const activeServerItems = newItems.filter(item => item.status !== 'CANCELLED');
+                // Preservamos descuentos globales virtuales si existían en la nota
+                const virtualDiscounts = (prev.items || []).filter(i => i.isVirtualDiscount);
+                const mergedItems = [...newItems, ...virtualDiscounts];
+                const activeServerItems = mergedItems.filter(item => item.status !== 'CANCELLED');
                 const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
                 
-                const newState = { items: newItems, total: newTotal };
+                const newState = { items: mergedItems, total: Math.max(0, newTotal) };
                 localStorage.setItem('lya_client_snapshot', JSON.stringify(newState));
                 return newState;
             });
@@ -430,6 +427,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         ...p,
         nombre: p.name || p.nombre || 'Sin Nombre',
         precio: parseFloat(p.basePrice || p.precio || 0),
+        precioBase: parseFloat(p.basePrice || p.precio || 0),
         imagen: p.imageUrl || p.image || p.imagen || null,
         categoria: p.categoryId || p.categoria,
         stock: p.stockQuantity ?? p.stock ?? 0,
@@ -514,7 +512,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   };
 
   const handleConfirmOrder = async () => {
-    if (cart.length === 0) return;
+    const physicalItems = cart.filter(item => !item.isVirtualDiscount);
+    if (physicalItems.length === 0) return;
+
     setIsSubmitting(true);
     setIsOrderPaid(false);
     localStorage.removeItem('lya_client_order_paid');
@@ -535,16 +535,19 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
 
       if (!targetOrderId) targetOrderId = await createNewOrder();
 
+      // Enviamos los productos físicos al backend con toda su metadata de promoción
       const itemsPayload = {
-        items: cart.map(item => ({
+        items: physicalItems.map(item => ({
           productId: item.id,
           quantity: item.qty,
           subtotal: item.precioUnitario * item.qty,
           cuenta: dbOrderType === 'LLEVAR' ? 'General' : (clientData?.name || 'General'), 
-          notes: JSON.stringify(item.detalles ? [item.detalles] : []), 
+          notes: JSON.stringify(item.detalles ? Array(item.qty).fill(item.detalles) : []), 
           isTakeaway: item.isTakeaway || false,
           isAutoPromo: item.isAutoPromo || false,
           promoLabel: item.promoLabel || null,
+          promoId: item.promoId || null,
+          promoType: item.promoType || null,
           precioOriginal: item.precioOriginal ? Number(item.precioOriginal) : null
         }))
       };
@@ -563,15 +566,21 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       }
 
       setConfirmedSnapshot(prev => {
-        let baseItems = orderWasClosedOrDeleted ? [] : [...prev.items];
-        let baseTotal = orderWasClosedOrDeleted ? 0 : prev.total;
+        let baseItems = orderWasClosedOrDeleted ? [] : [...prev.items].filter(i => !i.isVirtualDiscount);
+        let baseTotal = orderWasClosedOrDeleted ? 0 : baseItems.reduce((sum, i) => sum + (i.precioUnitario * i.qty), 0);
         let newItems = [...baseItems];
         
         cart.forEach(cartItem => {
+            if (cartItem.isVirtualDiscount) {
+                newItems.push({ ...cartItem });
+                return;
+            }
             const detailStr1 = JSON.stringify(cartItem.detalles || {});
             const existingIndex = newItems.findIndex(i => 
                 i.id === cartItem.id && i.isTakeaway === cartItem.isTakeaway && 
-                !!i.isAutoPromo === !!cartItem.isAutoPromo && JSON.stringify(i.detalles || {}) === detailStr1
+                !!i.isAutoPromo === !!cartItem.isAutoPromo &&
+                Number(i.precioUnitario).toFixed(2) === Number(cartItem.precioUnitario).toFixed(2) &&
+                JSON.stringify(i.detalles || {}) === detailStr1
             );
             if (existingIndex >= 0) {
                 newItems[existingIndex] = { ...newItems[existingIndex], qty: newItems[existingIndex].qty + cartItem.qty };
@@ -580,7 +589,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
             }
         });
 
-        const newState = { items: newItems, total: baseTotal + totalCart };
+        const newState = { items: newItems, total: Math.max(0, baseTotal + totalCart) };
         localStorage.setItem('lya_client_snapshot', JSON.stringify(newState));
         return newState;
       });
@@ -590,7 +599,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       setShowCheckout(false);
 
     } catch (error) {
-      // 🔥 ESCUDO ANTI RED FANTASMA (TIMEOUT)
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message === 'Network Error') {
         triggerNotification("Conexión inestable. El pedido no se envió, intenta de nuevo.", "error");
         return;

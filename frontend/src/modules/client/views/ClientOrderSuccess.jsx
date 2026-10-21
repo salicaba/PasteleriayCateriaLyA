@@ -1,12 +1,18 @@
-//frontend/src/modules/client/views/ClientOrderSuccess.jsx
+// frontend/src/modules/client/views/ClientOrderSuccess.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, MessageCircle, CheckCircle2, Loader2, ChevronDown, LogOut } from 'lucide-react';
+import { 
+  CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, 
+  ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, 
+  MessageCircle, CheckCircle2, Loader2, ChevronDown, LogOut, Gift, BadgePercent 
+} from 'lucide-react';
 import { socket } from '../../../api/socket.js';
 import client from '../../../api/client.js';
 
-// 🔥 Añadido onLogoutClick en las props
-export default function ClientOrderSuccess({ cart, totalCart, clientData, type, tableId, products, categories, getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid, onLogoutClick }) {
+export default function ClientOrderSuccess({ 
+  cart, totalCart, clientData, type, tableId, products, categories, 
+  getCategoryName, onReset, isQrActive, onOpenSettings, isOrderPaid, onLogoutClick 
+}) {
   const [showReadOnlyMenu, setShowReadOnlyMenu] = useState(false);
   const [liveCart, setLiveCart] = useState(() => cart || []);
   const [toastMessage, setToastMessage] = useState(null);
@@ -134,7 +140,9 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             const meta = parsedPreps.find(p => p && p._isPromoMeta);
             
             const safePrecioUnitario = Number(item.subtotal || 0) / Number(item.quantity || 1);
-            const safePrecioOriginal = meta?.precioOriginal ? Number(meta.precioOriginal) : (item.product?.basePrice ? Number(item.product.basePrice) : null);
+            const safePrecioOriginal = item.precioOriginal 
+              ? Number(item.precioOriginal) 
+              : (meta?.precioOriginal ? Number(meta.precioOriginal) : (item.product?.basePrice ? Number(item.product.basePrice) : null));
 
             const newItem = {
                 id: item.productId,
@@ -147,8 +155,10 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                 preparaciones: parsedPreps,
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway,
-                isAutoPromo: meta ? meta.isAutoPromo : false,
-                promoLabel: meta ? meta.promoLabel : null,
+                isAutoPromo: item.isAutoPromo ?? (meta ? meta.isAutoPromo : false),
+                promoLabel: item.promoLabel ?? (meta ? meta.promoLabel : null),
+                promoType: item.promoType ?? (meta ? meta.promoType : null),
+                promoId: item.promoId ?? (meta ? meta.promoId : null),
                 precioOriginal: safePrecioOriginal,
                 status: 'ACTIVE'
             };
@@ -225,7 +235,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                        const parsed = JSON.parse(val);
                        if (parsed.items) {
                            parsed.items = liveCart;
-                           parsed.total = liveCart.filter(i => i.status !== 'CANCELLED').reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
+                           parsed.total = Math.max(0, liveCart.filter(i => i.status !== 'CANCELLED').reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0));
                            localStorage.setItem(key, JSON.stringify(parsed));
                        }
                    }
@@ -235,9 +245,20 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
     }
   }, [liveCart, cart, onReset]);
 
-  const liveTotal = liveCart
+  // Separamos los productos físicos de los Descuentos Globales por monto de ticket (TICKET_DISCOUNT)
+  const regularItems = liveCart.filter(item => !item.isVirtualDiscount && item.promoType !== 'TICKET_DISCOUNT');
+  const ticketDiscounts = liveCart.filter(item => (item.isVirtualDiscount || item.promoType === 'TICKET_DISCOUNT') && item.status !== 'CANCELLED');
+
+  const regularSubtotal = regularItems
     .filter(item => item.status !== 'CANCELLED')
     .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
+
+  const liveTotal = Math.max(
+    0,
+    liveCart
+      .filter(item => item.status !== 'CANCELLED')
+      .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0)
+  );
 
   const showToast = (message) => {
     setToastMessage(message);
@@ -456,26 +477,45 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
             </div>
 
             <div className="space-y-4 max-h-[30vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
-              {liveCart.map((item, idx) => {
-                const isGhost = item.isAutoPromo && item.precioUnitario === 0;
+              {regularItems.map((item, idx) => {
+                const unitPrice = Number(item.precioUnitario || 0);
+                const qty = Number(item.qty || 1);
+                const lineTotal = unitPrice * qty;
+                const isGhost = Boolean(item.isAutoPromo && unitPrice === 0);
+                const isPromoItem = Boolean(item.isAutoPromo || item.promoLabel);
                 const isCancelled = item.status === 'CANCELLED';
+
+                const hasDetails = item.detalles && (
+                  item.detalles.tamano || 
+                  item.detalles.leche || 
+                  (Array.isArray(item.detalles.extras) && item.detalles.extras.length > 0) || 
+                  item.isTakeaway
+                );
 
                 return (
                   <div key={idx} className={`flex justify-between items-start text-sm font-medium pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0 transition-opacity ${isCancelled ? 'opacity-50 grayscale' : 'text-gray-800 dark:text-gray-200 lya:text-[#3E2723]'}`}>
                     
                     <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
-                      {isGhost ? (
-                         <div className="flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 rounded-lg px-2 py-1 shrink-0 border border-rose-100 dark:border-rose-800/30 lya:border-rose-200 mt-0.5">
-                           <Tag size={14} className="text-rose-500 lya:text-rose-600 mb-0.5" strokeWidth={2.5} />
-                           <span className="font-black text-center text-[10px] text-rose-600 dark:text-rose-400 lya:text-rose-600 tracking-wider">x{item.qty}</span>
+                      {isPromoItem && !isCancelled ? (
+                         <div className={`flex flex-col items-center justify-center rounded-lg px-2 py-1 shrink-0 border mt-0.5 ${
+                           isGhost 
+                             ? 'bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-100 border-emerald-200 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400' 
+                             : 'bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 border-rose-100 dark:border-rose-800/30 text-rose-600 dark:text-rose-400'
+                         }`}>
+                           {isGhost ? (
+                             <Gift size={13} className="mb-0.5" strokeWidth={2.5} />
+                           ) : (
+                             <Tag size={13} className="mb-0.5" strokeWidth={2.5} />
+                           )}
+                           <span className="font-black text-center text-[10px] tracking-wider">x{qty}</span>
                          </div>
                       ) : isCancelled ? (
                          <span className="text-xs font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                           x{item.qty}
+                           x{qty}
                          </span>
                       ) : (
                          <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                           x{item.qty}
+                           x{qty}
                          </span>
                       )}
                       
@@ -484,12 +524,18 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                           {item.nombre}
                         </span>
                         
-                        {item.detalles && !isGhost && (
-                          <div className="text-[10px] opacity-70 mt-1 leading-snug font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
-                            {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
-                            {item.detalles.leche && <span> • {item.detalles.leche}</span>}
-                            {item.detalles.extras && item.detalles.extras.length > 0 && <span> • +{item.detalles.extras.join(', ')}</span>}
-                            {item.isTakeaway && <span className={`block font-bold mt-1 ${isCancelled ? 'text-red-400' : 'text-orange-500 dark:text-orange-400 lya:text-[#78350F]'}`}>Empaque P/Llevar</span>}
+                        {hasDetails && (
+                          <div className="text-[10px] opacity-75 mt-1 leading-snug font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
+                            {item.detalles?.tamano && <span>{item.detalles.tamano}</span>}
+                            {item.detalles?.leche && <span>{item.detalles?.tamano ? ' | ' : ''}{item.detalles.leche}</span>}
+                            {Array.isArray(item.detalles?.extras) && item.detalles.extras.length > 0 && (
+                              <span>{(item.detalles?.tamano || item.detalles?.leche) ? ' + ' : '+'}{item.detalles.extras.join(', ')}</span>
+                            )}
+                            {item.isTakeaway && (
+                              <span className={`block font-bold mt-0.5 ${isCancelled ? 'text-red-400' : 'text-orange-500 dark:text-orange-400 lya:text-[#78350F]'}`}>
+                                Empaque P/Llevar
+                              </span>
+                            )}
                           </div>
                         )}
                         
@@ -501,21 +547,23 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                           )}
 
                           {item.promoLabel && !isCancelled && (
-                            <span className="inline-flex items-center gap-1 bg-rose-500 dark:bg-rose-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm">
-                              <Tag size={10} strokeWidth={3} />
+                            <span className={`inline-flex items-center gap-1 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm ${
+                              isGhost ? 'bg-emerald-500 dark:bg-emerald-600' : 'bg-rose-500 dark:bg-rose-600'
+                            }`}>
+                              {isGhost ? <Gift size={10} strokeWidth={3} /> : <Tag size={10} strokeWidth={3} />}
                               <span>{item.promoLabel}</span>
                             </span>
                           )}
                           
-                          {item.qty > 1 && !isGhost && (
+                          {qty > 1 && !isGhost && (
                             <span className="inline-block text-[9px] font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] tracking-wide uppercase">
-                              Unit: ${(Number(item.precioUnitario)).toFixed(2)}
+                              Unit: ${unitPrice.toFixed(2)}
                             </span>
                           )}
                           
-                          {item.precioOriginal && !isGhost && !isCancelled && (
+                          {item.precioOriginal && !isCancelled && Number(item.precioOriginal) > unitPrice && (
                             <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through shrink-0">
-                              Normal: ${(Number(item.precioOriginal)).toFixed(2)}
+                              Normal: ${Number(item.precioOriginal).toFixed(2)}
                             </span>
                           )}
                         </div>
@@ -523,12 +571,18 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                     </div>
                     
                     <div className="flex flex-col items-end shrink-0">
-                      <span className={`font-black text-[15px] ${isCancelled ? 'text-red-400 dark:text-red-500 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
-                        ${(Number(item.precioUnitario) * item.qty).toFixed(2)}
+                      <span className={`font-black text-[15px] ${
+                        isCancelled 
+                          ? 'text-red-400 dark:text-red-500 line-through' 
+                          : isGhost
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-gray-900 dark:text-white lya:text-[#3E2723]'
+                      }`}>
+                        {isGhost ? 'GRATIS' : `$${lineTotal.toFixed(2)}`}
                       </span>
-                      {item.precioOriginal && item.qty > 1 && !isGhost && !isCancelled && (
+                      {item.precioOriginal && !isCancelled && Number(item.precioOriginal) * qty > lineTotal && (
                          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
-                           ${(Number(item.precioOriginal) * item.qty).toFixed(2)}
+                           ${(Number(item.precioOriginal) * qty).toFixed(2)}
                          </span>
                       )}
                     </div>
@@ -536,6 +590,40 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
                 );
               })}
             </div>
+
+            {/* 🌟 CÁPSULA NEO-BENTO PARA DESCUENTO POR MONTO DE TICKET (TICKET_DISCOUNT) */}
+            {ticketDiscounts.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] space-y-2 relative z-10">
+                <div className="flex items-center justify-between text-xs font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] px-1">
+                  <span>Subtotal</span>
+                  <span>${regularSubtotal.toFixed(2)}</span>
+                </div>
+
+                {ticketDiscounts.map((discount, idx) => (
+                  <div 
+                    key={discount.cartItemId || idx}
+                    className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-2xl p-3 flex items-center justify-between shadow-sm"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <BadgePercent size={16} strokeWidth={2.5} />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-xs font-black text-emerald-800 dark:text-emerald-300 truncate">
+                          {discount.nombre || 'Descuento Global'}
+                        </p>
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                          {discount.promoLabel || 'Descuento Extra'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                      -${Math.abs(Number(discount.precioUnitario || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="mt-5 pt-5 border-t border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex flex-col items-center justify-center gap-1 relative z-10">
               <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/80">
@@ -741,7 +829,7 @@ export default function ClientOrderSuccess({ cart, totalCart, clientData, type, 
         </div>
       </div>
 
-      {/* 🔥 NUEVO: Botón Flotante de Retiro movido aquí (Dinámico para Mesa/Llevar y oculto en Solo Lectura) */}
+      {/* Botón Flotante de Retiro (Dinámico para Mesa/Llevar y oculto en Solo Lectura) */}
       <AnimatePresence>
         {localIsPaid && !showReadOnlyMenu && (
           <motion.div

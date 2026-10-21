@@ -1,7 +1,7 @@
-//frontend/src/modules/client/views/ClientMenu.jsx
-import React from 'react';
+// frontend/src/modules/client/views/ClientMenu.jsx
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
+import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift } from 'lucide-react';
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -14,7 +14,7 @@ import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
 import { ClientServiceShield } from './components/ClientServiceShield';
 import ClientOrderSuccess from './ClientOrderSuccess';
 
-// Nuevos componentes extraídos de la UI
+// Componentes extraídos de la UI
 import ClientHeader from './components/ClientHeader';
 import ClientProductCard from './components/ClientProductCard';
 
@@ -22,8 +22,8 @@ import ClientProductCard from './components/ClientProductCard';
 import { useClientMenuController } from '../controllers/useClientMenuController';
 
 export default function ClientMenu(props) {
-  // Inicializamos nuestro Custom Hook
   const ctrl = useClientMenuController(props);
+  const [claimingRewardId, setClaimingRewardId] = useState(null);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -33,6 +33,17 @@ export default function ClientMenu(props) {
   const itemVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
     show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
+  const handleClaimRewardClick = async (product, rewardData) => {
+    if (claimingRewardId !== null) return;
+    setClaimingRewardId(product.id);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      ctrl.cartUtils.claimPromoReward(product, rewardData.promo, rewardData.earnedGhosts);
+    } finally {
+      setClaimingRewardId(null);
+    }
   };
 
   // 1. Pantalla de Carga
@@ -109,7 +120,6 @@ export default function ClientMenu(props) {
           onReset={() => { if (!ctrl.isOrderPaid) ctrl.setIsConfirmed(false); }} 
           onOpenSettings={() => ctrl.setShowSettings(true)}
           isQrActive={ctrl.isServiceActive} 
-          // 🔥 Pasamos el control del cierre al hijo
           onLogoutClick={() => ctrl.setShowLogoutConfirm(true)}
         />
 
@@ -132,17 +142,45 @@ export default function ClientMenu(props) {
     );
   }
 
+  const rewardModalData = ctrl.cartUtils.pendingPromoReward;
+
   // 6. Vista Principal del Menú
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative">
+      {/* CÁPSULA FLOTANTE DE NOTIFICACIONES (Éxito, Upselling Info y Alertas) */}
       <AnimatePresence>
         {ctrl.notification && (
-          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-            <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: -20 }} className={`bg-white/95 dark:bg-gray-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center ${ctrl.notification.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-emerald-200/50 text-gray-800 dark:text-white lya:text-[#3E2723]' : 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-400/50 text-gray-800 dark:text-white lya:text-[#3E2723]'}`}>
-              <div className={`p-1.5 rounded-full ${ctrl.notification.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600'}`}>
-                {ctrl.notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          <div className="fixed top-8 left-0 right-0 z-[10050] flex justify-center pointer-events-none px-4">
+            <motion.div
+              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={clsx(
+                "bg-white/95 dark:bg-gray-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.25)] flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center text-gray-800 dark:text-white lya:text-[#3E2723]",
+                ctrl.notification.type === 'success'
+                  ? "border-emerald-200/50 dark:border-emerald-900/30 lya:border-emerald-300/50"
+                  : ctrl.notification.type === 'info'
+                    ? "border-orange-200/60 dark:border-orange-900/40 lya:border-[#D9C4A9]"
+                    : "border-amber-200/50 dark:border-amber-900/30 lya:border-amber-400/50"
+              )}
+            >
+              <div className={clsx(
+                "p-1.5 rounded-full shrink-0",
+                ctrl.notification.type === 'success'
+                  ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600"
+                  : ctrl.notification.type === 'info'
+                    ? "bg-orange-100 dark:bg-orange-500/20 text-orange-600 lya:text-[#78350F]"
+                    : "bg-amber-100 dark:bg-amber-500/20 text-amber-600"
+              )}>
+                {ctrl.notification.type === 'success' ? (
+                  <CheckCircle2 size={16} />
+                ) : ctrl.notification.type === 'info' ? (
+                  <Gift size={16} />
+                ) : (
+                  <AlertTriangle size={16} />
+                )}
               </div>
-              <span className="text-sm tracking-wide text-center">{ctrl.notification.msg}</span>
+              <span className="text-sm tracking-wide text-center leading-snug">{ctrl.notification.msg}</span>
             </motion.div>
           </div>
         )}
@@ -217,6 +255,7 @@ export default function ClientMenu(props) {
           />
         )}
       </AnimatePresence>
+
       <AnimatePresence>
         {ctrl.showCheckout && (
           <ClientCheckoutModal 
@@ -234,6 +273,101 @@ export default function ClientMenu(props) {
           />
         )}
       </AnimatePresence>
+
+      {/* 🌟 MODAL NEO-BENTO: SELECCIÓN DE RECOMPENSA (BOGO y NxM de Piscina) */}
+      <AnimatePresence>
+        {rewardModalData && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 260 }}
+              className="bg-white dark:bg-gray-900 lya:bg-[#FAF6F0] max-w-md w-full rounded-[2.5rem] shadow-2xl p-6 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] relative overflow-hidden"
+            >
+              <div className="flex items-center gap-4 mb-5">
+                <div className="h-14 w-14 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-[1.25rem] flex items-center justify-center shrink-0 shadow-inner">
+                  <Gift size={28} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight">
+                    ¡Promoción Desbloqueada!
+                  </h3>
+                  <p className="text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
+                    {rewardModalData.discountValue === 0 || rewardModalData.discountValue === undefined
+                      ? 'Elige tu producto GRATIS (Base)'
+                      : `Elige tu recompensa por $${Number(rewardModalData.discountValue).toFixed(2)}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto custom-scrollbar pr-1 mb-5">
+                {ctrl.products
+                  .filter(p => {
+                    const isMatch = rewardModalData.poolProductIds?.some(
+                      promoId => String(promoId).toLowerCase() === String(p.id).toLowerCase()
+                    );
+                    const hasStock = !p.controlarStock || p.stock > 0;
+                    return isMatch && hasStock && !p.isAgotado;
+                  })
+                  .map(p => {
+                    const pName = p.nombre || p.name || 'Producto';
+                    const pImage = p.imagen || p.imageUrl || p.image || null;
+                    const isFree = rewardModalData.discountValue === 0 || rewardModalData.discountValue === undefined;
+                    const isClaimingThis = claimingRewardId === p.id;
+
+                    return (
+                      <motion.button
+                        key={p.id}
+                        whileTap={claimingRewardId === null ? { scale: 0.95 } : {}}
+                        disabled={claimingRewardId !== null}
+                        onClick={() => handleClaimRewardClick(p, rewardModalData)}
+                        className="flex flex-col items-center justify-between p-3.5 bg-gray-50 dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] md:hover:border-emerald-400 dark:md:hover:border-emerald-500 transition-all outline-none group relative overflow-hidden touch-manipulation"
+                      >
+                        {pImage ? (
+                          <img
+                            src={pImage}
+                            alt={pName}
+                            className="w-16 h-16 rounded-full object-cover mb-2.5 border border-gray-200 dark:border-gray-700 shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 lya:bg-[#EADCC9] mb-2.5 flex items-center justify-center shadow-sm">
+                            <Gift size={24} className="text-gray-400 dark:text-gray-500 lya:text-[#7A6353]" />
+                          </div>
+                        )}
+
+                        <span className="text-xs font-black text-gray-800 dark:text-white lya:text-[#3E2723] text-center line-clamp-2 w-full leading-tight">
+                          {pName}
+                        </span>
+
+                        <span className="mt-2 inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
+                          {isClaimingThis ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              <span>Añadiendo...</span>
+                            </>
+                          ) : (
+                            <span>{isFree ? 'Elegir GRATIS' : `Por $${Number(rewardModalData.discountValue).toFixed(2)}`}</span>
+                          )}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+              </div>
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                disabled={claimingRewardId !== null}
+                onClick={() => ctrl.cartUtils.setPendingPromoReward(null)}
+                className="w-full py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-[#EADCC9] text-gray-600 dark:text-gray-300 lya:text-[#7A6353] font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none touch-manipulation"
+              >
+                No, gracias
+              </motion.button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {ctrl.showSettings && (
           <ClientSettingsModal 

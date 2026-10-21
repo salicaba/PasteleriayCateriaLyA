@@ -1,8 +1,26 @@
 // src/modules/client/views/components/ClientProductCard.jsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Image as ImageIcon, Flame, Gift, Tag, Lock, Plus, Loader2 } from 'lucide-react';
 import { getProductModifiers } from '../utils/clientMenuUtils';
+
+const PROMO_COLORS = [
+  { border: 'border-rose-400/60 dark:border-rose-500/40 lya:border-rose-400/60', badge: 'bg-rose-500 text-white', btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600', text: 'text-rose-500 dark:text-rose-400' },
+  { border: 'border-blue-400/60 dark:border-blue-500/40 lya:border-blue-400/60', badge: 'bg-blue-500 text-white', btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600', text: 'text-blue-600 dark:text-blue-400' },
+  { border: 'border-emerald-400/60 dark:border-emerald-500/40 lya:border-emerald-400/60', badge: 'bg-emerald-500 text-white', btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600', text: 'text-emerald-600 dark:text-emerald-400' },
+  { border: 'border-violet-400/60 dark:border-violet-500/40 lya:border-violet-400/60', badge: 'bg-violet-500 text-white', btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600', text: 'text-violet-600 dark:text-violet-400' },
+  { border: 'border-amber-400/60 dark:border-amber-500/40 lya:border-amber-400/60', badge: 'bg-amber-500 text-white', btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600', text: 'text-amber-600 dark:text-amber-400' }
+];
+
+const getPromoColor = (promoId) => {
+  if (!promoId) return PROMO_COLORS[0];
+  let hash = 0;
+  const idStr = String(promoId);
+  for (let i = 0; i < idStr.length; i++) {
+    hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return PROMO_COLORS[Math.abs(hash) % PROMO_COLORS.length];
+};
 
 export default function ClientProductCard({
   product,
@@ -21,16 +39,18 @@ export default function ClientProductCard({
   
   const isAgotado = product.isAgotado === true || (product.controlarStock === true && product.stock <= 0);
   
-  const cartQty = cart.filter(item => item.id === product.id && !item.isAutoPromo).reduce((acc, item) => acc + item.qty, 0);
+  const cartQty = cart.filter(item => item.id === product.id && (!item.isAutoPromo || item.promoLabel === 'OFERTA')).reduce((acc, item) => acc + item.qty, 0);
   const isLimitReached = product.controlarStock && cartQty >= product.stock && product.stock > 0;
   
   const showScarcity = !isAgotado && !isLimitReached && product.controlarStock === true && product.stock > 0 && product.stock <= 10;
 
   let parsedOptions = null;
-  try { if (product.opciones) parsedOptions = typeof product.opciones === 'string' ? JSON.parse(product.opciones) : product.opciones; } catch(e){}
+  try {
+    if (product.opciones) parsedOptions = typeof product.opciones === 'string' ? JSON.parse(product.opciones) : product.opciones;
+  } catch (e) {}
   
   const hasOptions = parsedOptions && (parsedOptions.tamanos?.length > 0 || parsedOptions.leches?.length > 0 || parsedOptions.extras?.length > 0);
-  const baseOriginal = Number(product.precio);
+  const baseOriginal = Number(product.precioBase || product.precio || 0);
   let finalPriceWithDefaults = baseOriginal;
   let defaultMods = null;
 
@@ -39,27 +59,38 @@ export default function ClientProductCard({
     const requiresSizeSelection = parsedOptions.tamanos?.length > 0 && (!parsedOptions.defaults?.tamano || isPlaceholderTamano);
 
     if (requiresSizeSelection) {
-        defaultMods = 'REQUIRE_MODAL'; 
+      defaultMods = 'REQUIRE_MODAL';
     } else {
-        const tamanoDefault = (!isPlaceholderTamano && parsedOptions.defaults?.tamano) ? parsedOptions.defaults.tamano : (parsedOptions.tamanos?.[0]?.nombre || 'Estándar');
-        const isPlaceholderLeche = parsedOptions.defaults?.leche && parsedOptions.defaults.leche.toLowerCase().includes('elegir');
-        const lecheDefault = (!isPlaceholderLeche && parsedOptions.defaults?.leche) ? parsedOptions.defaults.leche : parsedOptions.leches?.[0]?.nombre;
-        const extrasDefault = parsedOptions.defaults?.extras || [];
+      const tamanoDefault = (!isPlaceholderTamano && parsedOptions.defaults?.tamano) ? parsedOptions.defaults.tamano : (parsedOptions.tamanos?.[0]?.nombre || 'Estándar');
+      const isPlaceholderLeche = parsedOptions.defaults?.leche && parsedOptions.defaults.leche.toLowerCase().includes('elegir');
+      const lecheDefault = (!isPlaceholderLeche && parsedOptions.defaults?.leche) ? parsedOptions.defaults.leche : parsedOptions.leches?.[0]?.nombre;
+      const extrasDefault = parsedOptions.defaults?.extras || [];
 
-        let precioAdicional = 0;
-        if (tamanoDefault) { const t = parsedOptions.tamanos?.find(x => x.nombre === tamanoDefault); if (t && t.precioAdicional) precioAdicional += Number(t.precioAdicional); }
-        if (lecheDefault) { const l = parsedOptions.leches?.find(x => x.nombre === lecheDefault); if (l && l.precioAdicional) precioAdicional += Number(l.precioAdicional); }
+      let precioAdicional = 0;
+      if (tamanoDefault) {
+        const t = parsedOptions.tamanos?.find(x => x.nombre === tamanoDefault);
+        if (t && t.precioAdicional) precioAdicional += Number(t.precioAdicional);
+      }
+      if (lecheDefault) {
+        const l = parsedOptions.leches?.find(x => x.nombre === lecheDefault);
+        if (l && l.precioAdicional) precioAdicional += Number(l.precioAdicional);
+      }
 
-        finalPriceWithDefaults = baseOriginal + precioAdicional;
-        defaultMods = {
-            precioFinal: finalPriceWithDefaults,
-            detalles: { tamano: tamanoDefault, ...(lecheDefault && { leche: lecheDefault }), ...(extrasDefault.length > 0 && { extras: extrasDefault }) }
-        };
+      finalPriceWithDefaults = baseOriginal + precioAdicional;
+      defaultMods = {
+        precioFinal: finalPriceWithDefaults,
+        detalles: {
+          tamano: tamanoDefault,
+          ...(lecheDefault && { leche: lecheDefault }),
+          ...(extrasDefault.length > 0 && { extras: extrasDefault })
+        }
+      };
     }
   }
   
   const costoExtras = finalPriceWithDefaults - baseOriginal;
-  const promoData = getPromoBadge(product.id, finalPriceWithDefaults);
+  const promoData = getPromoBadge ? getPromoBadge(product.id, finalPriceWithDefaults, product.stock, product.controlarStock) : null;
+  const colorScheme = useMemo(() => getPromoColor(promoData?.id), [promoData?.id]);
 
   let displayOriginalPrice = null;
   let displayFinalPrice = finalPriceWithDefaults;
@@ -69,8 +100,8 @@ export default function ClientProductCard({
     displayFinalPrice = promoData.discountValue + (costoExtras > 0 ? costoExtras : 0);
     
     if (displayOriginalPrice > 0) {
-        const percent = ((displayOriginalPrice - displayFinalPrice) / displayOriginalPrice) * 100;
-        promoData.text = `-${Math.max(0, Math.round(percent))}% OFF`;
+      const percent = ((displayOriginalPrice - displayFinalPrice) / displayOriginalPrice) * 100;
+      promoData.text = `-${Math.max(0, Math.round(percent))}% OFF`;
     }
   }
 
@@ -87,15 +118,16 @@ export default function ClientProductCard({
         }
         if (isCustomizable) setSelectedProduct(product);
       }} 
-      className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border shadow-sm transition-all overflow-hidden outline-none touch-manipulation ${
+      className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-2 shadow-sm transition-all overflow-hidden outline-none touch-manipulation ${
         isAgotado 
           ? 'border-gray-200 dark:border-gray-700 opacity-60 grayscale-[50%]' 
           : isLimitReached
             ? 'border-amber-200 dark:border-amber-900/40 opacity-80' 
-            : `border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] md:hover:shadow-md dark:md:hover:bg-gray-700/80 lya:md:hover:bg-[#EADCC9]/30' : ''}`
+            : promoData
+              ? `${colorScheme.border} ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] md:hover:shadow-md' : ''}`
+              : `border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] ${isCustomizable ? 'cursor-pointer md:hover:scale-[1.01] md:hover:shadow-md dark:md:hover:bg-gray-700/80 lya:md:hover:bg-[#EADCC9]/30' : ''}`
       }`}
     >
-      
       {isAgotado && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[120%] pointer-events-none">
           <div className="bg-red-500/95 dark:bg-red-600/95 lya:bg-red-500/95 backdrop-blur-md text-white text-center py-1.5 font-black tracking-widest uppercase transform -rotate-12 shadow-2xl border-y border-red-400/50 text-[10px]">
@@ -111,18 +143,26 @@ export default function ClientProductCard({
           </div>
         )}
 
-        {hasImage ? <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={28} />}
+        {hasImage ? (
+          <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" />
+        ) : (
+          <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={28} />
+        )}
       </div>
       
       <div className="flex-1 min-w-0 flex flex-col justify-between h-full min-h-[6rem] py-1">
         <div className="min-w-0 mb-1">
-          <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">{getCategoryName(product.categoria)}</span>
-          <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white lya:text-[#3E2723] line-clamp-2 text-left leading-tight">{product.nombre}</h3>
+          <span className="text-[9px] font-extrabold uppercase tracking-widest text-orange-500 dark:text-orange-400 lya:text-[#78350F] block truncate text-left">
+            {getCategoryName(product.categoria)}
+          </span>
+          <h3 className="font-extrabold text-[15px] sm:text-base text-gray-900 dark:text-white lya:text-[#3E2723] line-clamp-2 text-left leading-tight">
+            {product.nombre}
+          </h3>
           
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-            {promoData && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-500 dark:bg-rose-600 px-2.5 py-1 rounded-full border border-transparent shadow-sm">
-                {promoData.type === 'NxM' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
+            {promoData && !isAgotado && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full border border-transparent shadow-sm uppercase tracking-wider ${colorScheme.badge}`}>
+                {promoData.type === 'NxM' || promoData.type === 'BOGO' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
                 <span>{promoData.text}</span>
               </span>
             )}
@@ -146,7 +186,7 @@ export default function ClientProductCard({
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through decoration-rose-500/40 decoration-[1.5px] leading-none block -mb-0.5">
                   ${displayOriginalPrice.toFixed(2)}
                 </span>
-                <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600' : 'text-rose-500 dark:text-rose-400 lya:text-[#78350F]'}`}>
+                <span className={`font-black text-lg tracking-tight block text-left ${isAgotado || isLimitReached ? 'text-gray-400 dark:text-gray-600' : colorScheme.text}`}>
                   ${displayFinalPrice.toFixed(2)}
                 </span>
               </>
@@ -177,7 +217,9 @@ export default function ClientProductCard({
                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                 : isLimitReached
                   ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500 dark:text-amber-500' 
-                  : 'bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 md:hover:bg-gray-800 dark:md:hover:bg-gray-200 lya:md:hover:bg-[#5C240A] active:scale-90 disabled:opacity-50'
+                  : promoData
+                    ? `${colorScheme.btn} active:scale-90 disabled:opacity-50`
+                    : 'bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 md:hover:bg-gray-800 dark:md:hover:bg-gray-200 lya:md:hover:bg-[#5C240A] active:scale-90 disabled:opacity-50'
             }`}
           >
             {isAdding ? <Loader2 size={20} className="animate-spin" /> : (isLimitReached ? <Lock size={20} strokeWidth={3} /> : <Plus size={20} strokeWidth={3} />)}
