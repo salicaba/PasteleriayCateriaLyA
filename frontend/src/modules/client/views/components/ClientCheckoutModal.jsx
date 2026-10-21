@@ -1,7 +1,7 @@
 // frontend/src/modules/client/views/components/ClientCheckoutModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2, BadgePercent } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2, BadgePercent, Gift } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
@@ -39,15 +39,17 @@ export default function ClientCheckoutModal({
       if (isMounted.current) setActionLoading({ id: cartItemId, action: actionType });
       
       if (actionType === 'increment') {
-        incrementInCart(item); // Pasamos el ítem completo
+        incrementInCart(item || cartItemId);
       } else if (actionType === 'decrement') {
-        removeFromCart(item);
+        removeFromCart(item || cartItemId);
       } else if (actionType === 'delete') {
-        // Motor Anti-Zombie para forzar la eliminación en cascada si es un regalo
-        if (item && item.isAutoPromo && item.promoLabel !== 'OFERTA') {
-            deleteLine({ cartItemId: cartItemId, _breakPromoQty: item.qty });
+        if (item && item.isAutoPromo && item.promoLabel !== 'OFERTA' && item.promoType !== 'FIXED') {
+          deleteLine({
+            cartItemId: cartItemId,
+            _breakPromoQty: item.qty
+          });
         } else {
-            deleteLine(item);
+          deleteLine(item || cartItemId);
         }
       }
 
@@ -65,9 +67,8 @@ export default function ClientCheckoutModal({
     }
   };
 
-  // Separar los items regulares de los Descuentos Globales (Ticket)
-  const regularItems = cart.filter(i => !i.isVirtualDiscount);
-  const ticketDiscounts = cart.filter(i => i.isVirtualDiscount);
+  const regularItems = cart.filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT');
+  const ticketDiscounts = cart.filter(i => i.isVirtualDiscount || i.promoType === 'TICKET_DISCOUNT');
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex flex-col justify-end p-4">
@@ -90,33 +91,49 @@ export default function ClientCheckoutModal({
             if (!item) return null;
             
             const isThisItemLoading = actionLoading?.id === item.cartItemId;
-            const precioUnitario = item.precioUnitario || 0;
-            const qty = item.qty || 0;
+            const precioUnitario = Number(item.precioUnitario || 0);
+            const qty = Number(item.qty || 0);
             const precioTotalItem = precioUnitario * qty;
             
-            // Detectar bloqueos (Gratis, Combos o ítems Rebajados vinculados a promos conjuntas)
-            const isGhost = item.isAutoPromo && precioUnitario === 0; 
-            const isCombo = item.isAutoPromo && item.promoType === 'COMBO';
-            const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
-            const isLockedPromo = isGhost || isNthPromo || isCombo;
+            // Homologado con TicketCartGroup.jsx del POS
+            const isCero = precioUnitario === 0;
+            const isGhostPromo = item.isAutoPromo && isCero && item.promoType !== 'COMBO';
+            const isNthPromo = item.isAutoPromo && (item.promoType === 'NTH_FIXED' || item.promoLabel?.includes('º') || item.promoLabel?.includes('REBAJADO'));
+            const isComboPromo = item.isAutoPromo && item.promoType === 'COMBO';
+            const isBogoPromo = item.isAutoPromo && item.promoType === 'BOGO';
+            const isNxMPromo = item.isAutoPromo && item.promoType === 'NxM';
 
-            const currentTotalQty = cart.filter(i => i.id === item.id && !i.isAutoPromo).reduce((acc, i) => acc + i.qty, 0);
+            const isLockedPromo = Boolean(isGhostPromo || isNthPromo || isComboPromo || isBogoPromo || isNxMPromo || (item.isAutoPromo && item.promoLabel !== 'OFERTA' && item.promoType !== 'FIXED'));
+
+            const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
+            let promoText = item.promoLabel || (isGhostPromo ? 'GRATIS' : 'OFERTA');
+
+            if (pOriginal && Number(pOriginal) > precioUnitario && !isGhostPromo && !item.promoLabel?.includes('º')) {
+              const originalNum = Number(pOriginal);
+              const discountAmt = originalNum - precioUnitario;
+              const percentage = Math.round((discountAmt / originalNum) * 100);
+              if (percentage > 0) promoText = `-${percentage}% OFF`;
+            }
+
+            const currentTotalQty = cart.filter(i => i.id === item.id && (!i.isAutoPromo || i.promoLabel === 'OFERTA')).reduce((acc, i) => acc + i.qty, 0);
             const isLimitReached = item.controlarStock && currentTotalQty >= item.stock && item.stock > 0;
 
             return (
               <div key={item.cartItemId} className={clsx(
                 "flex items-center justify-between p-4 rounded-3xl border shadow-sm transition-colors",
-                isLockedPromo ? "bg-orange-50/50 dark:bg-orange-900/10 lya:bg-orange-50 border-orange-200 dark:border-orange-800/30" : "bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]"
+                isLockedPromo 
+                  ? "bg-rose-50/70 dark:bg-rose-900/15 lya:bg-rose-50/80 border-rose-200 dark:border-rose-800/40" 
+                  : "bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]"
               )}>
                 <div className="min-w-0 flex-1 pr-3">
                   <h4 className="font-bold text-gray-900 dark:text-white lya:text-[#3E2723] text-sm truncate">
                     {item.nombre || 'Producto'}
                   </h4>
                   
-                  {item.detalles && !isGhost && (
+                  {item.detalles && (
                     <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-0.5 leading-tight text-justify">
                       {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
-                      {item.detalles.leche && <span> | {item.detalles.leche}</span>}
+                      {item.detalles.leche && <span>{item.detalles.tamano ? ' | ' : ''}{item.detalles.leche}</span>}
                       {item.detalles.extras && item.detalles.extras.length > 0 && <span> + {item.detalles.extras.join(', ')}</span>}
                       {item.isTakeaway && <span className="block text-orange-500 dark:text-orange-400 mt-0.5">Empaque P/Llevar</span>}
                     </div>
@@ -130,26 +147,29 @@ export default function ClientCheckoutModal({
                       </div>
                     )}
                     
-                    {item.promoLabel && (
+                    {(item.isAutoPromo || item.promoLabel) && (
                       <span className="inline-flex items-center gap-1 bg-rose-500 dark:bg-rose-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm">
-                        <Tag size={10} strokeWidth={3} />
-                        <span>{item.promoLabel}</span>
+                        {isGhostPromo ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
+                        <span>{promoText}</span>
                       </span>
                     )}
 
-                    <span className="text-sm font-black text-gray-700 dark:text-gray-300 lya:text-[#5D4037]">
+                    <span className={clsx(
+                      "text-sm font-black",
+                      (item.isAutoPromo || item.promoLabel) ? "text-rose-600 dark:text-rose-400" : "text-gray-700 dark:text-gray-300 lya:text-[#5D4037]"
+                    )}>
                       ${precioTotalItem.toFixed(2)}
                     </span>
                     
-                    {item.precioOriginal && (
+                    {pOriginal && Number(pOriginal) > precioUnitario && (
                       <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 line-through shrink-0">
-                        ${(item.precioOriginal * qty).toFixed(2)}
+                        ${(Number(pOriginal) * qty).toFixed(2)}
                       </span>
                     )}
                     
                     <span className={clsx(
                       "text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] uppercase transition-opacity shrink-0",
-                      qty > 1 && !isGhost ? "opacity-100" : "opacity-0 select-none pointer-events-none"
+                      qty > 1 && !isGhostPromo ? "opacity-100" : "opacity-0 select-none pointer-events-none"
                     )}>
                       Unit: ${precioUnitario.toFixed(2)}
                     </span>
@@ -160,7 +180,7 @@ export default function ClientCheckoutModal({
                     <motion.button 
                       whileTap={{ scale: 0.9 }}
                       onClick={(e) => handleAction(e, item.cartItemId, 'delete', item)} 
-                      className="flex flex-col items-center justify-center rounded-[1rem] bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 md:hover:bg-rose-100 shadow-sm font-bold border border-rose-100 dark:border-rose-800/30 outline-none select-none touch-manipulation transition-colors relative overflow-hidden px-4 py-2 shrink-0 h-[48px]"
+                      className="flex flex-col items-center justify-center rounded-[1rem] bg-rose-100/80 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 md:hover:bg-rose-200/70 shadow-sm font-bold border border-rose-200 dark:border-rose-800/50 outline-none select-none touch-manipulation transition-colors relative overflow-hidden px-3.5 py-2 shrink-0 h-[48px]"
                     >
                       {isThisItemLoading && actionLoading?.action === 'delete' ? (
                         <Loader2 size={16} className="animate-spin text-rose-500 absolute" />
@@ -168,9 +188,9 @@ export default function ClientCheckoutModal({
                         <div className="flex flex-col items-center justify-center">
                             <div className="flex items-center gap-1">
                                 <Trash2 size={12} strokeWidth={3} />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Eliminar</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider">Eliminar Promo</span>
                             </div>
-                            <span className="text-[8px] font-bold opacity-80 mt-0.5">Promo (x{qty})</span>
+                            <span className="text-[8px] font-bold opacity-80 mt-0.5">Cantidad: x{qty}</span>
                         </div>
                       )}
                     </motion.button>
@@ -237,7 +257,7 @@ export default function ClientCheckoutModal({
           })}
         </div>
 
-        {/* 🔥 SECCIÓN DE TICKET DISCOUNT (DESCUENTO GLOBAL) */}
+        {/* SECCIÓN DE TICKET DISCOUNT (DESCUENTO GLOBAL) */}
         {ticketDiscounts.map(discount => (
             <motion.div 
                 key={discount.cartItemId} 
@@ -251,23 +271,23 @@ export default function ClientCheckoutModal({
                     </div>
                     <div>
                         <h4 className="text-emerald-800 dark:text-emerald-300 font-black text-sm">{discount.nombre}</h4>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Descuento Global Aplicado</span>
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">{discount.promoLabel || 'Descuento Extra'}</span>
                     </div>
                 </div>
                 <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                    -${Math.abs(discount.precioUnitario).toFixed(2)}
+                    -${Math.abs(Number(discount.precioUnitario || 0)).toFixed(2)}
                 </div>
             </motion.div>
         ))}
 
         <div className="flex justify-between items-center py-4 border-y border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] text-gray-900 dark:text-white lya:text-[#3E2723] shrink-0 relative overflow-hidden h-16">
-          <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] z-10">Total Bruto</span>
+          <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] z-10">Total a Pagar</span>
           
           <div className="flex items-center justify-end z-10">
             {actionLoading ? (
               <Loader2 size={24} className="animate-spin text-orange-500" />
             ) : (
-              <span className="text-3xl font-black tracking-tight">${(totalCart || 0).toFixed(2)}</span>
+              <span className="text-3xl font-black tracking-tight">${Math.max(0, totalCart || 0).toFixed(2)}</span>
             )}
           </div>
         </div>
@@ -314,7 +334,7 @@ export default function ClientCheckoutModal({
               </div>
               
               <h3 className="text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-2 tracking-tight text-center">
-                ¿Perder Promoción?
+                ¿Romper Promoción?
               </h3>
               
               <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium mb-8 leading-relaxed px-2 text-justify">

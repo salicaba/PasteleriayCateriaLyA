@@ -5,18 +5,17 @@ import { X, Check, Image as ImageIcon, ShoppingBag, Loader2, Lock, Tag, Gift } f
 import clsx from 'clsx';
 import { getProductModifiers } from '../utils/clientMenuUtils';
 
-export default function ClientProductModal({ product, cart = [], promoData = null, onClose, onConfirm }) {
+export default function ClientProductModal({ product, cart = [], promoData = null, getPromoBadge = null, onClose, onConfirm }) {
   const [selections, setSelections] = useState({});
   const [isTakeaway, setIsTakeaway] = useState(false);
   
-  // ESTADOS DE PROCESAMIENTO
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCalculatingTotal, setIsCalculatingTotal] = useState(false);
+  const [calculatingOptId, setCalculatingOptId] = useState(null);
+  const isCalculatingTotal = calculatingOptId !== null;
 
   const isAgotado = product.controlarStock === true && product.stock <= 0;
   
-  // 🔥 CÁLCULO DE LÍMITE EN TIEMPO REAL (Poka-Yoke)
-  const currentCartQty = cart.filter(item => item.id === product.id && !item.isAutoPromo).reduce((acc, item) => acc + item.qty, 0);
+  const currentCartQty = cart.filter(item => item.id === product.id && (!item.isAutoPromo || item.promoLabel === 'OFERTA')).reduce((acc, item) => acc + item.qty, 0);
   const isLimitReached = product.controlarStock && currentCartQty >= product.stock && product.stock > 0;
 
   const availableModifiers = useMemo(() => getProductModifiers(product), [product]);
@@ -41,7 +40,7 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
 
   const handleToggle = (modId, optId, type) => {
     if (isCalculatingTotal) return;
-    setIsCalculatingTotal(true);
+    setCalculatingOptId(optId);
 
     setTimeout(() => {
       setSelections(prev => {
@@ -57,7 +56,7 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
         }
         return { ...prev, [modId]: [...currentArray, optId] };
       });
-      setIsCalculatingTotal(false);
+      setCalculatingOptId(null);
     }, 200);
   };
 
@@ -82,20 +81,25 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
     return Math.max(0, total); 
   };
 
-  // 🔥 CEREBRO MATEMÁTICO DEL MODAL
   const basePrice = cleanNumber(product.precioBase || product.precio);
   const totalOriginal = calculateTotal();
-  const costoExtras = Math.max(0, totalOriginal - basePrice);
+
+  const effectivePromoData = useMemo(() => {
+    if (getPromoBadge) {
+      return getPromoBadge(product.id, totalOriginal, product.stock, product.controlarStock);
+    }
+    return promoData;
+  }, [getPromoBadge, promoData, product.id, totalOriginal, product.stock, product.controlarStock]);
 
   let finalPrice = totalOriginal;
-  let displayPromoText = promoData?.text;
+  let displayPromoText = effectivePromoData?.text;
 
-  if (promoData?.type === 'FIXED') {
-      finalPrice = promoData.discountValue + costoExtras;
-      if (totalOriginal > 0) {
-          const p = ((totalOriginal - finalPrice) / totalOriginal) * 100;
-          displayPromoText = `-${Math.max(0, Math.round(p))}% OFF`;
-      }
+  if (effectivePromoData?.type === 'FIXED') {
+    finalPrice = Math.max(0, totalOriginal - Number(effectivePromoData.discountValue || 0));
+    if (totalOriginal > 0) {
+      const p = ((totalOriginal - finalPrice) / totalOriginal) * 100;
+      displayPromoText = `-${Math.max(0, Math.round(p))}% OFF`;
+    }
   }
 
   const handleConfirmAction = async () => {
@@ -136,7 +140,7 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
       });
 
       await onConfirm({
-        precioFinal: totalOriginal, // Mandamos el original; el carrito de la App aplica la promo matemáticamente
+        precioFinal: totalOriginal,
         detalles: { tamano: tamanoStr, ...(lecheStr && { leche: lecheStr }), ...(extrasArr.length > 0 && { extras: extrasArr }) },
         isTakeaway
       });
@@ -177,10 +181,9 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
           <div className="flex-1 min-w-0 pt-1 flex flex-col items-start">
             <h3 className="text-lg sm:text-xl font-black leading-tight text-gray-900 dark:text-white lya:text-[#3E2723] line-clamp-2 mb-1.5">{product.nombre}</h3>
             
-            {/* 🔥 BADGE DE PROMOCIÓN EN EL MODAL */}
-            {promoData && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider mb-1.5 shadow-sm">
-                {promoData.type === 'NxM' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
+            {effectivePromoData && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-black text-white bg-rose-500 dark:bg-rose-600 px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-1.5 shadow-sm">
+                {effectivePromoData.type === 'NxM' || effectivePromoData.type === 'BOGO' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
                 <span>{displayPromoText}</span>
               </span>
             )}
@@ -201,7 +204,7 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
           </motion.button>
         </div>
         
-        {/* BODY (SCROLLABLE) */}
+        {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
           {availableModifiers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center space-y-2">
@@ -218,12 +221,14 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
                 <div className="flex flex-wrap gap-3">
                   {mod.options.map(opt => {
                     const isSelected = mod.type === 'single' ? selections[mod.id] === opt.id : selections[mod.id]?.includes(opt.id);
+                    const isThisCalculating = calculatingOptId === opt.id;
+
                     return (
                       <motion.button 
                         type="button" 
                         whileTap={{ scale: 0.95 }} 
                         key={opt.id} 
-                        disabled={isCalculatingTotal}
+                        disabled={isProcessing || isCalculatingTotal}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -234,15 +239,19 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
                           isSelected 
                             ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/30 lya:bg-[#78350F] lya:border-[#78350F] lya:text-white" 
                             : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 md:hover:border-gray-300 lya:bg-white lya:border-[#EADCC9] lya:text-[#5D4037]",
-                          isCalculatingTotal && "opacity-80 cursor-wait"
+                          isThisCalculating && "opacity-90 scale-95"
                         )}
                       >
                         <span className="flex items-center pointer-events-none">
                           <span className={clsx(
                             "transition-all duration-300 flex items-center justify-center overflow-hidden",
-                            isSelected ? "w-5 opacity-100 mr-1" : "w-0 opacity-0 mr-0"
+                            (isSelected || isThisCalculating) ? "w-5 opacity-100 mr-1" : "w-0 opacity-0 mr-0"
                           )}>
-                            <Check size={16} strokeWidth={4} />
+                            {isThisCalculating ? (
+                              <Loader2 size={16} strokeWidth={4} className="animate-spin" />
+                            ) : (
+                              <Check size={16} strokeWidth={4} />
+                            )}
                           </span>
                           <span className="text-left">{opt.label}</span>
                         </span>
@@ -291,7 +300,7 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
           </div>
         </div>
         
-        {/* FOOTER - BOTÓN BLINDADO */}
+        {/* FOOTER */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]/80 bg-white dark:bg-gray-800 lya:bg-white shrink-0 z-20">
           <motion.button 
             type="button" 
@@ -322,9 +331,8 @@ export default function ClientProductModal({ product, cart = [], promoData = nul
               </span>
             </span>
 
-            {/* 🔥 FEEDBACK VISUAL PREMIUM CON TACHADO */}
             <div className="flex flex-col items-end justify-center">
-              {promoData?.type === 'FIXED' && totalOriginal > finalPrice && (
+              {effectivePromoData?.type === 'FIXED' && totalOriginal > finalPrice && (
                  <span className="text-[10px] font-bold text-white/70 line-through leading-none -mb-0.5">
                    ${totalOriginal.toFixed(2)}
                  </span>

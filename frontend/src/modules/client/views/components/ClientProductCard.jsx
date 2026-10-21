@@ -88,7 +88,6 @@ export default function ClientProductCard({
     }
   }
   
-  const costoExtras = finalPriceWithDefaults - baseOriginal;
   const promoData = getPromoBadge ? getPromoBadge(product.id, finalPriceWithDefaults, product.stock, product.controlarStock) : null;
   const colorScheme = useMemo(() => getPromoColor(promoData?.id), [promoData?.id]);
 
@@ -97,7 +96,7 @@ export default function ClientProductCard({
 
   if (promoData?.type === 'FIXED') {
     displayOriginalPrice = finalPriceWithDefaults;
-    displayFinalPrice = promoData.discountValue + (costoExtras > 0 ? costoExtras : 0);
+    displayFinalPrice = Math.max(0, finalPriceWithDefaults - Number(promoData.discountValue || 0));
     
     if (displayOriginalPrice > 0) {
       const percent = ((displayOriginalPrice - displayFinalPrice) / displayOriginalPrice) * 100;

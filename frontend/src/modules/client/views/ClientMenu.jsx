@@ -5,7 +5,6 @@ import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift } from '
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
-// Importación de componentes divididos
 import ClientProductModal from './components/ClientProductModal';
 import ClientCheckoutModal from './components/ClientCheckoutModal';
 import ClientSettingsModal from './components/ClientSettingsModal';
@@ -14,11 +13,9 @@ import ClientFinalizedOverlay from './components/ClientFinalizedOverlay';
 import { ClientServiceShield } from './components/ClientServiceShield';
 import ClientOrderSuccess from './ClientOrderSuccess';
 
-// Componentes extraídos de la UI
 import ClientHeader from './components/ClientHeader';
 import ClientProductCard from './components/ClientProductCard';
 
-// Importación del Controlador (El Cerebro)
 import { useClientMenuController } from '../controllers/useClientMenuController';
 
 export default function ClientMenu(props) {
@@ -147,7 +144,6 @@ export default function ClientMenu(props) {
   // 6. Vista Principal del Menú
   return (
     <div className="h-full w-full flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] relative">
-      {/* CÁPSULA FLOTANTE DE NOTIFICACIONES (Éxito, Upselling Info y Alertas) */}
       <AnimatePresence>
         {ctrl.notification && (
           <div className="fixed top-8 left-0 right-0 z-[10050] flex justify-center pointer-events-none px-4">
@@ -239,7 +235,7 @@ export default function ClientMenu(props) {
                 <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 flex items-center justify-center font-black text-sm">{ctrl.cartUtils.totalItems}</div>
                 <span className="text-base font-black">Revisar Pedido</span>
               </div>
-              {ctrl.addingToCartId !== null || ctrl.isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${ctrl.cartUtils.totalCart.toFixed(2)}</span>}
+              {ctrl.addingToCartId !== null || ctrl.isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${Math.max(0, ctrl.cartUtils.totalCart).toFixed(2)}</span>}
             </motion.button>
           </motion.div>
         )}
@@ -250,6 +246,7 @@ export default function ClientMenu(props) {
           <ClientProductModal 
             product={ctrl.selectedProduct} 
             cart={ctrl.cartUtils.cart} 
+            getPromoBadge={ctrl.cartUtils.getPromoBadge}
             onClose={() => ctrl.setSelectedProduct(null)} 
             onConfirm={async (customizations) => await ctrl.handleAddDirectly(ctrl.selectedProduct, customizations)} 
           />
@@ -274,7 +271,7 @@ export default function ClientMenu(props) {
         )}
       </AnimatePresence>
 
-      {/* 🌟 MODAL NEO-BENTO: SELECCIÓN DE RECOMPENSA (BOGO y NxM de Piscina) */}
+      {/* MODAL NEO-BENTO: SELECCIÓN DE RECOMPENSA (BOGO y NxM de Piscina) */}
       <AnimatePresence>
         {rewardModalData && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">

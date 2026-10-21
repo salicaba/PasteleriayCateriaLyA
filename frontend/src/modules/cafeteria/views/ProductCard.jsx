@@ -1,6 +1,6 @@
-//frontend/src/modules/cafeteria/views/ProductCard.jsx
+// frontend/src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
 
 const PROMO_COLORS = [
@@ -64,7 +64,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     return base;
   }, [product.precioBase, product.precio, parsedOptions, autoDefaults]);
 
-  // 🌟 EL FILTRO: Solo pasamos promos activas a la UI si el producto es un DISPARADOR.
   const promoData = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
@@ -81,7 +80,6 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       
       return { promo: p, isTrigger };
     }).filter(data => {
-      // Ocultar ADN del Premio: Excluimos visualmente los premios que no son disparadores.
       if (!data.isTrigger) return false;
       
       const rawActive = data.promo.isActive ?? data.promo.is_active ?? data.promo.status;
@@ -109,7 +107,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
         } else if (data.promo.type === 'BOGO') {
             requiredQty = Number(data.promo.buyQty || data.promo.buy_qty || 1);
         } else if (data.promo.type === 'COMBO') {
-            requiredQty = 1; // El combo solo exige que haya 1 unidad en stock para mostrarse
+            requiredQty = 1;
         }
         
         if (product.stock < requiredQty || product.stock <= threshold) {
@@ -125,13 +123,12 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
   const activePromo = promoData?.promo;
   const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
 
+  // 🔥 FIX: En FIXED se resta discountVal al precio del producto
   const promoFixedPrice = useMemo(() => {
     if (!activePromo || activePromo.type !== 'FIXED') return 0;
-    const originalDbPrice = Number(product.precioBase || product.precio || 0);
-    const costoExtras = realBasePrice - originalDbPrice;
     const discountVal = Number(activePromo.discountValue || activePromo.discount_value || 0);
-    return discountVal + costoExtras;
-  }, [activePromo, realBasePrice, product.precioBase, product.precio]);
+    return Math.max(0, realBasePrice - discountVal);
+  }, [activePromo, realBasePrice]);
 
   const discountPercent = useMemo(() => {
     if (activePromo?.type === 'FIXED' && realBasePrice > 0) {
@@ -172,7 +169,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     }
     
     return activePromo.name || 'Promo';
-  }, [activePromo, discountPercent, realBasePrice, product.precioBase, product.precio]);
+  }, [activePromo, discountPercent, realBasePrice]);
 
   const handleQuickAddClick = async (e) => {
     e.stopPropagation(); 
@@ -238,7 +235,7 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
             : isLimitReached
               ? 'border-amber-200 dark:border-amber-900/50 lya:border-amber-500/30 opacity-80 shadow-inner'
               : activePromo 
-                ? `${colorScheme.border}${colorScheme.shadowHover} cursor-pointer md:hover:-translate-y-1`
+                ? `${colorScheme.border} ${colorScheme.shadowHover} cursor-pointer md:hover:-translate-y-1`
                 : 'border-transparent dark:border-transparent lya:border-lya-border/20 shadow-[0_5px_15px_rgba(0,0,0,0.03)] cursor-pointer md:hover:-translate-y-1 md:hover:shadow-[0_10px_30px_rgba(244,139,49,0.15)] md:dark:hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:lya:hover:shadow-lya-primary/20 md:lya:hover:border-lya-secondary/30'
       }`}
     >
