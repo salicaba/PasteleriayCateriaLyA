@@ -29,7 +29,12 @@ export default function ClientMenu(props) {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
-    show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1, 
+      transition: { duration: 0.2, ease: "easeOut" } 
+    }
   };
 
   const handleClaimRewardClick = async (product, rewardData) => {
@@ -81,7 +86,12 @@ export default function ClientMenu(props) {
   if (ctrl.sessionExpired) {
     return (
       <div className="h-full w-full flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] p-6 overflow-hidden">
-        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]"
+        >
           <div className="w-20 h-20 bg-orange-50 dark:bg-orange-900/20 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-[#78350F]">
              <Clock size={40} />
           </div>
@@ -151,6 +161,7 @@ export default function ClientMenu(props) {
               initial={{ opacity: 0, y: -50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className={clsx(
                 "bg-white/95 dark:bg-gray-900/95 lya:bg-[#F3EBE0]/95 backdrop-blur-xl px-6 py-4 rounded-full shadow-[0_20px_40px_-15px_rgba(0,0,0,0.25)] flex items-center justify-center gap-3 font-bold border pointer-events-auto max-w-md w-full sm:w-auto text-center text-gray-800 dark:text-white lya:text-[#3E2723]",
                 ctrl.notification.type === 'success'
@@ -216,7 +227,14 @@ export default function ClientMenu(props) {
 
       <AnimatePresence>
         {ctrl.confirmedSnapshot.items.length > 0 && !ctrl.showCheckout && !ctrl.selectedProduct && (
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", ctrl.cartUtils.cart.length > 0 ? "bottom-28" : "bottom-6")} style={{ width: 'calc(100% - 3rem)' }}>
+          <motion.div 
+            initial={{ scale: 0 }} 
+            animate={{ scale: 1 }} 
+            exit={{ scale: 0 }} 
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", ctrl.cartUtils.cart.length > 0 ? "bottom-28" : "bottom-6")} 
+            style={{ width: 'calc(100% - 3rem)' }}
+          >
             <motion.button whileTap={{ scale: 0.95 }} onClick={() => ctrl.setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] shadow-md border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] text-gray-800 dark:text-white lya:text-[#3E2723] font-black text-sm md:hover:scale-105 outline-none select-none touch-manipulation"><ReceiptText size={20} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /><span>Mi Nota</span></motion.button>
           </motion.div>
         )}
@@ -224,7 +242,13 @@ export default function ClientMenu(props) {
 
       <AnimatePresence>
         {ctrl.cartUtils.cart.length > 0 && !ctrl.showCheckout && !ctrl.selectedProduct && (
-          <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto">
+          <motion.div 
+            initial={{ y: 50, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 50, opacity: 0 }} 
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed bottom-6 left-0 right-0 px-6 z-40 max-w-md mx-auto"
+          >
             <motion.button 
               whileTap={{ scale: 0.98 }} 
               disabled={ctrl.isSubmitting}
@@ -279,7 +303,7 @@ export default function ClientMenu(props) {
               initial={{ opacity: 0, scale: 0.92, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 260 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="bg-white dark:bg-gray-900 lya:bg-[#FAF6F0] max-w-md w-full rounded-[2.5rem] shadow-2xl p-6 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] relative overflow-hidden"
             >
               <div className="flex items-center gap-4 mb-5">
