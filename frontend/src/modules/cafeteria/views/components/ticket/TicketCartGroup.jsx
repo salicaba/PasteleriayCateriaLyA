@@ -169,6 +169,23 @@ export const TicketCartGroup = ({
       };
   };
 
+  // 🔥 CÁLCULO INDIVIDUAL POR CUENTA (Funciona para General y cualquier otra subcuenta)
+  const hasRealSentItemsInAccount = displayItems.some(i => !i.isVirtualDiscount && i.enviadoCocina);
+
+  const subtotalConfirmadoCuenta = displayItems
+    .filter(i => {
+      if (i.isVirtualDiscount) return hasRealSentItemsInAccount;
+      return i.enviadoCocina;
+    })
+    .reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
+
+  const subtotalPorEnviarCuenta = displayItems
+    .filter(i => {
+      if (i.isVirtualDiscount) return !hasRealSentItemsInAccount;
+      return !i.enviadoCocina;
+    })
+    .reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
+
   return (
     <motion.div 
       layout="position"
@@ -246,6 +263,17 @@ export const TicketCartGroup = ({
           <span className="block text-lg font-black text-gray-900 dark:text-white lya:text-lya-text leading-none">
               ${subtotalCuenta.toFixed(2)}
           </span>
+          
+          {/* 🔥 DESGLOSE EN CABECERA DE CUENTA (COCINA VS POR ENVIAR) */}
+          {!isVitrina && !isCuentaPagada && subtotalPorEnviarCuenta > 0 && (
+            <span className="text-[9px] font-bold text-orange-500 dark:text-orange-400 lya:text-lya-primary tracking-tight">
+              {subtotalConfirmadoCuenta > 0 
+                ? `Cocina: $${subtotalConfirmadoCuenta.toFixed(2)} • +$${subtotalPorEnviarCuenta.toFixed(2)}`
+                : `Por enviar: $${subtotalPorEnviarCuenta.toFixed(2)}`
+              }
+            </span>
+          )}
+
           <div className="flex gap-1.5 flex-wrap justify-end pointer-events-auto">
             {displayItems.length === 0 && cuentaName !== 'General' && (
               <motion.button 
@@ -465,7 +493,7 @@ export const TicketCartGroup = ({
                         isVirtualDiscount ? "text-emerald-600 dark:text-emerald-400" : 
                         isAnyPromo || (pOriginal && Number(pOriginal) > Number(item.precio)) ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white lya:text-lya-text"
                     )}>
-                      {isVirtualDiscount ? `-$${Math.abs(item.precio * item.qty).toFixed(2)}` : `$${(Number(item.precio) * item.qty).toFixed(2)}`}
+                        {isVirtualDiscount ? `-$${Math.abs(Number(item.precio) * item.qty).toFixed(2)}` : `$${(Number(item.precio) * item.qty).toFixed(2)}`}
                     </span>
                   </div>
                 </div>

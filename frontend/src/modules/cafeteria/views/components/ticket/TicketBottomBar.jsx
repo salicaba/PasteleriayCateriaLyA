@@ -48,7 +48,7 @@ export const TicketBottomBar = ({
   const cuentasActivasArray = allCartAccounts.filter(acc => !cuentasPagadasReales.includes(acc));
   const hasCuentasActivas = cuentasActivasArray.length > 0;
 
-  // FIX BUG DE ENTREGA: Evalúa que no haya items pendientes de entrega para habilitar el cobro
+  // Evalúa que no haya items pendientes de entrega para habilitar el cobro
   const isAnyCuentaReadyToPay = cuentasActivasArray.some(cuenta => {
     const itemsDeCuenta = activeCart.filter(i => (i.cuenta || 'General') === cuenta);
     if (itemsDeCuenta.length === 0) return false;
@@ -57,11 +57,41 @@ export const TicketBottomBar = ({
     return !hasPending;
   });
 
-  // 🔥 CORRECCIÓN MATEMÁTICA: Este total calcula la suma exacta de todo lo que hay en el carrito 
-  // (sin importar si ya se mandó a cocina o no).
-  const totalPendiente = activeCart
-    .filter(item => !cuentasPagadasReales.includes(item.cuenta || 'General'))
-    .reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
+  // Ítems de cuentas que aún no han sido pagadas
+  const unpaidActiveItems = activeCart.filter(
+    item => !cuentasPagadasReales.includes(item.cuenta || 'General')
+  );
+
+  // 1. CONFIRMADO EN COCINA (Pendiente real por pagar: $85.00)
+  const totalConfirmado = unpaidActiveItems
+    .filter(item => {
+      if (item.isVirtualDiscount) {
+        // Si hay un descuento global, solo se descuenta de lo confirmado si ya hay productos en cocina en esa cuenta
+        return unpaidActiveItems.some(
+          other => !other.isVirtualDiscount && (other.cuenta || 'General') === (item.cuenta || 'General') && other.enviadoCocina
+        );
+      }
+      return item.enviadoCocina;
+    })
+    .reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
+
+  // 2. POR ENVIAR A COCINA (En borrador: $100.00)
+  const totalPorEnviar = unpaidActiveItems
+    .filter(item => {
+      if (item.isVirtualDiscount) {
+        return !unpaidActiveItems.some(
+          other => !other.isVirtualDiscount && (other.cuenta || 'General') === (item.cuenta || 'General') && other.enviadoCocina
+        );
+      }
+      return !item.enviadoCocina;
+    })
+    .reduce((acc, curr) => acc + (Number(curr.precio) * curr.qty), 0);
+
+  // 3. TOTAL EN CARRITO (Confirmado + Por enviar: $185.00)
+  const totalEnCarrito = totalConfirmado + totalPorEnviar;
+
+  // En Vitrina no se envía a cocina primero, por lo que arriba muestra el total directo
+  const montoSuperior = isVitrina ? totalEnCarrito : totalConfirmado;
 
   return (
     <div className="p-3 sm:p-4 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-20 shrink-0 transition-colors flex flex-col gap-3">
@@ -72,7 +102,7 @@ export const TicketBottomBar = ({
             initial={{ opacity: 0, height: 0, marginBottom: 0 }}
             animate={{ opacity: 1, height: 'auto', marginBottom: 4 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Transición suave y directa
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="flex gap-2 overflow-hidden"
           >
             <motion.button 
@@ -105,7 +135,7 @@ export const TicketBottomBar = ({
             initial={{ opacity: 0, height: 0, marginBottom: 0 }}
             animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Evita el rebote de la altura (spring)
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="overflow-hidden"
           >
             <motion.button
@@ -140,27 +170,28 @@ export const TicketBottomBar = ({
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            transition={{ duration: 0.2, ease: "easeOut" }} // 🔥 FIX: Animación directa para evitar parpadeos
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="space-y-3"
           >
              <div className="space-y-1.5">
                <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-[10px] font-bold uppercase tracking-wider">
-                 <span>{isVitrina ? 'Total de Productos' : (isLlevar ? 'Subtotal Pedido' : 'Pendiente por Pagar')}</span>
-                 <span>${totalPendiente.toFixed(2)}</span>
+                 <span>{isVitrina ? 'Total de Productos' : (isLlevar ? 'Confirmado en Cocina' : 'Pendiente por Pagar')}</span>
+                 <span>${montoSuperior.toFixed(2)}</span>
                </div>
                
                {!isVitrina && hasUnsentItems && (
                  <div className="flex justify-between items-center text-orange-500 dark:text-orange-400 lya:text-lya-primary text-[10px] font-black uppercase tracking-wider bg-orange-50 dark:bg-orange-500/10 lya:bg-lya-primary/10 p-1.5 rounded-md border border-orange-100 dark:border-orange-500/20 lya:border-lya-primary/20">
                    <span>Por enviar a Cocina</span>
-                   <span>+${unsentTotal.toFixed(2)}</span>
+                   <span>+${totalPorEnviar.toFixed(2)}</span>
                  </div>
                )}
                
                <div className="flex justify-between items-end pt-1">
-                 <span className="text-gray-900 dark:text-white lya:text-lya-text font-black text-xs uppercase tracking-tight">Total Activo</span>
-                 {/* 🔥 FIX: Removida la doble suma del unsentTotal */}
+                 <span className="text-gray-900 dark:text-white lya:text-lya-text font-black text-xs uppercase tracking-tight">
+                   {!isVitrina && hasUnsentItems ? 'Total en Carrito' : 'Total Activo'}
+                 </span>
                  <span className="text-3xl sm:text-4xl font-black text-orange-500 dark:text-orange-400 lya:text-lya-primary tracking-tighter drop-shadow-sm leading-none">
-                   ${totalPendiente.toFixed(2)}
+                   ${totalEnCarrito.toFixed(2)}
                  </span>
                </div>
              </div>
@@ -201,7 +232,7 @@ export const TicketBottomBar = ({
         )}
       </AnimatePresence>
 
-      {(!isVitrina) && activeCart.some(i => i.enviadoCocina) && (onCancelFullOrder || onCancelAccount) && (
+      {(!isVitrina) && activeCart.some(i => i.enviadoCocina && !i.isVirtualDiscount) && (onCancelFullOrder || onCancelAccount) && (
           <motion.button 
              whileTap={{ scale: 0.95 }}
              onClick={() => setShowCancelModal(true)} 
