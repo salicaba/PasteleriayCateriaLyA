@@ -35,7 +35,7 @@ const parseIdArray = (data) => {
   return [];
 };
 
-export const useClientCart = (triggerNotification) => {
+export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0) => {
   const [_cart, _setCart] = useState([]);
   const cartRef = useRef([]);
   const [promotions, setPromotions] = useState([]);
@@ -362,10 +362,11 @@ export const useClientCart = (triggerNotification) => {
 
     if (ticketPromos.length > 0) {
       const itemsCuenta = cleanCart.filter(item => item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount);
-      const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0);
+      const subtotalCarritoNuevo = itemsCuenta.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0);
+      const subtotalCuentaTotal = subtotalCarritoNuevo + (itemsCuenta.length > 0 ? Number(confirmedAccountSubtotal || 0) : 0);
 
       const qualifyingPromos = ticketPromos
-        .filter(p => subtotalCuenta > 0 && subtotalCuenta >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
+        .filter(p => subtotalCuentaTotal > 0 && subtotalCuentaTotal >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
         .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
 
       const bestTicketPromo = qualifyingPromos[0];
@@ -374,8 +375,8 @@ export const useClientCart = (triggerNotification) => {
         const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
         const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
 
-        let finalDiscountPrice = isPercentage ? (subtotalCuenta * (rawDiscount / 100)) : rawDiscount;
-        finalDiscountPrice = -Math.abs(finalDiscountPrice);
+        let finalDiscountPrice = isPercentage ? (subtotalCuentaTotal * (rawDiscount / 100)) : rawDiscount;
+        finalDiscountPrice = -Math.min(subtotalCuentaTotal, Math.abs(finalDiscountPrice));
 
         if (existingTicketGhostIdx !== -1) {
           if (cleanCart[existingTicketGhostIdx].precioUnitario !== finalDiscountPrice || cleanCart[existingTicketGhostIdx].promoId !== bestTicketPromo.id) {

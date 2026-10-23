@@ -113,7 +113,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     setCart(prev => {
         const newCart = [...prev];
         const existingGhostIdx = newCart.findIndex(p => 
-            p.id === baseProduct.id && p.cuenta === cuenta && 
+            p.id === baseProduct.id && (p.cuenta || 'General') === (cuenta || 'General') && 
             p.isAutoPromo && p.promoId === promo.id && 
             !p.enviadoCocina && p.status !== 'CANCELLED'
         );
@@ -135,7 +135,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 preparaciones: Array(qty).fill(finalDetails),
                 enviadoCocina: false,
                 status: 'ACTIVE',
-                cuenta: cuenta,
+                cuenta: cuenta || 'General',
                 isAutoPromo: true,
                 requiereCocina: baseProduct.requiereCocina !== false,
                 promoId: promo.id,
@@ -170,8 +170,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
         
         if (activePromo && ['NxM', 'BOGO', 'NTH_FIXED', 'COMBO'].includes(activePromo.type)) {
-            const key = `${activePromo.id}::${item.cuenta}`;
-            if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, triggerQtys: {}, ghosts: [], activePromo, cuenta: item.cuenta };
+            const itemCuenta = item.cuenta || 'General';
+            const key = `${activePromo.id}::${itemCuenta}`;
+            if (!promoGroups[key]) promoGroups[key] = { normalQty: 0, triggerQtys: {}, ghosts: [], activePromo, cuenta: itemCuenta };
             
             if (item.isAutoPromo && item.promoId === activePromo.id) {
                 promoGroups[key].ghosts.push(item);
@@ -230,7 +231,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             let toRemove = currentGhostQty - expectedGhosts;
             for (let i = cleanCart.length - 1; i >= 0; i--) {
                 const item = cleanCart[i];
-                if (item.isAutoPromo && item.promoId === group.activePromo.id && String(item.cuenta) === String(group.cuenta) && !item.enviadoCocina) {
+                if (item.isAutoPromo && item.promoId === group.activePromo.id && String(item.cuenta || 'General') === String(group.cuenta) && !item.enviadoCocina) {
                     if (item.qty <= toRemove) {
                         toRemove -= item.qty;
                         cleanCart.splice(i, 1);
@@ -244,7 +245,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         }
     });
 
-    // 🔥 EL JEFE FINAL: EVALUACIÓN DE ÚLTIMA MILLA (TICKET_DISCOUNT)
+    // 🔥 EL JEFE FINAL: EVALUACIÓN DE ÚLTIMA MILLA ESTRICTAMENTE POR CUENTA INDIVIDUAL (TICKET_DISCOUNT)
     const ticketPromos = promotions.filter(p => {
         const rawActive = p.isActive ?? p.is_active ?? p.status;
         const isActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
@@ -256,54 +257,55 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     });
 
     if (ticketPromos.length > 0) {
-        const cuentasEnCarrito = [...new Set(cleanCart.map(item => item.cuenta))];
+        const cuentasEnCarrito = [...new Set(cleanCart.map(item => item.cuenta || 'General'))];
 
         cuentasEnCarrito.forEach(cuenta => {
-            // Calculamos el subtotal de la cuenta ignorando el fantasma previo
-            const itemsCuenta = cleanCart.filter(item => item.cuenta === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT');
-            const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (item.precio * item.qty), 0);
+            // Si la cuenta ya está sellada/pagada, no calculamos descuentos virtuales
+            if (cuentasPagadasReales.includes(cuenta)) return;
 
-            // 🔥 CORRECCIÓN CLAVE: Lectura usando minTicketAmount
+            // Calculamos el subtotal de ESTA CUENTA en específico (sin mezclar mesas ni otras cuentas)
+            const itemsCuenta = cleanCart.filter(item => (item.cuenta || 'General') === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount);
+            const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (Number(item.precio) * item.qty), 0);
+
             const qualifyingPromos = ticketPromos
-                .filter(p => subtotalCuenta >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
+                .filter(p => subtotalCuenta > 0 && subtotalCuenta >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
                 .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
 
             const bestTicketPromo = qualifyingPromos[0];
-            const ghostIdx = cleanCart.findIndex(item => item.cuenta === cuenta && item.promoType === 'TICKET_DISCOUNT');
+            const ghostIdx = cleanCart.findIndex(item => (item.cuenta || 'General') === cuenta && (item.promoType === 'TICKET_DISCOUNT' || item.isVirtualDiscount));
 
-            if (bestTicketPromo) {
+            if (bestTicketPromo && itemsCuenta.length > 0) {
                 const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
                 const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
                 
                 let finalDiscountPrice = isPercentage ? (subtotalCuenta * (rawDiscount / 100)) : rawDiscount;
-                finalDiscountPrice = -Math.abs(finalDiscountPrice); // Blindaje: Siempre negativo
+                finalDiscountPrice = -Math.min(subtotalCuenta, Math.abs(finalDiscountPrice)); // Blindaje: Negativo y limitado al subtotal
 
                 if (ghostIdx !== -1) {
-                    // Refrescar si el monto o el ID de la promo cambió
                     if (cleanCart[ghostIdx].precio !== finalDiscountPrice || cleanCart[ghostIdx].promoId !== bestTicketPromo.id) {
                         cleanCart[ghostIdx] = {
                             ...cleanCart[ghostIdx],
-                            nombre: bestTicketPromo.name || 'Descuento Global',
+                            cuenta: cuenta,
+                            nombre: bestTicketPromo.name || 'Descuento por Cuenta',
                             precio: finalDiscountPrice,
                             precioOriginal: finalDiscountPrice,
                             promoId: bestTicketPromo.id
                         };
                     }
                 } else {
-                    // Inyección del Fantasma
                     cleanCart.push({
-                        id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
-                        nombre: bestTicketPromo.name || 'Descuento Global',
+                        id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}_${cuenta}`,
+                        nombre: bestTicketPromo.name || 'Descuento por Cuenta',
                         precioOriginal: finalDiscountPrice,
                         precio: finalDiscountPrice,
                         qty: 1,
-                        preparaciones: [{}], // Blindaje contra iteradores
-                        enviadoCocina: true, // Ignorado en vista de cocina
-                        kitchenStatus: 'DELIVERED', // Congelado
+                        preparaciones: [{}],
+                        enviadoCocina: true,
+                        kitchenStatus: 'DELIVERED',
                         status: 'ACTIVE',
                         cuenta: cuenta,
                         isAutoPromo: true,
-                        isVirtualDiscount: true, // Bandera maestra
+                        isVirtualDiscount: true,
                         requiereCocina: false,
                         promoId: bestTicketPromo.id,
                         promoType: 'TICKET_DISCOUNT',
@@ -311,7 +313,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     });
                 }
             } else {
-                // El subtotal cayó por debajo del umbral, destruir fantasma
                 if (ghostIdx !== -1) {
                     cleanCart.splice(ghostIdx, 1);
                 }
@@ -359,7 +360,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     isProcessingRef.current = true;
 
     try {
-      const targetCuenta = forceCuenta || cuentaActiva;
+      const targetCuenta = forceCuenta || cuentaActiva || 'General';
       if (cuentasPagadasReales.includes(targetCuenta)) {
           if (triggerNotification) triggerNotification(`La cuenta "${targetCuenta}" está sellada.`, 'error');
           return false; 
@@ -368,8 +369,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       if (productWithDetails.controlarStock) {
         const currentUnsent = getUnsentQtyOfProduct(_cart, productWithDetails.id);
         if (currentUnsent + 1 > productWithDetails.stock) {
-            if (triggerNotification) triggerNotification(`Stock insuficiente. Solo quedan ${productWithDetails.stock - currentUnsent}.`, 'warning');
-            return false; 
+          return false; 
         }
       }
 
@@ -409,8 +409,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     : [String(activePromo.productId || activePromo.product_id)];
 
                 if (triggerIds.includes(String(productWithDetails.id))) {
-                    const normalQtyInAccount = prev.filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-                    const ghostQtyInAccount = prev.filter(p => p.isAutoPromo && p.promoId === activePromo.id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                    const normalQtyInAccount = prev.filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                    const ghostQtyInAccount = prev.filter(p => p.isAutoPromo && p.promoId === activePromo.id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
                     
                     const totalInCart = normalQtyInAccount + ghostQtyInAccount;
                     const buyTotal = Number(activePromo.buyQty || 2);
@@ -428,12 +428,12 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
                 if (triggerIds.includes(String(productWithDetails.id))) {
                     const currentBundles = Math.min(...triggerIds.map(id => 
-                        prev.filter(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0)
+                        prev.filter(p => String(p.id) === id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0)
                     ));
 
                     const triggerQtysAfter = {};
                     triggerIds.forEach(id => {
-                        let qty = prev.filter(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0);
+                        let qty = prev.filter(p => String(p.id) === id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0);
                         if (id === String(productWithDetails.id)) qty += 1;
                         triggerQtysAfter[id] = qty;
                     });
@@ -446,7 +446,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                         let otherItemsSum = 0;
                         triggerIds.forEach(id => {
                             if (id !== String(productWithDetails.id)) {
-                                const item = prev.find(p => String(p.id) === id && p.cuenta === targetCuenta && p.status !== 'CANCELLED');
+                                const item = prev.find(p => String(p.id) === id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED');
                                 if (item) otherItemsSum += Number(item.precioOriginal || item.precio);
                             }
                         });
@@ -467,7 +467,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const ghostIndex = newCart.findIndex(p => 
                 p.id === productWithDetails.id && 
                 Number(p.precio).toFixed(2) === Number(finalPromoPrice).toFixed(2) && 
-                p.cuenta === targetCuenta && 
+                (p.cuenta || 'General') === targetCuenta && 
                 !!p.isTakeaway === !!productWithDetails.isTakeaway && 
                 p.isAutoPromo && 
                 p.promoId === safeActivePromo.id &&
@@ -501,7 +501,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         } else {
             const index = newCart.findIndex(p => 
                 p.id === productWithDetails.id && Number(p.precio).toFixed(2) === Number(finalPrice).toFixed(2) && !p.enviadoCocina && 
-                p.cuenta === targetCuenta && !!p.isTakeaway === !!productWithDetails.isTakeaway && 
+                (p.cuenta || 'General') === targetCuenta && !!p.isTakeaway === !!productWithDetails.isTakeaway && 
                 (!p.isAutoPromo || p.promoLabel === 'OFERTA') && 
                 p.preparaciones.every(prep => JSON.stringify(prep) === detailStr)
             );
@@ -525,7 +525,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
             if (activePromo.type === 'NxM') {
                 const normalQtyInAccount = newCart
-                    .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
                     .reduce((a, b) => a + b.qty, 0);
 
                 const pay = Number(activePromo.payQty || 1);
@@ -549,14 +549,14 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const rewardIds = activePromo.rewardProducts || [];
 
                 const totalTriggerQty = newCart
-                    .filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
                     .reduce((a, b) => a + b.qty, 0);
                 
                 const bundles = Math.floor(totalTriggerQty / reqQty);
                 const expectedGhosts = bundles * rewardQty;
                 
                 const currentGhosts = newCart
-                    .filter(p => p.isAutoPromo && p.promoId === activePromo.id && p.cuenta === targetCuenta)
+                    .filter(p => p.isAutoPromo && p.promoId === activePromo.id && (p.cuenta || 'General') === targetCuenta)
                     .reduce((a, b) => a + b.qty, 0);
 
                 if (expectedGhosts > currentGhosts) {
@@ -576,8 +576,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     }
                 }
             } else if (activePromo.type === 'NTH_FIXED') {
-                const normalQtyInAccount = newCart.filter(p => triggerIds.includes(String(p.id)) && p.cuenta === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-                const ghostQtyInAccount = newCart.filter(p => p.isAutoPromo && p.promoId === activePromo.id && p.cuenta === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                const normalQtyInAccount = newCart.filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                const ghostQtyInAccount = newCart.filter(p => p.isAutoPromo && p.promoId === activePromo.id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
                 
                 const totalInCart = normalQtyInAccount + ghostQtyInAccount;
                 const buyTotal = Number(activePromo.buyQty || 2);
@@ -700,7 +700,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       checkRuptureAndExecute((prev) => {
           const newCart = [...prev];
           const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
-          const idx = newCart.findIndex(p => p.id === itemToRemove.id && Number(p.precio).toFixed(2) === Number(itemToRemove.precio).toFixed(2) && p.cuenta === itemToRemove.cuenta && !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
+          const idx = newCart.findIndex(p => p.id === itemToRemove.id && Number(p.precio).toFixed(2) === Number(itemToRemove.precio).toFixed(2) && (p.cuenta || 'General') === (itemToRemove.cuenta || 'General') && !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
           if (idx !== -1) {
               newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - 1, preparaciones: newCart[idx].preparaciones.slice(0, -1) };
               if (newCart[idx].qty <= 0) newCart.splice(idx, 1);
@@ -720,7 +720,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
       checkRuptureAndExecute((prev) => {
         const prepStr = JSON.stringify(itemToRemove.preparaciones[0] || {});
-        return prev.filter(p => !(p.id === itemToRemove.id && p.cuenta === itemToRemove.cuenta && !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr));
+        return prev.filter(p => !(p.id === itemToRemove.id && (p.cuenta || 'General') === (itemToRemove.cuenta || 'General') && !!p.isTakeaway === !!itemToRemove.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr));
       }, isDeletingPromo);
     } finally {
       isProcessingRef.current = false;
@@ -735,7 +735,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       setCart(prev => {
         const newCart = [...prev];
         const prepStr = JSON.stringify(itemToToggle.preparaciones[0] || {});
-        const idx = newCart.findIndex(p => p.id === itemToToggle.id && Number(p.precio).toFixed(2) === Number(itemToToggle.precio).toFixed(2) && p.cuenta === itemToToggle.cuenta && !!p.isTakeaway === !!itemToToggle.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
+        const idx = newCart.findIndex(p => p.id === itemToToggle.id && Number(p.precio).toFixed(2) === Number(itemToToggle.precio).toFixed(2) && (p.cuenta || 'General') === (itemToToggle.cuenta || 'General') && !!p.isTakeaway === !!itemToToggle.isTakeaway && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
 
         if (idx !== -1) {
           const currentItem = newCart[idx];
@@ -747,7 +747,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             const prepToMove = currentItem.preparaciones[currentItem.preparaciones.length - 1];
             newCart[idx] = { ...currentItem, qty: currentItem.qty - 1, preparaciones: currentItem.preparaciones.slice(0, -1) };
             
-            const existingTargetIdx = newCart.findIndex(p => p.id === currentItem.id && Number(p.precio).toFixed(2) === Number(currentItem.precio).toFixed(2) && p.cuenta === currentItem.cuenta && !!p.isTakeaway === targetTakeawayState && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
+            const existingTargetIdx = newCart.findIndex(p => p.id === currentItem.id && Number(p.precio).toFixed(2) === Number(currentItem.precio).toFixed(2) && (p.cuenta || 'General') === (currentItem.cuenta || 'General') && !!p.isTakeaway === targetTakeawayState && !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr);
             if (existingTargetIdx !== -1) { 
               newCart[existingTargetIdx] = { ...newCart[existingTargetIdx], qty: newCart[existingTargetIdx].qty + 1, preparaciones: [...newCart[existingTargetIdx].preparaciones, prepToMove] }; 
             } else { 
@@ -767,11 +767,11 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const hasUnsentItems = useMemo(() => _cart.some(p => !p.enviadoCocina && !p.isVirtualDiscount), [_cart]);
   const getSubtotalByCuenta = (nombreCuenta) => {
     if (cuentasPagadasReales.includes(nombreCuenta)) return 0;
-    return _cart.filter(item => item.cuenta === nombreCuenta && item.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
+    return _cart.filter(item => (item.cuenta || 'General') === (nombreCuenta || 'General') && item.status !== 'CANCELLED').reduce((acc, curr) => acc + (curr.precio * curr.qty), 0);
   };
-  const getProductQty = (id) => _cart.filter(p => p.id === id && !p.enviadoCocina && p.cuenta === cuentaActiva && p.status !== 'CANCELLED' && (!p.isAutoPromo || p.promoLabel === 'OFERTA')).reduce((acc, item) => acc + item.qty, 0);
+  const getProductQty = (id) => _cart.filter(p => p.id === id && !p.enviadoCocina && (p.cuenta || 'General') === (cuentaActiva || 'General') && p.status !== 'CANCELLED' && (!p.isAutoPromo || p.promoLabel === 'OFERTA')).reduce((acc, item) => acc + item.qty, 0);
 
-  const clearCartByAccount = (cuentaTarget) => setCart(prev => prev.filter(item => item.cuenta !== cuentaTarget));
+  const clearCartByAccount = (cuentaTarget) => setCart(prev => prev.filter(item => (item.cuenta || 'General') !== (cuentaTarget || 'General')));
   const clearEntireCart = () => setCart([]);
 
   return {

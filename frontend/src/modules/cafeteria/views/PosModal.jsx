@@ -92,17 +92,18 @@ export const PosModal = ({
 
   const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
+  // 1. Donde extraes de usePosController (línea ~95):
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    moveItemToCuenta, orderStatus, paidAccounts, validateAllDelivered,
+    moveItemToCuenta, mergeAccountToCuenta, orderStatus, paidAccounts, validateAllDelivered, // 👈 Añade mergeAccountToCuenta aquí
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
     releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture,
     pendingPromoReward, setPendingPromoReward, claimPromoReward,
-    suspendedPromos // 🌟 AQUÍ EXTRAEMOS LA VARIABLE DE PROMOS SUSPENDIDAS
-  } = usePosController(mesa, isOpen, todasLasMesas, showToast, onTableRelease, onClose, inline); 
+    suspendedPromos
+  } = usePosController(mesa, isOpen, todasLasMesas, showToast, onTableRelease, onClose, inline);
 
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
@@ -342,13 +343,15 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
+  // 2. Más abajo, dentro de sidebarProps (línea ~285):
   const sidebarProps = {
     cart: activeCart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
     cuentaActiva, setCuentaActiva, cuentasDisponibles: cleanCuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
-    orderStatus, paidAccounts, 
+    onMergeAccount: mergeAccountToCuenta, // 👈 Añade esta línea aquí
+    orderStatus, paidAccounts,
     onPrintTicket: (c) => {
       let telefonoPredeterminado = '';
       if (c) {

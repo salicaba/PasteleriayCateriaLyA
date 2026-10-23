@@ -64,7 +64,23 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     setTimeout(() => setNotification(null), 3500);
   }, []);
 
-  const cartUtils = useClientCart(triggerNotification);
+  const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
+    const saved = localStorage.getItem('lya_client_snapshot');
+    return saved ? JSON.parse(saved) : { items: [], total: 0 };
+  });
+
+  // 🔥 CÁLCULO INTELIGENTE: Subtotal ya confirmado en la nota del cliente (para acumular rondas de TICKET_DISCOUNT)
+  const confirmedPhysicalSubtotal = useMemo(() => {
+    return (confirmedSnapshot?.items || [])
+      .filter(i => !i.isVirtualDiscount && i.status !== 'CANCELLED')
+      .reduce((sum, i) => sum + ((Number(i.precioUnitario) || 0) * (i.qty || 1)), 0);
+  }, [confirmedSnapshot]);
+
+  const hasConfirmedTicketDiscount = useMemo(() => {
+    return (confirmedSnapshot?.items || []).some(i => i.isVirtualDiscount);
+  }, [confirmedSnapshot]);
+
+  const cartUtils = useClientCart(triggerNotification, hasConfirmedTicketDiscount ? 0 : confirmedPhysicalSubtotal);
   const { cart, setCart, addToCart, totalCart } = cartUtils;
 
   useEffect(() => {
@@ -76,10 +92,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   const lastActivityRef = useRef(initialActivity);
 
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('lya_client_order_id') || null);
-  const [confirmedSnapshot, setConfirmedSnapshot] = useState(() => {
-    const saved = localStorage.getItem('lya_client_snapshot');
-    return saved ? JSON.parse(saved) : { items: [], total: 0 };
-  });
 
   // 🛡️ PURGADO DE CACHÉ VIEJA (12 Horas para basura de sesiones olvidadas)
   useEffect(() => {

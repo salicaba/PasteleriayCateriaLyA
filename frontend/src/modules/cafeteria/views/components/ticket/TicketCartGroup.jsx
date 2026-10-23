@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, User, ShoppingBag, CheckCircle, CheckCircle2, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Trash2, User, ShoppingBag, CheckCircle, CheckCircle2, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon, AlertTriangle, ArrowRightLeft } from 'lucide-react';
 import clsx from 'clsx';
 
 // 🔥 CEREBRO EXTRACTOR VISUAL
@@ -27,6 +27,7 @@ export const TicketCartGroup = ({
   onPayCuenta, onPrintTicket, availableAccs,
   processingItems, handleToggleStatus, handleRemoveUnsent, onAdd,
   handleDeleteUnsent, handleCancelItem, toggleItemTakeaway, onCancelItem,
+  onOpenMergeModal,
   onDragStart, onDragEnd,
   showToast 
 }) => {
@@ -115,6 +116,7 @@ export const TicketCartGroup = ({
           !!d.isTakeaway === !!item.isTakeaway && 
           !!d.isAutoPromo === !!item.isAutoPromo && 
           d.promoLabel === item.promoLabel &&      
+          !!d.isVirtualDiscount === !!item.isVirtualDiscount &&
           getPrepStr(d) === getPrepStr(item)
       );
       
@@ -169,7 +171,7 @@ export const TicketCartGroup = ({
       };
   };
 
-  // 🔥 CÁLCULO INDIVIDUAL POR CUENTA (Funciona para General y cualquier otra subcuenta)
+  // 🔥 CÁLCULO INDIVIDUAL POR CUENTA
   const hasRealSentItemsInAccount = displayItems.some(i => !i.isVirtualDiscount && i.enviadoCocina);
 
   const subtotalConfirmadoCuenta = displayItems
@@ -189,6 +191,7 @@ export const TicketCartGroup = ({
   return (
     <motion.div 
       layout="position"
+      data-cuenta-drop={cuentaName} // 👈 IDENTIFICADOR PARA ARRASTRE TÁCTIL
       initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
@@ -264,11 +267,10 @@ export const TicketCartGroup = ({
               ${subtotalCuenta.toFixed(2)}
           </span>
           
-          {/* 🔥 DESGLOSE EN CABECERA DE CUENTA (COCINA VS POR ENVIAR) */}
           {!isVitrina && !isCuentaPagada && subtotalPorEnviarCuenta > 0 && (
             <span className="text-[9px] font-bold text-orange-500 dark:text-orange-400 lya:text-lya-primary tracking-tight">
               {subtotalConfirmadoCuenta > 0 
-                ? `Cocina: $${subtotalConfirmadoCuenta.toFixed(2)} • +$${subtotalPorEnviarCuenta.toFixed(2)}`
+                ? `Cocina: $${subtotalConfirmadoCuenta.toFixed(2)}+$${subtotalPorEnviarCuenta.toFixed(2)}`
                 : `Por enviar: $${subtotalPorEnviarCuenta.toFixed(2)}`
               }
             </span>
@@ -304,6 +306,18 @@ export const TicketCartGroup = ({
                   )}
               >
                 {isCobrarProcessing && <Loader2 size={10} className="animate-spin" />} Cobrar
+              </motion.button>
+            )}
+
+            {/* 🔥 BOTÓN UNIR CUENTAS */}
+            {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && displayItems.filter(i => !i.isVirtualDiscount).length > 0 && !isVitrina && !isLlevar && onOpenMergeModal && (
+              <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => { e.stopPropagation(); onOpenMergeModal(cuentaName); }} 
+                  className="text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 md:hover:bg-orange-100 outline-none touch-manipulation flex items-center gap-1"
+                  title="Unir los productos de esta cuenta con otra cuenta de la mesa"
+              >
+                <ArrowRightLeft size={10} /> Unir
               </motion.button>
             )}
             
@@ -440,11 +454,45 @@ export const TicketCartGroup = ({
             )}
 
             <div className="flex gap-3">
-              <div className={clsx(
-                "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
-                isVirtualDiscount ? "bg-emerald-100/50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50" :
-                isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-              )}>
+              <div 
+                onTouchStart={(e) => {
+                  if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo || availableAccs.length <= 1) return;
+                  onDragStart(item, cuentaName);
+                }}
+                onTouchMove={(e) => {
+                  if (!draggedItem || isCuentaPagada || isLlevar || isVitrina) return;
+                  const touch = e.touches[0];
+                  if (!touch) return;
+                  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                  const dropContainer = el?.closest('[data-cuenta-drop]');
+                  const targetAcc = dropContainer?.getAttribute('data-cuenta-drop');
+                  if (targetAcc && targetAcc !== cuentaName) {
+                    setDragOverCuenta(targetAcc);
+                  } else {
+                    setDragOverCuenta(null);
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (!draggedItem) return;
+                  const touch = e.changedTouches[0];
+                  if (touch) {
+                    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const dropContainer = el?.closest('[data-cuenta-drop]');
+                    const targetAcc = dropContainer?.getAttribute('data-cuenta-drop');
+                    if (targetAcc && targetAcc !== cuentaName) {
+                      handleDropOnCuenta(targetAcc);
+                    }
+                  }
+                  setDragOverCuenta(null);
+                  onDragEnd();
+                }}
+                className={clsx(
+                  "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
+                  (!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo) && "touch-none",
+                  isVirtualDiscount ? "bg-emerald-100/50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50" :
+                  isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+                )}
+              >
                 {isVirtualDiscount ? (
                   <Tag className="text-emerald-500" size={24} />
                 ) : item.imagen || item.image ? (
@@ -474,12 +522,12 @@ export const TicketCartGroup = ({
                       {item.nombre}
                     </h5>
                     {isAnyPromo && (
-                       <span className={clsx("text-[9px] font-black text-white px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm",
-                           isVirtualDiscount ? "bg-emerald-500 dark:bg-emerald-600" : "bg-rose-500 dark:bg-rose-600"
-                       )}>
-                         <Tag size={10} strokeWidth={3} /> 
-                         <span>{promoText}</span>
-                       </span>
+                        <span className={clsx("text-[9px] font-black text-white px-2 py-0.5 rounded-full uppercase tracking-wider w-fit mt-1 flex items-center gap-1 shadow-sm",
+                            isVirtualDiscount ? "bg-emerald-500 dark:bg-emerald-600" : "bg-rose-500 dark:bg-rose-600"
+                        )}>
+                          <Tag size={10} strokeWidth={3} /> 
+                          <span>{promoText}</span>
+                        </span>
                     )}
                   </div>
                   

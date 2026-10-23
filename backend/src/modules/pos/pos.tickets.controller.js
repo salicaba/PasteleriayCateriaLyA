@@ -27,6 +27,26 @@ const parseAccountName = (str) => {
   return s;
 };
 
+// 🔥 EXTRACTOR DE DESCUENTO DE TICKET GUARDADO EN NOTAS
+const extractAccountTicketDiscount = (accountItems) => {
+  for (const item of accountItems) {
+    if (!item.notes) continue;
+    try {
+      const parsed = JSON.parse(item.notes);
+      if (Array.isArray(parsed)) {
+        const discountMeta = parsed.find(n => n && n._isTicketDiscountMeta);
+        if (discountMeta && Number(discountMeta.amount) > 0) {
+          return {
+            name: discountMeta.name || 'Descuento Promoción',
+            amount: Number(discountMeta.amount)
+          };
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+};
+
 // ==========================================
 // 🧾 OBTENER HISTORIAL DE TICKETS (SOLO PAGADOS)
 // ==========================================
@@ -60,7 +80,6 @@ export const getTickets = async (req, res) => {
 // ==========================================
 export const getTodayTickets = async (req, res) => {
   try {
-    // 🔥 ZONA HORARIA LOCAL PARA VENTAS DE HOY
     const localNow = getLocalNow();
     
     const localYear = localNow.getFullYear();
@@ -182,7 +201,6 @@ export const printOrderTicket = async (req, res) => {
     printer.setTextNormal();
     printer.drawLine();
     
-    // 🔥 FECHA LOCAL EN EL TICKET IMPRESO
     const d = getLocalNow();
     const diaSemana = d.toLocaleDateString('es-MX', { weekday: 'long', timeZone: 'America/Mexico_City' });
     const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
@@ -283,6 +301,17 @@ export const printOrderTicket = async (req, res) => {
           }
         });
       });
+
+      // 🔥 Imprimir descuento de ticket si existe en esta cuenta
+      const accDiscount = extractAccountTicketDiscount(accountItemsRaw);
+      if (accDiscount) {
+        grandTotal = Math.max(0, grandTotal - accDiscount.amount);
+        printer.tableCustom([
+          { text: "1x", align: "LEFT", width: 0.15 },
+          { text: `[PROMO] ${accDiscount.name}`, align: "LEFT", width: 0.55 },
+          { text: `-$${accDiscount.amount.toFixed(2)}`, align: "RIGHT", width: 0.30 }
+        ]);
+      }
     });
 
     printer.drawLine();
@@ -295,7 +324,11 @@ export const printOrderTicket = async (req, res) => {
       printer.alignLeft();
       
       cuentasUnicas.forEach(accName => {
-        const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+        const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
+        let subTotalAcc = accountItemsRaw.reduce((sum, i) => sum + Number(i.subtotal), 0);
+        const accDiscount = extractAccountTicketDiscount(accountItemsRaw);
+        if (accDiscount) subTotalAcc = Math.max(0, subTotalAcc - accDiscount.amount);
+
         printer.tableCustom([
           { text: parseAccountName(accName).toUpperCase(), align: "LEFT", width: 0.60 },
           { text: `$${subTotalAcc.toFixed(2)}`, align: "RIGHT", width: 0.40 }
@@ -384,12 +417,20 @@ export const shareOrderTicket = async (req, res) => {
       itemsFiltrados = allItems.filter(i => (i.cuenta || 'General') === cuentaSeleccionada);
     }
 
-    const totalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const rawTotalAmount = itemsFiltrados.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const cuentasAVisualizarHtml = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
+    
+    let totalDiscountSum = 0;
+    cuentasAVisualizarHtml.forEach(acc => {
+      const accItems = itemsFiltrados.filter(i => (i.cuenta || 'General') === acc);
+      const disc = extractAccountTicketDiscount(accItems);
+      if (disc) totalDiscountSum += disc.amount;
+    });
+
+    const totalAmount = Math.max(0, rawTotalAmount - totalDiscountSum);
     
     const nombreCliente = parseAccountName(order.clientName || (cuentaSeleccionada !== 'Todas' ? cuentaSeleccionada : 'Público General'));
     
-    // 🔥 FECHA LOCAL EN EL TICKET DIGITAL
-    // Transformamos el UTC de la DB al horario de Chiapas para mostrárselo al cliente
     const rawDate = new Date(order.createdAt);
     const d = new Date(rawDate.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
 
@@ -398,8 +439,6 @@ export const shareOrderTicket = async (req, res) => {
     const fechaFormateada = d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Mexico_City' });
     const horaFormateada = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' });
     const dateStr = `${diaSemanaCap}, ${fechaFormateada} ${horaFormateada}`;
-
-    const cuentasAVisualizar = Array.from(new Set(itemsFiltrados.map(i => i.cuenta || 'General')));
 
     let isLlevar = order.orderType === 'LLEVAR';
     let rawId = String(order.ticketId || '');
@@ -434,9 +473,7 @@ export const shareOrderTicket = async (req, res) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Ticket de Consumo #${ticketFolioFile} - 𝓛𝔂𝓪</title>
-      <!-- 🔥 ICONO PARA LA PESTAÑA DEL NAVEGADOR (FAVICON) 🔥 -->
       <link rel="icon" type="image/png" href="https://menu-lya.vercel.app/logo.jpeg" />
-      <!-- 🔥 ETIQUETAS OPEN GRAPH PARA WHATSAPP (LOGO) 🔥 -->
       <meta property="og:title" content="Ticket de Consumo - 𝓛𝔂𝓪" />
       <meta property="og:description" content="¡Gracias por tu preferencia! Aquí tienes tu comprobante digital." />
       <meta property="og:image" content="https://menu-lya.vercel.app/logo.jpeg" />
@@ -509,7 +546,7 @@ export const shareOrderTicket = async (req, res) => {
             <div class="border-t border-slate-200 my-5"></div>
 
             <div class="space-y-4">
-              ${cuentasAVisualizar.map(accName => {
+              ${cuentasAVisualizarHtml.map(accName => {
                 const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
                 if (accountItemsRaw.length === 0) return '';
 
@@ -536,9 +573,11 @@ export const shareOrderTicket = async (req, res) => {
                   }
                 });
 
+                const accDiscount = extractAccountTicketDiscount(accountItemsRaw);
+
                 return `
                   <div class="space-y-4">
-                    ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
+                    ${cuentasAVisualizarHtml.length > 1 && cuentaSeleccionada === 'Todas' ? `
                       <div class="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg uppercase tracking-wider text-center">
                         — Cuenta: ${parseAccountName(accName)} —
                       </div>
@@ -563,6 +602,16 @@ export const shareOrderTicket = async (req, res) => {
                       </div>
                       `;
                     }).join('')}
+
+                    ${accDiscount ? `
+                      <div class="flex items-start gap-3 text-sm px-1 mb-3 bg-emerald-50/50 p-2 rounded-xl border border-emerald-100">
+                        <span class="font-black text-emerald-600 bg-emerald-100 min-w-[28px] h-6 flex items-center justify-center rounded-md text-xs mt-0.5 shrink-0">1x</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-bold text-emerald-800 break-words leading-tight">[PROMO] ${accDiscount.name}</p>
+                        </div>
+                        <span class="font-black text-emerald-600 shrink-0 text-base">-$${accDiscount.amount.toFixed(2)}</span>
+                      </div>
+                    ` : ''}
                   </div>
                 `;
               }).join('')}
@@ -570,11 +619,15 @@ export const shareOrderTicket = async (req, res) => {
 
             <div class="border-t border-slate-200 my-5"></div>
 
-            ${cuentasAVisualizar.length > 1 && cuentaSeleccionada === 'Todas' ? `
+            ${cuentasAVisualizarHtml.length > 1 && cuentaSeleccionada === 'Todas' ? `
               <div class="space-y-2 text-xs font-semibold text-slate-500 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <p class="font-black text-slate-400 uppercase tracking-wider mb-3 text-[10px] text-center">Resumen por Cuentas</p>
-                ${cuentasAVisualizar.map(accName => {
-                  const subTotalAcc = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName).reduce((sum, i) => sum + Number(i.subtotal), 0);
+                ${cuentasAVisualizarHtml.map(accName => {
+                  const accountItemsRaw = itemsFiltrados.filter(i => (i.cuenta || 'General') === accName);
+                  let subTotalAcc = accountItemsRaw.reduce((sum, i) => sum + Number(i.subtotal), 0);
+                  const accDiscount = extractAccountTicketDiscount(accountItemsRaw);
+                  if (accDiscount) subTotalAcc = Math.max(0, subTotalAcc - accDiscount.amount);
+
                   return `
                     <div class="flex justify-between items-center gap-4">
                       <span class="uppercase break-words">${parseAccountName(accName)}:</span>

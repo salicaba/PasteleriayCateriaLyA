@@ -24,9 +24,8 @@ const parseAccountName = (str) => {
 export const payOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cuentaName, isFullPayment, paymentMethod } = req.body;
+    const { cuentaName, isFullPayment, paymentMethod, ticketDiscount } = req.body;
     
-    // 1. CORRECCIÓN: Volvemos al include estricto que tu base de datos conoce
     const order = await Order.findByPk(orderId, { 
       include: ['items', { model: Table, as: 'table' }] 
     });
@@ -59,7 +58,6 @@ export const payOrder = async (req, res) => {
     if (paymentMethod === 'transferencia' || paymentMethod === 'TRANSFER') dbMethod = 'TRANSFER';
     else if (paymentMethod === 'tarjeta' || paymentMethod === 'CARD') dbMethod = 'CARD';
 
-    // 2. CORRECCIÓN: Extraemos los items de forma segura sin alias inventados
     const orderItems = order.items || [];
     const activeItems = orderItems.filter(i => i.status === 'ACTIVE' || !i.status);
     
@@ -86,13 +84,45 @@ export const payOrder = async (req, res) => {
       });
     }
 
+    // 🔥 APLICAR DESCUENTO DE TICKET POR CUENTA EN CAJA Y GUARDAR METADATA PARA EL TICKET
+    const discountAmt = ticketDiscount && Number(ticketDiscount.amount) > 0 ? Number(ticketDiscount.amount) : 0;
+    if (discountAmt > 0 && itemsToPay.length > 0) {
+      let remainingDiscount = discountAmt;
+      if (amountCafeteria >= remainingDiscount) {
+        amountCafeteria -= remainingDiscount;
+        remainingDiscount = 0;
+      } else {
+        remainingDiscount -= amountCafeteria;
+        amountCafeteria = 0;
+        amountPasteleria = Math.max(0, amountPasteleria - remainingDiscount);
+      }
+
+      // Guardamos la metadata del descuento en el primer item de esta cuenta para que el ticket físico y digital lo impriman
+      const anchorItem = itemsToPay[0];
+      let anchorNotes = [];
+      try { anchorNotes = JSON.parse(anchorItem.notes || '[]'); } catch(e) {}
+      if (!Array.isArray(anchorNotes)) anchorNotes = [anchorNotes];
+
+      anchorNotes = anchorNotes.filter(n => !(n && n._isTicketDiscountMeta));
+      anchorNotes.push({
+        _isTicketDiscountMeta: true,
+        promoId: ticketDiscount.promoId || null,
+        name: ticketDiscount.name || 'Descuento Promoción',
+        amount: discountAmt
+      });
+      await anchorItem.update({ notes: JSON.stringify(anchorNotes) });
+    }
+
     if (!isFullPayment && cuentaName && !paidAccounts.includes(cuentaName)) {
       paidAccounts.push(cuentaName);
     }
 
+    const updatedTotalAmount = Math.max(0, Number(order.totalAmount) - discountAmt);
+
     await order.update({ 
       status: isFullPayment ? 'PAID' : order.status, 
-      paidAccounts: paidAccounts 
+      paidAccounts: paidAccounts,
+      totalAmount: updatedTotalAmount
     });
 
     const isMixed = amountCafeteria > 0 && amountPasteleria > 0;
@@ -101,14 +131,14 @@ export const payOrder = async (req, res) => {
     if (!isFullPayment && cuentaName) {
       descBase += ` Cuenta: ${parseAccountName(cuentaName)}`;
     }
+    if (discountAmt > 0) {
+      descBase += ` [Promo -$${discountAmt.toFixed(2)}]`;
+    }
     
     const mixTag = isMixed ? ' | 🔗 Ticket Mixto' : '';
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
-
-    // Usamos la fecha base del servidor para evitar rechazos por timezone de la BD
     const localNow = new Date();
 
-    // 3. CORRECCIÓN: Quitamos el campo `type` para evitar errores de columna no encontrada
     if (amountCafeteria > 0) {
       const folioCaf = `CAF-${baseFolio}`;
       await Transaction.create({

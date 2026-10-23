@@ -1,3 +1,4 @@
+// frontend/src/modules/cafeteria/controllers/usePosController.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 
 // Hooks de Dominio
@@ -75,7 +76,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   const mesaId = mesaActual?.id;
   const mesaEstado = mesaActual?.estado;
   const mesaOrderId = mesaActual?.orderId;
-  const mesaOrderStatus = mesaActual?.status || mesaActual?.orderStatus; 
   
   // 🔥 FIX BBDD UNIVERSAL PARA LLEVAR Y MOSTRADOR
   const rawItems = mesaActual?.items || mesaActual?.orderItems || mesaActual?.OrderItems || [];
@@ -85,7 +85,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   // 🔥 EFECTO 1: EL BORRADOR INMORTAL
   useEffect(() => {
     if (isOpen && mesaId) {
-      const unsentDraft = cartLogic.cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED');
+      const unsentDraft = cartLogic.cart.filter(p => !p.enviadoCocina && p.status !== 'CANCELLED' && !p.isVirtualDiscount);
       if (unsentDraft.length > 0) {
         localStorage.setItem(`lya_draft_${mesaId}`, JSON.stringify(unsentDraft));
       } else {
@@ -179,11 +179,11 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         });
 
         setCart(prev => {
-            const localItems = prev.filter(p => !p.enviadoCocina);
+            const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
 
             const sentButNotLoaded = prev.filter(p => {
-                if (!p.enviadoCocina) return false;
+                if (!p.enviadoCocina || p.isVirtualDiscount) return false;
                 
                 if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
                      const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
@@ -225,7 +225,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         setPaidAccounts([]);
 
         setCart(prev => {
-            const localItems = prev.filter(p => !p.enviadoCocina);
+            const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
             const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
 
             if (sincronizarCuentas) {
@@ -284,13 +284,22 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       }));
   };
 
+  // 🔥 WRAPPER PARA UNIR CUENTAS Y LIMPIAR LA CUENTA VACÍA
+  const wrappedMergeAccount = async (sourceCuenta, targetCuenta) => {
+      await mutations.mergeAccountToCuenta(sourceCuenta, targetCuenta);
+      if (sourceCuenta !== 'General') {
+          setNombresCuentas(prev => prev.filter(c => c !== sourceCuenta));
+      }
+      setCuentaActiva(targetCuenta);
+  };
+
   const cuentasDisponibles = useMemo(() => 
     Array.from(new Set([...accounts.nombresCuentas, ...cartLogic.cart.map(i => i.cuenta || 'General')])), 
   [cartLogic.cart, accounts.nombresCuentas]);
 
   const cuentasCancelables = useMemo(() => {
     const cuentasVivas = cartLogic.cart
-      .filter(item => item.status !== 'CANCELLED')
+      .filter(item => item.status !== 'CANCELLED' && !item.isVirtualDiscount)
       .map(item => item.cuenta || 'General');
     return Array.from(new Set(cuentasVivas));
   }, [cartLogic.cart]);
@@ -311,7 +320,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     confirmPromoRupture: cartLogic.confirmPromoRupture,
     cancelPromoRupture: cartLogic.cancelPromoRupture,
 
-    suspendedPromos: cartLogic.suspendedPromos, // <---- AÑADE ESTA LÍNEA
+    suspendedPromos: cartLogic.suspendedPromos,
     
     pendingPromoReward: cartLogic.pendingPromoReward,
     setPendingPromoReward: cartLogic.setPendingPromoReward,
@@ -337,6 +346,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     isProcessing: mutations.isProcessing,
     simulateKitchenSend: mutations.simulateKitchenSend,
     moveItemToCuenta: mutations.moveItemToCuenta,
+    mergeAccountToCuenta: wrappedMergeAccount, // 👈 EXPORTADO AQUÍ
     toggleDeliveredStatus: mutations.toggleDeliveredStatus,
     handleCheckout: mutations.handleCheckout, 
     handleCloseTable: mutations.handleCloseTable, 

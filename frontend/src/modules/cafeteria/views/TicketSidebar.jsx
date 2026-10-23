@@ -31,7 +31,8 @@ export const TicketSidebar = ({
   isLlevar, isVitrina, toggleItemTakeaway, cuentasTelefonos,
   onDeliverAll, onDeliverAccount, onCancelItem, onCancelFullOrder, onCancelAccount,
   nombreCliente, showToast,
-  onReleaseAccount
+  onReleaseAccount,
+  onMergeAccount
 }) => {
   const toast = showToast || (() => {}); 
 
@@ -50,6 +51,10 @@ export const TicketSidebar = ({
   const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
 
+  // Estado para el modal de Unir Cuentas
+  const [mergeSourceCuenta, setMergeSourceCuenta] = useState(null);
+  const [isMerging, setIsMerging] = useState(false);
+
   const [isModalProcessing, setIsModalProcessing] = useState(false);
   const [isClosingTable, setIsClosingTable] = useState(false);
   const [isDeliveringAll, setIsDeliveringAll] = useState(false);
@@ -64,8 +69,9 @@ export const TicketSidebar = ({
 
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
   const cancelledCart = cart.filter(item => item.status === 'CANCELLED');
+  const physicalActiveCart = activeCart.filter(item => !item.isVirtualDiscount);
 
-  const globalUnsentQtyMap = activeCart
+  const globalUnsentQtyMap = physicalActiveCart
     .filter(item => !item.enviadoCocina)
     .reduce((acc, item) => {
       acc[item.id] = (acc[item.id] || 0) + item.qty;
@@ -107,8 +113,9 @@ export const TicketSidebar = ({
 
   const getPrepStr = (item) => {
     if (!item?.preparaciones || item.preparaciones.length === 0) return "";
-    const p = item.preparaciones[0];
-    if (!p) return "";
+    const validPreps = item.preparaciones.filter(p => p && !p._isPromoMeta);
+    if (validPreps.length === 0) return "";
+    const p = validPreps[0];
     return `${p.tamano || 'Estándar'}-${p.leche || 'Ninguna'}-${(p.extras || []).slice().sort().join(',')}`;
   };
 
@@ -124,7 +131,7 @@ export const TicketSidebar = ({
     const displayItems = [];
     
     rawItems.forEach(item => {
-        const isGhost = item.isAutoPromo || Number(item.precio) === 0;
+        const isGhost = item.isAutoPromo || Number(item.precio) === 0 || item.isVirtualDiscount;
 
         const existing = displayItems.find(d => 
             d.id === item.id && 
@@ -132,6 +139,7 @@ export const TicketSidebar = ({
             d.enviadoCocina === item.enviadoCocina && 
             d.kitchenStatus === item.kitchenStatus &&
             !!d.isTakeaway === !!item.isTakeaway && 
+            !!d.isVirtualDiscount === !!item.isVirtualDiscount &&
             (d.isAutoPromo || Number(d.precio) === 0) === isGhost && 
             getPrepStr(d) === getPrepStr(item)
         );
@@ -177,14 +185,12 @@ export const TicketSidebar = ({
     if (config.requireInput) setModalInputValue(config.inputDefault || '');
   };
 
-  // 🔥 FIX CRÍTICO: Recibimos qtyToDeliver y se lo pasamos intacto a la mutación
   const handleToggleStatus = async (item, qtyToDeliver = null) => {
     const itemId = item.backendItemId || item.id;
     setProcessingItems(prev => ({ ...prev, [itemId]: true }));
     try {
       if (toggleDeliveredStatus) await toggleDeliveredStatus(item, qtyToDeliver);
       
-      // Ajustamos el mensaje de éxito para que sea más descriptivo si fue entrega parcial
       if (qtyToDeliver && qtyToDeliver < item.qty) {
         toast(`Entregados ${qtyToDeliver}x ${item.nombre}`, 'success');
       } else {
@@ -235,7 +241,7 @@ export const TicketSidebar = ({
       }
 
       const updatedOcultas = [...cuentasOcultas, ...cuentasALiberar];
-      const unhiddenAccounts = activeCart.filter(item => {
+      const unhiddenAccounts = physicalActiveCart.filter(item => {
         const c = item.cuenta || 'General';
         return !updatedOcultas.includes(c);
       });
@@ -274,10 +280,10 @@ export const TicketSidebar = ({
     }
   };
 
-  const totalItemsInCart = activeCart.reduce((acc, curr) => acc + curr.qty, 0);
+  const totalItemsInCart = physicalActiveCart.reduce((acc, curr) => acc + curr.qty, 0);
 
   const handleDeleteUnsent = (item) => {
-    const accountActiveItems = activeCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
+    const accountActiveItems = physicalActiveCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
     const totalItemsInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0);
     const isLastInCart = totalItemsInCart === item.qty;
     const isLastInAccount = totalItemsInAccount === item.qty;
@@ -303,7 +309,7 @@ export const TicketSidebar = ({
 
   const handleRemoveUnsent = (item) => {
     const isLastInCart = totalItemsInCart === 1;
-    const accountActiveItems = activeCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
+    const accountActiveItems = physicalActiveCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
     const isLastInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0) === 1;
 
     if (isLastInCart) {
@@ -326,7 +332,7 @@ export const TicketSidebar = ({
   };
 
   const handleCancelItem = (item) => {
-    const accountActiveItems = activeCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
+    const accountActiveItems = physicalActiveCart.filter(i => (i.cuenta || 'General') === (item.cuenta || 'General'));
     const totalItemsInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0);
 
     if (item.qty > 1) {
@@ -502,6 +508,7 @@ export const TicketSidebar = ({
                   processingItems={processingItems} handleToggleStatus={handleToggleStatus} handleRemoveUnsent={handleRemoveUnsent}
                   onAdd={onAdd} handleDeleteUnsent={handleDeleteUnsent} handleCancelItem={handleCancelItem}
                   toggleItemTakeaway={toggleItemTakeaway} onCancelItem={onCancelItem}
+                  onOpenMergeModal={(cName) => setMergeSourceCuenta(cName)}
                   onDragStart={(item, cName) => setDraggedItem({ item, cuentaName: cName })}
                   onDragEnd={() => setDraggedItem(null)}
                   showToast={toast}
@@ -542,6 +549,52 @@ export const TicketSidebar = ({
         handleSendToKitchenClick={handleSendToKitchenClick} isSendingToKitchen={isSendingToKitchen}
         handleCheckoutClick={handleCheckoutClick} isCheckingOut={isCheckingOut}
       />
+
+      <AnimatePresence>
+        {mergeSourceCuenta && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col">
+              <div className="p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 text-center">
+                <div className="mx-auto w-12 h-12 bg-orange-100 dark:bg-orange-900/40 text-orange-500 rounded-full flex items-center justify-center mb-3">
+                  <ArrowRightLeft size={24} />
+                </div>
+                <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">Unir Cuenta</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Selecciona a qué cuenta deseas pasar todos los productos de <b>{parseAccountName(mergeSourceCuenta)}</b> para juntar consumos y aplicar promociones:
+                </p>
+              </div>
+              <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                {availableAccs
+                  .filter(acc => acc !== mergeSourceCuenta && !cuentasPagadasReales.includes(acc) && !cuentasOcultasEfectivas.includes(acc))
+                  .map(targetAcc => (
+                    <motion.button
+                      key={targetAcc}
+                      whileTap={!isMerging ? { scale: 0.95 } : {}}
+                      disabled={isMerging}
+                      onClick={async () => {
+                        setIsMerging(true);
+                        try {
+                          if (onMergeAccount) await onMergeAccount(mergeSourceCuenta, targetAcc);
+                          if (cuentaActiva === mergeSourceCuenta) setCuentaActiva(targetAcc);
+                          setMergeSourceCuenta(null);
+                        } finally {
+                          setIsMerging(false);
+                        }
+                      }}
+                      className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-bold text-gray-800 dark:text-gray-200 md:hover:border-orange-400 transition-colors flex justify-between items-center outline-none disabled:opacity-50"
+                    >
+                      <span>Unir dentro de: {parseAccountName(targetAcc)}</span>
+                      {isMerging ? <Loader2 size={16} className="animate-spin text-orange-500" /> : <ArrowRightLeft size={16} className="text-orange-500" />}
+                    </motion.button>
+                  ))}
+              </div>
+              <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setMergeSourceCuenta(null)} className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-bold outline-none">Cancelar</motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showReleaseModal && (

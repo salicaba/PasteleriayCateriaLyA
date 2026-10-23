@@ -30,6 +30,19 @@ export const usePosMutations = ({
   // 🔥 PILAR 3: Candado asíncrono infalible a nivel de hook
   const lockRef = useRef(false);
 
+  // 🔥 NUEVO: Extrae el descuento de ticket activo de una cuenta específica
+  const getAccountTicketDiscount = (cuentaTarget) => {
+    const discountItem = cart.find(
+      i => i.isVirtualDiscount && i.status !== 'CANCELLED' && (i.cuenta || 'General') === (cuentaTarget || 'General')
+    );
+    if (!discountItem) return null;
+    return {
+      promoId: discountItem.promoId,
+      name: discountItem.nombre || 'Descuento Promoción',
+      amount: Math.abs(Number(discountItem.precio) * (discountItem.qty || 1))
+    };
+  };
+
   const mapDBItemToLocal = (dbItem, itemsNuevos = []) => {
       let parsedPreps = [];
       if (dbItem.notes) { 
@@ -66,7 +79,7 @@ export const usePosMutations = ({
         preventUnlock = false;
     }
 
-    const itemsNuevos = cart.filter(p => !p.enviadoCocina);
+    const itemsNuevos = cart.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
     if (itemsNuevos.length === 0) { 
       if (!preventUnlock && onComplete) onComplete(); 
       return activeOrderId; 
@@ -125,8 +138,8 @@ export const usePosMutations = ({
       if (allItemsFromDB.length > 0) {
           const updatedNewItems = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
           setCart(prev => {
-              const unsentLocal = prev.filter(p => !p.enviadoCocina && !itemsNuevos.includes(p));
-              const previouslySent = prev.filter(p => p.enviadoCocina && !allItemsFromDB.some(db => String(db.id) === String(p.backendItemId)));
+              const unsentLocal = prev.filter(p => (!p.enviadoCocina && !itemsNuevos.includes(p)) || p.isVirtualDiscount);
+              const previouslySent = prev.filter(p => p.enviadoCocina && !p.isVirtualDiscount && !allItemsFromDB.some(db => String(db.id) === String(p.backendItemId)));
               return [...previouslySent, ...updatedNewItems, ...unsentLocal];
           });
       } else {
@@ -167,16 +180,21 @@ export const usePosMutations = ({
     try {
       let targetOrderId = activeOrderId;
 
-      if (cart.some(p => !p.enviadoCocina)) {
+      if (cart.some(p => !p.enviadoCocina && !p.isVirtualDiscount)) {
         // 🔥 Esperamos SECUENCIALMENTE a que termine, mandando true para que no libere el candado
         targetOrderId = await simulateKitchenSend(true);
       }
       
       const method = paymentDetails?.method || 'efectivo';
+      const ticketDiscount = getAccountTicketDiscount('General');
       
-      // 🔥 Usamos el targetOrderId garantizado, en lugar del activeOrderId de React (que tarda en refrescarse)
+      // 🔥 Usamos el targetOrderId garantizado, enviando el ticketDiscount corregido
       if (targetOrderId) {
-        await client.put(`/pos/orders/${targetOrderId}/pay`, { isFullPayment: true, paymentMethod: method });
+        await client.put(`/pos/orders/${targetOrderId}/pay`, { 
+          isFullPayment: true, 
+          paymentMethod: method,
+          ticketDiscount 
+        });
       }
       
       setOrderStatus('PAID');
@@ -236,7 +254,7 @@ export const usePosMutations = ({
                    if (idx === -1) { 
                      idx = newCart.findIndex(p => 
                        p.id === subItem.id && p.precio === subItem.precio && 
-                       p.cuenta === (subItem.cuenta || 'General') && !!p.isTakeaway === !!subItem.isTakeaway && 
+                       (p.cuenta || 'General') === (subItem.cuenta || 'General') && !!p.isTakeaway === !!subItem.isTakeaway && 
                        !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr
                      ); 
                    }
@@ -244,7 +262,7 @@ export const usePosMutations = ({
                    if(idx !== -1) {
                        const existingIdx = newCart.findIndex(p => 
                          p.id === subItem.id && p.precio === subItem.precio && 
-                         p.cuenta === target && !!p.isTakeaway === !!subItem.isTakeaway && 
+                         (p.cuenta || 'General') === target && !!p.isTakeaway === !!subItem.isTakeaway && 
                          !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr
                        );
                        
@@ -278,12 +296,69 @@ export const usePosMutations = ({
         if (dbMoveMade && allItemsFromDB) {
             const updatedCart = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem));
             setCart(prev => { 
-              const unsentLocal = prev.filter(p => !p.enviadoCocina); 
+              const unsentLocal = prev.filter(p => !p.enviadoCocina || p.isVirtualDiscount); 
               return [...updatedCart, ...unsentLocal]; 
             });
         }
     } catch (error) { 
       triggerNotification("Error al mover los ítems de cuenta.", "error");
+      throw error;
+    } finally {
+      lockRef.current = false;
+      setIsProcessing(false);
+    }
+  };
+
+  // 🔥 NUEVO: UNIR CUENTAS (Para amigos/familia que juntan su consumo en una sola cuenta)
+  const mergeAccountToCuenta = async (sourceCuenta, targetCuenta) => {
+    if (!sourceCuenta || !targetCuenta || sourceCuenta === targetCuenta) return;
+    if (cuentasPagadasReales.includes(sourceCuenta) || cuentasPagadasReales.includes(targetCuenta)) {
+      if (triggerNotification) triggerNotification("No se pueden unir cuentas que ya están cobradas.", "error");
+      return;
+    }
+
+    if (lockRef.current) return;
+    lockRef.current = true;
+    setIsProcessing(true);
+
+    try {
+      const itemsToMove = cart.filter(
+        i => (i.cuenta || 'General') === sourceCuenta && i.status !== 'CANCELLED' && !i.isVirtualDiscount
+      );
+
+      let allItemsFromDB = null;
+      let dbMoveMade = false;
+
+      for (const item of itemsToMove.filter(i => i.enviadoCocina && i.backendItemId)) {
+        const response = await client.put(`/pos/orders/items/${item.backendItemId}/move`, {
+          targetCuenta: targetCuenta,
+          qtyToMove: item.qty
+        });
+        allItemsFromDB = response.data.orderItems || [];
+        dbMoveMade = true;
+      }
+
+      setCart(prev => {
+        const unsentUpdated = prev
+          .filter(p => !p.enviadoCocina && !p.isVirtualDiscount)
+          .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta } : p));
+
+        if (dbMoveMade && allItemsFromDB) {
+          const updatedSent = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem));
+          const virtualDiscounts = prev.filter(p => p.isVirtualDiscount);
+          return [...updatedSent, ...unsentUpdated, ...virtualDiscounts];
+        } else {
+          return prev
+            .filter(p => !p.isVirtualDiscount)
+            .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta } : p));
+        }
+      });
+
+      if (triggerNotification) {
+        triggerNotification(`Cuentas unidas en "${parseAccountName(targetCuenta)}"`, 'success');
+      }
+    } catch (error) {
+      if (triggerNotification) triggerNotification("Error al unir las cuentas.", "error");
       throw error;
     } finally {
       lockRef.current = false;
@@ -427,7 +502,7 @@ export const usePosMutations = ({
         if (response.data.orderItems) {
             const updatedCart = response.data.orderItems.map(dbItem => mapDBItemToLocal(dbItem));
             setCart(prev => { 
-              const unsentLocal = prev.filter(p => !p.enviadoCocina); 
+              const unsentLocal = prev.filter(p => !p.enviadoCocina || p.isVirtualDiscount); 
               return [...updatedCart, ...unsentLocal]; 
             });
         } else {
@@ -451,7 +526,7 @@ export const usePosMutations = ({
   };
 
   const cancelAccountItems = async (cuentaName, cancelReason = 'Cancelación de cuenta') => {
-    const itemsToCancel = cart.filter(item => (item.cuenta || 'General') === cuentaName && item.enviadoCocina && item.status !== 'CANCELLED');
+    const itemsToCancel = cart.filter(item => (item.cuenta || 'General') === (cuentaName || 'General') && item.enviadoCocina && item.status !== 'CANCELLED');
     if (itemsToCancel.length === 0) return;
     
     if (lockRef.current) return;
@@ -501,7 +576,7 @@ export const usePosMutations = ({
   };
 
   const validateAllDelivered = (cuentaName = null) => { 
-    const itemsToCheck = cart.filter(c => (cuentaName ? c.cuenta === cuentaName : true) && c.status !== 'CANCELLED'); 
+    const itemsToCheck = cart.filter(c => (cuentaName ? (c.cuenta || 'General') === (cuentaName || 'General') : true) && c.status !== 'CANCELLED' && !c.isVirtualDiscount); 
     if (itemsToCheck.length === 0) return false;
     const hasPendingDelivery = itemsToCheck.some(item => !item.enviadoCocina || ['PENDING', 'PREPARING', 'READY'].includes(item.kitchenStatus));
     return !hasPendingDelivery;
@@ -514,8 +589,15 @@ export const usePosMutations = ({
 
     try {
       const method = paymentDetails?.method || 'efectivo'; 
+      const ticketDiscount = getAccountTicketDiscount(nombreCuenta);
+
       if(activeOrderId) {
-        await client.put(`/pos/orders/${activeOrderId}/pay`, { cuentaName: nombreCuenta, isFullPayment: false, paymentMethod: method });
+        await client.put(`/pos/orders/${activeOrderId}/pay`, { 
+          cuentaName: nombreCuenta, 
+          isFullPayment: false, 
+          paymentMethod: method,
+          ticketDiscount
+        });
       }
       setPaidAccounts(prev => {
           const newArr = Array.from(new Set([...prev, nombreCuenta]));
@@ -576,7 +658,7 @@ export const usePosMutations = ({
 
   return {
     isSuccess, isProcessing,
-    simulateKitchenSend, moveItemToCuenta, toggleDeliveredStatus, deliverAllActiveItems,
+    simulateKitchenSend, moveItemToCuenta, mergeAccountToCuenta, toggleDeliveredStatus, deliverAllActiveItems,
     cancelItem, cancelAccountItems, cancelFullOrder, payCuenta, handleCheckout, handleCloseTable, handlePrintTicket,
     validateAllDelivered, releaseAccount
   };
