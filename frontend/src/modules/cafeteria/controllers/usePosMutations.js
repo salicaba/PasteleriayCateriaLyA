@@ -51,6 +51,16 @@ export const usePosMutations = ({
       }
       if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
       
+      // 🔥 Detectar si la meta de notas indica que fue transferido
+      let isTransferredVal = dbItem.isTransferred || false;
+      try {
+        const notesObj = JSON.parse(dbItem.notes || '[]');
+        if (Array.isArray(notesObj)) {
+          const promoMeta = notesObj.find(n => n && n._isPromoMeta);
+          if (promoMeta && promoMeta.isTransferred) isTransferredVal = true;
+        }
+      } catch(e) {}
+      
       return { 
         id: dbItem.productId, 
         nombre: dbItem.product?.name || dbItem.product?.nombre || 'Producto', 
@@ -67,13 +77,13 @@ export const usePosMutations = ({
         requiereCocina: itemsNuevos.find(n => String(n.id) === String(dbItem.productId))?.requiereCocina !== false,
         isAutoPromo: dbItem.isAutoPromo || false,
         promoLabel: dbItem.promoLabel || null,
-        precioOriginal: dbItem.precioOriginal || null
+        precioOriginal: dbItem.precioOriginal || null,
+        isTransferred: isTransferredVal // 👈 Asignado aquí para bloquear promos de artículo
       };
   };
 
   // 🔥 FIX: preventUnlock evita que se libere el candado si otra función (como Cobrar) lo llamó
   const simulateKitchenSend = async (preventUnlock = false, onComplete = null) => {
-    // Soporte para mantener compatibilidad si se manda la función como primer argumento
     if (typeof preventUnlock === 'function') {
         onComplete = preventUnlock;
         preventUnlock = false;
@@ -95,7 +105,6 @@ export const usePosMutations = ({
     try {
       let orderId = activeOrderId;
       if (!orderId) {
-        // 🔥 FIX 500 ERROR: Añadimos 'vitrina' a isLlevarMode para que NUNCA envíe un tableId inválido
         const isLlevarMode = mesaActual?.zona === 'llevar' || mesaActual?.zona === 'vitrina';
         const res = await client.post('/pos/orders', { 
           orderType: isLlevarMode ? 'LLEVAR' : 'SALON', 
@@ -130,7 +139,7 @@ export const usePosMutations = ({
       
       if (response.data.newOrderId && response.data.newOrderId !== orderId) {
           setActiveOrderId(response.data.newOrderId);
-          orderId = response.data.newOrderId; // Actualizamos la referencia local
+          orderId = response.data.newOrderId; 
       }
 
       let allItemsFromDB = response.data.orderItems || response.data.items || response.data.order?.items || response.data.order?.OrderItems || [];
@@ -157,7 +166,7 @@ export const usePosMutations = ({
           }, 1500);
       }
 
-      return orderId; // 🔥 Retornamos el orderId fresquito
+      return orderId;
 
     } catch (error) { 
         if (!preventUnlock) setIsSuccess(false); 
@@ -172,23 +181,20 @@ export const usePosMutations = ({
   };
 
   const handleCheckout = async (paymentDetails, onComplete) => {
-    // 🔥 BLOQUEO MAESTRO: Si ya está procesando, ignora clics dobles
     if (lockRef.current) return;
     lockRef.current = true;
-    setIsProcessing(true); // Se muestra el loader instantáneamente
+    setIsProcessing(true);
 
     try {
       let targetOrderId = activeOrderId;
 
       if (cart.some(p => !p.enviadoCocina && !p.isVirtualDiscount)) {
-        // 🔥 Esperamos SECUENCIALMENTE a que termine, mandando true para que no libere el candado
         targetOrderId = await simulateKitchenSend(true);
       }
       
       const method = paymentDetails?.method || 'efectivo';
       const ticketDiscount = getAccountTicketDiscount('General');
       
-      // 🔥 Usamos el targetOrderId garantizado, enviando el ticketDiscount corregido
       if (targetOrderId) {
         await client.put(`/pos/orders/${targetOrderId}/pay`, { 
           isFullPayment: true, 
@@ -212,7 +218,6 @@ export const usePosMutations = ({
       if (triggerNotification) triggerNotification(error?.response?.data?.message || "Error al procesar el pago en caja", "error");
       throw error; 
     } finally {
-      // 🔥 LA LIBERACIÓN OCURRE SOLO HASTA EL FINAL DE TODO EL FLUJO
       lockRef.current = false;
       setIsProcessing(false);
     }
@@ -281,9 +286,9 @@ export const usePosMutations = ({
                        } else {
                            if (qtyFromThis < newCart[idx].qty) { 
                              newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - qtyFromThis, preparaciones: newCart[idx].preparaciones.slice(qtyFromThis) }; 
-                             newCart.push({ ...subItem, cuenta: target, qty: qtyFromThis, preparaciones: subItem.preparaciones.slice(0, qtyFromThis) }); 
+                             newCart.push({ ...subItem, cuenta: target, qty: qtyFromThis, preparaciones: subItem.preparaciones.slice(0, qtyFromThis), isTransferred: true }); 
                            } else { 
-                             newCart[idx] = { ...newCart[idx], cuenta: target }; 
+                             newCart[idx] = { ...newCart[idx], cuenta: target, isTransferred: true }; 
                            }
                        }
                    }
@@ -309,7 +314,6 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 NUEVO: UNIR CUENTAS (Para amigos/familia que juntan su consumo en una sola cuenta)
   const mergeAccountToCuenta = async (sourceCuenta, targetCuenta) => {
     if (!sourceCuenta || !targetCuenta || sourceCuenta === targetCuenta) return;
     if (cuentasPagadasReales.includes(sourceCuenta) || cuentasPagadasReales.includes(targetCuenta)) {
@@ -341,7 +345,7 @@ export const usePosMutations = ({
       setCart(prev => {
         const unsentUpdated = prev
           .filter(p => !p.enviadoCocina && !p.isVirtualDiscount)
-          .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta } : p));
+          .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta, isTransferred: true } : p));
 
         if (dbMoveMade && allItemsFromDB) {
           const updatedSent = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem));
@@ -350,7 +354,7 @@ export const usePosMutations = ({
         } else {
           return prev
             .filter(p => !p.isVirtualDiscount)
-            .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta } : p));
+            .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta, isTransferred: true } : p));
         }
       });
 

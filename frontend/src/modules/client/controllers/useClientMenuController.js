@@ -1,5 +1,5 @@
 // src/modules/client/controllers/useClientMenuController.js
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import client from '../../../api/client';
 import { socket } from '../../../api/socket';
 import { getInitialTheme, getInitialSize, THEME_CLASSES, SIZES } from '../views/utils/clientMenuUtils';
@@ -234,7 +234,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     cartUtils
   ]);
 
-  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO
+  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO (Con recálculo dinámico de TICKET_DISCOUNT)
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -310,9 +310,55 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
                     return prev;
                 }
 
-                // Preservamos descuentos globales virtuales si existían en la nota
-                const virtualDiscounts = (prev.items || []).filter(i => i.isVirtualDiscount);
-                const mergedItems = [...newItems, ...virtualDiscounts];
+                const activePhysicalItems = newItems.filter(item => item.status !== 'CANCELLED' && !item.isVirtualDiscount);
+                const physicalSubtotal = activePhysicalItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
+
+                // 🔥 Recalcular Descuento por Ticket en vivo según los productos actuales en la Nota del Cliente
+                const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+                const today = new Date(nowInChiapasStr).getDay();
+
+                const ticketPromos = (cartUtils.promotions || []).filter(p => {
+                    const rawActive = p.isActive ?? p.is_active ?? p.status;
+                    const isActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+                    let validDays = [];
+                    try {
+                        const dRaw = p.validDays || p.valid_days;
+                        validDays = Array.isArray(dRaw) ? dRaw.map(Number) : (dRaw ? JSON.parse(dRaw).map(Number) : []);
+                    } catch (e) {}
+                    const validToday = validDays.length === 0 || validDays.includes(today);
+                    return isActive && validToday && p.type === 'TICKET_DISCOUNT';
+                });
+
+                const qualifyingPromos = ticketPromos
+                    .filter(p => physicalSubtotal > 0 && physicalSubtotal >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
+                    .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
+
+                const bestTicketPromo = qualifyingPromos[0];
+                let computedVirtualDiscounts = [];
+
+                if (bestTicketPromo && activePhysicalItems.length > 0) {
+                    const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
+                    const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
+                    let finalDiscountPrice = isPercentage ? (physicalSubtotal * (rawDiscount / 100)) : rawDiscount;
+                    finalDiscountPrice = -Math.min(physicalSubtotal, Math.abs(finalDiscountPrice));
+
+                    computedVirtualDiscounts.push({
+                        id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
+                        cartItemId: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
+                        nombre: bestTicketPromo.name || 'Descuento Global',
+                        precioOriginal: finalDiscountPrice,
+                        precioUnitario: finalDiscountPrice,
+                        qty: 1,
+                        status: 'ACTIVE',
+                        isAutoPromo: true,
+                        isVirtualDiscount: true,
+                        promoId: bestTicketPromo.id,
+                        promoType: 'TICKET_DISCOUNT',
+                        promoLabel: 'DESCUENTO EXTRA'
+                    });
+                }
+
+                const mergedItems = [...newItems, ...computedVirtualDiscounts];
                 const activeServerItems = mergedItems.filter(item => item.status !== 'CANCELLED');
                 const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
                 
@@ -362,7 +408,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
        socket.off('pos:update', checkStatus);
        socket.off('orderPaid', handleOrderPaid);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed]);
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed, cartUtils.promotions]);
 
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {

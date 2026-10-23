@@ -174,7 +174,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 promoLabel: item.promoLabel || null,
                 precioOriginal: item.precioOriginal || null,
                 promoId: item.promoId || null,
-                promoType: item.promoType || null
+                promoType: item.promoType || null,
+                isTransferred: item.isTransferred || false // 🔥 Conservar marca de producto movido
             };
         });
 

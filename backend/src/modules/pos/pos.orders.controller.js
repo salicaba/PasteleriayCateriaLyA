@@ -8,11 +8,13 @@ import Table from './Table.model.js';
 // ==========================================
 // 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN Y LIBERACIÓN
 // ==========================================
+// 1. En extractPromoMeta (al inicio del archivo):
 const extractPromoMeta = (item) => {
   const plainItem = item.toJSON ? item.toJSON() : item;
   plainItem.isAutoPromo = false;
   plainItem.promoLabel = null;
   plainItem.precioOriginal = null;
+  plainItem.isTransferred = false; // 🔥 Nuevo flag para bloquear promos de artículo al mover
   plainItem._isReleased = false; 
   
   if (plainItem.notes) {
@@ -24,6 +26,7 @@ const extractPromoMeta = (item) => {
                   plainItem.isAutoPromo = meta.isAutoPromo;
                   plainItem.promoLabel = meta.promoLabel;
                   plainItem.precioOriginal = meta.precioOriginal;
+                  plainItem.isTransferred = Boolean(meta.isTransferred);
               }
               if (parsedNotes.some(n => n && n._isReleased)) {
                   plainItem._isReleased = true;
@@ -380,6 +383,7 @@ export const getActiveOrders = async (req, res) => {
 // ==========================================
 // 🔄 MOVER / DIVIDIR PRODUCTO ENTRE CUENTAS
 // ==========================================
+// 2. En moveItemAccount: marcamos el producto movido con isTransferred: true
 export const moveItemAccount = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -399,6 +403,15 @@ export const moveItemAccount = async (req, res) => {
     const isAutoPromo = metaObj ? metaObj.isAutoPromo : false;
     const promoLabel = metaObj ? metaObj.promoLabel : null;
     const unitPrice = Number(item.subtotal) / item.quantity;
+
+    // 🔥 Meta para los ítems que se mueven (bloquea que disparen nuevas promos de producto)
+    const movedMetaObj = {
+      _isPromoMeta: true,
+      isAutoPromo: isAutoPromo,
+      promoLabel: promoLabel,
+      precioOriginal: metaObj?.precioOriginal || null,
+      isTransferred: true
+    };
     
     const existingItems = await OrderItem.findAll({
         where: { orderId: item.orderId, productId: item.productId, cuenta: targetCuenta, kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' }
@@ -417,8 +430,8 @@ export const moveItemAccount = async (req, res) => {
     const notesToMove = moveNotes.slice(0, qtyToMove);
     const remainingNotes = moveNotes.slice(qtyToMove);
 
+    notesToMove.push(movedMetaObj);
     if (metaObj) {
-        notesToMove.push(metaObj);
         remainingNotes.push(metaObj);
     }
     
@@ -430,7 +443,11 @@ export const moveItemAccount = async (req, res) => {
         const eMetaIdx = existingNotes.findIndex(n => n && n._isPromoMeta);
         if (eMetaIdx >= 0) existingNotes.splice(eMetaIdx, 1);
         
-        await existingItem.update({ quantity: existingItem.quantity + qtyToMove, subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove), notes: JSON.stringify([...existingNotes, ...notesToMove]) });
+        await existingItem.update({ 
+          quantity: existingItem.quantity + qtyToMove, 
+          subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove), 
+          notes: JSON.stringify([...existingNotes, ...notesToMove]) 
+        });
         if (qtyToMove >= item.quantity) { await item.destroy(); } 
         else { await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) }); }
     } else {
@@ -438,7 +455,7 @@ export const moveItemAccount = async (req, res) => {
            await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
            await OrderItem.create({ orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove, cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' });
         } else {
-           await item.update({ cuenta: targetCuenta });
+           await item.update({ cuenta: targetCuenta, notes: JSON.stringify(notesToMove) });
         }
     }
 
@@ -543,6 +560,9 @@ export const splitDeliverItem = async (req, res) => {
 // ==========================================
 // 🔍 ESTADO EN VIVO PARA CLIENTES (QR Público)
 // ==========================================
+// 3. En checkOrderStatus: emparejamiento flexible del nombre de cuenta para que el cliente siempre vea lo que el POS mueva a su nombre
+const cleanAccountBase = (str) => String(str || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
+
 export const checkOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -560,9 +580,15 @@ export const checkOrderStatus = async (req, res) => {
     const targetCuenta = order.orderType === 'LLEVAR' ? 'General' : cuenta;
     
     if (targetCuenta) {
-      const itemsCuenta = await OrderItem.findAll({ 
-        where: { orderId, cuenta: targetCuenta },
+      const allOrderItems = await OrderItem.findAll({ 
+        where: { orderId },
         include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+      });
+
+      const targetBase = cleanAccountBase(targetCuenta);
+      const itemsCuenta = allOrderItems.filter(i => {
+        if (order.orderType === 'LLEVAR') return (i.cuenta || 'General') === 'General';
+        return i.cuenta === targetCuenta || cleanAccountBase(i.cuenta) === targetBase;
       });
       
       if (itemsCuenta.length > 0) {
@@ -575,19 +601,21 @@ export const checkOrderStatus = async (req, res) => {
              } catch(e) { return false; }
          });
 
+         const isPaid = order.paidAccounts && Array.isArray(order.paidAccounts) && 
+                        order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase);
+
          if (allCancelled) {
              accountStatus = 'CANCELLED';
          } else if (isReleased) {
              accountStatus = 'CLOSED';
-         } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(targetCuenta)) {
+         } else if (isPaid) {
              accountStatus = 'PAID';
          } else {
              accountStatus = 'OPEN';
-             
              const activeItems = itemsCuenta.filter(i => i.status === 'ACTIVE');
              clientItems = activeItems.map(extractPromoMeta).filter(i => !i._isReleased);
          }
-      } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.includes(targetCuenta)) {
+      } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase)) {
          accountStatus = 'PAID';
       }
     }

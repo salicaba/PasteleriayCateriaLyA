@@ -1,4 +1,5 @@
 //frontend/src/modules/cafeteria/controllers/usePosCart.js
+//frontend/src/modules/cafeteria/controllers/usePosCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
@@ -160,7 +161,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const promoGroups = {}; 
 
     cleanCart.forEach(item => {
-        if (item.status === 'CANCELLED' || item.enviadoCocina || item.isVirtualDiscount) return;
+        // 🔥 Blindaje: Ignoramos ítems cancelados, enviados a cocina, transferidos o descuentos virtuales de ticket
+        if (item.status === 'CANCELLED' || item.enviadoCocina || item.isTransferred || item.isVirtualDiscount) return;
         
         let activePromo = null;
         if (item.isAutoPromo && item.promoId) {
@@ -263,7 +265,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
             // Si la cuenta ya está sellada/pagada, no calculamos descuentos virtuales
             if (cuentasPagadasReales.includes(cuenta)) return;
 
-            // Calculamos el subtotal de ESTA CUENTA en específico (sin mezclar mesas ni otras cuentas)
+            // Calculamos el subtotal de ESTA CUENTA en específico (sumando todo lo que tenga en la cuenta)
             const itemsCuenta = cleanCart.filter(item => (item.cuenta || 'General') === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount);
             const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (Number(item.precio) * item.qty), 0);
 
@@ -392,6 +394,13 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       let successNotification = null;
 
       setCart(prev => {
+        // 🔥 Helper: Excluye ítems transferidos o ya enviados al validar promos de artículo
+        const isEligiblePromoTrigger = (p) => 
+          (p.cuenta || 'General') === targetCuenta && 
+          p.status !== 'CANCELLED' && 
+          !p.enviadoCocina && 
+          !p.isTransferred;
+
         const detailStr = JSON.stringify(finalDetails);
         let newCart = [...prev];
         
@@ -409,8 +418,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     : [String(activePromo.productId || activePromo.product_id)];
 
                 if (triggerIds.includes(String(productWithDetails.id))) {
-                    const normalQtyInAccount = prev.filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-                    const ghostQtyInAccount = prev.filter(p => p.isAutoPromo && p.promoId === activePromo.id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                    const normalQtyInAccount = prev.filter(p => triggerIds.includes(String(p.id)) && isEligiblePromoTrigger(p) && !p.isAutoPromo).reduce((a, b) => a + b.qty, 0);
+                    const ghostQtyInAccount = prev.filter(p => p.isAutoPromo && p.promoId === activePromo.id && isEligiblePromoTrigger(p)).reduce((a, b) => a + b.qty, 0);
                     
                     const totalInCart = normalQtyInAccount + ghostQtyInAccount;
                     const buyTotal = Number(activePromo.buyQty || 2);
@@ -428,12 +437,12 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
                 if (triggerIds.includes(String(productWithDetails.id))) {
                     const currentBundles = Math.min(...triggerIds.map(id => 
-                        prev.filter(p => String(p.id) === id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0)
+                        prev.filter(p => String(p.id) === id && isEligiblePromoTrigger(p)).reduce((a,b)=>a+b.qty, 0)
                     ));
 
                     const triggerQtysAfter = {};
                     triggerIds.forEach(id => {
-                        let qty = prev.filter(p => String(p.id) === id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a,b)=>a+b.qty, 0);
+                        let qty = prev.filter(p => String(p.id) === id && isEligiblePromoTrigger(p)).reduce((a,b)=>a+b.qty, 0);
                         if (id === String(productWithDetails.id)) qty += 1;
                         triggerQtysAfter[id] = qty;
                     });
@@ -446,7 +455,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                         let otherItemsSum = 0;
                         triggerIds.forEach(id => {
                             if (id !== String(productWithDetails.id)) {
-                                const item = prev.find(p => String(p.id) === id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED');
+                                const item = prev.find(p => String(p.id) === id && isEligiblePromoTrigger(p));
                                 if (item) otherItemsSum += Number(item.precioOriginal || item.precio);
                             }
                         });
@@ -525,7 +534,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
             if (activePromo.type === 'NxM') {
                 const normalQtyInAccount = newCart
-                    .filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .filter(p => triggerIds.includes(String(p.id)) && isEligiblePromoTrigger(p) && !p.isAutoPromo)
                     .reduce((a, b) => a + b.qty, 0);
 
                 const pay = Number(activePromo.payQty || 1);
@@ -549,7 +558,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const rewardIds = activePromo.rewardProducts || [];
 
                 const totalTriggerQty = newCart
-                    .filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED')
+                    .filter(p => triggerIds.includes(String(p.id)) && isEligiblePromoTrigger(p) && !p.isAutoPromo)
                     .reduce((a, b) => a + b.qty, 0);
                 
                 const bundles = Math.floor(totalTriggerQty / reqQty);
@@ -576,8 +585,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                     }
                 }
             } else if (activePromo.type === 'NTH_FIXED') {
-                const normalQtyInAccount = newCart.filter(p => triggerIds.includes(String(p.id)) && (p.cuenta || 'General') === targetCuenta && !p.isAutoPromo && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
-                const ghostQtyInAccount = newCart.filter(p => p.isAutoPromo && p.promoId === activePromo.id && (p.cuenta || 'General') === targetCuenta && p.status !== 'CANCELLED').reduce((a, b) => a + b.qty, 0);
+                const normalQtyInAccount = newCart.filter(p => triggerIds.includes(String(p.id)) && isEligiblePromoTrigger(p) && !p.isAutoPromo).reduce((a, b) => a + b.qty, 0);
+                const ghostQtyInAccount = newCart.filter(p => p.isAutoPromo && p.promoId === activePromo.id && isEligiblePromoTrigger(p)).reduce((a, b) => a + b.qty, 0);
                 
                 const totalInCart = normalQtyInAccount + ghostQtyInAccount;
                 const buyTotal = Number(activePromo.buyQty || 2);
