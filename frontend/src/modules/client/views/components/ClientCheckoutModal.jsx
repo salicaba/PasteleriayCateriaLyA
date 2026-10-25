@@ -28,6 +28,16 @@ export default function ClientCheckoutModal({
     };
   }, []);
 
+  const regularItems = cart.filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT');
+  const ticketDiscounts = cart.filter(i => i.isVirtualDiscount || i.promoType === 'TICKET_DISCOUNT');
+
+  // Si el cliente vacía todos los productos de su carrito previo, cerramos el modal automáticamente
+  useEffect(() => {
+    if (regularItems.length === 0 && !promoWarning?.isOpen && !isSubmitting) {
+      onClose();
+    }
+  }, [regularItems.length, promoWarning?.isOpen, isSubmitting, onClose]);
+
   const handleAction = async (e, cartItemId, actionType, item = null) => {
     try {
       e.preventDefault();
@@ -67,9 +77,6 @@ export default function ClientCheckoutModal({
     }
   };
 
-  const regularItems = cart.filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT');
-  const ticketDiscounts = cart.filter(i => i.isVirtualDiscount || i.promoType === 'TICKET_DISCOUNT');
-
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex flex-col justify-end p-4">
       <div className="absolute inset-0" onClick={() => !isSubmitting && !actionLoading && !promoWarning?.isOpen && onClose()} />
@@ -95,7 +102,6 @@ export default function ClientCheckoutModal({
             const qty = Number(item.qty || 0);
             const precioTotalItem = precioUnitario * qty;
             
-            // Homologado con TicketCartGroup.jsx del POS
             const isCero = precioUnitario === 0;
             const isGhostPromo = item.isAutoPromo && isCero && item.promoType !== 'COMBO';
             const isNthPromo = item.isAutoPromo && (item.promoType === 'NTH_FIXED' || item.promoLabel?.includes('º') || item.promoLabel?.includes('REBAJADO'));
@@ -131,7 +137,7 @@ export default function ClientCheckoutModal({
                   </h4>
                   
                   {item.detalles && (
-                    <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-0.5 leading-tight text-justify">
+                    <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-0.5 leading-tight text-left">
                       {item.detalles.tamano && <span>{item.detalles.tamano}</span>}
                       {item.detalles.leche && <span>{item.detalles.tamano ? ' | ' : ''}{item.detalles.leche}</span>}
                       {item.detalles.extras && item.detalles.extras.length > 0 && <span> + {item.detalles.extras.join(', ')}</span>}
@@ -337,7 +343,7 @@ export default function ClientCheckoutModal({
                 ¿Romper Promoción?
               </h3>
               
-              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium mb-8 leading-relaxed px-2 text-justify">
+              <p className="text-sm text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium mb-8 leading-relaxed px-2 text-center">
                 {promoWarning.message}
               </p>
               

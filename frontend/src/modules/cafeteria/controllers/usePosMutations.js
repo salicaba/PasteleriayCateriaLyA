@@ -1,4 +1,4 @@
-// src/modules/cafeteria/controllers/usePosMutations.js
+// frontend/src/modules/cafeteria/controllers/usePosMutations.js
 import { useState, useRef } from 'react';
 import client from '../../../api/client.js';
 
@@ -22,15 +22,15 @@ export const usePosMutations = ({
   setPaidAccounts,
   setOrderStatus,
   cuentasPagadasReales,
-  triggerNotification
+  triggerNotification,
+  checkAndExecuteMove,
+  checkAndExecuteMerge // 👈 Recibido aquí
 }) => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
   
-  // 🔥 PILAR 3: Candado asíncrono infalible a nivel de hook
   const lockRef = useRef(false);
 
-  // 🔥 NUEVO: Extrae el descuento de ticket activo de una cuenta específica
   const getAccountTicketDiscount = (cuentaTarget) => {
     const discountItem = cart.find(
       i => i.isVirtualDiscount && i.status !== 'CANCELLED' && (i.cuenta || 'General') === (cuentaTarget || 'General')
@@ -51,7 +51,6 @@ export const usePosMutations = ({
       }
       if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
       
-      // 🔥 Detectar si la meta de notas indica que fue transferido
       let isTransferredVal = dbItem.isTransferred || false;
       try {
         const notesObj = JSON.parse(dbItem.notes || '[]');
@@ -78,11 +77,10 @@ export const usePosMutations = ({
         isAutoPromo: dbItem.isAutoPromo || false,
         promoLabel: dbItem.promoLabel || null,
         precioOriginal: dbItem.precioOriginal || null,
-        isTransferred: isTransferredVal // 👈 Asignado aquí para bloquear promos de artículo
+        isTransferred: isTransferredVal
       };
   };
 
-  // 🔥 FIX: preventUnlock evita que se libere el candado si otra función (como Cobrar) lo llamó
   const simulateKitchenSend = async (preventUnlock = false, onComplete = null) => {
     if (typeof preventUnlock === 'function') {
         onComplete = preventUnlock;
@@ -223,16 +221,13 @@ export const usePosMutations = ({
     }
   };
 
-  const moveItemToCuenta = async (item, target, qtyToMove = item.qty) => { 
-    if (cuentasPagadasReales.includes(target)) {
-        triggerNotification(`La cuenta "${parseAccountName(target)}" ya está cobrada. No puedes moverle más productos.`, 'error');
-        return;
-    }
-
+  // 🔥 EJECUTOR INTERNO DE MOVIMIENTO DE PRODUCTO INDIVIDUAL
+  const executeMoveItemToCuenta = async (item, target, qtyToMove, ruptureData = {}) => {
     if (lockRef.current) return;
     lockRef.current = true;
     setIsProcessing(true);
     const itemsToProcess = item._groupedItems || [item];
+    const { revokeMovedItemPromo = false, revokePromos = [] } = ruptureData;
     
     try {
         let remainingToMove = qtyToMove;
@@ -246,7 +241,9 @@ export const usePosMutations = ({
             if (subItem.enviadoCocina) {
                 const response = await client.put(`/pos/orders/items/${subItem.backendItemId}/move`, { 
                   targetCuenta: target, 
-                  qtyToMove: qtyFromThis 
+                  qtyToMove: qtyFromThis,
+                  revokeMovedItemPromo,
+                  revokePromos
                 });
                 allItemsFromDB = response.data.orderItems || [];
                 dbMoveMade = true;
@@ -265,17 +262,22 @@ export const usePosMutations = ({
                    }
                    
                    if(idx !== -1) {
+                       const movedUnitPrice = revokeMovedItemPromo 
+                         ? Number(subItem.precioOriginal || subItem.precioBase || subItem.precio) 
+                         : subItem.precio;
+
                        const existingIdx = newCart.findIndex(p => 
-                         p.id === subItem.id && p.precio === subItem.precio && 
+                         p.id === subItem.id && Number(p.precio).toFixed(2) === Number(movedUnitPrice).toFixed(2) && 
                          (p.cuenta || 'General') === target && !!p.isTakeaway === !!subItem.isTakeaway && 
-                         !p.enviadoCocina && JSON.stringify(p.preparaciones[0] || {}) === prepStr
+                         !p.enviadoCocina && !p.isAutoPromo && JSON.stringify(p.preparaciones[0] || {}) === prepStr
                        );
                        
                        if (existingIdx !== -1) {
                            newCart[existingIdx] = { 
                              ...newCart[existingIdx], 
                              qty: newCart[existingIdx].qty + qtyFromThis, 
-                             preparaciones: [...newCart[existingIdx].preparaciones, ...subItem.preparaciones.slice(0, qtyFromThis)] 
+                             preparaciones: [...newCart[existingIdx].preparaciones, ...subItem.preparaciones.slice(0, qtyFromThis)],
+                             isTransferred: true
                            };
                            
                            if (qtyFromThis < newCart[idx].qty) { 
@@ -284,11 +286,22 @@ export const usePosMutations = ({
                              newCart.splice(idx, 1); 
                            }
                        } else {
+                           const movedProps = {
+                             ...subItem,
+                             cuenta: target,
+                             precio: movedUnitPrice,
+                             isAutoPromo: revokeMovedItemPromo ? false : subItem.isAutoPromo,
+                             promoLabel: revokeMovedItemPromo ? null : subItem.promoLabel,
+                             promoId: revokeMovedItemPromo ? null : subItem.promoId,
+                             promoType: revokeMovedItemPromo ? null : subItem.promoType,
+                             isTransferred: true
+                           };
+
                            if (qtyFromThis < newCart[idx].qty) { 
                              newCart[idx] = { ...newCart[idx], qty: newCart[idx].qty - qtyFromThis, preparaciones: newCart[idx].preparaciones.slice(qtyFromThis) }; 
-                             newCart.push({ ...subItem, cuenta: target, qty: qtyFromThis, preparaciones: subItem.preparaciones.slice(0, qtyFromThis), isTransferred: true }); 
+                             newCart.push({ ...movedProps, qty: qtyFromThis, preparaciones: subItem.preparaciones.slice(0, qtyFromThis) }); 
                            } else { 
-                             newCart[idx] = { ...newCart[idx], cuenta: target, isTransferred: true }; 
+                             newCart[idx] = movedProps; 
                            }
                        }
                    }
@@ -314,14 +327,36 @@ export const usePosMutations = ({
     }
   };
 
-  const mergeAccountToCuenta = async (sourceCuenta, targetCuenta) => {
-    if (!sourceCuenta || !targetCuenta || sourceCuenta === targetCuenta) return;
-    if (cuentasPagadasReales.includes(sourceCuenta) || cuentasPagadasReales.includes(targetCuenta)) {
-      if (triggerNotification) triggerNotification("No se pueden unir cuentas que ya están cobradas.", "error");
-      return;
-    }
+  // 🔥 FUNCIÓN PÚBLICA DE MOVIMIENTO INDIVIDUAL (Con alerta de ruptura)
+  const moveItemToCuenta = (item, target, qtyToMove = item.qty) => { 
+  if (cuentasPagadasReales.includes(target)) {
+      triggerNotification(`La cuenta "${parseAccountName(target)}" ya está cobrada. No puedes moverle más productos.`, 'error');
+      return Promise.resolve(false);
+  }
 
-    if (lockRef.current) return;
+  return new Promise((resolve) => {
+    if (typeof checkAndExecuteMove === 'function') {
+      checkAndExecuteMove(
+        item,
+        target,
+        qtyToMove,
+        async (ruptureData) => {
+          await executeMoveItemToCuenta(item, target, qtyToMove, ruptureData);
+          resolve(true);
+        },
+        () => {
+          resolve(false);
+        }
+      );
+    } else {
+      executeMoveItemToCuenta(item, target, qtyToMove).then(() => resolve(true));
+    }
+  });
+};
+
+  // 🔥 EJECUTOR INTERNO DE UNIÓN DE CUENTAS
+  const executeMergeAccountToCuenta = async (sourceCuenta, targetCuenta) => {
+    if (lockRef.current) return false;
     lockRef.current = true;
     setIsProcessing(true);
 
@@ -336,38 +371,82 @@ export const usePosMutations = ({
       for (const item of itemsToMove.filter(i => i.enviadoCocina && i.backendItemId)) {
         const response = await client.put(`/pos/orders/items/${item.backendItemId}/move`, {
           targetCuenta: targetCuenta,
-          qtyToMove: item.qty
+          qtyToMove: item.qty,
+          revokeMovedItemPromo: Boolean(item.isAutoPromo)
         });
         allItemsFromDB = response.data.orderItems || [];
         dbMoveMade = true;
       }
 
+      const normalizeUnsentMoved = (p) => {
+        if ((p.cuenta || 'General') !== sourceCuenta) return p;
+        const regularPrice = p.isAutoPromo ? Number(p.precioOriginal || p.precioBase || p.precio || 0) : p.precio;
+        return {
+          ...p,
+          cuenta: targetCuenta,
+          precio: regularPrice,
+          isAutoPromo: false,
+          promoLabel: null,
+          promoId: null,
+          promoType: null,
+          isTransferred: true
+        };
+      };
+
       setCart(prev => {
         const unsentUpdated = prev
           .filter(p => !p.enviadoCocina && !p.isVirtualDiscount)
-          .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta, isTransferred: true } : p));
+          .map(normalizeUnsentMoved);
 
         if (dbMoveMade && allItemsFromDB) {
           const updatedSent = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem));
-          const virtualDiscounts = prev.filter(p => p.isVirtualDiscount);
+          const virtualDiscounts = prev.filter(p => p.isVirtualDiscount && (p.cuenta || 'General') !== sourceCuenta);
           return [...updatedSent, ...unsentUpdated, ...virtualDiscounts];
         } else {
           return prev
-            .filter(p => !p.isVirtualDiscount)
-            .map(p => ((p.cuenta || 'General') === sourceCuenta ? { ...p, cuenta: targetCuenta, isTransferred: true } : p));
+            .filter(p => !p.isVirtualDiscount || (p.cuenta || 'General') !== sourceCuenta)
+            .map(normalizeUnsentMoved);
         }
       });
 
       if (triggerNotification) {
         triggerNotification(`Cuentas unidas en "${parseAccountName(targetCuenta)}"`, 'success');
       }
+      return true;
     } catch (error) {
       if (triggerNotification) triggerNotification("Error al unir las cuentas.", "error");
-      throw error;
+      return false;
     } finally {
       lockRef.current = false;
       setIsProcessing(false);
     }
+  };
+
+  // 🔥 FUNCIÓN PÚBLICA DE UNIÓN DE CUENTAS (Con alerta de ruptura y retorno booleano)
+  const mergeAccountToCuenta = (sourceCuenta, targetCuenta) => {
+    if (!sourceCuenta || !targetCuenta || sourceCuenta === targetCuenta) return Promise.resolve(false);
+    if (cuentasPagadasReales.includes(sourceCuenta) || cuentasPagadasReales.includes(targetCuenta)) {
+      if (triggerNotification) triggerNotification("No se pueden unir cuentas que ya están cobradas.", "error");
+      return Promise.resolve(false);
+    }
+
+    return new Promise((resolve) => {
+      if (typeof checkAndExecuteMerge === 'function') {
+        checkAndExecuteMerge(
+          sourceCuenta,
+          targetCuenta,
+          async () => {
+            const ok = await executeMergeAccountToCuenta(sourceCuenta, targetCuenta);
+            resolve(ok);
+          },
+          () => {
+            resolve(false);
+          }
+        );
+      } else {
+        executeMergeAccountToCuenta(sourceCuenta, targetCuenta).then(resolve);
+      }
+    });
   };
 
   const flattenGroupedItems = (groupedItem) => {

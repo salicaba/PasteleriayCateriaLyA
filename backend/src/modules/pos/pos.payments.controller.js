@@ -60,10 +60,11 @@ export const payOrder = async (req, res) => {
 
     const orderItems = order.items || [];
     const activeItems = orderItems.filter(i => i.status === 'ACTIVE' || !i.status);
+    const targetAccountName = cuentaName || 'General';
     
     const itemsToPay = isFullPayment
-      ? activeItems.filter(i => !paidAccounts.includes(i.cuenta))
-      : activeItems.filter(i => i.cuenta === cuentaName);
+      ? activeItems.filter(i => !paidAccounts.includes(i.cuenta || 'General'))
+      : activeItems.filter(i => (i.cuenta || 'General') === targetAccountName);
 
     let amountCafeteria = 0;
     let amountPasteleria = 0;
@@ -113,14 +114,20 @@ export const payOrder = async (req, res) => {
       await anchorItem.update({ notes: JSON.stringify(anchorNotes) });
     }
 
-    if (!isFullPayment && cuentaName && !paidAccounts.includes(cuentaName)) {
-      paidAccounts.push(cuentaName);
+    if (isFullPayment) {
+      const allActiveAccs = Array.from(new Set(activeItems.map(i => i.cuenta || 'General')));
+      paidAccounts = Array.from(new Set([...paidAccounts, ...allActiveAccs]));
+    } else if (targetAccountName && !paidAccounts.includes(targetAccountName)) {
+      paidAccounts.push(targetAccountName);
     }
+
+    const allOrderAccounts = Array.from(new Set(activeItems.map(i => i.cuenta || 'General')));
+    const areAllAccountsPaid = allOrderAccounts.length > 0 && allOrderAccounts.every(acc => paidAccounts.includes(acc));
 
     const updatedTotalAmount = Math.max(0, Number(order.totalAmount) - discountAmt);
 
     await order.update({ 
-      status: isFullPayment ? 'PAID' : order.status, 
+      status: (isFullPayment || areAllAccountsPaid) ? 'PAID' : order.status, 
       paidAccounts: paidAccounts,
       totalAmount: updatedTotalAmount
     });
@@ -172,8 +179,8 @@ export const payOrder = async (req, res) => {
       orderId: order.id, 
       tableId: order.tableId, 
       ticketId: order.ticketId, 
-      isFullPayment, 
-      cuentaName 
+      isFullPayment: isFullPayment || areAllAccountsPaid, 
+      cuentaName: targetAccountName 
     });
 
     res.json({ message: 'Pago registrado con éxito en Caja', order });

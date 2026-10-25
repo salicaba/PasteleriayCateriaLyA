@@ -28,7 +28,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   const cartLogic = usePosCart(accounts.cuentaActiva, accounts.cuentasPagadasReales, showToast || triggerNotification);
 
-  // 🔥 1. PRIMERO declaramos mutations
+  // 🔥 1. PRIMERO declaramos mutations (conectando ambos guardianes de promociones)
   const mutations = usePosMutations({
     cart: cartLogic.cart,
     setCart: cartLogic.setCart,
@@ -39,7 +39,9 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     setPaidAccounts: accounts.setPaidAccounts,
     setOrderStatus,
     cuentasPagadasReales: accounts.cuentasPagadasReales,
-    triggerNotification: showToast || triggerNotification 
+    triggerNotification: showToast || triggerNotification,
+    checkAndExecuteMove: cartLogic.checkAndExecuteMove,
+    checkAndExecuteMerge: cartLogic.checkAndExecuteMerge
   });
 
   // 🔥 2. LUEGO declaramos el candado (Cooldown Lock)
@@ -175,7 +177,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
                 precioOriginal: item.precioOriginal || null,
                 promoId: item.promoId || null,
                 promoType: item.promoType || null,
-                isTransferred: item.isTransferred || false // 🔥 Conservar marca de producto movido
+                isTransferred: item.isTransferred || false
             };
         });
 
@@ -285,9 +287,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       }));
   };
 
-  // 🔥 WRAPPER PARA UNIR CUENTAS Y LIMPIAR LA CUENTA VACÍA
+  // 🔥 WRAPPER PARA UNIR CUENTAS: Solo elimina la pestaña si la unión fue confirmada
   const wrappedMergeAccount = async (sourceCuenta, targetCuenta) => {
-      await mutations.mergeAccountToCuenta(sourceCuenta, targetCuenta);
+      const wasMerged = await mutations.mergeAccountToCuenta(sourceCuenta, targetCuenta);
+      if (!wasMerged) return;
       if (sourceCuenta !== 'General') {
           setNombresCuentas(prev => prev.filter(c => c !== sourceCuenta));
       }
@@ -347,7 +350,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     isProcessing: mutations.isProcessing,
     simulateKitchenSend: mutations.simulateKitchenSend,
     moveItemToCuenta: mutations.moveItemToCuenta,
-    mergeAccountToCuenta: wrappedMergeAccount, // 👈 EXPORTADO AQUÍ
+    mergeAccountToCuenta: wrappedMergeAccount,
     toggleDeliveredStatus: mutations.toggleDeliveredStatus,
     handleCheckout: mutations.handleCheckout, 
     handleCloseTable: mutations.handleCloseTable, 

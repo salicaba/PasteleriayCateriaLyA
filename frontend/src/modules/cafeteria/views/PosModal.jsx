@@ -1,3 +1,4 @@
+// frontend/src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift } from 'lucide-react';
@@ -92,13 +93,12 @@ export const PosModal = ({
 
   const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
-  // 1. Donde extraes de usePosController (línea ~95):
   const { 
     cart, total, addToCart, removeFromCart, deleteLine, 
     handleCheckout, handleCloseTable, handlePrintTicket, isSuccess,
     unsentTotal, hasUnsentItems, simulateKitchenSend, toggleDeliveredStatus,
     cuentaActiva, setCuentaActiva, cuentasDisponibles, addNewCuenta, getSubtotalByCuenta, payCuenta,
-    moveItemToCuenta, mergeAccountToCuenta, orderStatus, paidAccounts, validateAllDelivered, // 👈 Añade mergeAccountToCuenta aquí
+    moveItemToCuenta, mergeAccountToCuenta, orderStatus, paidAccounts, validateAllDelivered,
     toggleItemTakeaway, cuentasTelefonos, deliverAllActiveItems, cancelItem, cancelFullOrder, cancelAccountItems,
     releaseAccount, promoWarning, confirmPromoRupture, cancelPromoRupture,
     pendingPromoReward, setPendingPromoReward, claimPromoReward,
@@ -165,7 +165,7 @@ export const PosModal = ({
     
     if (cuentaName && cuentaName !== 'Todas') shareLink += `?cuenta=${encodeURIComponent(cuentaName)}`;
 
-    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺️️ *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
+    const direccionTexto = `📍 *UBICACIÓN:* Segunda Calle Ote. Nte., Nuevo Mexico, 30540 Pijijiapan, Chis.\n🗺 *VER MAPA:* https://maps.app.goo.gl/hTiGxsjqGc5VEr5A8?g_st=a`;
     
     let textoCuenta = '';
     if (isVitrina) {
@@ -343,14 +343,13 @@ export const PosModal = ({
 
   if (!isOpen || !mesa) return null;
 
-  // 2. Más abajo, dentro de sidebarProps (línea ~285):
   const sidebarProps = {
     cart: activeCart, total, hasUnsentItems, unsentTotal, mesaTotal: total - unsentTotal,
     onAdd: addToCart, onRemove: removeFromCart, onDelete: deleteLine,
     onSendToKitchen: handleSendToKitchen, onCheckout: handleOpenCheckout,
     cuentaActiva, setCuentaActiva, cuentasDisponibles: cleanCuentasDisponibles, addNewCuenta, getSubtotalByCuenta,
     onPayCuenta: handleOpenPayCuenta, onMoveItem: moveItemToCuenta,
-    onMergeAccount: mergeAccountToCuenta, // 👈 Añade esta línea aquí
+    onMergeAccount: mergeAccountToCuenta,
     orderStatus, paidAccounts,
     onPrintTicket: (c) => {
       let telefonoPredeterminado = '';
@@ -366,7 +365,7 @@ export const PosModal = ({
     isLlevar: (isLlevar || isVitrina), 
     isVitrina, 
     toggleItemTakeaway, cuentasTelefonos,
-    onDeliverAll: deliverAllActiveItems,          
+    onDeliverAll: deliverAllActiveItems,           
     onCancelItem: cancelItem,                    
     onCancelFullOrder: cancelFullOrder,
     onCancelAccount: cancelAccountItems,
@@ -409,7 +408,6 @@ export const PosModal = ({
               />
             </div>
             
-            {/* 🌟 AQUÍ ESTÁ EL BOTÓN DE ALERTA DE PROMOS SUSPENDIDAS (PING ROJO) */}
             <AnimatePresence>
               {suspendedPromos?.length > 0 && (
                 <motion.div 
@@ -558,216 +556,220 @@ export const PosModal = ({
     </div>
   );
 
+  // 🔥 Capas flotantes compartidas (Funcionan tanto en modal normal como en modo inline/Mostrador)
+  const floatingOverlays = typeof document !== 'undefined' ? createPortal(
+    <div className="relative z-[9999]">
+      {/* 🌟 MODAL CÁPSULA: SELECCIÓN DE RECOMPENSA (Adaptado a BOGO y NxM) */}
+      <AnimatePresence>
+        {pendingPromoReward && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-lg w-full rounded-[2.5rem] shadow-2xl p-6 md:p-8 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="h-14 w-14 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-[1.25rem] flex items-center justify-center shrink-0">
+                  <Gift size={28} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight">¡Promoción Desbloqueada!</h3>
+                  <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
+                    {pendingPromoReward.discountValue === 0 || pendingPromoReward.discountValue === undefined 
+                      ? 'Elige tu producto GRATIS (Base)' 
+                      : `Elige tu recompensa a $${pendingPromoReward.discountValue.toFixed(2)}`
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
+                {allGlobalProducts
+                  .filter(p => {
+                    const isMatch = pendingPromoReward.poolProductIds.some(promoId => String(promoId).toLowerCase() === String(p.id).toLowerCase());
+                    const hasStock = !p.controlarStock || p.stock > 0;
+                    return isMatch && hasStock;
+                  })
+                  .map(p => {
+                    const pName = p.nombre || p.name || 'Producto';
+                    const pImage = p.imageUrl || p.imagen || p.image || null;
+                    const isFree = pendingPromoReward.discountValue === 0 || pendingPromoReward.discountValue === undefined;
+
+                    return (
+                      <motion.button
+                        key={p.id}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => claimPromoReward(p, pendingPromoReward.promo, pendingPromoReward.targetCuenta, pendingPromoReward.earnedGhosts)}
+                        className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-400 dark:md:hover:border-emerald-500 transition-all outline-none group"
+                      >
+                        {pImage ? (
+                          <img 
+                            src={pImage} 
+                            alt={pName} 
+                            className="w-14 h-14 rounded-full object-cover mb-2 border border-gray-200 dark:border-gray-700 shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-700 mb-2 flex items-center justify-center shadow-sm">
+                            <Gift size={24} className="text-gray-400 dark:text-gray-500" />
+                          </div>
+                        )}
+                        
+                        <span className="text-[11px] sm:text-xs font-black text-gray-800 dark:text-white lya:text-lya-text text-center line-clamp-2 w-full leading-tight">
+                          {pName}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-500 mt-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                          {isFree ? 'Seleccionar GRATIS' : `Añadir por $${pendingPromoReward.discountValue.toFixed(2)}`}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+              </div>
+
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setPendingPromoReward(null)}
+                className="w-full py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
+              >
+                No, gracias
+              </motion.button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🌟 MODAL CÁPSULA: ALERTA DE RUPTURA DE PROMOCIÓN (Al eliminar, mover o unir cuentas) */}
+      <AnimatePresence>
+        {promoWarning?.isOpen && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-md w-full rounded-[2.5rem] shadow-2xl p-7 sm:p-8 flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
+            >
+              <div className="h-16 w-16 bg-amber-100 dark:bg-amber-900/30 text-amber-500 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                <AlertTriangle size={32} strokeWidth={2.5} />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-full mb-2">
+                Aviso de Promoción
+              </span>
+              <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text text-center mb-3">
+                ¿Confirmar cambio en promoción?
+              </h3>
+              <p className="text-sm font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 text-center mb-7 leading-relaxed">
+                {promoWarning.message}
+              </p>
+              <div className="flex w-full gap-3">
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={cancelPromoRupture}
+                  className="flex-1 py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
+                >
+                  Cancelar
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={confirmPromoRupture}
+                  className="flex-1 py-3.5 bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface font-black rounded-2xl md:hover:bg-orange-600 dark:md:hover:bg-orange-500 lya:md:hover:bg-lya-primary/90 transition-colors shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none"
+                >
+                  Sí, Continuar
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <TicketPreviewModal 
+        isOpen={!!previewTicketData} 
+        onClose={() => setPreviewTicketData(null)} 
+        cart={activeCart} 
+        mesa={mesa} 
+        cuentaName={previewTicketData?.cuentaName} 
+        telefonoPredeterminado={previewTicketData?.telefono}
+        onConfirmPrint={executeRealPrint} 
+        onSendWhatsApp={handleSendWhatsAppTicket} 
+        userName={nombreCajero}
+        cuentasPagadasReales={cuentasPagadasReales}
+        cuentasTelefonos={cuentasTelefonos} 
+      />
+
+      <AnimatePresence>
+        {localToast && (
+          <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center justify-center gap-3 font-semibold tracking-tight border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
+                localToast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
+                localToast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
+                'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
+              }`}
+            >
+              <div className={`p-1 rounded-full shrink-0 ${
+                localToast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
+                localToast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
+                'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
+              }`}>
+                {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
+              </div>
+              <span className="text-sm text-center">{localToast.msg}</span>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
+        {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
+        {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
+        
+        {showCheckout && (
+          <CheckoutModal 
+            isOpen={showCheckout} 
+            onClose={() => setShowCheckout(false)} 
+            total={total} 
+            initialTarget={checkoutTarget} 
+            cuentasResumen={cleanCuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} 
+            onConfirmPayment={handleFinalizePayment} 
+            orderType={isVitrina ? 'mostrador' : isLlevar ? 'llevar' : 'salon'}
+            validateAllDelivered={validateAllDelivered}
+          />
+        )}
+
+        {showOpcionesMesa && (
+          <OpcionesMesaModal 
+            isOpen={showOpcionesMesa} 
+            onClose={() => setShowOpcionesMesa(false)} 
+            mesa={mesa} 
+            todasLasMesas={todasLasMesas} 
+            onUnir={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} 
+          />
+        )}
+      </AnimatePresence>
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <>
       {inline ? (
         <div className="w-full h-full animate-fade-in">{posContent}</div>
       ) : (
         typeof document !== 'undefined' ? createPortal(
-          <>
-            <div className="fixed inset-0 z-[9980] flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden">
-              <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm z-0 transition-colors" />
-              <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative z-10 w-full h-[100dvh] md:h-[92vh] md:max-w-7xl shadow-2xl md:rounded-[2.5rem] flex flex-col overflow-hidden">
-                {posContent}
-              </motion.div>
-            </div>
-
-            <div className="relative z-[9999]">
-                
-                {/* 🌟 MODAL CÁPSULA: SELECCIÓN DE RECOMPENSA (Adaptado a BOGO y NxM) */}
-                <AnimatePresence>
-                  {pendingPromoReward && (
-                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-lg w-full rounded-[2.5rem] shadow-2xl p-6 md:p-8 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-                      >
-                        <div className="flex items-center gap-4 mb-6">
-                          <div className="h-14 w-14 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-[1.25rem] flex items-center justify-center shrink-0">
-                            <Gift size={28} strokeWidth={2.5} />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight">¡Promoción Desbloqueada!</h3>
-                            <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                              {pendingPromoReward.discountValue === 0 || pendingPromoReward.discountValue === undefined 
-                                ? 'Elige tu producto GRATIS (Base)' 
-                                : `Elige tu recompensa a $${pendingPromoReward.discountValue.toFixed(2)}`
-                              }
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2 mb-6">
-                          {allGlobalProducts
-                            .filter(p => {
-                              const isMatch = pendingPromoReward.poolProductIds.some(promoId => String(promoId).toLowerCase() === String(p.id).toLowerCase());
-                              const hasStock = !p.controlarStock || p.stock > 0;
-                              return isMatch && hasStock;
-                            })
-                            .map(p => {
-                              const pName = p.nombre || p.name || 'Producto';
-                              const pImage = p.imageUrl || p.imagen || p.image || null;
-                              const isFree = pendingPromoReward.discountValue === 0 || pendingPromoReward.discountValue === undefined;
-
-                              return (
-                                <motion.button
-                                  key={p.id}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => claimPromoReward(p, pendingPromoReward.promo, pendingPromoReward.targetCuenta, pendingPromoReward.earnedGhosts)}
-                                  className="flex flex-col items-center justify-center p-3 bg-gray-50 dark:bg-gray-800 lya:bg-lya-bg rounded-[1.5rem] border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:border-emerald-400 dark:md:hover:border-emerald-500 transition-all outline-none group"
-                                >
-                                  {pImage ? (
-                                    <img 
-                                      src={pImage} 
-                                      alt={pName} 
-                                      className="w-14 h-14 rounded-full object-cover mb-2 border border-gray-200 dark:border-gray-700 shadow-sm"
-                                    />
-                                  ) : (
-                                    <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-700 mb-2 flex items-center justify-center shadow-sm">
-                                      <Gift size={24} className="text-gray-400 dark:text-gray-500" />
-                                    </div>
-                                  )}
-                                  
-                                  <span className="text-[11px] sm:text-xs font-black text-gray-800 dark:text-white lya:text-lya-text text-center line-clamp-2 w-full leading-tight">
-                                    {pName}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-emerald-500 mt-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                                    {isFree ? 'Seleccionar GRATIS' : `Añadir por $${pendingPromoReward.discountValue.toFixed(2)}`}
-                                  </span>
-                                </motion.button>
-                              );
-                            })}
-                        </div>
-
-                        <motion.button 
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setPendingPromoReward(null)}
-                          className="w-full py-4 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
-                        >
-                          No, gracias
-                        </motion.button>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
-                {/* MODAL CÁPSULA: ALERTA DE RUPTURA DE PROMOCIÓN */}
-                <AnimatePresence>
-                  {promoWarning?.isOpen && (
-                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-sm w-full rounded-[2.5rem] shadow-2xl p-8 flex flex-col items-center border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
-                      >
-                        <div className="h-16 w-16 bg-amber-100 dark:bg-amber-900/30 text-amber-500 rounded-full flex items-center justify-center mb-5">
-                          <AlertTriangle size={32} strokeWidth={2.5} />
-                        </div>
-                        <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text text-center mb-2 line-clamp-2">
-                          Ruptura de Promoción
-                        </h3>
-                        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-justify mb-8 leading-relaxed">
-                          {promoWarning.message}
-                        </p>
-                        <div className="flex w-full gap-3">
-                          <motion.button 
-                            whileTap={{ scale: 0.95 }}
-                            onClick={cancelPromoRupture}
-                            className="flex-1 py-3.5 bg-gray-100 dark:bg-gray-800 lya:bg-lya-border/30 text-gray-600 dark:text-gray-300 lya:text-lya-text font-black rounded-2xl md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
-                          >
-                            Cancelar
-                          </motion.button>
-                          <motion.button 
-                            whileTap={{ scale: 0.95 }}
-                            onClick={confirmPromoRupture}
-                            className="flex-1 py-3.5 bg-orange-500 dark:bg-orange-600 lya:bg-lya-primary text-white lya:text-lya-surface font-black rounded-2xl md:hover:bg-orange-600 dark:md:hover:bg-orange-500 lya:md:hover:bg-lya-primary/90 transition-colors shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none"
-                          >
-                            Aceptar
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
-                <TicketPreviewModal 
-                  isOpen={!!previewTicketData} 
-                  onClose={() => setPreviewTicketData(null)} 
-                  cart={activeCart} 
-                  mesa={mesa} 
-                  cuentaName={previewTicketData?.cuentaName} 
-                  telefonoPredeterminado={previewTicketData?.telefono}
-                  onConfirmPrint={executeRealPrint} 
-                  onSendWhatsApp={handleSendWhatsAppTicket} 
-                  userName={nombreCajero}
-                  cuentasPagadasReales={cuentasPagadasReales}
-                  cuentasTelefonos={cuentasTelefonos} 
-                />
-
-                <AnimatePresence>
-                  {localToast && (
-                    <div className="fixed top-8 left-0 right-0 z-[9999] flex justify-center pointer-events-none px-4">
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
-                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
-                        className={`bg-white/95 dark:bg-gray-900/95 lya:bg-lya-surface/95 backdrop-blur-xl text-gray-800 dark:text-white lya:text-lya-text px-5 py-3 rounded-full shadow-2xl flex items-center justify-center gap-3 font-semibold tracking-tight border pointer-events-auto transition-colors max-w-md w-full sm:w-auto text-center ${
-                          localToast.type === 'success' ? 'border-emerald-200/50 dark:border-emerald-900/30 lya:border-lya-primary/30' :
-                          localToast.type === 'warning' ? 'border-amber-200/50 dark:border-amber-900/30 lya:border-amber-500/30' :
-                          'border-red-200/50 dark:border-red-900/30 lya:border-red-500/30'
-                        }`}
-                      >
-                        <div className={`p-1 rounded-full shrink-0 ${
-                          localToast.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-lya-primary/20 text-emerald-500 lya:text-lya-primary' :
-                          localToast.type === 'warning' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-500 lya:text-amber-400' :
-                          'bg-red-100 dark:bg-red-500/20 text-red-500 lya:text-red-400'
-                        }`}>
-                          {localToast.type === 'success' ? <CheckCircle2 size={20} strokeWidth={2.5} /> : localToast.type === 'warning' ? <AlertTriangle size={20} strokeWidth={2.5} /> : <AlertCircle size={20} strokeWidth={2.5} />}
-                        </div>
-                        <span className="text-sm text-center">{localToast.msg}</span>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {(isSuccess && !isVitrina) && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen /></motion.div>}
-                  {paymentSuccessData && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9990]"><SuccessScreen title={paymentSuccessData.title} message={paymentSuccessData.message} /></motion.div>}
-                  {selectedProduct && <ProductOptionsModal product={selectedProduct} isVitrina={isVitrina} isLlevar={isLlevar} onClose={() => setSelectedProduct(null)} onConfirm={handleConfirmOption} />}
-                  
-                  {showCheckout && (
-                    <CheckoutModal 
-                      isOpen={showCheckout} 
-                      onClose={() => setShowCheckout(false)} 
-                      total={total} 
-                      initialTarget={checkoutTarget} 
-                      cuentasResumen={cleanCuentasDisponibles.map(n => ({nombre: n, subtotal: getSubtotalByCuenta(n)})).filter(c => c.subtotal > 0)} 
-                      onConfirmPayment={handleFinalizePayment} 
-                      orderType={isVitrina ? 'mostrador' : isLlevar ? 'llevar' : 'salon'}
-                      validateAllDelivered={validateAllDelivered}
-                    />
-                  )}
-
-                  {showOpcionesMesa && (
-                    <OpcionesMesaModal 
-                      isOpen={showOpcionesMesa} 
-                      onClose={() => setShowOpcionesMesa(false)} 
-                      mesa={mesa} 
-                      todasLasMesas={todasLasMesas} 
-                      onUnir={(origen, destino) => { setShowOpcionesMesa(false); onUnirMesas(origen, destino); }} 
-                    />
-                  )}
-                </AnimatePresence>
-                
-            </div>
-          </>,
+          <div className="fixed inset-0 z-[9980] flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden">
+            <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="hidden" onClick={onClose} className="absolute inset-0 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm z-0 transition-colors" />
+            <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" className="relative z-10 w-full h-[100dvh] md:h-[92vh] md:max-w-7xl shadow-2xl md:rounded-[2.5rem] flex flex-col overflow-hidden">
+              {posContent}
+            </motion.div>
+          </div>,
           document.body
         ) : null
       )}
+      {floatingOverlays}
     </>
   );
 };

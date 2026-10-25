@@ -1,5 +1,4 @@
-//frontend/src/modules/cafeteria/controllers/usePosCart.js
-//frontend/src/modules/cafeteria/controllers/usePosCart.js
+// frontend/src/modules/cafeteria/controllers/usePosCart.js
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { getDefaultCustomizations } from '../utils/posHelpers.js';
 import { socket } from '../../../api/socket.js';
@@ -18,8 +17,21 @@ const parseValidDays = (daysData) => {
   return [];
 };
 
+const formatAccountDisplayName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s;
+};
+
 export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotification) => {
   const [_cart, _setCart] = useState([]);
+  const cartRef = useRef([]);
   const [promotions, setPromotions] = useState([]);
   const isProcessingRef = useRef(false);
 
@@ -31,6 +43,10 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
 
   const [suspendedPromos, setSuspendedPromos] = useState([]);
   const alertedPromosRef = useRef(new Set());
+
+  useEffect(() => {
+    cartRef.current = _cart;
+  }, [_cart]);
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -161,7 +177,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const promoGroups = {}; 
 
     cleanCart.forEach(item => {
-        // 🔥 Blindaje: Ignoramos ítems cancelados, enviados a cocina, transferidos o descuentos virtuales de ticket
         if (item.status === 'CANCELLED' || item.enviadoCocina || item.isTransferred || item.isVirtualDiscount) return;
         
         let activePromo = null;
@@ -262,10 +277,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
         const cuentasEnCarrito = [...new Set(cleanCart.map(item => item.cuenta || 'General'))];
 
         cuentasEnCarrito.forEach(cuenta => {
-            // Si la cuenta ya está sellada/pagada, no calculamos descuentos virtuales
             if (cuentasPagadasReales.includes(cuenta)) return;
 
-            // Calculamos el subtotal de ESTA CUENTA en específico (sumando todo lo que tenga en la cuenta)
             const itemsCuenta = cleanCart.filter(item => (item.cuenta || 'General') === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount);
             const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (Number(item.precio) * item.qty), 0);
 
@@ -281,7 +294,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
                 const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
                 
                 let finalDiscountPrice = isPercentage ? (subtotalCuenta * (rawDiscount / 100)) : rawDiscount;
-                finalDiscountPrice = -Math.min(subtotalCuenta, Math.abs(finalDiscountPrice)); // Blindaje: Negativo y limitado al subtotal
+                finalDiscountPrice = -Math.min(subtotalCuenta, Math.abs(finalDiscountPrice));
 
                 if (ghostIdx !== -1) {
                     if (cleanCart[ghostIdx].precio !== finalDiscountPrice || cleanCart[ghostIdx].promoId !== bestTicketPromo.id) {
@@ -328,7 +341,9 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
   const setCart = (action) => {
     _setCart(prev => {
        const nextCart = typeof action === 'function' ? action(prev) : action;
-       return syncPromotions(nextCart);
+       const synced = syncPromotions(nextCart);
+       cartRef.current = synced;
+       return synced;
     });
   };
 
@@ -346,6 +361,7 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
           isOpen: true,
           message: `Al reducir o eliminar este artículo, se romperá una promoción y perderás un beneficio asociado. ¿Deseas continuar?`,
           onConfirm: () => {
+            cartRef.current = syncedNextCart;
             _setCart(syncedNextCart); 
             setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
           },
@@ -355,6 +371,230 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       }
       return rawNextCart;
     });
+  };
+
+  // 🔥 GUARDIÁN 1: RUPTURA DE PROMOCIÓN AL MOVER UN PRODUCTO INDIVIDUAL ENTRE CUENTAS
+  const checkAndExecuteMove = (item, targetCuenta, qtyToMove, onProceed, onCancelCallback) => {
+    const sourceCuenta = item.cuenta || 'General';
+    if (sourceCuenta === targetCuenta) {
+      return onProceed({ revokeMovedItemPromo: false, revokePromos: [] });
+    }
+
+    const currentCart = cartRef.current;
+    const sourceName = formatAccountDisplayName(sourceCuenta);
+    const targetName = formatAccountDisplayName(targetCuenta);
+
+    const brokenPromoNames = new Set();
+    let revokeMovedItemPromo = false;
+    const revokePromos = [];
+    const unsentGhostsToRevert = [];
+
+    if (item.isAutoPromo && !item.isVirtualDiscount) {
+      const pObj = promotions.find(p => String(p.id) === String(item.promoId));
+      brokenPromoNames.add(pObj?.name || item.promoLabel || `Promoción en ${item.nombre}`);
+      revokeMovedItemPromo = true;
+    }
+
+    const sourceAccountItems = currentCart.filter(
+      p => (p.cuenta || 'General') === sourceCuenta && p.status !== 'CANCELLED' && !p.isVirtualDiscount
+    );
+
+    const sourceGhosts = sourceAccountItems.filter(p => p.isAutoPromo && p !== item);
+
+    sourceGhosts.forEach(ghost => {
+      const promoDef = promotions.find(p => (ghost.promoId && String(p.id) === String(ghost.promoId))) 
+        || getActivePromo(ghost.id, ghost.stock, ghost.controlarStock);
+
+      const triggerIds = promoDef
+        ? (Array.isArray(promoDef.applyToProducts) && promoDef.applyToProducts.length > 0
+            ? promoDef.applyToProducts.map(String)
+            : [String(promoDef.productId || promoDef.product_id || ghost.id)])
+        : [String(ghost.id)];
+
+      if (!triggerIds.includes(String(item.id))) return;
+
+      const currentTriggerQty = sourceAccountItems
+        .filter(p => triggerIds.includes(String(p.id)) && !p.isAutoPromo && Boolean(p.enviadoCocina) === Boolean(ghost.enviadoCocina))
+        .reduce((sum, p) => sum + p.qty, 0);
+
+      const remainingTriggerQty = Math.max(0, currentTriggerQty - (!item.isAutoPromo ? qtyToMove : 0));
+
+      let supportedGhostsAfter = 0;
+      const pType = promoDef?.type || ghost.promoType || 'NxM';
+
+      if (pType === 'NxM') {
+        const pay = Number(promoDef?.payQty || 1);
+        const buy = Number(promoDef?.buyQty || 2);
+        supportedGhostsAfter = Math.floor(remainingTriggerQty / pay) * Math.max(1, buy - pay);
+      } else if (pType === 'BOGO') {
+        const buyReq = Number(promoDef?.buyQty || 1);
+        const rewardGiven = Number(promoDef?.payQty || 1);
+        supportedGhostsAfter = Math.floor(remainingTriggerQty / buyReq) * rewardGiven;
+      } else if (pType === 'NTH_FIXED') {
+        const buyTotal = Number(promoDef?.buyQty || 2);
+        const normalReq = Math.max(1, buyTotal - 1);
+        supportedGhostsAfter = Math.floor(remainingTriggerQty / normalReq);
+      } else if (pType === 'COMBO') {
+        const minTriggerAfter = Math.min(...triggerIds.map(tId => {
+          const totalOfTId = sourceAccountItems
+            .filter(p => String(p.id) === tId && Boolean(p.enviadoCocina) === Boolean(ghost.enviadoCocina))
+            .reduce((sum, p) => sum + p.qty, 0);
+          return String(item.id) === tId ? Math.max(0, totalOfTId - qtyToMove) : totalOfTId;
+        }));
+        supportedGhostsAfter = minTriggerAfter;
+      }
+
+      if (ghost.qty > supportedGhostsAfter) {
+        const qtyBroken = ghost.qty - supportedGhostsAfter;
+        const promoTitle = promoDef?.name || ghost.promoLabel || `Promoción en ${ghost.nombre}`;
+        brokenPromoNames.add(promoTitle);
+
+        if (ghost.enviadoCocina && ghost.backendItemId) {
+          revokePromos.push({ itemId: ghost.backendItemId, qtyToRevoke: qtyBroken });
+        } else if (!ghost.enviadoCocina) {
+          unsentGhostsToRevert.push({ ghostRef: ghost, qtyToRevert: qtyBroken });
+        }
+      }
+    });
+
+    const prevTicketDiscount = currentCart.find(
+      p => (p.cuenta || 'General') === sourceCuenta && (p.isVirtualDiscount || p.promoType === 'TICKET_DISCOUNT')
+    );
+
+    if (prevTicketDiscount) {
+      const currentSourceSubtotal = sourceAccountItems.reduce((acc, p) => acc + (Number(p.precio) * p.qty), 0);
+      const movedAmount = Number(item.precio) * qtyToMove;
+      const nextSourceSubtotal = Math.max(0, currentSourceSubtotal - movedAmount);
+
+      const ticketPromoObj = promotions.find(p => String(p.id) === String(prevTicketDiscount.promoId));
+      const minRequired = Number(ticketPromoObj?.minTicketAmount || ticketPromoObj?.min_ticket_amount || 0);
+
+      if (nextSourceSubtotal < minRequired) {
+        brokenPromoNames.add(prevTicketDiscount.nombre || 'Descuento por Cuenta');
+      }
+    }
+
+    const executeWithRevert = () => {
+      if (unsentGhostsToRevert.length > 0) {
+        _setCart(prev => {
+          const updated = [...prev];
+          unsentGhostsToRevert.forEach(({ ghostRef, qtyToRevert }) => {
+            const gIdx = updated.findIndex(p => p === ghostRef || (p.id === ghostRef.id && p.cuenta === ghostRef.cuenta && p.isAutoPromo && !p.enviadoCocina));
+            if (gIdx !== -1) {
+              const targetGhost = updated[gIdx];
+              const regularPrice = Number(targetGhost.precioOriginal || targetGhost.precioBase || targetGhost.precio || 0);
+              if (qtyToRevert >= targetGhost.qty) {
+                updated[gIdx] = {
+                  ...targetGhost,
+                  precio: regularPrice,
+                  isAutoPromo: false,
+                  promoLabel: null,
+                  promoId: null,
+                  promoType: null,
+                  isTransferred: true
+                };
+              } else {
+                updated[gIdx] = {
+                  ...targetGhost,
+                  qty: targetGhost.qty - qtyToRevert,
+                  preparaciones: targetGhost.preparaciones.slice(qtyToRevert)
+                };
+                updated.push({
+                  ...targetGhost,
+                  qty: qtyToRevert,
+                  preparaciones: targetGhost.preparaciones.slice(0, qtyToRevert),
+                  precio: regularPrice,
+                  isAutoPromo: false,
+                  promoLabel: null,
+                  promoId: null,
+                  promoType: null,
+                  isTransferred: true
+                });
+              }
+            }
+          });
+          cartRef.current = updated;
+          return updated;
+        });
+      }
+
+      onProceed({ revokeMovedItemPromo, revokePromos });
+    };
+
+    if (brokenPromoNames.size > 0) {
+      const brokenList = Array.from(brokenPromoNames).join(', ');
+      setPromoWarning({
+        isOpen: true,
+        message: `Al pasar este producto de "${sourceName}" a "${targetName}", se romperá la promoción "${brokenList}" en la cuenta de "${sourceName}". ¿Deseas continuar?`,
+        onConfirm: () => {
+          setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
+          executeWithRevert();
+        },
+        onCancel: () => {
+          setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
+          if (onCancelCallback) onCancelCallback(); // 👈 SOLO FALTABA ESTA LÍNEA AQUÍ
+        }
+      });
+      return;
+    }
+
+    executeWithRevert();
+  };
+
+  // 🔥 GUARDIÁN 2: RUPTURA DE PROMOCIÓN AL UNIR CUENTAS COMPLETAS
+  const checkAndExecuteMerge = (sourceCuenta, targetCuenta, onProceed, onCancelCallback) => {
+    if (!sourceCuenta || !targetCuenta || sourceCuenta === targetCuenta) {
+      if (onCancelCallback) onCancelCallback();
+      return;
+    }
+
+    const currentCart = cartRef.current;
+    const sourceName = formatAccountDisplayName(sourceCuenta);
+    const targetName = formatAccountDisplayName(targetCuenta);
+
+    const brokenPromoNames = new Set();
+
+    // 1. Detectar promociones de artículos activas en la cuenta origen (se revocarán al moverse)
+    const sourcePromoItems = currentCart.filter(
+      p => (p.cuenta || 'General') === sourceCuenta && p.status !== 'CANCELLED' && p.isAutoPromo && !p.isVirtualDiscount
+    );
+
+    sourcePromoItems.forEach(item => {
+      const promoDef = promotions.find(p => (item.promoId && String(p.id) === String(item.promoId)))
+        || getActivePromo(item.id, item.stock, item.controlarStock);
+      brokenPromoNames.add(promoDef?.name || item.promoLabel || `Promoción en ${item.nombre}`);
+    });
+
+    // 2. Detectar si ambas cuentas tenían Descuento por Ticket por separado (al unirlas solo quedará 1 descuento por cuenta)
+    const sourceTicketDiscount = currentCart.find(
+      p => (p.cuenta || 'General') === sourceCuenta && (p.isVirtualDiscount || p.promoType === 'TICKET_DISCOUNT')
+    );
+    const targetTicketDiscount = currentCart.find(
+      p => (p.cuenta || 'General') === targetCuenta && (p.isVirtualDiscount || p.promoType === 'TICKET_DISCOUNT')
+    );
+
+    if (sourceTicketDiscount && targetTicketDiscount) {
+      brokenPromoNames.add(`${sourceTicketDiscount.nombre || 'Descuento por Cuenta'} (se unificará en una sola cuenta)`);
+    }
+
+    if (brokenPromoNames.size > 0) {
+      const brokenList = Array.from(brokenPromoNames).join(', ');
+      setPromoWarning({
+        isOpen: true,
+        message: `Al unir la cuenta de "${sourceName}" con "${targetName}", se perderá la promoción "${brokenList}" de "${sourceName}" (solo se mantendrá el Descuento por Ticket en "${targetName}" si cumple la meta). ¿Deseas continuar?`,
+        onConfirm: () => {
+          setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
+          onProceed();
+        },
+        onCancel: () => {
+          setPromoWarning({ isOpen: false, message: '', onConfirm: null, onCancel: null });
+          if (onCancelCallback) onCancelCallback();
+        }
+      });
+      return;
+    }
+
+    onProceed();
   };
 
   const addToCart = (productWithDetails, forceCuenta = null) => {
@@ -394,7 +634,6 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
       let successNotification = null;
 
       setCart(prev => {
-        // 🔥 Helper: Excluye ítems transferidos o ya enviados al validar promos de artículo
         const isEligiblePromoTrigger = (p) => 
           (p.cuenta || 'General') === targetCuenta && 
           p.status !== 'CANCELLED' && 
@@ -788,6 +1027,8 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     clearCartByAccount, clearEntireCart,
     promoWarning, confirmPromoRupture: () => promoWarning.onConfirm && promoWarning.onConfirm(), cancelPromoRupture: () => promoWarning.onCancel && promoWarning.onCancel(),
     pendingPromoReward, setPendingPromoReward, claimPromoReward,
-    suspendedPromos
+    suspendedPromos,
+    checkAndExecuteMove,
+    checkAndExecuteMerge // 👈 Exportado aquí
   };
 };

@@ -267,7 +267,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
             let newItems = [];
             serverItems.forEach(serverItem => {
                 let parsedNotes = [];
-                try { parsedNotes = JSON.parse(serverItem.notes || '[]'); } catch(e){}
+                try { 
+                    const rawNotes = JSON.parse(serverItem.notes || '[]'); 
+                    parsedNotes = Array.isArray(rawNotes) 
+                        ? rawNotes.filter(n => n && !n._isPromoMeta && !n._isReleased && !n._isTicketDiscountMeta) 
+                        : [];
+                } catch(e){}
                 const precioUnitario = Number(serverItem.subtotal) / (serverItem.quantity || 1);
                 
                 for(let i = 0; i < serverItem.quantity; i++) {
@@ -387,9 +392,10 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     const handleOrderPaid = (data) => {
       const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
       const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+      const cleanPaidAcc = String(data?.cuentaName || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
 
       if (isMyTable || isMyTakeaway) {
-          if (data.isFullPayment || (data.cuentaName && data.cuentaName.toLowerCase() === displayName.toLowerCase())) {
+          if (data.isFullPayment || (cleanPaidAcc && cleanPaidAcc === displayName.toLowerCase())) {
               setIsOrderPaid(true);
               localStorage.setItem('lya_client_order_paid', 'true');
               setIsConfirmed(true);

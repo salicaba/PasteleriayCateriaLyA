@@ -383,13 +383,14 @@ export const getActiveOrders = async (req, res) => {
 // ==========================================
 // 🔄 MOVER / DIVIDIR PRODUCTO ENTRE CUENTAS
 // ==========================================
-// 2. En moveItemAccount: marcamos el producto movido con isTransferred: true
 export const moveItemAccount = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { targetCuenta, qtyToMove } = req.body;
+    const { targetCuenta, qtyToMove, revokeMovedItemPromo = false, revokePromos = [] } = req.body;
     
-    const item = await OrderItem.findByPk(itemId);
+    const item = await OrderItem.findByPk(itemId, {
+      include: [{ model: Product, as: 'product', attributes: ['basePrice'] }]
+    });
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
     
     let moveNotes = [];
@@ -400,16 +401,18 @@ export const moveItemAccount = async (req, res) => {
     const metaIdx = moveNotes.findIndex(n => n && n._isPromoMeta);
     if (metaIdx >= 0) { metaObj = moveNotes.splice(metaIdx, 1)[0]; }
     
-    const isAutoPromo = metaObj ? metaObj.isAutoPromo : false;
-    const promoLabel = metaObj ? metaObj.promoLabel : null;
-    const unitPrice = Number(item.subtotal) / item.quantity;
+    const isAutoPromo = revokeMovedItemPromo ? false : (metaObj ? metaObj.isAutoPromo : false);
+    const promoLabel = revokeMovedItemPromo ? null : (metaObj ? metaObj.promoLabel : null);
+    const originalUnitPrice = Number(item.subtotal) / item.quantity;
+    const movedUnitPrice = revokeMovedItemPromo
+      ? Number(metaObj?.precioOriginal || item.product?.basePrice || originalUnitPrice)
+      : originalUnitPrice;
 
-    // 🔥 Meta para los ítems que se mueven (bloquea que disparen nuevas promos de producto)
     const movedMetaObj = {
       _isPromoMeta: true,
       isAutoPromo: isAutoPromo,
       promoLabel: promoLabel,
-      precioOriginal: metaObj?.precioOriginal || null,
+      precioOriginal: revokeMovedItemPromo ? null : (metaObj?.precioOriginal || null),
       isTransferred: true
     };
     
@@ -418,7 +421,7 @@ export const moveItemAccount = async (req, res) => {
     });
 
     const existingItem = existingItems.find(i => {
-        if ((Number(i.subtotal) / i.quantity) !== unitPrice) return false;
+        if ((Number(i.subtotal) / i.quantity) !== movedUnitPrice) return false;
         let eNotes = [];
         try { eNotes = JSON.parse(i.notes || '[]'); } catch(e){}
         const eMeta = eNotes.find(n => n && n._isPromoMeta);
@@ -445,24 +448,82 @@ export const moveItemAccount = async (req, res) => {
         
         await existingItem.update({ 
           quantity: existingItem.quantity + qtyToMove, 
-          subtotal: Number(existingItem.subtotal) + (unitPrice * qtyToMove), 
+          subtotal: Number(existingItem.subtotal) + (movedUnitPrice * qtyToMove), 
           notes: JSON.stringify([...existingNotes, ...notesToMove]) 
         });
         if (qtyToMove >= item.quantity) { await item.destroy(); } 
-        else { await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) }); }
+        else { await item.update({ quantity: item.quantity - qtyToMove, subtotal: originalUnitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) }); }
     } else {
         if (qtyToMove < item.quantity) {
-           await item.update({ quantity: item.quantity - qtyToMove, subtotal: unitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
-           await OrderItem.create({ orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: unitPrice * qtyToMove, cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' });
+           await item.update({ quantity: item.quantity - qtyToMove, subtotal: originalUnitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
+           await OrderItem.create({ orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: movedUnitPrice * qtyToMove, cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' });
         } else {
-           await item.update({ cuenta: targetCuenta, notes: JSON.stringify(notesToMove) });
+           await item.update({ cuenta: targetCuenta, subtotal: movedUnitPrice * item.quantity, notes: JSON.stringify(notesToMove) });
         }
     }
 
+    // 🔥 Si al mover este ítem se rompió una promoción de otro ítem en la cuenta origen, revertimos su precio a normal
+    if (Array.isArray(revokePromos) && revokePromos.length > 0) {
+      for (const rev of revokePromos) {
+        const ghostItem = await OrderItem.findByPk(rev.itemId, {
+          include: [{ model: Product, as: 'product', attributes: ['basePrice'] }]
+        });
+        if (!ghostItem || ghostItem.status !== 'ACTIVE') continue;
+
+        let gNotes = [];
+        try { gNotes = JSON.parse(ghostItem.notes || '[]'); } catch(e){}
+        if (!Array.isArray(gNotes)) gNotes = [gNotes];
+
+        let gMeta = null;
+        const gMetaIdx = gNotes.findIndex(n => n && n._isPromoMeta);
+        if (gMetaIdx >= 0) gMeta = gNotes.splice(gMetaIdx, 1)[0];
+
+        const regularPrice = Number(gMeta?.precioOriginal || ghostItem.product?.basePrice || (Number(ghostItem.subtotal) / ghostItem.quantity));
+        const currentGhostUnitPrice = Number(ghostItem.subtotal) / ghostItem.quantity;
+        const qtyRev = Math.min(ghostItem.quantity, Number(rev.qtyToRevoke || ghostItem.quantity));
+
+        const revokedMeta = { _isPromoMeta: true, isAutoPromo: false, promoLabel: null, precioOriginal: null, isTransferred: true };
+
+        if (qtyRev >= ghostItem.quantity) {
+          await ghostItem.update({
+            subtotal: regularPrice * ghostItem.quantity,
+            notes: JSON.stringify([...gNotes, revokedMeta])
+          });
+        } else {
+          const revNotes = gNotes.slice(0, qtyRev);
+          const remNotes = gNotes.slice(qtyRev);
+          if (gMeta) remNotes.push(gMeta);
+          revNotes.push(revokedMeta);
+
+          await ghostItem.update({
+            quantity: ghostItem.quantity - qtyRev,
+            subtotal: currentGhostUnitPrice * (ghostItem.quantity - qtyRev),
+            notes: JSON.stringify(remNotes)
+          });
+
+          await OrderItem.create({
+            orderId: ghostItem.orderId,
+            productId: ghostItem.productId,
+            quantity: qtyRev,
+            subtotal: regularPrice * qtyRev,
+            cuenta: ghostItem.cuenta,
+            notes: JSON.stringify(revNotes),
+            kitchenStatus: ghostItem.kitchenStatus,
+            isTakeaway: ghostItem.isTakeaway,
+            status: 'ACTIVE'
+          });
+        }
+      }
+    }
+
+    // Recalcular totalAmount de la orden
     const allItems = await OrderItem.findAll({
       where: { orderId: item.orderId, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
     });
+
+    const newOrderTotal = allItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
+    await Order.update({ totalAmount: newOrderTotal }, { where: { id: item.orderId } });
     
     getIO().emit('pos:update');
     const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);

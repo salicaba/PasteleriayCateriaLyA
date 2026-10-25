@@ -1,4 +1,4 @@
-// src/modules/cafeteria/views/TicketSidebar.jsx
+// frontend/src/modules/cafeteria/views/TicketSidebar.jsx
 import React, { useState, useRef } from 'react';
 import { Trash2, Minus, ArrowRightLeft, XCircle, ShoppingBag, AlertTriangle, Printer, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -407,19 +407,22 @@ export const TicketSidebar = ({
     }
   };
 
+  // 🔥 DRAG & DROP ENTRE CUENTAS: Espera la confirmación de ruptura antes de lanzar el toast
   const handleDropOnCuenta = async (cuentaName) => {
     setDragOverCuenta(null);
     if (draggedItem && draggedItem.cuentaName !== cuentaName && !cuentasPagadasReales.includes(cuentaName) && !isLlevar && !isVitrina) {
       
-      if (draggedItem.item.isAutoPromo || Number(draggedItem.item.precio) === 0) return;
+      // Solo bloqueamos arrastrar el descuento virtual de ticket; los productos físicos sí pueden moverse (con aviso de ruptura si aplica)
+      if (draggedItem.item.isVirtualDiscount) return;
 
-      let qtyToMove = draggedItem.item.qty;
-      const itemIdToProcess = draggedItem.item.backendItemId || draggedItem.item.id;
+      const itemToMove = draggedItem.item;
+      let qtyToMove = itemToMove.qty;
+      const itemIdToProcess = itemToMove.backendItemId || itemToMove.id;
 
       if (qtyToMove > 1) {
           openConfirmModal({
               title: 'Mover Producto',
-              message: `¿Cuántos "${draggedItem.item.nombre}" deseas mover a la cuenta de ${parseAccountName(cuentaName)}? (Máx: ${qtyToMove})`,
+              message: `¿Cuántos "${itemToMove.nombre}" deseas mover a la cuenta de ${parseAccountName(cuentaName)}? (Máx: ${qtyToMove})`,
               icon: ArrowRightLeft, color: 'blue', confirmText: 'Mover Producto',
               requireInput: true, inputType: 'number', inputMax: qtyToMove, inputDefault: qtyToMove.toString(),
               onConfirm: async (val) => { 
@@ -427,8 +430,10 @@ export const TicketSidebar = ({
                   if (qty > 0 && qty <= qtyToMove) { 
                       setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
                       try {
-                        await onMoveItem(draggedItem.item, cuentaName, qty); 
-                        toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
+                        const wasMoved = await onMoveItem(itemToMove, cuentaName, qty); 
+                        if (wasMoved !== false) {
+                          toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
+                        }
                       } catch (error) {
                         toast('Error al mover el producto', 'error');
                       } finally {
@@ -440,8 +445,10 @@ export const TicketSidebar = ({
       } else {
           setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
           try {
-            await onMoveItem(draggedItem.item, cuentaName, 1);
-            toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
+            const wasMoved = await onMoveItem(itemToMove, cuentaName, 1);
+            if (wasMoved !== false) {
+              toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
+            }
           } catch (error) {
             toast('Error al mover el producto', 'error');
           } finally {
@@ -449,7 +456,7 @@ export const TicketSidebar = ({
           }
       }
     }
-  }
+  };
 
   const cuentasCancelables = Array.from(
     new Set(activeCart.filter(i => i.enviadoCocina).map(i => i.cuenta || 'General'))
@@ -559,8 +566,8 @@ export const TicketSidebar = ({
                   <ArrowRightLeft size={24} />
                 </div>
                 <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">Unir Cuenta</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Selecciona a qué cuenta deseas pasar todos los productos de <b>{parseAccountName(mergeSourceCuenta)}</b> para juntar consumos y aplicar promociones:
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                  Selecciona a qué cuenta deseas pasar todos los productos de <b>{parseAccountName(mergeSourceCuenta)}</b> (aplicará Descuento por Ticket si el acumulado llega a la meta):
                 </p>
               </div>
               <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
@@ -572,11 +579,17 @@ export const TicketSidebar = ({
                       whileTap={!isMerging ? { scale: 0.95 } : {}}
                       disabled={isMerging}
                       onClick={async () => {
+                        const sourceToMerge = mergeSourceCuenta;
                         setIsMerging(true);
+                        // Cerramos el selector primero para que no se encime si se abre el modal de ruptura de promoción
+                        setMergeSourceCuenta(null);
                         try {
-                          if (onMergeAccount) await onMergeAccount(mergeSourceCuenta, targetAcc);
-                          if (cuentaActiva === mergeSourceCuenta) setCuentaActiva(targetAcc);
-                          setMergeSourceCuenta(null);
+                          if (onMergeAccount) {
+                            const wasMerged = await onMergeAccount(sourceToMerge, targetAcc);
+                            if (wasMerged && cuentaActiva === sourceToMerge) {
+                              setCuentaActiva(targetAcc);
+                            }
+                          }
                         } finally {
                           setIsMerging(false);
                         }

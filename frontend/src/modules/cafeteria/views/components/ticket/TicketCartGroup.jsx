@@ -1,4 +1,4 @@
-// src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
+// frontend/src/modules/cafeteria/views/components/ticket/TicketCartGroup.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, User, ShoppingBag, CheckCircle, CheckCircle2, Lock, Phone, GripVertical, Info, Minus, Plus, XCircle, ChefHat, Loader2, Printer, Tag, Image as ImageIcon, AlertTriangle, ArrowRightLeft } from 'lucide-react';
@@ -44,11 +44,11 @@ export const TicketCartGroup = ({
 
     setActionLocks(prev => ({ ...prev, [lockKey]: true }));
     try {
-      await actionFn(); // 🔥 Ahora espera a que termine la acción de la BD
+      await actionFn();
     } finally {
       setTimeout(() => {
         setActionLocks(prev => ({ ...prev, [lockKey]: false }));
-      }, 400); // Pequeño debounce anti-rebote táctil
+      }, 400);
     }
   };
 
@@ -135,7 +135,7 @@ export const TicketCartGroup = ({
   // 🔥 ORDEN COMBO BLINDADO: Prioridad -> Alfabético -> Ancla por ID
   const sortedDisplayItems = [...displayItems].sort((a, b) => {
     const getPriority = (item) => {
-      if (item.isVirtualDiscount) return 3; // El descuento global va al final de todo
+      if (item.isVirtualDiscount) return 3;
       const status = (item.kitchenStatus || '').toUpperCase();
       if (!item.enviadoCocina) return 0;
       if (status === 'READY' || status === 'DELIVERED') return 2;
@@ -191,7 +191,7 @@ export const TicketCartGroup = ({
   return (
     <motion.div 
       layout="position"
-      data-cuenta-drop={cuentaName} // 👈 IDENTIFICADOR PARA ARRASTRE TÁCTIL
+      data-cuenta-drop={cuentaName}
       initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
@@ -352,13 +352,15 @@ export const TicketCartGroup = ({
       <div className="px-2 pb-2 space-y-2">
         {sortedDisplayItems.map((item, index) => {
           
-          const isVirtualDiscount = item.isVirtualDiscount === true; // 🔥 Identificador Jefe Final
+          const isVirtualDiscount = item.isVirtualDiscount === true;
           const isCero = Number(item.precio) === 0;
           const isGhostPromo = item.isAutoPromo && isCero && item.promoType !== 'COMBO';
           const isNthPromo = item.isAutoPromo && item.promoLabel && (item.promoLabel.includes('º') || item.promoLabel.includes('REBAJADO'));
           const isComboPromo = item.isAutoPromo && item.promoType === 'COMBO';
 
           const isLockedPromo = isGhostPromo || isNthPromo || isComboPromo || isVirtualDiscount;
+          // 🔥 Permitimos arrastrar cualquier producto físico a otra cuenta (solo bloqueamos el descuento virtual de ticket)
+          const canBeDraggedToOtherAccount = !isCuentaPagada && !isLlevar && !isVitrina && !isVirtualDiscount;
           
           const isAnyPromo = item.isAutoPromo || (item.precioOriginal && Number(item.precioOriginal) > Number(item.precio));
           const pOriginal = item.precioOriginal || (isGhostPromo ? item.precioBase || null : null);
@@ -402,7 +404,7 @@ export const TicketCartGroup = ({
 
           let containerClasses = "relative group flex flex-col p-3 rounded-2xl transition-all overflow-hidden border ";
           
-          if (!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo) {
+          if (canBeDraggedToOtherAccount && !isLocalProcessingToggle) {
               containerClasses += "cursor-grab active:cursor-grabbing ";
           }
           if (draggedItem?.item === item) {
@@ -412,7 +414,6 @@ export const TicketCartGroup = ({
           }
 
           if (isVirtualDiscount) {
-              // 🔥 TICKET DISCOUNT STYLING
               containerClasses += "bg-emerald-50/80 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700/50 shadow-sm ";
           } else if (isAnyPromo) {
              if (item.enviadoCocina) {
@@ -437,9 +438,9 @@ export const TicketCartGroup = ({
             key={currentItemKey} 
             layout="position"
             transition={{ duration: 0.2, ease: "easeOut" }} 
-            draggable={!isCuentaPagada && !isLlevar && !isVitrina && !isLocalProcessingToggle && !isLockedPromo}
+            draggable={canBeDraggedToOtherAccount && !isLocalProcessingToggle}
             onDragStart={(e) => { 
-                if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo) return; 
+                if (!canBeDraggedToOtherAccount || isLocalProcessingToggle) return; 
                 onDragStart(item, cuentaName); 
                 e.dataTransfer.effectAllowed = 'move'; 
             }}
@@ -456,11 +457,11 @@ export const TicketCartGroup = ({
             <div className="flex gap-3">
               <div 
                 onTouchStart={(e) => {
-                  if (isCuentaPagada || isLlevar || isVitrina || isLocalProcessingToggle || isLockedPromo || availableAccs.length <= 1) return;
+                  if (!canBeDraggedToOtherAccount || isLocalProcessingToggle || availableAccs.length <= 1) return;
                   onDragStart(item, cuentaName);
                 }}
                 onTouchMove={(e) => {
-                  if (!draggedItem || isCuentaPagada || isLlevar || isVitrina) return;
+                  if (!draggedItem || !canBeDraggedToOtherAccount) return;
                   const touch = e.touches[0];
                   if (!touch) return;
                   const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -488,7 +489,7 @@ export const TicketCartGroup = ({
                 }}
                 className={clsx(
                   "w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center relative group-hover:shadow-inner shadow-sm transition-shadow",
-                  (!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo) && "touch-none",
+                  (canBeDraggedToOtherAccount && availableAccs.length > 1) && "touch-none",
                   isVirtualDiscount ? "bg-emerald-100/50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50" :
                   isAnyPromo ? "bg-rose-100/50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50" : "bg-white dark:bg-gray-900 lya:bg-lya-surface border border-gray-100 dark:border-gray-800 lya:border-lya-border/40"
                 )}
@@ -501,7 +502,7 @@ export const TicketCartGroup = ({
                   <ImageIcon className="text-gray-300 dark:text-gray-600 lya:text-[#C4B29A]" size={20} />
                 )}
                 
-                {!isCuentaPagada && availableAccs.length > 1 && !isVitrina && !isLockedPromo && (
+                {canBeDraggedToOtherAccount && availableAccs.length > 1 && (
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
                         <GripVertical size={16} className="text-white drop-shadow-md" />
                     </div>
@@ -662,18 +663,7 @@ export const TicketCartGroup = ({
                                     whileTap={!isRemovingLocal ? { scale: 0.9 } : {}} 
                                     disabled={isRemovingLocal}
                                     onClick={(e) => executeWithLock(e, lockKeyRemove, async () => {
-                                        if (isLockedPromo) {
-                                            openConfirmModal({
-                                                title: 'Romper Promoción',
-                                                message: `Vas a restar un producto de la promoción "${item.nombre}". Se restarán también los productos que la activan. ¿Confirmas?`,
-                                                icon: AlertTriangle,
-                                                color: 'red',
-                                                confirmText: 'Confirmar',
-                                                onConfirm: async () => await handleRemoveUnsent(createBreakFlag(item, 1))
-                                            });
-                                        } else {
-                                            await handleRemoveUnsent(item);
-                                        }
+                                        await handleRemoveUnsent(item);
                                     })} 
                                     className={clsx(
                                         "rounded-lg transition-colors outline-none", 

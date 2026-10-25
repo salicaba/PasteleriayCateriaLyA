@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, 
   ReceiptText, Check, PowerOff, Settings, Phone, Tag, Copy, Landmark, 
-  MessageCircle, CheckCircle2, Loader2, ChevronDown, LogOut, Gift, BadgePercent 
+  MessageCircle, CheckCircle2, Loader2, ChevronDown, LogOut, Gift, BadgePercent, ArrowRightLeft 
 } from 'lucide-react';
 import { socket } from '../../../api/socket.js';
 import client from '../../../api/client.js';
+
+const cleanAccountBase = (str) => String(str || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
 
 export default function ClientOrderSuccess({ 
   cart, totalCart, clientData, type, tableId, products, categories, 
@@ -129,6 +131,11 @@ export default function ClientOrderSuccess({
 
     const handleItemRestored = ({ orderId, itemId, item }) => {
         if (!item) return;
+        // Verificar que el ítem restaurado pertenezca a la cuenta de este cliente
+        if (type === 'mesa' && item.cuenta && cleanAccountBase(item.cuenta) !== cleanAccountBase(displayName)) {
+            return;
+        }
+
         setLiveCart(prev => {
             const exists = prev.find(p => String(p.backendItemId || p.id) === String(itemId));
             if (exists) {
@@ -137,7 +144,8 @@ export default function ClientOrderSuccess({
             
             let parsedPreps = [];
             try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
-            const meta = parsedPreps.find(p => p && p._isPromoMeta);
+            const meta = Array.isArray(parsedPreps) ? parsedPreps.find(p => p && p._isPromoMeta) : null;
+            const cleanPreps = Array.isArray(parsedPreps) ? parsedPreps.filter(p => p && !p._isPromoMeta && !p._isReleased && !p._isTicketDiscountMeta) : [];
             
             const safePrecioUnitario = Number(item.subtotal || 0) / Number(item.quantity || 1);
             const safePrecioOriginal = item.precioOriginal 
@@ -151,8 +159,8 @@ export default function ClientOrderSuccess({
                 imagen: item.product?.imageUrl || null,
                 precioUnitario: safePrecioUnitario,
                 qty: Number(item.quantity || 1),
-                detalles: parsedPreps.filter(p => !p._isPromoMeta)[0] || null,
-                preparaciones: parsedPreps,
+                detalles: cleanPreps[0] || null,
+                preparaciones: cleanPreps,
                 cuenta: item.cuenta || 'General',
                 isTakeaway: item.isTakeaway,
                 isAutoPromo: item.isAutoPromo ?? (meta ? meta.isAutoPromo : false),
@@ -194,9 +202,10 @@ export default function ClientOrderSuccess({
     const handleOrderPaid = (data) => {
         const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
         const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+        const cleanPaidAcc = cleanAccountBase(data?.cuentaName);
 
         if (isMyTable || isMyTakeaway) {
-            if (data.isFullPayment || (data.cuentaName && data.cuentaName.toLowerCase() === displayName.toLowerCase())) {
+            if (data.isFullPayment || (cleanPaidAcc && cleanPaidAcc === cleanAccountBase(displayName))) {
                 setLocalIsPaid(true);
             }
         }
@@ -429,7 +438,9 @@ export default function ClientOrderSuccess({
               ¡Listo, {primerNombre}!
             </h2>
             <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] px-4 text-center">
-              Tu orden está siendo preparada en cocina con mucho amor.
+              {regularItems.length === 0 && !localIsPaid
+                ? 'Tus productos fueron trasladados a otra cuenta de la mesa.'
+                : 'Tu orden está siendo preparada en cocina con mucho amor.'}
             </p>
           </div>
 
@@ -477,118 +488,133 @@ export default function ClientOrderSuccess({
             </div>
 
             <div className="space-y-4 max-h-[30vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
-              {regularItems.map((item, idx) => {
-                const unitPrice = Number(item.precioUnitario || 0);
-                const qty = Number(item.qty || 1);
-                const lineTotal = unitPrice * qty;
-                const isGhost = Boolean(item.isAutoPromo && unitPrice === 0);
-                const isPromoItem = Boolean(item.isAutoPromo || item.promoLabel);
-                const isCancelled = item.status === 'CANCELLED';
+              {regularItems.length === 0 ? (
+                <div className="py-6 px-3 text-center flex flex-col items-center justify-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-500 flex items-center justify-center">
+                    <ArrowRightLeft size={18} />
+                  </div>
+                  <p className="text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-[#3E2723]">
+                    No tienes productos activos en esta nota.
+                  </p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 lya:text-[#7A6353] leading-relaxed">
+                    Si pediste unir tu cuenta en caja, tus productos ahora se encuentran en la cuenta principal.
+                  </p>
+                </div>
+              ) : (
+                regularItems.map((item, idx) => {
+                  const unitPrice = Number(item.precioUnitario || 0);
+                  const qty = Number(item.qty || 1);
+                  const lineTotal = unitPrice * qty;
+                  const isGhost = Boolean(item.isAutoPromo && unitPrice === 0);
+                  const isPromoItem = Boolean(item.isAutoPromo || item.promoLabel);
+                  const isCancelled = item.status === 'CANCELLED';
 
-                const hasDetails = item.detalles && (
-                  item.detalles.tamano || 
-                  item.detalles.leche || 
-                  (Array.isArray(item.detalles.extras) && item.detalles.extras.length > 0) || 
-                  item.isTakeaway
-                );
+                  const cleanDetalles = (item.detalles && !item.detalles._isPromoMeta && !item.detalles._isReleased) ? item.detalles : null;
+                  const hasDetails = cleanDetalles && (
+                    cleanDetalles.tamano || 
+                    cleanDetalles.leche || 
+                    (Array.isArray(cleanDetalles.extras) && cleanDetalles.extras.length > 0) || 
+                    item.isTakeaway
+                  );
 
-                return (
-                  <div key={idx} className={`flex justify-between items-start text-sm font-medium pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0 transition-opacity ${isCancelled ? 'opacity-50 grayscale' : 'text-gray-800 dark:text-gray-200 lya:text-[#3E2723]'}`}>
-                    
-                    <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
-                      {isPromoItem && !isCancelled ? (
-                         <div className={`flex flex-col items-center justify-center rounded-lg px-2 py-1 shrink-0 border mt-0.5 ${
-                           isGhost 
-                             ? 'bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-100 border-emerald-200 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400' 
-                             : 'bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 border-rose-100 dark:border-rose-800/30 text-rose-600 dark:text-rose-400'
-                         }`}>
-                           {isGhost ? (
-                             <Gift size={13} className="mb-0.5" strokeWidth={2.5} />
-                           ) : (
-                             <Tag size={13} className="mb-0.5" strokeWidth={2.5} />
-                           )}
-                           <span className="font-black text-center text-[10px] tracking-wider">x{qty}</span>
-                         </div>
-                      ) : isCancelled ? (
-                         <span className="text-xs font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                           x{qty}
-                         </span>
-                      ) : (
-                         <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                           x{qty}
-                         </span>
-                      )}
+                  return (
+                    <div key={idx} className={`flex justify-between items-start text-sm font-medium pb-4 border-b border-gray-50 dark:border-gray-700/30 lya:border-[#EADCC9]/50 last:border-0 last:pb-0 transition-opacity ${isCancelled ? 'opacity-50 grayscale' : 'text-gray-800 dark:text-gray-200 lya:text-[#3E2723]'}`}>
                       
-                      <div className="flex-1 min-w-0 text-left">
-                        <span className={`font-bold block leading-tight ${isCancelled ? 'text-red-500 dark:text-red-400 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
-                          {item.nombre}
-                        </span>
+                      <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
+                        {isPromoItem && !isCancelled ? (
+                           <div className={`flex flex-col items-center justify-center rounded-lg px-2 py-1 shrink-0 border mt-0.5 ${
+                             isGhost 
+                               ? 'bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-100 border-emerald-200 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400' 
+                               : 'bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 border-rose-100 dark:border-rose-800/30 text-rose-600 dark:text-rose-400'
+                           }`}>
+                             {isGhost ? (
+                               <Gift size={13} className="mb-0.5" strokeWidth={2.5} />
+                             ) : (
+                               <Tag size={13} className="mb-0.5" strokeWidth={2.5} />
+                             )}
+                             <span className="font-black text-center text-[10px] tracking-wider">x{qty}</span>
+                           </div>
+                        ) : isCancelled ? (
+                           <span className="text-xs font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                             x{qty}
+                           </span>
+                        ) : (
+                           <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                             x{qty}
+                           </span>
+                        )}
                         
-                        {hasDetails && (
-                          <div className="text-[10px] opacity-75 mt-1 leading-snug font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
-                            {item.detalles?.tamano && <span>{item.detalles.tamano}</span>}
-                            {item.detalles?.leche && <span>{item.detalles?.tamano ? ' | ' : ''}{item.detalles.leche}</span>}
-                            {Array.isArray(item.detalles?.extras) && item.detalles.extras.length > 0 && (
-                              <span>{(item.detalles?.tamano || item.detalles?.leche) ? ' + ' : '+'}{item.detalles.extras.join(', ')}</span>
+                        <div className="flex-1 min-w-0 text-left">
+                          <span className={`font-bold block leading-tight ${isCancelled ? 'text-red-500 dark:text-red-400 line-through' : 'text-gray-900 dark:text-white lya:text-[#3E2723]'}`}>
+                            {item.nombre}
+                          </span>
+                          
+                          {hasDetails && (
+                            <div className="text-[10px] opacity-75 mt-1 leading-snug font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
+                              {cleanDetalles?.tamano && <span>{cleanDetalles.tamano}</span>}
+                              {cleanDetalles?.leche && <span>{cleanDetalles?.tamano ? ' | ' : ''}{cleanDetalles.leche}</span>}
+                              {Array.isArray(cleanDetalles?.extras) && cleanDetalles.extras.length > 0 && (
+                                <span>{(cleanDetalles?.tamano || cleanDetalles?.leche) ? ' + ' : '+'}{cleanDetalles.extras.join(', ')}</span>
+                              )}
+                              {item.isTakeaway && (
+                                <span className={`block font-bold mt-0.5 ${isCancelled ? 'text-red-400' : 'text-orange-500 dark:text-orange-400 lya:text-[#78350F]'}`}>
+                                  Empaque P/Llevar
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            {isCancelled && (
+                              <span className="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm border border-red-200 dark:border-red-800">
+                                Cancelado
+                              </span>
                             )}
-                            {item.isTakeaway && (
-                              <span className={`block font-bold mt-0.5 ${isCancelled ? 'text-red-400' : 'text-orange-500 dark:text-orange-400 lya:text-[#78350F]'}`}>
-                                Empaque P/Llevar
+
+                            {item.promoLabel && !isCancelled && (
+                              <span className={`inline-flex items-center gap-1 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm ${
+                                isGhost ? 'bg-emerald-500 dark:bg-emerald-600' : 'bg-rose-500 dark:bg-rose-600'
+                              }`}>
+                                {isGhost ? <Gift size={10} strokeWidth={3} /> : <Tag size={10} strokeWidth={3} />}
+                                <span>{item.promoLabel}</span>
+                              </span>
+                            )}
+                            
+                            {qty > 1 && !isGhost && (
+                              <span className="inline-block text-[9px] font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] tracking-wide uppercase">
+                                Unit: ${unitPrice.toFixed(2)}
+                              </span>
+                            )}
+                            
+                            {item.precioOriginal && !isCancelled && Number(item.precioOriginal) > unitPrice && (
+                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through shrink-0">
+                                Normal: ${Number(item.precioOriginal).toFixed(2)}
                               </span>
                             )}
                           </div>
-                        )}
-                        
-                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                          {isCancelled && (
-                            <span className="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm border border-red-200 dark:border-red-800">
-                              Cancelado
-                            </span>
-                          )}
-
-                          {item.promoLabel && !isCancelled && (
-                            <span className={`inline-flex items-center gap-1 text-white px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase shrink-0 shadow-sm ${
-                              isGhost ? 'bg-emerald-500 dark:bg-emerald-600' : 'bg-rose-500 dark:bg-rose-600'
-                            }`}>
-                              {isGhost ? <Gift size={10} strokeWidth={3} /> : <Tag size={10} strokeWidth={3} />}
-                              <span>{item.promoLabel}</span>
-                            </span>
-                          )}
-                          
-                          {qty > 1 && !isGhost && (
-                            <span className="inline-block text-[9px] font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] tracking-wide uppercase">
-                              Unit: ${unitPrice.toFixed(2)}
-                            </span>
-                          )}
-                          
-                          {item.precioOriginal && !isCancelled && Number(item.precioOriginal) > unitPrice && (
-                            <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through shrink-0">
-                              Normal: ${Number(item.precioOriginal).toFixed(2)}
-                            </span>
-                          )}
                         </div>
                       </div>
+                      
+                      <div className="flex flex-col items-end shrink-0">
+                        <span className={`font-black text-[15px] ${
+                          isCancelled 
+                            ? 'text-red-400 dark:text-red-500 line-through' 
+                            : isGhost
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-gray-900 dark:text-white lya:text-[#3E2723]'
+                        }`}>
+                          {isGhost ? 'GRATIS' : `$${lineTotal.toFixed(2)}`}
+                        </span>
+                        {item.precioOriginal && !isCancelled && Number(item.precioOriginal) * qty > lineTotal && (
+                           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
+                             ${(Number(item.precioOriginal) * qty).toFixed(2)}
+                           </span>
+                        )}
+                      </div>
                     </div>
-                    
-                    <div className="flex flex-col items-end shrink-0">
-                      <span className={`font-black text-[15px] ${
-                        isCancelled 
-                          ? 'text-red-400 dark:text-red-500 line-through' 
-                          : isGhost
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-gray-900 dark:text-white lya:text-[#3E2723]'
-                      }`}>
-                        {isGhost ? 'GRATIS' : `$${lineTotal.toFixed(2)}`}
-                      </span>
-                      {item.precioOriginal && !isCancelled && Number(item.precioOriginal) * qty > lineTotal && (
-                         <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
-                           ${(Number(item.precioOriginal) * qty).toFixed(2)}
-                         </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* 🌟 CÁPSULA NEO-BENTO PARA DESCUENTO POR MONTO DE TICKET (TICKET_DISCOUNT) */}
@@ -647,7 +673,7 @@ export default function ClientOrderSuccess({
                   <p className="flex items-center justify-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400 font-black text-sm uppercase tracking-widest">
                     <CheckCircle size={18} strokeWidth={2.5} /> Cuenta Pagada
                   </p>
-                  <p className="text-emerald-700/80 dark:text-emerald-300/80 text-[11.5px] font-bold leading-relaxed px-2 text-justify mb-4">
+                  <p className="text-emerald-700/80 dark:text-emerald-300/80 text-[11.5px] font-bold leading-relaxed px-2 text-center mb-4">
                     Tu cuenta ha sido saldada exitosamente y este ticket ha sido bloqueado. En breve nuestro personal liberará la orden. ¡Gracias por elegir 𝓛𝔂𝓪!
                   </p>
                   
@@ -670,117 +696,119 @@ export default function ClientOrderSuccess({
                   exit={{ opacity: 0 }} 
                   className="space-y-6 w-full"
                 >
-                  <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-5 rounded-[2rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-center">
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <Landmark className="text-orange-500 lya:text-[#78350F]" size={20} strokeWidth={2.5} />
-                      <h3 className="font-black text-gray-900 dark:text-white lya:text-[#3E2723] text-sm uppercase tracking-wide">Pago por Transferencia</h3>
-                    </div>
-                    
-                    <p className="text-[11.5px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-justify mb-4 px-1 leading-relaxed">
-                      Si prefieres pagar vía transferencia electrónica, puedes desplegar los datos bancarios y enviarnos tu comprobante.
-                    </p>
-
-                    {isLoadingAccounts ? (
-                      <div className="flex flex-col items-center justify-center py-6">
-                        <Loader2 className="animate-spin text-orange-500 mb-2" size={32} strokeWidth={3} />
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Conectando...</p>
+                  {liveTotal > 0 && (
+                    <div className="w-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-5 rounded-[2rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-center">
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                        <Landmark className="text-orange-500 lya:text-[#78350F]" size={20} strokeWidth={2.5} />
+                        <h3 className="font-black text-gray-900 dark:text-white lya:text-[#3E2723] text-sm uppercase tracking-wide">Pago por Transferencia</h3>
                       </div>
-                    ) : bankAccounts.length === 0 ? (
-                      <div className="bg-gray-50 dark:bg-gray-900/50 lya:bg-[#EADCC9]/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 mb-4">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">No hay cuentas bancarias configuradas por el momento.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 mb-5">
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setShowBankDetails(!showBankDetails)}
-                          className="w-full py-3.5 px-4 rounded-2xl bg-gray-50 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex items-center justify-between text-xs font-black text-gray-800 dark:text-gray-200 lya:text-[#3E2723] shadow-sm outline-none transition-colors md:hover:bg-gray-100 dark:md:hover:bg-gray-800"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Landmark size={16} className="text-orange-500 lya:text-[#78350F]" />
-                            <span>{showBankDetails ? 'Ocultar cuentas bancarias' : `Ver cuentas bancarias (${bankAccounts.length})`}</span>
-                          </div>
-                          <ChevronDown size={16} className={`transition-transform duration-300 ${showBankDetails ? 'rotate-180' : ''}`} />
-                        </motion.button>
+                      
+                      <p className="text-[11.5px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-center mb-4 px-1 leading-relaxed">
+                        Si prefieres pagar vía transferencia electrónica, puedes desplegar los datos bancarios y enviarnos tu comprobante.
+                      </p>
 
-                        <AnimatePresence>
-                          {showBankDetails && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3, ease: "easeInOut" }}
-                              className="overflow-hidden space-y-3 pt-1"
-                            >
-                              {bankAccounts.map((acc, index) => {
-                                const banco = acc.bank_name || acc.banco || 'Banco';
-                                const titular = acc.account_holder || acc.titular;
-                                const cuenta = acc.account_number || acc.cuenta;
-                                const clabe = acc.clabe;
-
-                                return (
-                                  <div key={acc.id || index} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-left">
-                                    <div className="mb-2">
-                                      <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723]">{banco}</p>
-                                      {titular && <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">Titular: {titular}</p>}
-                                    </div>
-                                    
-                                    {cuenta && (
-                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] mb-2">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">Cuenta</p>
-                                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{cuenta}</p>
-                                        </div>
-                                        <motion.button
-                                          whileTap={{ scale: 0.90 }}
-                                          onClick={() => handleCopy(cuenta, 'Cuenta', acc.id || index)}
-                                          className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
-                                        >
-                                          {copyingId === `${acc.id || index}-Cuenta` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                        </motion.button>
-                                      </div>
-                                    )}
-
-                                    {clabe && (
-                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">CLABE Interbancaria</p>
-                                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{clabe}</p>
-                                        </div>
-                                        <motion.button
-                                          whileTap={{ scale: 0.90 }}
-                                          onClick={() => handleCopy(clabe, 'CLABE', acc.id || index)}
-                                          className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
-                                        >
-                                          {copyingId === `${acc.id || index}-CLABE` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                        </motion.button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    )}
-
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleWhatsApp}
-                      disabled={isProcessingWa || !whatsappNumber}
-                      className="w-full py-3.5 rounded-2xl font-black text-sm bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/30 outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                      {isProcessingWa ? (
-                        <Loader2 size={18} className="animate-spin" />
+                      {isLoadingAccounts ? (
+                        <div className="flex flex-col items-center justify-center py-6">
+                          <Loader2 className="animate-spin text-orange-500 mb-2" size={32} strokeWidth={3} />
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Conectando...</p>
+                        </div>
+                      ) : bankAccounts.length === 0 ? (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 lya:bg-[#EADCC9]/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 mb-4">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">No hay cuentas bancarias configuradas por el momento.</p>
+                        </div>
                       ) : (
-                        <>
-                          <MessageCircle size={18} strokeWidth={2.5} />
-                          <span>{whatsappNumber ? 'Enviar Comprobante' : 'WhatsApp no configurado'}</span>
-                        </>
+                        <div className="space-y-3 mb-5">
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setShowBankDetails(!showBankDetails)}
+                            className="w-full py-3.5 px-4 rounded-2xl bg-gray-50 dark:bg-gray-900 lya:bg-white border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex items-center justify-between text-xs font-black text-gray-800 dark:text-gray-200 lya:text-[#3E2723] shadow-sm outline-none transition-colors md:hover:bg-gray-100 dark:md:hover:bg-gray-800"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Landmark size={16} className="text-orange-500 lya:text-[#78350F]" />
+                              <span>{showBankDetails ? 'Ocultar cuentas bancarias' : `Ver cuentas bancarias (${bankAccounts.length})`}</span>
+                            </div>
+                            <ChevronDown size={16} className={`transition-transform duration-300 ${showBankDetails ? 'rotate-180' : ''}`} />
+                          </motion.button>
+
+                          <AnimatePresence>
+                            {showBankDetails && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.3, ease: "easeInOut" }}
+                                className="overflow-hidden space-y-3 pt-1"
+                              >
+                                {bankAccounts.map((acc, index) => {
+                                  const banco = acc.bank_name || acc.banco || 'Banco';
+                                  const titular = acc.account_holder || acc.titular;
+                                  const cuenta = acc.account_number || acc.cuenta;
+                                  const clabe = acc.clabe;
+
+                                  return (
+                                    <div key={acc.id || index} className="bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-2xl p-4 border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-left">
+                                      <div className="mb-2">
+                                        <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723]">{banco}</p>
+                                        {titular && <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] truncate">Titular: {titular}</p>}
+                                      </div>
+                                      
+                                      {cuenta && (
+                                        <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] mb-2">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">Cuenta</p>
+                                            <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{cuenta}</p>
+                                          </div>
+                                          <motion.button
+                                            whileTap={{ scale: 0.90 }}
+                                            onClick={() => handleCopy(cuenta, 'Cuenta', acc.id || index)}
+                                            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
+                                          >
+                                            {copyingId === `${acc.id || index}-Cuenta` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                          </motion.button>
+                                        </div>
+                                      )}
+
+                                      {clabe && (
+                                        <div className="flex items-center justify-between bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] rounded-xl px-3 py-2 border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9]">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] uppercase font-extrabold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]/70">CLABE Interbancaria</p>
+                                            <p className="text-xs font-bold text-gray-800 dark:text-gray-200 lya:text-[#3E2723] tracking-wider truncate">{clabe}</p>
+                                          </div>
+                                          <motion.button
+                                            whileTap={{ scale: 0.90 }}
+                                            onClick={() => handleCopy(clabe, 'CLABE', acc.id || index)}
+                                            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 lya:bg-white flex items-center justify-center text-gray-600 dark:text-gray-300 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-600 outline-none shrink-0"
+                                          >
+                                            {copyingId === `${acc.id || index}-CLABE` ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                          </motion.button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       )}
-                    </motion.button>
-                  </div>
+
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleWhatsApp}
+                        disabled={isProcessingWa || !whatsappNumber}
+                        className="w-full py-3.5 rounded-2xl font-black text-sm bg-emerald-500 md:hover:bg-emerald-600 dark:bg-emerald-600 dark:md:hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/30 outline-none transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {isProcessingWa ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <>
+                            <MessageCircle size={18} strokeWidth={2.5} />
+                            <span>{whatsappNumber ? 'Enviar Comprobante' : 'WhatsApp no configurado'}</span>
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
+                  )}
 
                   {isQrActive ? (
                     <div className="space-y-2">
@@ -801,7 +829,7 @@ export default function ClientOrderSuccess({
                        <p className="flex items-center justify-center gap-2 mb-2 text-gray-500 dark:text-gray-400 lya:text-[#78350F] font-black text-sm">
                          <PowerOff size={16} strokeWidth={2.5} /> Servicio Pausado
                        </p>
-                       <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-[11.5px] font-medium leading-relaxed px-2 text-justify">
+                       <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-[11.5px] font-medium leading-relaxed px-2 text-center">
                          Los pedidos digitales se han apagado temporalmente. Si deseas ordenar algo más, por favor habla directamente con nuestro personal en mostrador o en tu mesa.
                        </p>
                     </div>
