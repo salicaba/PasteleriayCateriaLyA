@@ -3,6 +3,90 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import client from '../../../api/client.js';
 import { socket } from '../../../api/socket.js'; 
 
+const parseValidDays = (daysData) => {
+  if (!daysData) return [];
+  if (Array.isArray(daysData)) return daysData.map(Number);
+  if (typeof daysData === 'string') {
+    try { 
+      return JSON.parse(daysData).map(Number); 
+    } catch (e) { 
+      return daysData.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); 
+    }
+  }
+  return [];
+};
+
+const extractSavedTicketDiscount = (accountItems) => {
+  for (const item of accountItems) {
+    if (!item.notes) continue;
+    try {
+      const parsed = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+      if (Array.isArray(parsed)) {
+        const discountMeta = parsed.find(n => n && n._isTicketDiscountMeta);
+        if (discountMeta && Number(discountMeta.amount) > 0) {
+          return Number(discountMeta.amount);
+        }
+      }
+    } catch (e) {}
+  }
+  return 0;
+};
+
+// 🔥 Calcula el total neto de la orden aplicando TICKET_DISCOUNT por cada cuenta activa
+const calculateOrderNetTotal = (order, promotionsList = []) => {
+  if (!order) return 0;
+  const activeItems = (order.items || []).filter(i => i.status !== 'CANCELLED' && !i._isReleased);
+  if (activeItems.length === 0) return Number(order.totalAmount) || 0;
+
+  const today = new Date().getDay();
+  const ticketPromos = (promotionsList || []).filter(p => {
+    const rawActive = p.isActive ?? p.is_active ?? p.status;
+    const isActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+    const daysRaw = p.validDays || p.valid_days;
+    const validDays = parseValidDays(daysRaw);
+    const validToday = validDays.length === 0 || validDays.includes(today);
+    return isActive && validToday && p.type === 'TICKET_DISCOUNT';
+  });
+
+  const paidAccounts = Array.isArray(order.paidAccounts) ? order.paidAccounts : [];
+  const cuentasUnicas = [...new Set(activeItems.map(item => item.cuenta || 'General'))];
+
+  let netTotal = 0;
+
+  cuentasUnicas.forEach(cuenta => {
+    const itemsCuenta = activeItems.filter(item => (item.cuenta || 'General') === cuenta);
+    const subtotalCuenta = itemsCuenta.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+
+    // 1. Si la cuenta ya está pagada, descontar el monto que se guardó al cobrar
+    if (paidAccounts.includes(cuenta)) {
+      const savedDiscount = extractSavedTicketDiscount(itemsCuenta);
+      netTotal += Math.max(0, subtotalCuenta - savedDiscount);
+      return;
+    }
+
+    // 2. Si la cuenta sigue abierta, evaluar promociones activas de TICKET_DISCOUNT
+    if (ticketPromos.length > 0 && subtotalCuenta > 0) {
+      const qualifyingPromos = ticketPromos
+        .filter(p => subtotalCuenta >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
+        .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
+
+      const bestTicketPromo = qualifyingPromos[0];
+      if (bestTicketPromo) {
+        const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
+        const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
+        const discountAmount = isPercentage ? (subtotalCuenta * (rawDiscount / 100)) : rawDiscount;
+        const finalDiscount = Math.min(subtotalCuenta, Math.abs(discountAmount));
+        netTotal += Math.max(0, subtotalCuenta - finalDiscount);
+        return;
+      }
+    }
+
+    netTotal += subtotalCuenta;
+  });
+
+  return netTotal;
+};
+
 export const useMesasController = () => {
   const [mesas, setMesas] = useState([]);
   const [zonaActiva, setZonaActiva] = useState('salon');
@@ -13,7 +97,7 @@ export const useMesasController = () => {
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
   });
 
-  // 🔥 NUEVO: Candado de concurrencia para evitar creación múltiple de tickets
+  // 🔥 Candado de concurrencia para evitar creación múltiple de tickets
   const isProcessingRef = useRef(false);
 
   const zonas = [ 
@@ -24,15 +108,18 @@ export const useMesasController = () => {
 
   const loadMesas = useCallback(async () => {
     try {
-      // 🔥 CARGA CONCURRENTE ATÓMICA: Mesas, Órdenes activas y Resumen Diario juntos
-      const [tablesRes, activeOrdersRes, summaryRes] = await Promise.all([
+      // 🔥 CARGA CONCURRENTE ATÓMICA: Mesas, Órdenes activas, Resumen Diario y Promociones
+      const [tablesRes, activeOrdersRes, summaryRes, promosRes] = await Promise.all([
         client.get('/pos/tables'), 
         client.get('/pos/orders/active'),
-        client.get('/pos/orders/daily-summary').catch(() => ({ data: {} }))
+        client.get('/pos/orders/daily-summary').catch(() => ({ data: {} })),
+        client.get('/promotions').catch(() => ({ data: [] }))
       ]);
       
       const catalog = tablesRes.data || [];
       const orders = (activeOrdersRes.data || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const rawPromos = promosRes?.data;
+      const promotionsList = Array.isArray(rawPromos) ? rawPromos : (rawPromos?.data || rawPromos?.promotions || []);
       
       if (summaryRes.data) {
         setDailySummary(summaryRes.data);
@@ -54,7 +141,7 @@ export const useMesasController = () => {
           numero: table.number, 
           zona: table.zone, 
           estado: order ? 'ocupada' : 'libre',
-          total: order ? Number(order.totalAmount) : 0, 
+          total: order ? calculateOrderNetTotal(order, promotionsList) : 0, 
           orderId: order ? order.id : null,
           items: order ? order.items : [], 
           horaInicio: order ? order.createdAt : null,
@@ -89,7 +176,7 @@ export const useMesasController = () => {
             numero: numeroFinal, 
             zona: isVitrina ? 'vitrina' : 'llevar', 
             estado: 'ocupada', 
-            total: Number(o.totalAmount) || 0,
+            total: calculateOrderNetTotal(o, promotionsList),
             orderId: o.id, 
             items: o.items || [], 
             horaInicio: o.createdAt || null,
@@ -112,7 +199,17 @@ export const useMesasController = () => {
     loadMesas(); 
     const onUpdate = () => loadMesas();
     socket.on('pos:update', onUpdate);
-    return () => { socket.off('pos:update', onUpdate); };
+    socket.on('menu:promotions_updated', onUpdate);
+    socket.on('promotion_created', onUpdate);
+    socket.on('promotion_updated', onUpdate);
+    socket.on('promotion_deleted', onUpdate);
+    return () => { 
+      socket.off('pos:update', onUpdate); 
+      socket.off('menu:promotions_updated', onUpdate);
+      socket.off('promotion_created', onUpdate);
+      socket.off('promotion_updated', onUpdate);
+      socket.off('promotion_deleted', onUpdate);
+    };
   }, [loadMesas]);
 
   const mesasSalon = useMemo(() => mesas.filter(m => m.zona === 'salon'), [mesas]);
@@ -252,8 +349,8 @@ export const useMesasController = () => {
     actualizarEstadoMesa: loadMesas, pagoParcialMesa: loadMesas, unirMesas: loadMesas, 
     nuevoPedidoLlevar, nuevoPedidoVitrina, isLoading,
     mesasSalon, mesasLlevar,
-    dailySummary,            // 👈 Exportamos el resumen unificado
-    fetchSummary: loadMesas, // 👈 Vinculamos el refresco al loadMesas general
+    dailySummary,
+    fetchSummary: loadMesas,
     handleLiberarMesa: loadMesas,
     handleUpdateTotal: loadMesas,
     handleUnirMesas: loadMesas,
