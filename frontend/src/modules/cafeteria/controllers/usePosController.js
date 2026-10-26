@@ -98,18 +98,18 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
 
   // 🔥 EFECTO 2: ORQUESTADOR PRINCIPAL (Fusión de BD + Borrador)
   useEffect(() => {
-    if (mutations.isProcessing || isSyncLocked) return;
-
     if (!isOpen) {
-        setCart([]); 
-        setActiveOrderId(null); 
-        setOrderStatus('OPEN'); 
-        setPaidAccounts([]);
-        setNombresCuentas(['General']); 
-        setCuentaActiva('General');
-        setCuentasTelefonos({});
-        return;
+      setCart([]); 
+      setActiveOrderId(null); 
+      setOrderStatus('OPEN'); 
+      setPaidAccounts([]);
+      setNombresCuentas(['General']); 
+      setCuentaActiva('General');
+      setCuentasTelefonos({});
+      return;
     }
+
+    if (mutations.isProcessing || isSyncLocked) return;
 
     let recoveredDraft = [];
     try {
@@ -122,179 +122,181 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     const isMesaActiva = isVitrina || isLlevarVirtual || mesaEstado === 'ocupada' || mesaOrderId != null || activeOrderId != null || rawItems.length > 0;
 
     if (isMesaActiva) {
-        setActiveOrderId(mesaOrderId || activeOrderId);
-        setOrderStatus(mesaActual?.status || mesaActual?.orderStatus || orderStatus || 'OPEN');
-        
-        let loadedPaidAccounts = [];
-        try { loadedPaidAccounts = JSON.parse(paidAccountsString); } catch(e) {}
+      setActiveOrderId(mesaOrderId || activeOrderId);
+      setOrderStatus(mesaActual?.status || mesaActual?.orderStatus || orderStatus || 'OPEN');
+      
+      let loadedPaidAccounts = [];
+      try { loadedPaidAccounts = JSON.parse(paidAccountsString); } catch(e) {}
 
-        if (mesaOrderId) {
-            const storedPhones = localStorage.getItem(`lya_phones_${mesaOrderId}`);
-            if (storedPhones) try { setCuentasTelefonos(JSON.parse(storedPhones)); } catch(e) {}
+      if (mesaOrderId) {
+        const storedPhones = localStorage.getItem(`lya_phones_${mesaOrderId}`);
+        if (storedPhones) try { setCuentasTelefonos(JSON.parse(storedPhones)); } catch(e) {}
 
-            const storedPaid = localStorage.getItem(`lya_paid_${mesaOrderId}`);
-            if (storedPaid) {
-                try {
-                  const parsedPaid = JSON.parse(storedPaid);
-                  loadedPaidAccounts = Array.from(new Set([...loadedPaidAccounts, ...parsedPaid]));
-                } catch(e) {}
-            }
+        const storedPaid = localStorage.getItem(`lya_paid_${mesaOrderId}`);
+        if (storedPaid) {
+          try {
+            const parsedPaid = JSON.parse(storedPaid);
+            loadedPaidAccounts = Array.from(new Set([...loadedPaidAccounts, ...parsedPaid]));
+          } catch(e) {}
         }
-        
-        setPaidAccounts(prev => Array.from(new Set([...prev, ...loadedPaidAccounts])));
+      }
+      
+      setPaidAccounts(prev => Array.from(new Set([...prev, ...loadedPaidAccounts])));
 
-        let dbItems = [];
-        try { dbItems = JSON.parse(dbItemsString); } catch(e) {}
+      let dbItems = [];
+      try { dbItems = JSON.parse(dbItemsString); } catch(e) {}
 
-        const loadedCart = dbItems.map(item => {
-            let parsedPreps = [];
-            if (item.notes) {
-                try { parsedPreps = JSON.parse(item.notes); } 
-                catch(e) { parsedPreps = [{ detalles: "Personalización cargada" }]; }
-            }
-            if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+      const loadedCart = dbItems.map(item => {
+        let parsedPreps = [];
+        if (item.notes) {
+          try { parsedPreps = JSON.parse(item.notes); } 
+          catch(e) { parsedPreps = [{ detalles: "Personalización cargada" }]; }
+        }
+        if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+        // Limpiar metadatos internos para que no ensucien las preparaciones
+        parsedPreps = parsedPreps.filter(n => n && !n._isPromoMeta && !n._isTicketDiscountMeta && !n._isReleased);
 
-            // 🛡️ ESCUDO ANTI-ZOMBIES
-            const prevLocal = cartLogic.cart.find(p => String(p.backendItemId) === String(item.id));
-            const safeStatus = (prevLocal && prevLocal.status === 'CANCELLED') ? 'CANCELLED' : (item.status || 'ACTIVE');
+        // 🛡️ ESCUDO ANTI-ZOMBIES
+        const prevLocal = cartLogic.cart.find(p => String(p.backendItemId) === String(item.id));
+        const safeStatus = (prevLocal && prevLocal.status === 'CANCELLED') ? 'CANCELLED' : (item.status || 'ACTIVE');
 
-            return {
-                id: item.productId,
-                nombre: item.product?.name || item.product?.nombre || 'Producto',
-                imagen: item.product?.imageUrl || null,
-                precio: parseFloat(item.subtotal) / (item.quantity || 1),
-                qty: item.quantity,
-                preparaciones: parsedPreps,
-                enviadoCocina: true,
-                kitchenStatus: item.kitchenStatus,
-                status: safeStatus, 
-                cuenta: item.cuenta || 'General',
-                isTakeaway: item.isTakeaway || false,
-                backendItemId: String(item.id),
-                requiereCocina: item.product?.requiereCocina !== false,
-                isAutoPromo: item.isAutoPromo || false,
-                promoLabel: item.promoLabel || null,
-                precioOriginal: item.precioOriginal || null,
-                promoId: item.promoId || null,
-                promoType: item.promoType || null,
-                isTransferred: item.isTransferred || false
-            };
+        return {
+          id: item.productId,
+          nombre: item.product?.name || item.product?.nombre || 'Producto',
+          imagen: item.product?.imageUrl || null,
+          precio: parseFloat(item.subtotal) / (item.quantity || 1),
+          qty: item.quantity,
+          preparaciones: parsedPreps,
+          enviadoCocina: true,
+          kitchenStatus: item.kitchenStatus,
+          status: safeStatus, 
+          cuenta: item.cuenta || 'General',
+          isTakeaway: item.isTakeaway || false,
+          backendItemId: String(item.id),
+          requiereCocina: item.product?.requiereCocina !== false,
+          isAutoPromo: item.isAutoPromo || false,
+          promoLabel: item.promoLabel || null,
+          precioOriginal: item.precioOriginal || null,
+          promoId: item.promoId || null,
+          promoType: item.promoType || null,
+          isTransferred: item.isTransferred || false
+        };
+      });
+
+      setCart(prev => {
+        const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
+        const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
+
+        const sentButNotLoaded = prev.filter(p => {
+          if (!p.enviadoCocina || p.isVirtualDiscount) return false;
+          
+          if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
+            const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
+            if (exactMatch) return false; 
+            return true; 
+          }
+          
+          const contentMatch = loadedCart.some(loaded => 
+            String(loaded.id) === String(p.id) && 
+            loaded.cuenta === (p.cuenta || 'General') &&
+            Number(loaded.precio).toFixed(2) === Number(p.precio).toFixed(2)
+          );
+          
+          return !contentMatch; 
         });
 
-        setCart(prev => {
-            const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
-            const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
-
-            const sentButNotLoaded = prev.filter(p => {
-                if (!p.enviadoCocina || p.isVirtualDiscount) return false;
-                
-                if (p.backendItemId && p.backendItemId !== 'undefined' && p.backendItemId !== 'null') {
-                     const exactMatch = loadedCart.some(loaded => String(loaded.backendItemId) === String(p.backendItemId));
-                     if (exactMatch) return false; 
-                     return true; 
-                }
-                
-                const contentMatch = loadedCart.some(loaded => 
-                     String(loaded.id) === String(p.id) && 
-                     loaded.cuenta === (p.cuenta || 'General') &&
-                     Number(loaded.precio).toFixed(2) === Number(p.precio).toFixed(2)
-                );
-                
-                return !contentMatch; 
-            });
-
-            const finalCart = [...loadedCart, ...sentButNotLoaded, ...activeLocals];
-            
-            if (sincronizarCuentas) {
-                sincronizarCuentas({
-                    items: finalCart.map(i => ({ ...i, status: 'ACTIVE' })),
-                    paidAccounts: loadedPaidAccounts
-                });
-            } else {
-                const reales = new Set(['General', ...loadedPaidAccounts, ...finalCart.map(i => i.cuenta || 'General')]);
-                setNombresCuentas(prevN => {
-                    const purgadas = prevN.filter(c => reales.has(c));
-                    return purgadas.length > 0 ? purgadas : ['General'];
-                });
-                setCuentaActiva(prevA => reales.has(prevA) ? prevA : 'General');
-            }
-
-            return finalCart;
-        });
+        const finalCart = [...loadedCart, ...sentButNotLoaded, ...activeLocals];
         
+        if (sincronizarCuentas) {
+          sincronizarCuentas({
+            items: finalCart.map(i => ({ ...i, status: 'ACTIVE' })),
+            paidAccounts: loadedPaidAccounts
+          });
+        } else {
+          const reales = new Set(['General', ...loadedPaidAccounts, ...finalCart.map(i => i.cuenta || 'General')]);
+          setNombresCuentas(prevN => {
+            const purgadas = prevN.filter(c => reales.has(c));
+            return purgadas.length > 0 ? purgadas : ['General'];
+          });
+          setCuentaActiva(prevA => reales.has(prevA) ? prevA : 'General');
+        }
+
+        return finalCart;
+      });
+      
     } else {
-        setActiveOrderId(null);
-        setOrderStatus('OPEN');
-        setPaidAccounts([]);
+      setActiveOrderId(null);
+      setOrderStatus('OPEN');
+      setPaidAccounts([]);
 
-        setCart(prev => {
-            const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
-            const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
+      setCart(prev => {
+        const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
+        const activeLocals = localItems.length > 0 ? localItems : recoveredDraft;
 
-            if (sincronizarCuentas) {
-                sincronizarCuentas({
-                    items: activeLocals.map(i => ({ ...i, status: 'ACTIVE' })),
-                    paidAccounts: []
-                });
-            }
-            return activeLocals;
-        });
+        if (sincronizarCuentas) {
+          sincronizarCuentas({
+            items: activeLocals.map(i => ({ ...i, status: 'ACTIVE' })),
+            paidAccounts: []
+          });
+        }
+        return activeLocals;
+      });
     }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId, mesaActual?.status]);
+  }, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId, mesaActual?.status, mutations.isProcessing, isSyncLocked]);
 
   // 🔥 WRAPPERS CON ANIMACIÓN DE CARGA Y ACTUALIZACIÓN FLUIDA
   const wrappedCancelFullOrder = async (motivo) => {
-      await mutations.cancelFullOrder(motivo);
-      if (clearEntireCart) clearEntireCart();
-      localStorage.removeItem(`lya_draft_${mesaId}`);
-      
-      setCart(prev => prev.map(item => ({ ...item, status: 'CANCELLED' })));
-      setActiveOrderId(null); 
-      setOrderStatus('OPEN');
+    await mutations.cancelFullOrder(motivo);
+    if (clearEntireCart) clearEntireCart();
+    localStorage.removeItem(`lya_draft_${mesaId}`);
+    
+    setCart(prev => prev.map(item => ({ ...item, status: 'CANCELLED' })));
+    setActiveOrderId(null); 
+    setOrderStatus('OPEN');
 
-      if (onTableRelease) onTableRelease(mesaId);
-      if (onClose && !inline) onClose();
+    if (onTableRelease) onTableRelease(mesaId);
+    if (onClose && !inline) onClose();
   };
 
   const wrappedCancelAccountItems = async (cuenta, motivo) => {
-      await mutations.cancelAccountItems(cuenta, motivo);
-      if (clearCartByAccount) clearCartByAccount(cuenta);
-      
-      setCart(prev => prev.map(item => 
-          ((item.cuenta || 'General') === cuenta) ? { ...item, status: 'CANCELLED' } : item
-      ));
-      
-      const remainingUnsent = cartLogic.cart.filter(p => p.cuenta !== cuenta && !p.enviadoCocina && p.status !== 'CANCELLED');
-      if (remainingUnsent.length === 0) {
-          localStorage.removeItem(`lya_draft_${mesaId}`);
-      }
+    await mutations.cancelAccountItems(cuenta, motivo);
+    if (clearCartByAccount) clearCartByAccount(cuenta);
+    
+    setCart(prev => prev.map(item => 
+      ((item.cuenta || 'General') === cuenta) ? { ...item, status: 'CANCELLED' } : item
+    ));
+    
+    const remainingUnsent = cartLogic.cart.filter(p => p.cuenta !== cuenta && !p.enviadoCocina && p.status !== 'CANCELLED');
+    if (remainingUnsent.length === 0) {
+      localStorage.removeItem(`lya_draft_${mesaId}`);
+    }
   };
 
   const wrappedCancelItem = async (itemId, cancelReason, cancelQty) => {
-      await mutations.cancelItem(itemId, cancelReason, cancelQty);
+    await mutations.cancelItem(itemId, cancelReason, cancelQty);
 
-      setCart(prev => prev.map(item => {
-          if (String(item.backendItemId) === String(itemId) || String(item.id) === String(itemId)) {
-              if (cancelQty && cancelQty < item.qty) {
-                  return { ...item, qty: item.qty - cancelQty };
-              } else {
-                  return { ...item, status: 'CANCELLED' };
-              }
-          }
-          return item;
-      }));
+    setCart(prev => prev.map(item => {
+      if (String(item.backendItemId) === String(itemId) || String(item.id) === String(itemId)) {
+        if (cancelQty && cancelQty < item.qty) {
+          return { ...item, qty: item.qty - cancelQty };
+        } else {
+          return { ...item, status: 'CANCELLED' };
+        }
+      }
+      return item;
+    }));
   };
 
   // 🔥 WRAPPER PARA UNIR CUENTAS: Solo elimina la pestaña si la unión fue confirmada
   const wrappedMergeAccount = async (sourceCuenta, targetCuenta) => {
-      const wasMerged = await mutations.mergeAccountToCuenta(sourceCuenta, targetCuenta);
-      if (!wasMerged) return;
-      if (sourceCuenta !== 'General') {
-          setNombresCuentas(prev => prev.filter(c => c !== sourceCuenta));
-      }
-      setCuentaActiva(targetCuenta);
+    const wasMerged = await mutations.mergeAccountToCuenta(sourceCuenta, targetCuenta);
+    if (!wasMerged) return;
+    if (sourceCuenta !== 'General') {
+      setNombresCuentas(prev => prev.filter(c => c !== sourceCuenta));
+    }
+    setCuentaActiva(targetCuenta);
   };
 
   const cuentasDisponibles = useMemo(() => 
