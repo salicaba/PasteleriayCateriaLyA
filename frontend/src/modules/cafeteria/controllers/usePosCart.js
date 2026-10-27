@@ -291,17 +291,59 @@ export const usePosCart = (cuentaActiva, cuentasPagadasReales, triggerNotificati
     const cuentasEnCarrito = [...new Set(cleanCart.map(item => item.cuenta || 'General'))];
 
     cuentasEnCarrito.forEach(cuenta => {
-      if (currentPaidAccounts.includes(cuenta)) return;
-
-      const itemsCuenta = cleanCart.filter(item => (item.cuenta || 'General') === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount);
+      const itemsCuenta = cleanCart.filter(
+        item => (item.cuenta || 'General') === cuenta && item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount
+      );
       const subtotalCuenta = itemsCuenta.reduce((acc, item) => acc + (Number(item.precio) * item.qty), 0);
+      const ghostIdx = cleanCart.findIndex(
+        item => (item.cuenta || 'General') === cuenta && (item.promoType === 'TICKET_DISCOUNT' || item.isVirtualDiscount)
+      );
 
+      // 1. Verificar si la cuenta ya fue cobrada y tiene un descuento guardado en BD
+      const savedMetaItem = itemsCuenta.find(i => i.savedTicketDiscount && Number(i.savedTicketDiscount.amount) > 0);
+      if (currentPaidAccounts.includes(cuenta) && savedMetaItem) {
+        const savedMeta = savedMetaItem.savedTicketDiscount;
+        const savedDiscountPrice = -Math.min(subtotalCuenta, Math.abs(Number(savedMeta.amount)));
+        const savedPromoId = savedMeta.promoId || 'SAVED';
+
+        if (ghostIdx !== -1) {
+          cleanCart[ghostIdx] = {
+            ...cleanCart[ghostIdx],
+            cuenta: cuenta,
+            nombre: savedMeta.name || 'Descuento por Cuenta',
+            precio: savedDiscountPrice,
+            precioOriginal: savedDiscountPrice,
+            promoId: savedPromoId
+          };
+        } else if (itemsCuenta.length > 0) {
+          cleanCart.push({
+            id: `GLOBAL_DISCOUNT_${savedPromoId}_${cuenta}`,
+            nombre: savedMeta.name || 'Descuento por Cuenta',
+            precioOriginal: savedDiscountPrice,
+            precio: savedDiscountPrice,
+            qty: 1,
+            preparaciones: [{}],
+            enviadoCocina: true,
+            kitchenStatus: 'DELIVERED',
+            status: 'ACTIVE',
+            cuenta: cuenta,
+            isAutoPromo: true,
+            isVirtualDiscount: true,
+            requiereCocina: false,
+            promoId: savedPromoId,
+            promoType: 'TICKET_DISCOUNT',
+            promoLabel: 'DESCUENTO EXTRA'
+          });
+        }
+        return;
+      }
+
+      // 2. Evaluar promoción activa (mantiene el descuento visible también recién cobrada en Express/Salón/Llevar)
       const qualifyingPromos = ticketPromos
         .filter(p => subtotalCuenta > 0 && subtotalCuenta >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
         .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
 
       const bestTicketPromo = qualifyingPromos[0];
-      const ghostIdx = cleanCart.findIndex(item => (item.cuenta || 'General') === cuenta && (item.promoType === 'TICKET_DISCOUNT' || item.isVirtualDiscount));
 
       if (bestTicketPromo && itemsCuenta.length > 0) {
         const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);

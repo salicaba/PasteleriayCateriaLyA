@@ -153,6 +153,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
           catch(e) { parsedPreps = [{ detalles: "Personalización cargada" }]; }
         }
         if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
+
+        // 🔥 Rescatar metadata de descuento por ticket si la cuenta ya fue cobrada
+        const savedTicketDiscount = parsedPreps.find(n => n && n._isTicketDiscountMeta) || null;
+
         // Limpiar metadatos internos para que no ensucien las preparaciones
         parsedPreps = parsedPreps.filter(n => n && !n._isPromoMeta && !n._isTicketDiscountMeta && !n._isReleased);
 
@@ -179,7 +183,8 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
           precioOriginal: item.precioOriginal || null,
           promoId: item.promoId || null,
           promoType: item.promoType || null,
-          isTransferred: item.isTransferred || false
+          isTransferred: item.isTransferred || false,
+          savedTicketDiscount
         };
       });
 
