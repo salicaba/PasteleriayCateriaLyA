@@ -1,5 +1,5 @@
 // frontend/src/modules/client/views/ClientOrderSuccess.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CheckCircle, ShoppingBag, Eye, ArrowLeft, Utensils, ChevronRight, 
@@ -20,6 +20,8 @@ export default function ClientOrderSuccess({
   const [toastMessage, setToastMessage] = useState(null);
   
   const [localIsPaid, setLocalIsPaid] = useState(isOrderPaid);
+  const [transferredItems, setTransferredItems] = useState([]);
+  const [transferredToAccounts, setTransferredToAccounts] = useState([]);
   
   const [bankAccounts, setBankAccounts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
@@ -53,6 +55,39 @@ export default function ClientOrderSuccess({
     setLocalIsPaid(isOrderPaid);
   }, [isOrderPaid]);
 
+  // 🔥 Sincronizar rastro de productos trasladados a otras cuentas de la mesa
+  const fetchTransferStatus = useCallback(async () => {
+    const activeOrderId = localStorage.getItem('lya_client_order_id');
+    if (!activeOrderId || type !== 'mesa') return;
+
+    try {
+      const res = await client.get(`/pos/orders/${activeOrderId}/status`, {
+        params: { cuenta: clientData?.name || displayName }
+      });
+      const data = res.data || {};
+      const tItems = Array.isArray(data.transferredItems) ? data.transferredItems : [];
+      const tAccounts = Array.isArray(data.transferredToAccounts) ? data.transferredToAccounts : [];
+
+      setTransferredItems(tItems);
+      setTransferredToAccounts(tAccounts);
+
+      const isAllMoved = Boolean(data.allTransferred || ((data.items || []).length === 0 && tItems.length > 0));
+      if (isAllMoved) {
+        localStorage.setItem('lya_client_all_transferred', 'true');
+        localStorage.setItem('lya_client_transferred_to', JSON.stringify(tAccounts));
+      } else if ((data.items || []).length > 0) {
+        localStorage.removeItem('lya_client_all_transferred');
+        localStorage.removeItem('lya_client_transferred_to');
+      }
+    } catch (err) {
+      // Silencioso en caso de reconexión
+    }
+  }, [clientData?.name, displayName, type]);
+
+  useEffect(() => {
+    fetchTransferStatus();
+  }, [fetchTransferStatus, liveCart.length]);
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -66,22 +101,22 @@ export default function ClientOrderSuccess({
         let parsedWa = "";
 
         if (Array.isArray(rawData)) {
-            const accObj = rawData.find(item => item.key && (item.key.toLowerCase().includes('cuenta') || item.key.toLowerCase().includes('bank')));
-            const waObj = rawData.find(item => item.key && item.key.toLowerCase().includes('whatsapp'));
-            
-            if (accObj) {
-                try { parsedAccounts = typeof accObj.value === 'string' ? JSON.parse(accObj.value) : accObj.value; } catch(e){}
-            } else if (rawData.length > 0 && (rawData[0].banco || rawData[0].bank_name)) {
-                parsedAccounts = rawData;
-            }
-            if (waObj) parsedWa = waObj.value;
+          const accObj = rawData.find(item => item.key && (item.key.toLowerCase().includes('cuenta') || item.key.toLowerCase().includes('bank')));
+          const waObj = rawData.find(item => item.key && item.key.toLowerCase().includes('whatsapp'));
+          
+          if (accObj) {
+            try { parsedAccounts = typeof accObj.value === 'string' ? JSON.parse(accObj.value) : accObj.value; } catch(e){}
+          } else if (rawData.length > 0 && (rawData[0].banco || rawData[0].bank_name)) {
+            parsedAccounts = rawData;
+          }
+          if (waObj) parsedWa = waObj.value;
         } 
         else if (typeof rawData === 'object') {
-            parsedAccounts = rawData.bank_accounts || rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || [];
-            if (typeof parsedAccounts === 'string') {
-                try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
-            }
-            parsedWa = rawData.whatsapp_number || rawData.whatsappComprobantes || rawData.whatsapp || rawData.telefono || "";
+          parsedAccounts = rawData.bank_accounts || rawData.cuentasBancarias || rawData.bankAccounts || rawData.cuentas || [];
+          if (typeof parsedAccounts === 'string') {
+            try { parsedAccounts = JSON.parse(parsedAccounts); } catch(e) { parsedAccounts = []; }
+          }
+          parsedWa = rawData.whatsapp_number || rawData.whatsappComprobantes || rawData.whatsapp || rawData.telefono || "";
         }
 
         setBankAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
@@ -113,102 +148,105 @@ export default function ClientOrderSuccess({
 
   useEffect(() => {
     const handleItemCancelled = ({ orderId, itemId, productId, cancelQty }) => {
-        setLiveCart(prev => {
-            let found = false;
-            return prev.map(item => {
-                if (!found && (String(item.backendItemId || item.id) === String(itemId) || String(item.id) === String(productId))) {
-                    found = true;
-                    const newQty = item.qty - (cancelQty || item.qty);
-                    if (newQty <= 0) {
-                        return { ...item, status: 'CANCELLED' };
-                    }
-                    return { ...item, qty: newQty };
-                }
-                return item;
-            });
+      setLiveCart(prev => {
+        let found = false;
+        return prev.map(item => {
+          if (!found && (String(item.backendItemId || item.id) === String(itemId) || String(item.id) === String(productId))) {
+            found = true;
+            const newQty = item.qty - (cancelQty || item.qty);
+            if (newQty <= 0) {
+              return { ...item, status: 'CANCELLED' };
+            }
+            return { ...item, qty: newQty };
+          }
+          return item;
         });
+      });
     };
 
     const handleItemRestored = ({ orderId, itemId, item }) => {
-        if (!item) return;
-        // Verificar que el ítem restaurado pertenezca a la cuenta de este cliente
-        if (type === 'mesa' && item.cuenta && cleanAccountBase(item.cuenta) !== cleanAccountBase(displayName)) {
-            return;
+      if (!item) return;
+      if (type === 'mesa' && item.cuenta && cleanAccountBase(item.cuenta) !== cleanAccountBase(displayName)) {
+        return;
+      }
+
+      setLiveCart(prev => {
+        const exists = prev.find(p => String(p.backendItemId || p.id) === String(itemId));
+        if (exists) {
+          return prev.map(p => String(p.backendItemId || p.id) === String(itemId) ? { ...p, qty: item.quantity, status: 'ACTIVE' } : p);
         }
+        
+        let parsedPreps = [];
+        try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
+        const meta = Array.isArray(parsedPreps) ? parsedPreps.find(p => p && p._isPromoMeta) : null;
+        const cleanPreps = Array.isArray(parsedPreps) ? parsedPreps.filter(p => p && !p._isPromoMeta && !p._isReleased && !p._isTicketDiscountMeta) : [];
+        
+        const safePrecioUnitario = Number(item.subtotal || 0) / Number(item.quantity || 1);
+        const safePrecioOriginal = item.precioOriginal 
+          ? Number(item.precioOriginal) 
+          : (meta?.precioOriginal ? Number(meta.precioOriginal) : (item.product?.basePrice ? Number(item.product.basePrice) : null));
 
-        setLiveCart(prev => {
-            const exists = prev.find(p => String(p.backendItemId || p.id) === String(itemId));
-            if (exists) {
-                return prev.map(p => String(p.backendItemId || p.id) === String(itemId) ? { ...p, qty: item.quantity, status: 'ACTIVE' } : p);
-            }
-            
-            let parsedPreps = [];
-            try { parsedPreps = JSON.parse(item.notes || '[]'); } catch(e) {}
-            const meta = Array.isArray(parsedPreps) ? parsedPreps.find(p => p && p._isPromoMeta) : null;
-            const cleanPreps = Array.isArray(parsedPreps) ? parsedPreps.filter(p => p && !p._isPromoMeta && !p._isReleased && !p._isTicketDiscountMeta) : [];
-            
-            const safePrecioUnitario = Number(item.subtotal || 0) / Number(item.quantity || 1);
-            const safePrecioOriginal = item.precioOriginal 
-              ? Number(item.precioOriginal) 
-              : (meta?.precioOriginal ? Number(meta.precioOriginal) : (item.product?.basePrice ? Number(item.product.basePrice) : null));
-
-            const newItem = {
-                id: item.productId,
-                backendItemId: item.id,
-                nombre: item.product?.name || item.nombre || 'Producto',
-                imagen: item.product?.imageUrl || null,
-                precioUnitario: safePrecioUnitario,
-                qty: Number(item.quantity || 1),
-                detalles: cleanPreps[0] || null,
-                preparaciones: cleanPreps,
-                cuenta: item.cuenta || 'General',
-                isTakeaway: item.isTakeaway,
-                isAutoPromo: item.isAutoPromo ?? (meta ? meta.isAutoPromo : false),
-                promoLabel: item.promoLabel ?? (meta ? meta.promoLabel : null),
-                promoType: item.promoType ?? (meta ? meta.promoType : null),
-                promoId: item.promoId ?? (meta ? meta.promoId : null),
-                precioOriginal: safePrecioOriginal,
-                status: 'ACTIVE'
-            };
-            
-            return [...prev, newItem];
-        });
+        const newItem = {
+          id: item.productId,
+          backendItemId: item.id,
+          nombre: item.product?.name || item.nombre || 'Producto',
+          imagen: item.product?.imageUrl || null,
+          precioUnitario: safePrecioUnitario,
+          qty: Number(item.quantity || 1),
+          detalles: cleanPreps[0] || null,
+          preparaciones: cleanPreps,
+          cuenta: item.cuenta || 'General',
+          isTakeaway: item.isTakeaway,
+          isAutoPromo: item.isAutoPromo ?? (meta ? meta.isAutoPromo : false),
+          promoLabel: item.promoLabel ?? (meta ? meta.promoLabel : null),
+          promoType: item.promoType ?? (meta ? meta.promoType : null),
+          promoId: item.promoId ?? (meta ? meta.promoId : null),
+          precioOriginal: safePrecioOriginal,
+          status: 'ACTIVE'
+        };
+        
+        return [...prev, newItem];
+      });
     };
 
     const handleOrderCancelled = (data) => {
-        const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
-        const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
-        
-        if (isMyTable || isMyTakeaway) {
-            try {
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && (key.includes('lya_') || key.includes('snapshot'))) localStorage.removeItem(key);
-                }
-            } catch(e) {}
-            onReset(); 
-        }
+      const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+      const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+      
+      if (isMyTable || isMyTakeaway) {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('lya_') || key.includes('snapshot'))) localStorage.removeItem(key);
+          }
+        } catch(e) {}
+        onReset(); 
+      }
     };
 
     const handleOrderRestored = (data) => {
-        const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
-        const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
-        
-        if (isMyTable || isMyTakeaway) {
-            window.location.reload();
-        }
+      const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+      const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+      
+      if (isMyTable || isMyTakeaway) {
+        window.location.reload();
+      }
     };
 
     const handleOrderPaid = (data) => {
-        const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
-        const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
-        const cleanPaidAcc = cleanAccountBase(data?.cuentaName);
+      const isMyTable = type === 'mesa' && data?.tableId && String(data.tableId) === String(tableId);
+      const isMyTakeaway = type !== 'mesa' && data?.ticketId && data.ticketId.toLowerCase().includes(displayName.toLowerCase());
+      const cleanPaidAcc = cleanAccountBase(data?.cuentaName);
 
-        if (isMyTable || isMyTakeaway) {
-            if (data.isFullPayment || (cleanPaidAcc && cleanPaidAcc === cleanAccountBase(displayName))) {
-                setLocalIsPaid(true);
-            }
+      if (isMyTable || isMyTakeaway) {
+        if (data.isFullPayment || (cleanPaidAcc && cleanPaidAcc === cleanAccountBase(displayName))) {
+          setLocalIsPaid(true);
         }
+      }
+    };
+
+    const handlePosUpdate = () => {
+      fetchTransferStatus();
     };
     
     socket.on('orderItemCancelled', handleItemCancelled);
@@ -216,45 +254,46 @@ export default function ClientOrderSuccess({
     socket.on('orderCancelled', handleOrderCancelled);
     socket.on('orderRestored', handleOrderRestored);
     socket.on('orderPaid', handleOrderPaid);
+    socket.on('pos:update', handlePosUpdate);
     
     return () => {
-       socket.off('orderItemCancelled', handleItemCancelled);
-       socket.off('orderItemRestored', handleItemRestored);
-       socket.off('orderCancelled', handleOrderCancelled);
-       socket.off('orderRestored', handleOrderRestored);
-       socket.off('orderPaid', handleOrderPaid);
+      socket.off('orderItemCancelled', handleItemCancelled);
+      socket.off('orderItemRestored', handleItemRestored);
+      socket.off('orderCancelled', handleOrderCancelled);
+      socket.off('orderRestored', handleOrderRestored);
+      socket.off('orderPaid', handleOrderPaid);
+      socket.off('pos:update', handlePosUpdate);
     };
-  }, [tableId, type, displayName, onReset]);
+  }, [tableId, type, displayName, onReset, fetchTransferStatus]);
 
   useEffect(() => {
     if (isFirstRender.current) {
-        isFirstRender.current = false;
-        return; 
+      isFirstRender.current = false;
+      return; 
     }
 
     if (liveCart.length === 0 && cart && cart.length > 0) {
-       onReset(); 
+      onReset(); 
     } else if (liveCart.length > 0 && (liveCart.length !== cart.length || liveCart.some((l, i) => cart[i] && l.qty !== cart[i].qty))) {
-       try {
-           for (let i = 0; i < localStorage.length; i++) {
-               const key = localStorage.key(i);
-               if (key && (key.toLowerCase().includes('client') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('cart'))) {
-                   const val = localStorage.getItem(key);
-                   if (val && val.includes('precioUnitario')) {
-                       const parsed = JSON.parse(val);
-                       if (parsed.items) {
-                           parsed.items = liveCart;
-                           parsed.total = Math.max(0, liveCart.filter(i => i.status !== 'CANCELLED').reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0));
-                           localStorage.setItem(key, JSON.stringify(parsed));
-                       }
-                   }
-               }
-           }
-       } catch(e) {}
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.toLowerCase().includes('client') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('cart'))) {
+            const val = localStorage.getItem(key);
+            if (val && val.includes('precioUnitario')) {
+              const parsed = JSON.parse(val);
+              if (parsed.items) {
+                parsed.items = liveCart;
+                parsed.total = Math.max(0, liveCart.filter(i => i.status !== 'CANCELLED').reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0));
+                localStorage.setItem(key, JSON.stringify(parsed));
+              }
+            }
+          }
+        }
+      } catch(e) {}
     }
   }, [liveCart, cart, onReset]);
 
-  // Separamos los productos físicos de los Descuentos Globales por monto de ticket (TICKET_DISCOUNT)
   const regularItems = liveCart.filter(item => !item.isVirtualDiscount && item.promoType !== 'TICKET_DISCOUNT');
   const ticketDiscounts = liveCart.filter(item => (item.isVirtualDiscount || item.promoType === 'TICKET_DISCOUNT') && item.status !== 'CANCELLED');
 
@@ -268,6 +307,12 @@ export default function ClientOrderSuccess({
       .filter(item => item.status !== 'CANCELLED')
       .reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0)
   );
+
+  const formattedDestinationAccounts = transferredToAccounts.length === 1
+    ? `la cuenta de ${transferredToAccounts[0]}`
+    : transferredToAccounts.length > 1
+      ? `las cuentas de ${transferredToAccounts.join(' y ')}`
+      : 'otra cuenta de la mesa';
 
   const showToast = (message) => {
     setToastMessage(message);
@@ -328,7 +373,7 @@ export default function ClientOrderSuccess({
             onClick={onOpenSettings} 
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm text-gray-600 dark:text-gray-300 lya:text-[#7A6353] outline-none md:hover:bg-gray-100 dark:md:hover:bg-gray-700"
           >
-             <Settings size={20} strokeWidth={2.5} />
+            <Settings size={20} strokeWidth={2.5} />
           </motion.button>
         </header>
 
@@ -439,7 +484,7 @@ export default function ClientOrderSuccess({
             </h2>
             <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 lya:text-[#7A6353] px-4 text-center">
               {regularItems.length === 0 && !localIsPaid
-                ? 'Tus productos fueron trasladados a otra cuenta de la mesa.'
+                ? `Tus productos fueron trasladados a ${formattedDestinationAccounts}.`
                 : 'Tu orden está siendo preparada en cocina con mucho amor.'}
             </p>
           </div>
@@ -469,36 +514,66 @@ export default function ClientOrderSuccess({
                   Comprobante
                 </span>
                 <div className="flex flex-col">
-                   <span className="text-sm font-bold text-gray-900 dark:text-white lya:text-[#3E2723] capitalize">
-                     {displayName}
-                   </span>
-                   {displayPhone && (
-                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
-                       <Phone size={10} /> {displayPhone}
-                     </span>
-                   )}
+                  <span className="text-sm font-bold text-gray-900 dark:text-white lya:text-[#3E2723] capitalize">
+                    {displayName}
+                  </span>
+                  {displayPhone && (
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                      <Phone size={10} /> {displayPhone}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 items-end">
-                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-xl border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#3E2723]">
-                   {type === 'mesa' ? <Utensils size={14} className="text-orange-500 lya:text-[#78350F]" /> : <ShoppingBag size={14} className="text-orange-500 lya:text-[#78350F]" />}
-                   <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
-                 </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-900 lya:bg-white rounded-xl border border-gray-100 dark:border-gray-700 lya:border-[#EADCC9] text-[11px] font-bold text-gray-700 dark:text-gray-300 lya:text-[#3E2723]">
+                  {type === 'mesa' ? <Utensils size={14} className="text-orange-500 lya:text-[#78350F]" /> : <ShoppingBag size={14} className="text-orange-500 lya:text-[#78350F]" />}
+                  <span>{type === 'mesa' ? `Mesa ${tableId}` : 'Llevar'}</span>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4 max-h-[30vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
+            <div className="space-y-4 max-h-[34vh] overflow-y-auto custom-scrollbar pr-2 relative z-10">
               {regularItems.length === 0 ? (
-                <div className="py-6 px-3 text-center flex flex-col items-center justify-center gap-2">
+                <div className="py-5 px-3 text-center flex flex-col items-center justify-center gap-2.5">
                   <div className="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-500 flex items-center justify-center">
                     <ArrowRightLeft size={18} />
                   </div>
-                  <p className="text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-[#3E2723]">
+                  <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-[#3E2723]">
                     No tienes productos activos en esta nota.
                   </p>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 lya:text-[#7A6353] leading-relaxed">
-                    Si pediste unir tu cuenta en caja, tus productos ahora se encuentran en la cuenta principal.
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 lya:text-[#7A6353] leading-relaxed">
+                    {transferredToAccounts.length > 0 ? (
+                      <>
+                        Tus productos ahora se encuentran en {transferredToAccounts.length === 1 ? 'la cuenta de ' : 'las cuentas de '}
+                        <b className="text-orange-600 dark:text-orange-400 lya:text-[#78350F]">{transferredToAccounts.join(' y ')}</b>.
+                      </>
+                    ) : (
+                      'Si pediste unir tu cuenta en caja, tus productos ahora se encuentran en otra cuenta de la mesa.'
+                    )}
                   </p>
+
+                  {transferredItems.length > 0 && (
+                    <div className="w-full mt-2 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] space-y-2 text-left">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 block text-center">
+                        Detalle de productos trasladados
+                      </span>
+                      {transferredItems.map((tItem, tIdx) => (
+                        <div key={tIdx} className="flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-900/60 lya:bg-white/70 px-3 py-2 rounded-xl border border-gray-100 dark:border-gray-700/60 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded text-[10px] shrink-0">
+                              x{tItem.qty}
+                            </span>
+                            <span className="font-bold text-gray-800 dark:text-gray-200 truncate">
+                              {tItem.nombre}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full shrink-0">
+                            → {tItem.toCuenta}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 regularItems.map((item, idx) => {
@@ -522,26 +597,26 @@ export default function ClientOrderSuccess({
                       
                       <div className="flex-1 pr-3 min-w-0 flex items-start gap-2.5">
                         {isPromoItem && !isCancelled ? (
-                           <div className={`flex flex-col items-center justify-center rounded-lg px-2 py-1 shrink-0 border mt-0.5 ${
-                             isGhost 
-                               ? 'bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-100 border-emerald-200 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400' 
-                               : 'bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 border-rose-100 dark:border-rose-800/30 text-rose-600 dark:text-rose-400'
-                           }`}>
-                             {isGhost ? (
-                               <Gift size={13} className="mb-0.5" strokeWidth={2.5} />
-                             ) : (
-                               <Tag size={13} className="mb-0.5" strokeWidth={2.5} />
-                             )}
-                             <span className="font-black text-center text-[10px] tracking-wider">x{qty}</span>
-                           </div>
+                          <div className={`flex flex-col items-center justify-center rounded-lg px-2 py-1 shrink-0 border mt-0.5 ${
+                            isGhost 
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 lya:bg-emerald-100 border-emerald-200 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400' 
+                              : 'bg-rose-50 dark:bg-rose-900/20 lya:bg-rose-100 border-rose-100 dark:border-rose-800/30 text-rose-600 dark:text-rose-400'
+                          }`}>
+                            {isGhost ? (
+                              <Gift size={13} className="mb-0.5" strokeWidth={2.5} />
+                            ) : (
+                              <Tag size={13} className="mb-0.5" strokeWidth={2.5} />
+                            )}
+                            <span className="font-black text-center text-[10px] tracking-wider">x{qty}</span>
+                          </div>
                         ) : isCancelled ? (
-                           <span className="text-xs font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                             x{qty}
-                           </span>
+                          <span className="text-xs font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                            x{qty}
+                          </span>
                         ) : (
-                           <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
-                             x{qty}
-                           </span>
+                          <span className="text-xs font-black text-orange-500 dark:text-orange-400 lya:text-[#78350F] bg-orange-50 dark:bg-orange-500/10 lya:bg-[#EADCC9]/50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                            x{qty}
+                          </span>
                         )}
                         
                         <div className="flex-1 min-w-0 text-left">
@@ -606,14 +681,47 @@ export default function ClientOrderSuccess({
                           {isGhost ? 'GRATIS' : `$${lineTotal.toFixed(2)}`}
                         </span>
                         {item.precioOriginal && !isCancelled && Number(item.precioOriginal) * qty > lineTotal && (
-                           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
-                             ${(Number(item.precioOriginal) * qty).toFixed(2)}
-                           </span>
+                          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] line-through mt-0.5">
+                            ${(Number(item.precioOriginal) * qty).toFixed(2)}
+                          </span>
                         )}
                       </div>
                     </div>
                   );
                 })
+              )}
+
+              {/* 🔥 AVISO DE TRANSFERENCIA PARCIAL: Cuando solo pasaron algunos productos a otra cuenta */}
+              {regularItems.length > 0 && transferredItems.length > 0 && (
+                <div className="pt-3 mt-2 border-t border-dashed border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] space-y-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                    <ArrowRightLeft size={12} strokeWidth={2.5} />
+                    <span>Productos pasados a otra cuenta</span>
+                  </div>
+                  {transferredItems.map((tItem, tIdx) => (
+                    <div
+                      key={tIdx}
+                      className="flex items-center justify-between gap-2 bg-blue-50/70 dark:bg-blue-900/20 border border-blue-200/70 dark:border-blue-800/40 rounded-2xl px-3 py-2 text-left"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] font-black bg-blue-100 dark:bg-blue-800/50 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded shrink-0">
+                          x{tItem.qty}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">
+                            {tItem.nombre}
+                          </p>
+                          <span className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 block">
+                            No incluido en tu total
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-xl border border-blue-200 dark:border-blue-700 shrink-0 shadow-sm">
+                        Pasó a: {tItem.toCuenta}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -826,12 +934,12 @@ export default function ClientOrderSuccess({
                     </div>
                   ) : (
                     <div className="w-full bg-gray-200/50 dark:bg-gray-800/50 lya:bg-[#EADCC9]/50 p-5 rounded-[2rem] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shrink-0 text-center">
-                       <p className="flex items-center justify-center gap-2 mb-2 text-gray-500 dark:text-gray-400 lya:text-[#78350F] font-black text-sm">
-                         <PowerOff size={16} strokeWidth={2.5} /> Servicio Pausado
-                       </p>
-                       <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-[11.5px] font-medium leading-relaxed px-2 text-center">
-                         Los pedidos digitales se han apagado temporalmente. Si deseas ordenar algo más, por favor habla directamente con nuestro personal en mostrador o en tu mesa.
-                       </p>
+                      <p className="flex items-center justify-center gap-2 mb-2 text-gray-500 dark:text-gray-400 lya:text-[#78350F] font-black text-sm">
+                        <PowerOff size={16} strokeWidth={2.5} /> Servicio Pausado
+                      </p>
+                      <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] text-[11.5px] font-medium leading-relaxed px-2 text-center">
+                        Los pedidos digitales se han apagado temporalmente. Si deseas ordenar algo más, por favor habla directamente con nuestro personal en mostrador o en tu mesa.
+                      </p>
                     </div>
                   )}
 
@@ -857,7 +965,6 @@ export default function ClientOrderSuccess({
         </div>
       </div>
 
-      {/* Botón Flotante de Retiro (Dinámico para Mesa/Llevar y oculto en Solo Lectura) */}
       <AnimatePresence>
         {localIsPaid && !showReadOnlyMenu && (
           <motion.div

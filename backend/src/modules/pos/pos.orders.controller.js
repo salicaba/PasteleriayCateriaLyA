@@ -5,36 +5,73 @@ import OrderItem from './OrderItem.model.js';
 import Product from '../menu/Product.model.js';
 import Table from './Table.model.js';
 
+const cleanAccountBase = (str) => String(str || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
+
+const parseAccountDisplayName = (str) => {
+  if (!str) return 'General';
+  const s = String(str);
+  if (s.includes(' | ')) return s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
+  }
+  return s.trim();
+};
+
 // ==========================================
 // 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN Y LIBERACIÓN
 // ==========================================
-// 1. En extractPromoMeta (al inicio del archivo):
 const extractPromoMeta = (item) => {
   const plainItem = item.toJSON ? item.toJSON() : item;
   plainItem.isAutoPromo = false;
   plainItem.promoLabel = null;
   plainItem.precioOriginal = null;
-  plainItem.isTransferred = false; // 🔥 Nuevo flag para bloquear promos de artículo al mover
+  plainItem.isTransferred = false;
+  plainItem.transfers = [];
   plainItem._isReleased = false; 
   
   if (plainItem.notes) {
-      try {
-          let parsedNotes = JSON.parse(plainItem.notes);
-          if (Array.isArray(parsedNotes)) {
-              const meta = parsedNotes.find(n => n && n._isPromoMeta);
-              if (meta) {
-                  plainItem.isAutoPromo = meta.isAutoPromo;
-                  plainItem.promoLabel = meta.promoLabel;
-                  plainItem.precioOriginal = meta.precioOriginal;
-                  plainItem.isTransferred = Boolean(meta.isTransferred);
-              }
-              if (parsedNotes.some(n => n && n._isReleased)) {
-                  plainItem._isReleased = true;
-              }
-          }
-      } catch(e) {}
+    try {
+      let parsedNotes = JSON.parse(plainItem.notes);
+      if (Array.isArray(parsedNotes)) {
+        const meta = parsedNotes.find(n => n && n._isPromoMeta);
+        if (meta) {
+          plainItem.isAutoPromo = meta.isAutoPromo;
+          plainItem.promoLabel = meta.promoLabel;
+          plainItem.precioOriginal = meta.precioOriginal;
+          plainItem.isTransferred = Boolean(meta.isTransferred);
+          plainItem.transfers = Array.isArray(meta.transfers) ? meta.transfers : [];
+        }
+        if (parsedNotes.some(n => n && n._isReleased)) {
+          plainItem._isReleased = true;
+        }
+      }
+    } catch(e) {}
   }
   return plainItem;
+};
+
+// Combina historiales de transferencia agrupando por cuenta origen
+const mergeTransferArrays = (arrA = [], arrB = []) => {
+  const combined = [];
+  [...arrA, ...arrB].forEach(t => {
+    if (!t || !t.fromCuenta || Number(t.qty) <= 0) return;
+    const existing = combined.find(
+      c => cleanAccountBase(c.fromCuenta) === cleanAccountBase(t.fromCuenta) &&
+           cleanAccountBase(c.toCuenta) === cleanAccountBase(t.toCuenta)
+    );
+    if (existing) {
+      existing.qty += Number(t.qty);
+    } else {
+      combined.push({
+        fromCuenta: t.fromCuenta,
+        toCuenta: t.toCuenta,
+        qty: Number(t.qty)
+      });
+    }
+  });
+  return combined;
 };
 
 // ==========================================
@@ -79,9 +116,6 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    // 🔥 FECHA LOCAL DE CHIAPAS
-    // FIX: Se usa la fecha estándar (UTC) para que la base de datos no arroje Error 500. 
-    // El frontend se encargará de mostrarla en la zona horaria correcta.
     const localNow = new Date();
 
     const newOrder = await Order.create({ 
@@ -91,7 +125,7 @@ export const createOrder = async (req, res) => {
       createdBy: employeeId, 
       status: 'OPEN', 
       totalAmount: 0,
-      createdAt: localNow // Obliga a la orden a registrarse con la fecha de hoy
+      createdAt: localNow
     });
 
     getIO().emit('pos:update');
@@ -118,20 +152,19 @@ export const addItemsToOrder = async (req, res) => {
     let order = await Order.findByPk(orderId);
     
     if (order && !['OPEN', 'PAID'].includes(order.status)) {
-        order = await Order.create({
-            orderType: order.orderType,
-            tableId: order.tableId,
-            ticketId: order.ticketId,
-            createdBy: req.user?.id || null,
-            status: 'OPEN',
-            totalAmount: 0
-        });
-        orderId = order.id; 
+      order = await Order.create({
+        orderType: order.orderType,
+        tableId: order.tableId,
+        ticketId: order.ticketId,
+        createdBy: req.user?.id || null,
+        status: 'OPEN',
+        totalAmount: 0
+      });
+      orderId = order.id; 
     } else if (!order) {
-        return res.status(400).json({ message: 'La orden no existe.' });
+      return res.status(400).json({ message: 'La orden no existe.' });
     }
 
-    // 🔥 1. Buscar si los productos requieren cocina antes de insertarlos
     const productIds = items.map(i => i.productId);
     const productsInfo = await Product.findAll({
       where: { id: productIds },
@@ -142,7 +175,6 @@ export const addItemsToOrder = async (req, res) => {
       reqCocinaMap[p.id] = p.requiereCocina;
     });
 
-    // 🔥 2. Identificar si esta es una orden Express / Mostrador
     const isExpress = order.ticketId && (
       order.ticketId.startsWith('MOSTRADOR') || 
       order.ticketId.startsWith('VITRINA') || 
@@ -165,8 +197,7 @@ export const addItemsToOrder = async (req, res) => {
         });
       }
 
-      // 🔥 3. LA MAGIA: Si es mostrador y NO requiere cocina, nace ENTREGADO
-      const requiereCocina = reqCocinaMap[item.productId] !== false; // por defecto true
+      const requiereCocina = reqCocinaMap[item.productId] !== false;
       let statusCocina = 'PENDING';
       
       if (isExpress && !requiereCocina) {
@@ -177,7 +208,7 @@ export const addItemsToOrder = async (req, res) => {
         ...item, 
         orderId, 
         cuenta: order.orderType === 'LLEVAR' ? 'General' : (item.cuenta || 'General'), 
-        kitchenStatus: statusCocina, // <-- Estado inteligente aplicado aquí
+        kitchenStatus: statusCocina,
         isTakeaway: item.isTakeaway || false,
         notes: JSON.stringify(parsedNotes)
       };
@@ -188,9 +219,9 @@ export const addItemsToOrder = async (req, res) => {
     const subtotalNuevo = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
     if (order.status === 'PAID') {
-        await order.update({ status: 'OPEN', totalAmount: Number(order.totalAmount) + subtotalNuevo });
+      await order.update({ status: 'OPEN', totalAmount: Number(order.totalAmount) + subtotalNuevo });
     } else {
-        await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
+      await order.update({ totalAmount: Number(order.totalAmount) + subtotalNuevo });
     }
 
     const stockToDeduct = {};
@@ -251,13 +282,13 @@ export const getActiveOrderByTable = async (req, res) => {
     const validOrder = orders.length > 0 ? orders[0].toJSON() : null;
     
     if (validOrder && validOrder.items) {
-        validOrder.items = validOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
-        validOrder.totalAmount = validOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-        
-        if (validOrder.paidAccounts && Array.isArray(validOrder.paidAccounts)) {
-            const visibleAccounts = new Set(validOrder.items.map(i => i.cuenta || 'General'));
-            validOrder.paidAccounts = validOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
-        }
+      validOrder.items = validOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
+      validOrder.totalAmount = validOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+      
+      if (validOrder.paidAccounts && Array.isArray(validOrder.paidAccounts)) {
+        const visibleAccounts = new Set(validOrder.items.map(i => i.cuenta || 'General'));
+        validOrder.paidAccounts = validOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
+      }
     }
     
     res.json({ order: validOrder });
@@ -300,32 +331,32 @@ export const closeAccount = async (req, res) => {
     const items = await OrderItem.findAll({ where: { orderId, cuenta: cuentaName, status: 'ACTIVE' } });
     
     for (const item of items) {
-        let notes = [];
-        try { notes = JSON.parse(item.notes || '[]'); } catch(e){}
-        if (!Array.isArray(notes)) notes = [notes];
-        
-        if (!notes.some(n => n && n._isReleased)) {
-            notes.push({ _isReleased: true });
-            await item.update({ notes: JSON.stringify(notes) });
-        }
+      let notes = [];
+      try { notes = JSON.parse(item.notes || '[]'); } catch(e){}
+      if (!Array.isArray(notes)) notes = [notes];
+      
+      if (!notes.some(n => n && n._isReleased)) {
+        notes.push({ _isReleased: true });
+        await item.update({ notes: JSON.stringify(notes) });
+      }
     }
 
     const allActiveItems = await OrderItem.findAll({ where: { orderId, status: 'ACTIVE' } });
     const remainingVisible = allActiveItems.filter(item => {
-        try {
-            const n = JSON.parse(item.notes || '[]');
-            return !(Array.isArray(n) && n.some(x => x && x._isReleased));
-        } catch(e) { return true; }
+      try {
+        const n = JSON.parse(item.notes || '[]');
+        return !(Array.isArray(n) && n.some(x => x && x._isReleased));
+      } catch(e) { return true; }
     });
 
     if (remainingVisible.length === 0) {
-       const order = await Order.findByPk(orderId);
-       if (order && order.status !== 'CLOSED') {
-         await order.update({ status: 'CLOSED' });
-         if (order.tableId) {
-           await Table.update({ status: 'active' }, { where: { id: order.tableId } });
-         }
-       }
+      const order = await Order.findByPk(orderId);
+      if (order && order.status !== 'CLOSED') {
+        await order.update({ status: 'CLOSED' });
+        if (order.tableId) {
+          await Table.update({ status: 'active' }, { where: { id: order.tableId } });
+        }
+      }
     }
 
     getIO().emit('pos:update');
@@ -358,18 +389,18 @@ export const getActiveOrders = async (req, res) => {
     const validOrders = [];
     for (const order of activeOrders) {
       if (order.orderType === 'LLEVAR' && (!order.items || order.items.length === 0)) {
-         if (!order.createdBy) continue; 
+        if (!order.createdBy) continue; 
       }
       
       const plainOrder = order.toJSON();
       if (plainOrder.items) {
-          plainOrder.items = plainOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
-          plainOrder.totalAmount = plainOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-          
-          if (plainOrder.paidAccounts && Array.isArray(plainOrder.paidAccounts)) {
-              const visibleAccounts = new Set(plainOrder.items.map(i => i.cuenta || 'General'));
-              plainOrder.paidAccounts = plainOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
-          }
+        plainOrder.items = plainOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
+        plainOrder.totalAmount = plainOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+        
+        if (plainOrder.paidAccounts && Array.isArray(plainOrder.paidAccounts)) {
+          const visibleAccounts = new Set(plainOrder.items.map(i => i.cuenta || 'General'));
+          plainOrder.paidAccounts = plainOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
+        }
       }
       validOrders.push(plainOrder);
     }
@@ -392,6 +423,9 @@ export const moveItemAccount = async (req, res) => {
       include: [{ model: Product, as: 'product', attributes: ['basePrice'] }]
     });
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
+
+    const sourceCuenta = item.cuenta || 'General';
+    const safeQtyToMove = Math.min(item.quantity, Number(qtyToMove || item.quantity));
     
     let moveNotes = [];
     try { moveNotes = JSON.parse(item.notes || '[]'); } catch(e){}
@@ -408,58 +442,130 @@ export const moveItemAccount = async (req, res) => {
       ? Number(metaObj?.precioOriginal || item.product?.basePrice || originalUnitPrice)
       : originalUnitPrice;
 
+    // 🔥 RASTREO DE TRANSFERENCIAS ENTRE CUENTAS (Para vista del cliente)
+    const prevTransfers = Array.isArray(metaObj?.transfers) ? metaObj.transfers.map(t => ({ ...t })) : [];
+    const totalPrevTransferred = prevTransfers.reduce((sum, t) => sum + Number(t.qty || 0), 0);
+    const ownUnitsInSource = Math.max(0, item.quantity - totalPrevTransferred);
+
+    const ownMoved = Math.min(ownUnitsInSource, safeQtyToMove);
+    let remToTakeFromPrev = safeQtyToMove - ownMoved;
+
+    const movedTransfers = [];
+    if (ownMoved > 0 && cleanAccountBase(sourceCuenta) !== cleanAccountBase(targetCuenta)) {
+      movedTransfers.push({
+        fromCuenta: sourceCuenta,
+        toCuenta: targetCuenta,
+        qty: ownMoved
+      });
+    }
+
+    for (const t of prevTransfers) {
+      if (remToTakeFromPrev <= 0) break;
+      const take = Math.min(Number(t.qty || 0), remToTakeFromPrev);
+      if (take > 0) {
+        t.qty -= take;
+        remToTakeFromPrev -= take;
+        // Si no está regresando a la cuenta original del dueño, actualizamos el nuevo destino
+        if (cleanAccountBase(t.fromCuenta) !== cleanAccountBase(targetCuenta)) {
+          movedTransfers.push({
+            fromCuenta: t.fromCuenta,
+            toCuenta: targetCuenta,
+            qty: take
+          });
+        }
+      }
+    }
+
+    const remainingTransfers = prevTransfers.filter(t => Number(t.qty) > 0);
+
     const movedMetaObj = {
       _isPromoMeta: true,
       isAutoPromo: isAutoPromo,
       promoLabel: promoLabel,
       precioOriginal: revokeMovedItemPromo ? null : (metaObj?.precioOriginal || null),
-      isTransferred: true
+      isTransferred: true,
+      transfers: mergeTransferArrays([], movedTransfers)
     };
     
     const existingItems = await OrderItem.findAll({
-        where: { orderId: item.orderId, productId: item.productId, cuenta: targetCuenta, kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' }
+      where: { orderId: item.orderId, productId: item.productId, cuenta: targetCuenta, kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' }
     });
 
     const existingItem = existingItems.find(i => {
-        if ((Number(i.subtotal) / i.quantity) !== movedUnitPrice) return false;
-        let eNotes = [];
-        try { eNotes = JSON.parse(i.notes || '[]'); } catch(e){}
-        const eMeta = eNotes.find(n => n && n._isPromoMeta);
-        const eIsPromo = eMeta ? eMeta.isAutoPromo : false;
-        const eLabel = eMeta ? eMeta.promoLabel : null;
-        return eIsPromo === isAutoPromo && eLabel === promoLabel;
+      if ((Number(i.subtotal) / i.quantity) !== movedUnitPrice) return false;
+      let eNotes = [];
+      try { eNotes = JSON.parse(i.notes || '[]'); } catch(e){}
+      const eMeta = eNotes.find(n => n && n._isPromoMeta);
+      const eIsPromo = eMeta ? eMeta.isAutoPromo : false;
+      const eLabel = eMeta ? eMeta.promoLabel : null;
+      return eIsPromo === isAutoPromo && eLabel === promoLabel;
     });
 
-    const notesToMove = moveNotes.slice(0, qtyToMove);
-    const remainingNotes = moveNotes.slice(qtyToMove);
+    const notesToMove = moveNotes.slice(0, safeQtyToMove);
+    const remainingNotes = moveNotes.slice(safeQtyToMove);
 
-    notesToMove.push(movedMetaObj);
-    if (metaObj) {
-        remainingNotes.push(metaObj);
+    if (metaObj || remainingTransfers.length > 0) {
+      remainingNotes.push({
+        ...(metaObj || { _isPromoMeta: true, isAutoPromo: false, promoLabel: null, precioOriginal: null }),
+        transfers: remainingTransfers
+      });
     }
     
     if (existingItem && existingItem.id !== item.id) {
-        let existingNotes = [];
-        try { existingNotes = JSON.parse(existingItem.notes || '[]'); } catch(e){}
-        if (!Array.isArray(existingNotes)) existingNotes = [existingNotes];
-        
-        const eMetaIdx = existingNotes.findIndex(n => n && n._isPromoMeta);
-        if (eMetaIdx >= 0) existingNotes.splice(eMetaIdx, 1);
-        
-        await existingItem.update({ 
-          quantity: existingItem.quantity + qtyToMove, 
-          subtotal: Number(existingItem.subtotal) + (movedUnitPrice * qtyToMove), 
-          notes: JSON.stringify([...existingNotes, ...notesToMove]) 
+      let existingNotes = [];
+      try { existingNotes = JSON.parse(existingItem.notes || '[]'); } catch(e){}
+      if (!Array.isArray(existingNotes)) existingNotes = [existingNotes];
+      
+      let existingMeta = null;
+      const eMetaIdx = existingNotes.findIndex(n => n && n._isPromoMeta);
+      if (eMetaIdx >= 0) existingMeta = existingNotes.splice(eMetaIdx, 1)[0];
+
+      const mergedMetaForExisting = {
+        ...movedMetaObj,
+        transfers: mergeTransferArrays(existingMeta?.transfers || [], movedMetaObj.transfers)
+      };
+      notesToMove.push(mergedMetaForExisting);
+      
+      await existingItem.update({ 
+        quantity: existingItem.quantity + safeQtyToMove, 
+        subtotal: Number(existingItem.subtotal) + (movedUnitPrice * safeQtyToMove), 
+        notes: JSON.stringify([...existingNotes, ...notesToMove]) 
+      });
+      if (safeQtyToMove >= item.quantity) {
+        await item.destroy();
+      } else {
+        await item.update({
+          quantity: item.quantity - safeQtyToMove,
+          subtotal: originalUnitPrice * (item.quantity - safeQtyToMove),
+          notes: JSON.stringify(remainingNotes)
         });
-        if (qtyToMove >= item.quantity) { await item.destroy(); } 
-        else { await item.update({ quantity: item.quantity - qtyToMove, subtotal: originalUnitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) }); }
+      }
     } else {
-        if (qtyToMove < item.quantity) {
-           await item.update({ quantity: item.quantity - qtyToMove, subtotal: originalUnitPrice * (item.quantity - qtyToMove), notes: JSON.stringify(remainingNotes) });
-           await OrderItem.create({ orderId: item.orderId, productId: item.productId, quantity: qtyToMove, subtotal: movedUnitPrice * qtyToMove, cuenta: targetCuenta, notes: JSON.stringify(notesToMove), kitchenStatus: item.kitchenStatus, isTakeaway: item.isTakeaway, status: 'ACTIVE' });
-        } else {
-           await item.update({ cuenta: targetCuenta, subtotal: movedUnitPrice * item.quantity, notes: JSON.stringify(notesToMove) });
-        }
+      notesToMove.push(movedMetaObj);
+      if (safeQtyToMove < item.quantity) {
+        await item.update({
+          quantity: item.quantity - safeQtyToMove,
+          subtotal: originalUnitPrice * (item.quantity - safeQtyToMove),
+          notes: JSON.stringify(remainingNotes)
+        });
+        await OrderItem.create({
+          orderId: item.orderId,
+          productId: item.productId,
+          quantity: safeQtyToMove,
+          subtotal: movedUnitPrice * safeQtyToMove,
+          cuenta: targetCuenta,
+          notes: JSON.stringify(notesToMove),
+          kitchenStatus: item.kitchenStatus,
+          isTakeaway: item.isTakeaway,
+          status: 'ACTIVE'
+        });
+      } else {
+        await item.update({
+          cuenta: targetCuenta,
+          subtotal: movedUnitPrice * item.quantity,
+          notes: JSON.stringify(notesToMove)
+        });
+      }
     }
 
     // 🔥 Si al mover este ítem se rompió una promoción de otro ítem en la cuenta origen, revertimos su precio a normal
@@ -482,7 +588,14 @@ export const moveItemAccount = async (req, res) => {
         const currentGhostUnitPrice = Number(ghostItem.subtotal) / ghostItem.quantity;
         const qtyRev = Math.min(ghostItem.quantity, Number(rev.qtyToRevoke || ghostItem.quantity));
 
-        const revokedMeta = { _isPromoMeta: true, isAutoPromo: false, promoLabel: null, precioOriginal: null, isTransferred: true };
+        const revokedMeta = {
+          _isPromoMeta: true,
+          isAutoPromo: false,
+          promoLabel: null,
+          precioOriginal: null,
+          isTransferred: true,
+          transfers: gMeta?.transfers || []
+        };
 
         if (qtyRev >= ghostItem.quantity) {
           await ghostItem.update({
@@ -516,7 +629,6 @@ export const moveItemAccount = async (req, res) => {
       }
     }
 
-    // Recalcular totalAmount de la orden
     const allItems = await OrderItem.findAll({
       where: { orderId: item.orderId, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
@@ -554,7 +666,7 @@ export const deliverAllItems = async (req, res) => {
 };
 
 // ==========================================
-// 🍕🔥 DIVISIÓN DE ENTREGAS (Split Deliver) - ¡NUEVO!
+// 🍕🔥 DIVISIÓN DE ENTREGAS (Split Deliver)
 // ==========================================
 export const splitDeliverItem = async (req, res) => {
   try {
@@ -565,11 +677,9 @@ export const splitDeliverItem = async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
     if (item.kitchenStatus === 'DELIVERED') return res.status(400).json({ message: 'El producto ya está entregado' });
 
-    // Si la cantidad a entregar es igual o mayor a la cantidad del producto, marcamos toda la fila como entregada
     if (qtyToDeliver >= item.quantity) {
       await item.update({ kitchenStatus: 'DELIVERED' });
     } else {
-      // Si entrega menos, DIVIDIMOS matemáticamente la fila en 2
       const unitPrice = Number(item.subtotal) / item.quantity;
       
       let moveNotes = [];
@@ -580,23 +690,33 @@ export const splitDeliverItem = async (req, res) => {
       const metaIdx = moveNotes.findIndex(n => n && n._isPromoMeta);
       if (metaIdx >= 0) { metaObj = moveNotes.splice(metaIdx, 1)[0]; }
 
-      // Las notas que se van a marcar como entregadas y las que se quedan pendientes
       const deliveredNotes = moveNotes.slice(0, qtyToDeliver);
       const remainingNotes = moveNotes.slice(qtyToDeliver);
 
       if (metaObj) {
-          deliveredNotes.push(metaObj);
-          remainingNotes.push(metaObj);
+        const prevTransfers = Array.isArray(metaObj.transfers) ? metaObj.transfers.map(t => ({ ...t })) : [];
+        let remDel = qtyToDeliver;
+        const delTransfers = [];
+        for (const t of prevTransfers) {
+          if (remDel <= 0) break;
+          const take = Math.min(Number(t.qty || 0), remDel);
+          if (take > 0) {
+            delTransfers.push({ ...t, qty: take });
+            t.qty -= take;
+            remDel -= take;
+          }
+        }
+        const remTransfers = prevTransfers.filter(t => Number(t.qty) > 0);
+        deliveredNotes.push({ ...metaObj, transfers: delTransfers });
+        remainingNotes.push({ ...metaObj, transfers: remTransfers });
       }
 
-      // 1. Actualizamos la fila original con la cantidad restante (Se queda pendiente/lista)
       await item.update({ 
         quantity: item.quantity - qtyToDeliver, 
         subtotal: unitPrice * (item.quantity - qtyToDeliver), 
         notes: JSON.stringify(remainingNotes) 
       });
 
-      // 2. Creamos una fila nueva exactamente igual, pero con el estado DELIVERED
       await OrderItem.create({ 
         orderId: item.orderId, 
         productId: item.productId, 
@@ -604,7 +724,7 @@ export const splitDeliverItem = async (req, res) => {
         subtotal: unitPrice * qtyToDeliver, 
         cuenta: item.cuenta, 
         notes: JSON.stringify(deliveredNotes), 
-        kitchenStatus: 'DELIVERED', // ¡La fila hija nace ya entregada!
+        kitchenStatus: 'DELIVERED',
         isTakeaway: item.isTakeaway, 
         status: 'ACTIVE' 
       });
@@ -621,67 +741,142 @@ export const splitDeliverItem = async (req, res) => {
 // ==========================================
 // 🔍 ESTADO EN VIVO PARA CLIENTES (QR Público)
 // ==========================================
-// 3. En checkOrderStatus: emparejamiento flexible del nombre de cuenta para que el cliente siempre vea lo que el POS mueva a su nombre
-const cleanAccountBase = (str) => String(str || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
-
 export const checkOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { cuenta } = req.query; 
     const order = await Order.findByPk(orderId);
     if (!order) return res.json({ status: 'DELETED' });
-    
+
+    const targetCuenta = order.orderType === 'LLEVAR' ? 'General' : cuenta;
+    const targetBase = cleanAccountBase(targetCuenta);
+
+    let allOrderItems = [];
+    if (targetCuenta) {
+      allOrderItems = await OrderItem.findAll({ 
+        where: { orderId },
+        include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+      });
+    }
+
+    // 1. Buscar productos propios de esta cuenta
+    const itemsCuenta = targetCuenta ? allOrderItems.filter(i => {
+      if (order.orderType === 'LLEVAR') return (i.cuenta || 'General') === 'General';
+      return i.cuenta === targetCuenta || cleanAccountBase(i.cuenta) === targetBase;
+    }) : [];
+
+    const activeOwnItems = itemsCuenta.filter(i => i.status === 'ACTIVE');
+
+    // 2. Buscar productos que fueron trasladados desde esta cuenta hacia otra cuenta de la mesa
+    const transferredItems = [];
+    const transferredToSet = new Set();
+
+    if (targetCuenta && order.orderType !== 'LLEVAR') {
+      const otherAccountItems = allOrderItems.filter(
+        i => i.status === 'ACTIVE' && cleanAccountBase(i.cuenta) !== targetBase
+      );
+
+      otherAccountItems.forEach(otherItem => {
+        const plainOther = extractPromoMeta(otherItem);
+        const matchingTransfers = (plainOther.transfers || []).filter(
+          t => cleanAccountBase(t.fromCuenta) === targetBase && Number(t.qty) > 0
+        );
+
+        if (matchingTransfers.length > 0) {
+          const movedQtyFromThisClient = Math.min(
+            plainOther.quantity,
+            matchingTransfers.reduce((sum, t) => sum + Number(t.qty || 0), 0)
+          );
+
+          if (movedQtyFromThisClient > 0) {
+            const destName = parseAccountDisplayName(plainOther.cuenta);
+            transferredToSet.add(destName);
+
+            const unitPrice = Number(plainOther.subtotal || 0) / (plainOther.quantity || 1);
+            const existingTransferred = transferredItems.find(
+              ti => String(ti.productId) === String(plainOther.productId) &&
+                    ti.toCuenta === destName &&
+                    Math.abs(ti.unitPrice - unitPrice) < 0.01
+            );
+
+            if (existingTransferred) {
+              existingTransferred.qty += movedQtyFromThisClient;
+              existingTransferred.subtotal += unitPrice * movedQtyFromThisClient;
+            } else {
+              transferredItems.push({
+                id: plainOther.productId,
+                productId: plainOther.productId,
+                backendItemId: plainOther.id,
+                nombre: plainOther.product?.name || 'Producto',
+                imagen: plainOther.product?.imageUrl || null,
+                qty: movedQtyFromThisClient,
+                unitPrice: unitPrice,
+                subtotal: unitPrice * movedQtyFromThisClient,
+                toCuenta: destName,
+                isTakeaway: Boolean(plainOther.isTakeaway)
+              });
+            }
+          }
+        }
+      });
+    }
+
+    const transferredToAccounts = Array.from(transferredToSet);
+    const hasOwnItems = activeOwnItems.length > 0;
+    const allTransferred = !hasOwnItems && transferredItems.length > 0;
+
     if (['CLOSED', 'CANCELLED', 'DELETED'].includes(order.status)) {
-        return res.json({ status: order.status, accountStatus: order.status });
+      return res.json({
+        status: order.status,
+        accountStatus: order.status,
+        hasOwnItems,
+        allTransferred,
+        transferredItems,
+        transferredToAccounts
+      });
     }
     
     let accountStatus = order.status;
     let clientItems = []; 
     
-    const targetCuenta = order.orderType === 'LLEVAR' ? 'General' : cuenta;
-    
     if (targetCuenta) {
-      const allOrderItems = await OrderItem.findAll({ 
-        where: { orderId },
-        include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
-      });
-
-      const targetBase = cleanAccountBase(targetCuenta);
-      const itemsCuenta = allOrderItems.filter(i => {
-        if (order.orderType === 'LLEVAR') return (i.cuenta || 'General') === 'General';
-        return i.cuenta === targetCuenta || cleanAccountBase(i.cuenta) === targetBase;
-      });
-      
       if (itemsCuenta.length > 0) {
-         const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
-         
-         const isReleased = !allCancelled && itemsCuenta.filter(i => i.status === 'ACTIVE').every(item => {
-             try {
-                 const n = JSON.parse(item.notes || '[]');
-                 return Array.isArray(n) && n.some(x => x && x._isReleased);
-             } catch(e) { return false; }
-         });
+        const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
+        
+        const isReleased = !allCancelled && activeOwnItems.length > 0 && activeOwnItems.every(item => {
+          try {
+            const n = JSON.parse(item.notes || '[]');
+            return Array.isArray(n) && n.some(x => x && x._isReleased);
+          } catch(e) { return false; }
+        });
 
-         const isPaid = order.paidAccounts && Array.isArray(order.paidAccounts) && 
-                        order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase);
+        const isPaid = order.paidAccounts && Array.isArray(order.paidAccounts) && 
+                       order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase);
 
-         if (allCancelled) {
-             accountStatus = 'CANCELLED';
-         } else if (isReleased) {
-             accountStatus = 'CLOSED';
-         } else if (isPaid) {
-             accountStatus = 'PAID';
-         } else {
-             accountStatus = 'OPEN';
-             const activeItems = itemsCuenta.filter(i => i.status === 'ACTIVE');
-             clientItems = activeItems.map(extractPromoMeta).filter(i => !i._isReleased);
-         }
+        if (allCancelled) {
+          accountStatus = 'CANCELLED';
+        } else if (isReleased) {
+          accountStatus = 'CLOSED';
+        } else if (isPaid) {
+          accountStatus = 'PAID';
+        } else {
+          accountStatus = 'OPEN';
+          clientItems = activeOwnItems.map(extractPromoMeta).filter(i => !i._isReleased);
+        }
       } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase)) {
-         accountStatus = 'PAID';
+        accountStatus = 'PAID';
       }
     }
     
-    res.json({ status: order.status, accountStatus, items: clientItems });
+    res.json({
+      status: order.status,
+      accountStatus,
+      items: clientItems,
+      hasOwnItems,
+      allTransferred,
+      transferredItems,
+      transferredToAccounts
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error al verificar estado', error: error.message });
   }

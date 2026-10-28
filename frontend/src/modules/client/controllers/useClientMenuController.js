@@ -6,9 +6,7 @@ import { getInitialTheme, getInitialSize, THEME_CLASSES, SIZES } from '../views/
 import { useClientCart } from './useClientCart';
 
 // ⏱️ CONFIGURACIÓN DE TIEMPOS DE SESIÓN
-// 25 minutos de inactividad en el menú sin confirmar pedido
 const INACTIVITY_TIMEOUT_MS = 25 * 60 * 1000; 
-// 12 horas para purgar caché residual de sesiones antiguas olvidadas
 const CACHE_PURGE_TTL_MS = 12 * 60 * 60 * 1000; 
 
 export function useClientMenuController({ clientData, type, tableId, tableNumber, onLogout, setActiveOrdersCount }) {
@@ -35,6 +33,17 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   const [finalizedStatus, setFinalizedStatus] = useState(() => localStorage.getItem('lya_client_finalized_status') || null);
   const [isOrderPaid, setIsOrderPaid] = useState(() => localStorage.getItem('lya_client_order_paid') === 'true');
   const [showFinalizedOverlay, setShowFinalizedOverlay] = useState(true);
+
+  // Rastro de productos trasladados a otras cuentas de la mesa
+  const [transferredItems, setTransferredItems] = useState([]);
+  const [transferredToAccounts, setTransferredToAccounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lya_client_transferred_to');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const [globalQrActive, setGlobalQrActive] = useState(true);
   const [disabledQrs, setDisabledQrs] = useState([]);
@@ -108,9 +117,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
 
   useEffect(() => {
     if (typeof setActiveOrdersCount === 'function') {
-      setActiveOrdersCount(confirmedSnapshot?.items?.length || 0);
+      setActiveOrdersCount((confirmedSnapshot?.items?.length || 0) + (transferredItems?.length || 0));
     }
-  }, [confirmedSnapshot, setActiveOrdersCount]);
+  }, [confirmedSnapshot, transferredItems, setActiveOrdersCount]);
 
   const parsedNameData = clientData?.name || 'Cliente';
   let displayName = parsedNameData;
@@ -187,7 +196,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       const elapsed = now - lastActivityRef.current;
 
       if (elapsed > INACTIVITY_TIMEOUT_MS) { 
-        const hasConfirmedOrders = (confirmedSnapshot?.items?.length || 0) > 0 || Boolean(activeOrderId);
+        const hasConfirmedOrders = (confirmedSnapshot?.items?.length || 0) > 0 || (transferredItems?.length || 0) > 0 || Boolean(activeOrderId);
 
         if (hasConfirmedOrders) {
           setCart([]);
@@ -227,6 +236,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     finalizedStatus, 
     sessionExpired, 
     confirmedSnapshot?.items?.length, 
+    transferredItems?.length,
     activeOrderId, 
     setCart, 
     setIsConfirmed, 
@@ -234,7 +244,55 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     cartUtils
   ]);
 
-  // 🔥 SINCRONIZACIÓN DE CARRITO Y ESPEJO (Con recálculo dinámico de TICKET_DISCOUNT)
+  // Helper para calcular el descuento por ticket sobre una lista de ítems físicos
+  const computeTicketDiscountForPhysicalItems = useCallback((physicalItems) => {
+    const activePhysical = (physicalItems || []).filter(item => item.status !== 'CANCELLED' && !item.isVirtualDiscount);
+    const physicalSubtotal = activePhysical.reduce((sum, item) => sum + (Number(item.precioUnitario || 0) * (item.qty || 1)), 0);
+
+    const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const today = new Date(nowInChiapasStr).getDay();
+
+    const ticketPromos = (cartUtils.promotions || []).filter(p => {
+      const rawActive = p.isActive ?? p.is_active ?? p.status;
+      const isActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
+      let validDays = [];
+      try {
+        const dRaw = p.validDays || p.valid_days;
+        validDays = Array.isArray(dRaw) ? dRaw.map(Number) : (dRaw ? JSON.parse(dRaw).map(Number) : []);
+      } catch (e) {}
+      const validToday = validDays.length === 0 || validDays.includes(today);
+      return isActive && validToday && p.type === 'TICKET_DISCOUNT';
+    });
+
+    const qualifyingPromos = ticketPromos
+      .filter(p => physicalSubtotal > 0 && physicalSubtotal >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
+      .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
+
+    const bestTicketPromo = qualifyingPromos[0];
+    if (!bestTicketPromo || activePhysical.length === 0) return [];
+
+    const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
+    const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
+    let finalDiscountPrice = isPercentage ? (physicalSubtotal * (rawDiscount / 100)) : rawDiscount;
+    finalDiscountPrice = -Math.min(physicalSubtotal, Math.abs(finalDiscountPrice));
+
+    return [{
+      id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
+      cartItemId: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
+      nombre: bestTicketPromo.name || 'Descuento Global',
+      precioOriginal: finalDiscountPrice,
+      precioUnitario: finalDiscountPrice,
+      qty: 1,
+      status: 'ACTIVE',
+      isAutoPromo: true,
+      isVirtualDiscount: true,
+      promoId: bestTicketPromo.id,
+      promoType: 'TICKET_DISCOUNT',
+      promoLabel: 'DESCUENTO EXTRA'
+    }];
+  }, [cartUtils.promotions]);
+
+  // 🔥 SINCRONIZACIÓN DE CARRITO, TRASLADOS Y ESPEJO (Con recálculo dinámico de TICKET_DISCOUNT)
   useEffect(() => {
     if (!activeOrderId || finalizedStatus) return;
 
@@ -251,138 +309,106 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
         const globalStatus = data.status;
         const accountStatus = data.accountStatus;
         const serverItems = data.items; 
+
+        // Sincronizar información de productos trasladados a otra cuenta
+        const incomingTransferredItems = Array.isArray(data.transferredItems) ? data.transferredItems : [];
+        const incomingTransferredAccounts = Array.isArray(data.transferredToAccounts) ? data.transferredToAccounts : [];
+        setTransferredItems(incomingTransferredItems);
+        setTransferredToAccounts(incomingTransferredAccounts);
+
+        const isAllMoved = Boolean(data.allTransferred || ((serverItems || []).length === 0 && incomingTransferredItems.length > 0));
+        if (isAllMoved) {
+          localStorage.setItem('lya_client_all_transferred', 'true');
+          localStorage.setItem('lya_client_transferred_to', JSON.stringify(incomingTransferredAccounts));
+        } else if ((serverItems || []).length > 0) {
+          localStorage.removeItem('lya_client_all_transferred');
+          localStorage.removeItem('lya_client_transferred_to');
+        }
         
         let finalStatus = 'OPEN';
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
-            finalStatus = globalStatus;
+          finalStatus = globalStatus;
         } else if (globalStatus === 'PAID') {
-            finalStatus = 'PAID';
+          finalStatus = 'PAID';
         } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') { 
-            finalStatus = accountStatus;
+          finalStatus = accountStatus;
         } else {
-            finalStatus = 'OPEN'; 
+          finalStatus = 'OPEN'; 
         }
 
         if (serverItems && Array.isArray(serverItems)) {
-            let newItems = [];
-            serverItems.forEach(serverItem => {
-                let parsedNotes = [];
-                try { 
-                    const rawNotes = JSON.parse(serverItem.notes || '[]'); 
-                    parsedNotes = Array.isArray(rawNotes) 
-                        ? rawNotes.filter(n => n && !n._isPromoMeta && !n._isReleased && !n._isTicketDiscountMeta) 
-                        : [];
-                } catch(e){}
-                const precioUnitario = Number(serverItem.subtotal) / (serverItem.quantity || 1);
-                
-                for(let i = 0; i < serverItem.quantity; i++) {
-                    const note = parsedNotes[i] || parsedNotes[0] || {};
-                    const newItem = {
-                        id: serverItem.productId,
-                        backendItemId: serverItem.id, 
-                        nombre: serverItem.product?.name || 'Producto',
-                        imagen: serverItem.product?.imageUrl || null,
-                        precioUnitario: precioUnitario,
-                        qty: 1,
-                        detalles: note,
-                        isTakeaway: serverItem.isTakeaway,
-                        isAutoPromo: serverItem.isAutoPromo,
-                        promoLabel: serverItem.promoLabel,
-                        precioOriginal: serverItem.precioOriginal ? Number(serverItem.precioOriginal) : null,
-                        status: serverItem.status || 'ACTIVE' 
-                    };
-                    
-                    const detailStr = JSON.stringify(newItem.detalles || {});
-                    const existingIdx = newItems.findIndex(x => 
-                        x.id === newItem.id && 
-                        x.isTakeaway === newItem.isTakeaway && 
-                        !!x.isAutoPromo === !!newItem.isAutoPromo &&
-                        Number(x.precioUnitario).toFixed(2) === Number(newItem.precioUnitario).toFixed(2) &&
-                        x.status === newItem.status && 
-                        JSON.stringify(x.detalles || {}) === detailStr
-                    );
-                    
-                    if (existingIdx >= 0) {
-                        newItems[existingIdx].qty += 1;
-                    } else {
-                        newItems.push(newItem);
-                    }
-                }
-            });
+          let newItems = [];
+          serverItems.forEach(serverItem => {
+            let parsedNotes = [];
+            try { 
+              const rawNotes = JSON.parse(serverItem.notes || '[]'); 
+              parsedNotes = Array.isArray(rawNotes) 
+                ? rawNotes.filter(n => n && !n._isPromoMeta && !n._isReleased && !n._isTicketDiscountMeta) 
+                : [];
+            } catch(e){}
+            const precioUnitario = Number(serverItem.subtotal) / (serverItem.quantity || 1);
+            
+            for(let i = 0; i < serverItem.quantity; i++) {
+              const note = parsedNotes[i] || parsedNotes[0] || {};
+              const newItem = {
+                id: serverItem.productId,
+                backendItemId: serverItem.id, 
+                nombre: serverItem.product?.name || 'Producto',
+                imagen: serverItem.product?.imageUrl || null,
+                precioUnitario: precioUnitario,
+                qty: 1,
+                detalles: note,
+                isTakeaway: serverItem.isTakeaway,
+                isAutoPromo: serverItem.isAutoPromo,
+                promoLabel: serverItem.promoLabel,
+                precioOriginal: serverItem.precioOriginal ? Number(serverItem.precioOriginal) : null,
+                status: serverItem.status || 'ACTIVE' 
+              };
+              
+              const detailStr = JSON.stringify(newItem.detalles || {});
+              const existingIdx = newItems.findIndex(x => 
+                x.id === newItem.id && 
+                x.isTakeaway === newItem.isTakeaway && 
+                !!x.isAutoPromo === !!newItem.isAutoPromo &&
+                Number(x.precioUnitario).toFixed(2) === Number(newItem.precioUnitario).toFixed(2) &&
+                x.status === newItem.status && 
+                JSON.stringify(x.detalles || {}) === detailStr
+              );
+              
+              if (existingIdx >= 0) {
+                newItems[existingIdx].qty += 1;
+              } else {
+                newItems.push(newItem);
+              }
+            }
+          });
 
-            setConfirmedSnapshot(prev => {
-                if (newItems.length === 0 && prev.items && prev.items.length > 0 && (finalStatus === 'PAID' || finalStatus === 'CLOSED')) {
-                    return prev;
-                }
+          setConfirmedSnapshot(prev => {
+            if (newItems.length === 0 && prev.items && prev.items.length > 0 && (finalStatus === 'PAID' || finalStatus === 'CLOSED') && !isAllMoved) {
+              return prev;
+            }
 
-                const activePhysicalItems = newItems.filter(item => item.status !== 'CANCELLED' && !item.isVirtualDiscount);
-                const physicalSubtotal = activePhysicalItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
-
-                // 🔥 Recalcular Descuento por Ticket en vivo según los productos actuales en la Nota del Cliente
-                const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
-                const today = new Date(nowInChiapasStr).getDay();
-
-                const ticketPromos = (cartUtils.promotions || []).filter(p => {
-                    const rawActive = p.isActive ?? p.is_active ?? p.status;
-                    const isActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
-                    let validDays = [];
-                    try {
-                        const dRaw = p.validDays || p.valid_days;
-                        validDays = Array.isArray(dRaw) ? dRaw.map(Number) : (dRaw ? JSON.parse(dRaw).map(Number) : []);
-                    } catch (e) {}
-                    const validToday = validDays.length === 0 || validDays.includes(today);
-                    return isActive && validToday && p.type === 'TICKET_DISCOUNT';
-                });
-
-                const qualifyingPromos = ticketPromos
-                    .filter(p => physicalSubtotal > 0 && physicalSubtotal >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
-                    .sort((a, b) => Number(b.minTicketAmount || b.min_ticket_amount || 0) - Number(a.minTicketAmount || a.min_ticket_amount || 0));
-
-                const bestTicketPromo = qualifyingPromos[0];
-                let computedVirtualDiscounts = [];
-
-                if (bestTicketPromo && activePhysicalItems.length > 0) {
-                    const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
-                    const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
-                    let finalDiscountPrice = isPercentage ? (physicalSubtotal * (rawDiscount / 100)) : rawDiscount;
-                    finalDiscountPrice = -Math.min(physicalSubtotal, Math.abs(finalDiscountPrice));
-
-                    computedVirtualDiscounts.push({
-                        id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
-                        cartItemId: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
-                        nombre: bestTicketPromo.name || 'Descuento Global',
-                        precioOriginal: finalDiscountPrice,
-                        precioUnitario: finalDiscountPrice,
-                        qty: 1,
-                        status: 'ACTIVE',
-                        isAutoPromo: true,
-                        isVirtualDiscount: true,
-                        promoId: bestTicketPromo.id,
-                        promoType: 'TICKET_DISCOUNT',
-                        promoLabel: 'DESCUENTO EXTRA'
-                    });
-                }
-
-                const mergedItems = [...newItems, ...computedVirtualDiscounts];
-                const activeServerItems = mergedItems.filter(item => item.status !== 'CANCELLED');
-                const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
-                
-                const newState = { items: mergedItems, total: Math.max(0, newTotal) };
-                localStorage.setItem('lya_client_snapshot', JSON.stringify(newState));
-                return newState;
-            });
+            const computedVirtualDiscounts = computeTicketDiscountForPhysicalItems(newItems);
+            const mergedItems = [...newItems, ...computedVirtualDiscounts];
+            const activeServerItems = mergedItems.filter(item => item.status !== 'CANCELLED');
+            const newTotal = activeServerItems.reduce((sum, item) => sum + (item.precioUnitario * item.qty), 0);
+            
+            const newState = { items: mergedItems, total: Math.max(0, newTotal) };
+            localStorage.setItem('lya_client_snapshot', JSON.stringify(newState));
+            return newState;
+          });
         }
         
         if (finalStatus === 'PAID') {
-           if (!isOrderPaid) {
-               setIsOrderPaid(true);
-               localStorage.setItem('lya_client_order_paid', 'true');
-               setIsConfirmed(true); 
-           }
+          if (!isOrderPaid && !isAllMoved) {
+            setIsOrderPaid(true);
+            localStorage.setItem('lya_client_order_paid', 'true');
+            setIsConfirmed(true); 
+          }
         } else if (finalStatus === 'CLOSED') {
-           triggerFinalized('CLOSED');
+          triggerFinalized('CLOSED');
         } else if (finalStatus === 'CANCELLED' || finalStatus === 'DELETED') {
-           triggerFinalized('CANCELLED');
+          triggerFinalized('CANCELLED');
         }
       } catch (error) {
         // Ignorar errores transitorios
@@ -395,11 +421,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       const cleanPaidAcc = String(data?.cuentaName || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
 
       if (isMyTable || isMyTakeaway) {
-          if (data.isFullPayment || (cleanPaidAcc && cleanPaidAcc === displayName.toLowerCase())) {
-              setIsOrderPaid(true);
-              localStorage.setItem('lya_client_order_paid', 'true');
-              setIsConfirmed(true);
-          }
+        const allMovedFlag = localStorage.getItem('lya_client_all_transferred') === 'true';
+        if ((data.isFullPayment && !allMovedFlag) || (cleanPaidAcc && cleanPaidAcc === displayName.toLowerCase())) {
+          setIsOrderPaid(true);
+          localStorage.setItem('lya_client_order_paid', 'true');
+          setIsConfirmed(true);
+        }
       }
     };
 
@@ -410,16 +437,16 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     checkStatus(); 
 
     return () => {
-       clearInterval(interval);
-       socket.off('pos:update', checkStatus);
-       socket.off('orderPaid', handleOrderPaid);
+      clearInterval(interval);
+      socket.off('pos:update', checkStatus);
+      socket.off('orderPaid', handleOrderPaid);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed, cartUtils.promotions]);
+  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed, computeTicketDiscountForPhysicalItems]);
 
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {
-       localStorage.setItem('lya_client_finalized_at', Date.now().toString());
-       localStorage.setItem('lya_client_finalized_status', status);
+      localStorage.setItem('lya_client_finalized_at', Date.now().toString());
+      localStorage.setItem('lya_client_finalized_status', status);
     }
     setFinalizedStatus(status);
     setShowFinalizedOverlay(true);
@@ -437,7 +464,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       'lya_client_order_id', 'lya_client_snapshot', 'lya_client_data', 
       'lya_client_session', 'lya_client_finalized_at', 'lya_client_finalized_status', 
       'lya_client_order_paid', 'lya_client_is_confirmed', 'lya_client_last_activity',
-      'lya_client_session_expired'
+      'lya_client_session_expired', 'lya_client_all_transferred', 'lya_client_transferred_to'
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
@@ -471,9 +498,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     try {
       if (!isBackground) setIsLoading(true);
       const [catsRes, prodsRes] = await Promise.all([ 
-          client.get(`/menu/categories?_t=${Date.now()}`).catch(() => ({ data: [] })), 
-          client.get(`/menu/products?_t=${Date.now()}`).catch(() => ({ data: [] })) 
-        ]);
+        client.get(`/menu/categories?_t=${Date.now()}`).catch(() => ({ data: [] })), 
+        client.get(`/menu/products?_t=${Date.now()}`).catch(() => ({ data: [] })) 
+      ]);
       
       const rawCats = catsRes.data?.data || catsRes.data || [];
       const fetchedCats = Array.isArray(rawCats) ? rawCats : [];
@@ -582,6 +609,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     setIsSubmitting(true);
     setIsOrderPaid(false);
     localStorage.removeItem('lya_client_order_paid');
+    localStorage.removeItem('lya_client_all_transferred');
     
     try {
       const isActuallySalon = type === 'mesa' && tableId;
@@ -599,7 +627,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
 
       if (!targetOrderId) targetOrderId = await createNewOrder();
 
-      // Enviamos los productos físicos al backend con toda su metadata de promoción
       const itemsPayload = {
         items: physicalItems.map(item => ({
           productId: item.id,
@@ -630,30 +657,32 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       }
 
       setConfirmedSnapshot(prev => {
-        let baseItems = orderWasClosedOrDeleted ? [] : [...prev.items].filter(i => !i.isVirtualDiscount);
-        let baseTotal = orderWasClosedOrDeleted ? 0 : baseItems.reduce((sum, i) => sum + (i.precioUnitario * i.qty), 0);
-        let newItems = [...baseItems];
+        const baseItems = orderWasClosedOrDeleted ? [] : [...prev.items].filter(i => !i.isVirtualDiscount);
+        const newPhysicalItems = [...baseItems];
         
-        cart.forEach(cartItem => {
-            if (cartItem.isVirtualDiscount) {
-                newItems.push({ ...cartItem });
-                return;
-            }
-            const detailStr1 = JSON.stringify(cartItem.detalles || {});
-            const existingIndex = newItems.findIndex(i => 
-                i.id === cartItem.id && i.isTakeaway === cartItem.isTakeaway && 
-                !!i.isAutoPromo === !!cartItem.isAutoPromo &&
-                Number(i.precioUnitario).toFixed(2) === Number(cartItem.precioUnitario).toFixed(2) &&
-                JSON.stringify(i.detalles || {}) === detailStr1
-            );
-            if (existingIndex >= 0) {
-                newItems[existingIndex] = { ...newItems[existingIndex], qty: newItems[existingIndex].qty + cartItem.qty };
-            } else {
-                newItems.push({ ...cartItem });
-            }
+        physicalItems.forEach(cartItem => {
+          const detailStr1 = JSON.stringify(cartItem.detalles || {});
+          const existingIndex = newPhysicalItems.findIndex(i => 
+            i.id === cartItem.id && i.isTakeaway === cartItem.isTakeaway && 
+            !!i.isAutoPromo === !!cartItem.isAutoPromo &&
+            Number(i.precioUnitario).toFixed(2) === Number(cartItem.precioUnitario).toFixed(2) &&
+            JSON.stringify(i.detalles || {}) === detailStr1
+          );
+          if (existingIndex >= 0) {
+            newPhysicalItems[existingIndex] = { ...newPhysicalItems[existingIndex], qty: newPhysicalItems[existingIndex].qty + cartItem.qty };
+          } else {
+            newPhysicalItems.push({ ...cartItem });
+          }
         });
 
-        const newState = { items: newItems, total: Math.max(0, baseTotal + totalCart) };
+        // Recalcular Descuento por Ticket sobre la totalidad de ítems físicos sin parpadeos
+        const updatedVirtualDiscounts = computeTicketDiscountForPhysicalItems(newPhysicalItems);
+        const finalMergedItems = [...newPhysicalItems, ...updatedVirtualDiscounts];
+        const finalTotal = finalMergedItems
+          .filter(i => i.status !== 'CANCELLED')
+          .reduce((sum, i) => sum + (Number(i.precioUnitario || 0) * (i.qty || 1)), 0);
+
+        const newState = { items: finalMergedItems, total: Math.max(0, finalTotal) };
         localStorage.setItem('lya_client_snapshot', JSON.stringify(newState));
         return newState;
       });
@@ -690,6 +719,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     themeIndex, sizeIndex, isSubmitting, addingToCartId, notification,
     sessionExpired, finalizedStatus, isOrderPaid, showFinalizedOverlay,
     isServiceActive, isConfirmed, setIsConfirmed, isReadOnly, confirmedSnapshot,
+    transferredItems, transferredToAccounts,
     isLoggingOut, displayName, displayPhone, visibleProducts,
     triggerNotification, handleLogout, handleDownloadTicket, cycleTheme, 
     cycleSize, handleAddDirectly, handleConfirmOrder, getCategoryName,

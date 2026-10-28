@@ -52,20 +52,20 @@ export default function ClientMenu(props) {
   if (ctrl.isLoading) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] backdrop-blur-md transition-opacity duration-300">
-         <div className="relative w-28 h-28 mb-6">
-            <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-[#EADCC9]" />
-            <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-600 lya:border-[#78350F] border-t-transparent animate-spin" />
-            <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
-              <img src={logoLyA} alt="Logo 𝓛𝔂α" className="w-full h-full object-cover animate-pulse" />
-            </div>
-         </div>
-         <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight mb-2 animate-pulse text-center">
-            {ctrl.isLoggingOut ? "Cerrando sesión..." : (props.type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
-         </h2>
-         <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm flex items-center gap-2 justify-center">
-            {ctrl.isLoggingOut ? <Loader2 size={16} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F] animate-spin" /> : <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400" />}
-            {ctrl.isLoggingOut ? (props.type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") : "Cargando el menú más fresco"}
-         </p>
+        <div className="relative w-28 h-28 mb-6">
+          <div className="absolute inset-0 rounded-full border-[6px] border-gray-200 dark:border-gray-800 lya:border-[#EADCC9]" />
+          <div className="absolute inset-0 rounded-full border-[6px] border-orange-500 dark:border-orange-600 lya:border-[#78350F] border-t-transparent animate-spin" />
+          <div className="absolute inset-0 m-2 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner">
+            <img src={logoLyA} alt="Logo 𝓛𝔂α" className="w-full h-full object-cover animate-pulse" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight mb-2 animate-pulse text-center">
+          {ctrl.isLoggingOut ? "Cerrando sesión..." : (props.type === 'llevar' ? "Preparando menú para llevar..." : "Preparando tu mesa...")}
+        </h2>
+        <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm flex items-center gap-2 justify-center">
+          {ctrl.isLoggingOut ? <Loader2 size={16} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F] animate-spin" /> : <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400" />}
+          {ctrl.isLoggingOut ? (props.type === 'llevar' ? "Cerrando orden..." : "Liberando la mesa...") : "Cargando el menú más fresco"}
+        </p>
       </div>
     );
   }
@@ -93,11 +93,11 @@ export default function ClientMenu(props) {
           className="bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] max-w-[400px] w-full flex flex-col items-center border border-gray-100 dark:border-gray-700/50 lya:border-[#EADCC9]"
         >
           <div className="w-20 h-20 bg-orange-50 dark:bg-orange-900/20 lya:bg-[#EADCC9]/50 rounded-full flex items-center justify-center mb-6 shadow-inner text-orange-500 dark:text-orange-400 lya:text-[#78350F]">
-             <Clock size={40} />
+            <Clock size={40} />
           </div>
           <h2 className="text-2xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] mb-4 tracking-tight text-center">Sesión Expirada</h2>
           <p className="text-gray-500 dark:text-gray-400 lya:text-[#7A6353] font-medium text-sm mb-8 leading-relaxed text-justify px-2">
-             {props.type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada o tu cuenta ya fue pagada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
+            {props.type === 'llevar' ? "Hemos cerrado tu sesión por inactividad temporal ya que no detectamos ninguna orden confirmada o tu cuenta ya fue pagada." : "Hemos cerrado tu sesión por inactividad para liberar la mesa digitalmente."}
           </p>
           <motion.button whileTap={{ scale: 0.95 }} onClick={ctrl.handleLogout} className="w-full py-4 bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white rounded-2xl font-black shadow-lg">Entendido</motion.button>
         </motion.div>
@@ -150,6 +150,7 @@ export default function ClientMenu(props) {
   }
 
   const rewardModalData = ctrl.cartUtils.pendingPromoReward;
+  const hasNoteToView = ctrl.confirmedSnapshot.items.length > 0 || (ctrl.transferredItems && ctrl.transferredItems.length > 0);
 
   // 6. Vista Principal del Menú
   return (
@@ -225,8 +226,9 @@ export default function ClientMenu(props) {
         )}
       </motion.div>
 
+      {/* 🔥 Botón "Mi Nota" visible si tiene productos propios o productos trasladados a otra cuenta */}
       <AnimatePresence>
-        {ctrl.confirmedSnapshot.items.length > 0 && !ctrl.showCheckout && !ctrl.selectedProduct && (
+        {hasNoteToView && !ctrl.showCheckout && !ctrl.selectedProduct && (
           <motion.div 
             initial={{ scale: 0 }} 
             animate={{ scale: 1 }} 

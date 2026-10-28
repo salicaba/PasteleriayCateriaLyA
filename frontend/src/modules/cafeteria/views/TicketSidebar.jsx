@@ -51,9 +51,10 @@ export const TicketSidebar = ({
   const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
 
-  // Estado para el modal de Unir Cuentas
+  // Estado para el modal de Unir Cuentas con bloqueo hasta finalizar
   const [mergeSourceCuenta, setMergeSourceCuenta] = useState(null);
   const [isMerging, setIsMerging] = useState(false);
+  const [mergingTargetAcc, setMergingTargetAcc] = useState(null);
 
   const [isModalProcessing, setIsModalProcessing] = useState(false);
   const [isClosingTable, setIsClosingTable] = useState(false);
@@ -81,7 +82,7 @@ export const TicketSidebar = ({
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   
   const cuentasLiberadasPorBackend = cuentasPagadasReales.filter(acc => {
-      return !activeCart.some(item => (item.cuenta || 'General') === acc);
+    return !activeCart.some(item => (item.cuenta || 'General') === acc);
   });
   
   const cuentasOcultasEfectivas = Array.from(new Set([...cuentasOcultas, ...cuentasLiberadasPorBackend]));
@@ -94,13 +95,13 @@ export const TicketSidebar = ({
     if (name && addNewCuenta) {
       const nameLower = name.toLowerCase();
       const yaExiste = availableAccs.some(acc => {
-          const accName = parseAccountName(acc).toLowerCase();
-          return accName === nameLower;
+        const accName = parseAccountName(acc).toLowerCase();
+        return accName === nameLower;
       });
 
       if (yaExiste) {
-          toast(`Ya hay una cuenta llamada "${name}". Agrégale una inicial o número (Ej. ${name} 2).`, 'warning');
-          return; 
+        toast(`Ya hay una cuenta llamada "${name}". Agrégale una inicial o número (Ej. ${name} 2).`, 'warning');
+        return; 
       }
 
       addNewCuenta(name, newCuentaPhone);
@@ -131,42 +132,42 @@ export const TicketSidebar = ({
     const displayItems = [];
     
     rawItems.forEach(item => {
-        const isGhost = item.isAutoPromo || Number(item.precio) === 0 || item.isVirtualDiscount;
+      const isGhost = item.isAutoPromo || Number(item.precio) === 0 || item.isVirtualDiscount;
 
-        const existing = displayItems.find(d => 
-            d.id === item.id && 
-            Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
-            d.enviadoCocina === item.enviadoCocina && 
-            d.kitchenStatus === item.kitchenStatus &&
-            !!d.isTakeaway === !!item.isTakeaway && 
-            !!d.isVirtualDiscount === !!item.isVirtualDiscount &&
-            (d.isAutoPromo || Number(d.precio) === 0) === isGhost && 
-            getPrepStr(d) === getPrepStr(item)
-        );
-        if (existing) { 
-            existing.qty += item.qty; 
-            existing.preparaciones = [...existing.preparaciones, ...(item.preparaciones || [])]; 
-            existing._groupedItems.push(item); 
-        } else { 
-            displayItems.push({ ...item, _groupedItems: [item] }); 
-        }
+      const existing = displayItems.find(d => 
+        d.id === item.id && 
+        Number(d.precio).toFixed(2) === Number(item.precio).toFixed(2) && 
+        d.enviadoCocina === item.enviadoCocina && 
+        d.kitchenStatus === item.kitchenStatus &&
+        !!d.isTakeaway === !!item.isTakeaway && 
+        !!d.isVirtualDiscount === !!item.isVirtualDiscount &&
+        (d.isAutoPromo || Number(d.precio) === 0) === isGhost && 
+        getPrepStr(d) === getPrepStr(item)
+      );
+      if (existing) { 
+        existing.qty += item.qty; 
+        existing.preparaciones = [...existing.preparaciones, ...(item.preparaciones || [])]; 
+        existing._groupedItems.push(item); 
+      } else { 
+        displayItems.push({ ...item, _groupedItems: [item] }); 
+      }
     });
     return { cuentaName, items: displayItems };
   });
 
   const visibleGroups = groupedCart.filter(g => {
-      if (cuentasOcultasEfectivas.includes(g.cuentaName)) return false;
-      if (g.items.length === 0 && g.cuentaName === 'General') {
-          const otherGroupsWithItems = groupedCart.some(other => other.cuentaName !== 'General' && other.items.length > 0);
-          if (otherGroupsWithItems) return false;
-      }
-      return true;
+    if (cuentasOcultasEfectivas.includes(g.cuentaName)) return false;
+    if (g.items.length === 0 && g.cuentaName === 'General') {
+      const otherGroupsWithItems = groupedCart.some(other => other.cuentaName !== 'General' && other.items.length > 0);
+      if (otherGroupsWithItems) return false;
+    }
+    return true;
   }).sort((a, b) => {
-      const aPagada = cuentasPagadasReales.includes(a.cuentaName);
-      const bPagada = cuentasPagadasReales.includes(b.cuentaName);
-      if (aPagada && !bPagada) return 1;  
-      if (!aPagada && bPagada) return -1; 
-      return 0; 
+    const aPagada = cuentasPagadasReales.includes(a.cuentaName);
+    const bPagada = cuentasPagadasReales.includes(b.cuentaName);
+    if (aPagada && !bPagada) return 1;  
+    if (!aPagada && bPagada) return -1; 
+    return 0; 
   });
 
   const handleContainerDragOver = (e) => {
@@ -289,21 +290,21 @@ export const TicketSidebar = ({
     const isLastInAccount = totalItemsInAccount === item.qty;
 
     if (isLastInCart) {
-        openConfirmModal({
-            title: 'Vaciar Orden',
-            message: `¿Seguro que deseas eliminar este producto? La orden quedará completamente vacía.`,
-            icon: Trash2, color: 'red', confirmText: 'Sí, Vaciar',
-            onConfirm: () => { onDelete(item); toast('Orden vaciada', 'success'); }
-        });
+      openConfirmModal({
+        title: 'Vaciar Orden',
+        message: `¿Seguro que deseas eliminar este producto? La orden quedará completamente vacía.`,
+        icon: Trash2, color: 'red', confirmText: 'Sí, Vaciar',
+        onConfirm: () => { onDelete(item); toast('Orden vaciada', 'success'); }
+      });
     } else if (isLastInAccount) {
-        openConfirmModal({
-            title: 'Eliminar Último Producto',
-            message: `¿Seguro que deseas eliminar el producto "${item.nombre}"? Al ser el último, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía.`,
-            icon: Trash2, color: 'red', confirmText: 'Sí, Eliminar',
-            onConfirm: () => { onDelete(item); toast('Producto eliminado', 'success'); }
-        });
+      openConfirmModal({
+        title: 'Eliminar Último Producto',
+        message: `¿Seguro que deseas eliminar el producto "${item.nombre}"? Al ser el último, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía.`,
+        icon: Trash2, color: 'red', confirmText: 'Sí, Eliminar',
+        onConfirm: () => { onDelete(item); toast('Producto eliminado', 'success'); }
+      });
     } else {
-        onDelete(item);
+      onDelete(item);
     }
   };
 
@@ -313,21 +314,21 @@ export const TicketSidebar = ({
     const isLastInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0) === 1;
 
     if (isLastInCart) {
-         openConfirmModal({
-            title: 'Vaciar Orden',
-            message: `Al quitar este producto, la orden quedará completamente vacía. ¿Deseas continuar?`,
-            icon: Minus, color: 'red', confirmText: 'Sí, Quitar',
-            onConfirm: () => { onRemove(item); toast('Orden vaciada', 'success'); }
-        });
+      openConfirmModal({
+        title: 'Vaciar Orden',
+        message: `Al quitar este producto, la orden quedará completamente vacía. ¿Deseas continuar?`,
+        icon: Minus, color: 'red', confirmText: 'Sí, Quitar',
+        onConfirm: () => { onRemove(item); toast('Orden vaciada', 'success'); }
+      });
     } else if (isLastInAccount) {
-         openConfirmModal({
-            title: 'Quitar Último Producto',
-            message: `Al quitar este producto, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía. ¿Deseas continuar?`,
-            icon: Minus, color: 'red', confirmText: 'Sí, Quitar',
-            onConfirm: () => { onRemove(item); toast('Producto removido', 'success'); }
-        });
+      openConfirmModal({
+        title: 'Quitar Último Producto',
+        message: `Al quitar este producto, la cuenta "${parseAccountName(item.cuenta)}" quedará vacía. ¿Deseas continuar?`,
+        icon: Minus, color: 'red', confirmText: 'Sí, Quitar',
+        onConfirm: () => { onRemove(item); toast('Producto removido', 'success'); }
+      });
     } else {
-        onRemove(item);
+      onRemove(item);
     }
   };
 
@@ -336,83 +337,81 @@ export const TicketSidebar = ({
     const totalItemsInAccount = accountActiveItems.reduce((acc, curr) => acc + curr.qty, 0);
 
     if (item.qty > 1) {
-        openConfirmModal({
-            title: 'Cancelar Producto',
-            message: `¿Cuántos "${item.nombre}" deseas cancelar? (Máximo: ${item.qty})`,
-            icon: XCircle, color: 'red', confirmText: 'Cancelar',
-            requireInput: true, inputType: 'number', inputMax: item.qty, inputDefault: item.qty.toString(),
-            onConfirm: async (val) => {
-                const qtyToCancel = parseInt(val, 10);
-                if (qtyToCancel > 0 && qtyToCancel <= item.qty) {
-                    try {
-                      const isCancellingAllInCart = totalItemsInCart === qtyToCancel;
-                      const isCancellingAllInAccount = totalItemsInAccount === qtyToCancel;
+      openConfirmModal({
+        title: 'Cancelar Producto',
+        message: `¿Cuántos "${item.nombre}" deseas cancelar? (Máximo: ${item.qty})`,
+        icon: XCircle, color: 'red', confirmText: 'Cancelar',
+        requireInput: true, inputType: 'number', inputMax: item.qty, inputDefault: item.qty.toString(),
+        onConfirm: async (val) => {
+          const qtyToCancel = parseInt(val, 10);
+          if (qtyToCancel > 0 && qtyToCancel <= item.qty) {
+            try {
+              const isCancellingAllInCart = totalItemsInCart === qtyToCancel;
+              const isCancellingAllInAccount = totalItemsInAccount === qtyToCancel;
 
-                      if (isCancellingAllInCart && onCancelFullOrder) {
-                          await onCancelFullOrder(`Cancelación de la totalidad de productos (${qtyToCancel}x)`);
-                          toast('Orden completa cancelada', 'success');
-                      } else if (isCancellingAllInAccount && onCancelAccount) {
-                          await onCancelAccount(item.cuenta || 'General', `Cancelación parcial que vacía la cuenta (${qtyToCancel}x)`);
-                          toast(`Cuenta cancelada exitosamente`, 'success');
-                      } else {
-                          await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, 'Cancelación parcial desde POS', qtyToCancel);
-                          toast('Producto cancelado', 'success');
-                      }
-                    } catch (error) {
-                      toast('Error al cancelar el producto', 'error');
-                      throw error;
-                    }
-                }
+              if (isCancellingAllInCart && onCancelFullOrder) {
+                await onCancelFullOrder(`Cancelación de la totalidad de productos (${qtyToCancel}x)`);
+                toast('Orden completa cancelada', 'success');
+              } else if (isCancellingAllInAccount && onCancelAccount) {
+                await onCancelAccount(item.cuenta || 'General', `Cancelación parcial que vacía la cuenta (${qtyToCancel}x)`);
+                toast(`Cuenta cancelada exitosamente`, 'success');
+              } else {
+                await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, 'Cancelación parcial desde POS', qtyToCancel);
+                toast('Producto cancelado', 'success');
+              }
+            } catch (error) {
+              toast('Error al cancelar el producto', 'error');
+              throw error;
             }
-        });
-    } else {
-        const isLastInCart = totalItemsInCart === 1;
-        const isLastInAccount = totalItemsInAccount === 1;
-
-        if (isLastInCart && onCancelFullOrder) {
-            openConfirmModal({
-                title: isVitrina ? 'Cancelar Venta Express' : (isLlevar ? 'Cancelar Pedido Completo' : 'Cancelar Toda la Mesa'),
-                message: `Al cancelar este último producto, se cancelará ${isVitrina ? 'la venta' : (isLlevar ? 'el pedido' : 'la mesa')} por completo en el sistema. ¿Deseas continuar?`,
-                icon: AlertTriangle, color: 'red', confirmText: 'Sí, Cancelar Todo',
-                requireInput: true, inputType: 'text', inputPlaceholder: 'Motivo (opcional)', inputDefault: 'Cancelado desde POS',
-                onConfirm: async (reason) => {
-                    try {
-                      await onCancelFullOrder(reason);
-                      toast('Orden completa cancelada', 'success');
-                    } catch (e) {
-                      toast('Error al cancelar la orden', 'error');
-                      throw e;
-                    }
-                }
-            });
-        } else {
-            openConfirmModal({
-                title: isLastInAccount ? 'Cancelar Último Producto' : 'Cancelar Producto',
-                message: isLastInAccount 
-                    ? `¿Seguro que deseas cancelar "${item.nombre}"? Al ser el último producto, la cuenta "${parseAccountName(item.cuenta)}" se limpiará de las activas.`
-                    : `¿Seguro que deseas cancelar 1x ${item.nombre}?`,
-                icon: XCircle, color: 'red', confirmText: isLastInAccount ? 'Cancelar y Limpiar Cuenta' : 'Cancelar Producto',
-                requireInput: true, inputType: 'text', inputPlaceholder: 'Motivo (opcional)', inputDefault: 'Cancelado desde POS',
-                onConfirm: async (reason) => {
-                    try {
-                      await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, reason, 1);
-                      toast('Producto cancelado exitosamente', 'success');
-                    } catch (e) {
-                      toast('Error al cancelar el producto', 'error');
-                      throw e;
-                    }
-                }
-            });
+          }
         }
+      });
+    } else {
+      const isLastInCart = totalItemsInCart === 1;
+      const isLastInAccount = totalItemsInAccount === 1;
+
+      if (isLastInCart && onCancelFullOrder) {
+        openConfirmModal({
+          title: isVitrina ? 'Cancelar Venta Express' : (isLlevar ? 'Cancelar Pedido Completo' : 'Cancelar Toda la Mesa'),
+          message: `Al cancelar este último producto, se cancelará ${isVitrina ? 'la venta' : (isLlevar ? 'el pedido' : 'la mesa')} por completo en el sistema. ¿Deseas continuar?`,
+          icon: AlertTriangle, color: 'red', confirmText: 'Sí, Cancelar Todo',
+          requireInput: true, inputType: 'text', inputPlaceholder: 'Motivo (opcional)', inputDefault: 'Cancelado desde POS',
+          onConfirm: async (reason) => {
+            try {
+              await onCancelFullOrder(reason);
+              toast('Orden completa cancelada', 'success');
+            } catch (e) {
+              toast('Error al cancelar la orden', 'error');
+              throw e;
+            }
+          }
+        });
+      } else {
+        openConfirmModal({
+          title: isLastInAccount ? 'Cancelar Último Producto' : 'Cancelar Producto',
+          message: isLastInAccount 
+            ? `¿Seguro que deseas cancelar "${item.nombre}"? Al ser el último producto, la cuenta "${parseAccountName(item.cuenta)}" se limpiará de las activas.`
+            : `¿Seguro que deseas cancelar 1x ${item.nombre}?`,
+          icon: XCircle, color: 'red', confirmText: isLastInAccount ? 'Cancelar y Limpiar Cuenta' : 'Cancelar Producto',
+          requireInput: true, inputType: 'text', inputPlaceholder: 'Motivo (opcional)', inputDefault: 'Cancelado desde POS',
+          onConfirm: async (reason) => {
+            try {
+              await onCancelItem(item._groupedItems ? item._groupedItems[0] : item, reason, 1);
+              toast('Producto cancelado exitosamente', 'success');
+            } catch (e) {
+              toast('Error al cancelar el producto', 'error');
+              throw e;
+            }
+          }
+        });
+      }
     }
   };
 
-  // 🔥 DRAG & DROP ENTRE CUENTAS: Espera la confirmación de ruptura antes de lanzar el toast
+  // 🔥 DRAG & DROP ENTRE CUENTAS
   const handleDropOnCuenta = async (cuentaName) => {
     setDragOverCuenta(null);
     if (draggedItem && draggedItem.cuentaName !== cuentaName && !cuentasPagadasReales.includes(cuentaName) && !isLlevar && !isVitrina) {
-      
-      // Solo bloqueamos arrastrar el descuento virtual de ticket; los productos físicos sí pueden moverse (con aviso de ruptura si aplica)
       if (draggedItem.item.isVirtualDiscount) return;
 
       const itemToMove = draggedItem.item;
@@ -420,40 +419,40 @@ export const TicketSidebar = ({
       const itemIdToProcess = itemToMove.backendItemId || itemToMove.id;
 
       if (qtyToMove > 1) {
-          openConfirmModal({
-              title: 'Mover Producto',
-              message: `¿Cuántos "${itemToMove.nombre}" deseas mover a la cuenta de ${parseAccountName(cuentaName)}? (Máx: ${qtyToMove})`,
-              icon: ArrowRightLeft, color: 'blue', confirmText: 'Mover Producto',
-              requireInput: true, inputType: 'number', inputMax: qtyToMove, inputDefault: qtyToMove.toString(),
-              onConfirm: async (val) => { 
-                  const qty = parseInt(val, 10); 
-                  if (qty > 0 && qty <= qtyToMove) { 
-                      setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
-                      try {
-                        const wasMoved = await onMoveItem(itemToMove, cuentaName, qty); 
-                        if (wasMoved !== false) {
-                          toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
-                        }
-                      } catch (error) {
-                        toast('Error al mover el producto', 'error');
-                      } finally {
-                        setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: false }));
-                      }
-                  } 
+        openConfirmModal({
+          title: 'Mover Producto',
+          message: `¿Cuántos "${itemToMove.nombre}" deseas mover a la cuenta de ${parseAccountName(cuentaName)}? (Máx: ${qtyToMove})`,
+          icon: ArrowRightLeft, color: 'blue', confirmText: 'Mover Producto',
+          requireInput: true, inputType: 'number', inputMax: qtyToMove, inputDefault: qtyToMove.toString(),
+          onConfirm: async (val) => { 
+            const qty = parseInt(val, 10); 
+            if (qty > 0 && qty <= qtyToMove) { 
+              setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
+              try {
+                const wasMoved = await onMoveItem(itemToMove, cuentaName, qty); 
+                if (wasMoved !== false) {
+                  toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
+                }
+              } catch (error) {
+                toast('Error al mover el producto', 'error');
+              } finally {
+                setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: false }));
               }
-          });
-      } else {
-          setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
-          try {
-            const wasMoved = await onMoveItem(itemToMove, cuentaName, 1);
-            if (wasMoved !== false) {
-              toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
-            }
-          } catch (error) {
-            toast('Error al mover el producto', 'error');
-          } finally {
-            setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: false }));
+            } 
           }
+        });
+      } else {
+        setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: true }));
+        try {
+          const wasMoved = await onMoveItem(itemToMove, cuentaName, 1);
+          if (wasMoved !== false) {
+            toast(`Movido a ${parseAccountName(cuentaName)}`, 'success');
+          }
+        } catch (error) {
+          toast('Error al mover el producto', 'error');
+        } finally {
+          setProcessingItems(prev => ({ ...prev, [itemIdToProcess]: false }));
+        }
       }
     }
   };
@@ -515,7 +514,8 @@ export const TicketSidebar = ({
                   processingItems={processingItems} handleToggleStatus={handleToggleStatus} handleRemoveUnsent={handleRemoveUnsent}
                   onAdd={onAdd} handleDeleteUnsent={handleDeleteUnsent} handleCancelItem={handleCancelItem}
                   toggleItemTakeaway={toggleItemTakeaway} onCancelItem={onCancelItem}
-                  onOpenMergeModal={(cName) => setMergeSourceCuenta(cName)}
+                  onOpenMergeModal={(cName) => { if (!isMerging) setMergeSourceCuenta(cName); }}
+                  isMerging={isMerging}
                   onDragStart={(item, cName) => setDraggedItem({ item, cuentaName: cName })}
                   onDragEnd={() => setDraggedItem(null)}
                   showToast={toast}
@@ -557,52 +557,83 @@ export const TicketSidebar = ({
         handleCheckoutClick={handleCheckoutClick} isCheckingOut={isCheckingOut}
       />
 
+      {/* 🔥 MODAL UNIR CUENTA: Permanece bloqueado y mostrando spinner hasta terminar la unión */}
       <AnimatePresence>
         {mergeSourceCuenta && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/60 lya:bg-lya-dark/50 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 15 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 15 }} className="w-full max-w-sm bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 flex flex-col">
               <div className="p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 text-center">
                 <div className="mx-auto w-12 h-12 bg-orange-100 dark:bg-orange-900/40 text-orange-500 rounded-full flex items-center justify-center mb-3">
-                  <ArrowRightLeft size={24} />
+                  {isMerging ? <Loader2 size={24} className="animate-spin" /> : <ArrowRightLeft size={24} />}
                 </div>
-                <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">Unir Cuenta</h3>
+                <h3 className="font-black text-lg text-gray-900 dark:text-white lya:text-lya-text">
+                  {isMerging ? 'Uniendo Cuentas...' : 'Unir Cuenta'}
+                </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                  Selecciona a qué cuenta deseas pasar todos los productos de <b>{parseAccountName(mergeSourceCuenta)}</b> (aplicará Descuento por Ticket si el acumulado llega a la meta):
+                  {isMerging ? (
+                    <>Trasladando los productos de <b>{parseAccountName(mergeSourceCuenta)}</b> a <b>{parseAccountName(mergingTargetAcc)}</b>. Por favor espera...</>
+                  ) : (
+                    <>Selecciona a qué cuenta deseas pasar todos los productos de <b>{parseAccountName(mergeSourceCuenta)}</b> (aplicará Descuento por Ticket si el acumulado llega a la meta):</>
+                  )}
                 </p>
               </div>
               <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
                 {availableAccs
                   .filter(acc => acc !== mergeSourceCuenta && !cuentasPagadasReales.includes(acc) && !cuentasOcultasEfectivas.includes(acc))
-                  .map(targetAcc => (
-                    <motion.button
-                      key={targetAcc}
-                      whileTap={!isMerging ? { scale: 0.95 } : {}}
-                      disabled={isMerging}
-                      onClick={async () => {
-                        const sourceToMerge = mergeSourceCuenta;
-                        setIsMerging(true);
-                        // Cerramos el selector primero para que no se encime si se abre el modal de ruptura de promoción
-                        setMergeSourceCuenta(null);
-                        try {
-                          if (onMergeAccount) {
-                            const wasMerged = await onMergeAccount(sourceToMerge, targetAcc);
-                            if (wasMerged && cuentaActiva === sourceToMerge) {
-                              setCuentaActiva(targetAcc);
+                  .map(targetAcc => {
+                    const isThisTargetMerging = isMerging && mergingTargetAcc === targetAcc;
+                    return (
+                      <motion.button
+                        key={targetAcc}
+                        whileTap={!isMerging ? { scale: 0.95 } : {}}
+                        disabled={isMerging}
+                        onClick={async () => {
+                          if (isMerging) return;
+                          const sourceToMerge = mergeSourceCuenta;
+                          setIsMerging(true);
+                          setMergingTargetAcc(targetAcc);
+                          try {
+                            if (onMergeAccount) {
+                              const wasMerged = await onMergeAccount(sourceToMerge, targetAcc);
+                              if (wasMerged && cuentaActiva === sourceToMerge) {
+                                setCuentaActiva(targetAcc);
+                              }
                             }
+                          } finally {
+                            setIsMerging(false);
+                            setMergingTargetAcc(null);
+                            setMergeSourceCuenta(null);
                           }
-                        } finally {
-                          setIsMerging(false);
-                        }
-                      }}
-                      className="w-full p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-bold text-gray-800 dark:text-gray-200 md:hover:border-orange-400 transition-colors flex justify-between items-center outline-none disabled:opacity-50"
-                    >
-                      <span>Unir dentro de: {parseAccountName(targetAcc)}</span>
-                      {isMerging ? <Loader2 size={16} className="animate-spin text-orange-500" /> : <ArrowRightLeft size={16} className="text-orange-500" />}
-                    </motion.button>
-                  ))}
+                        }}
+                        className={`w-full p-3 text-left rounded-xl border font-bold transition-colors flex justify-between items-center outline-none ${
+                          isThisTargetMerging
+                            ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 cursor-wait'
+                            : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 md:hover:border-orange-400 disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
+                      >
+                        <span>
+                          {isThisTargetMerging
+                            ? `Uniendo con ${parseAccountName(targetAcc)}...`
+                            : `Unir dentro de: ${parseAccountName(targetAcc)}`}
+                        </span>
+                        {isThisTargetMerging ? (
+                          <Loader2 size={16} className="animate-spin text-orange-500 shrink-0" />
+                        ) : (
+                          <ArrowRightLeft size={16} className="text-orange-500 shrink-0" />
+                        )}
+                      </motion.button>
+                    );
+                  })}
               </div>
               <div className="p-4 border-t border-gray-100 dark:border-gray-800">
-                <motion.button whileTap={{ scale: 0.95 }} onClick={() => setMergeSourceCuenta(null)} className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-bold outline-none">Cancelar</motion.button>
+                <motion.button
+                  whileTap={!isMerging ? { scale: 0.95 } : {}}
+                  disabled={isMerging}
+                  onClick={() => { if (!isMerging) setMergeSourceCuenta(null); }}
+                  className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-bold outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isMerging ? 'Procesando unión...' : 'Cancelar'}
+                </motion.button>
               </div>
             </motion.div>
           </div>
@@ -674,11 +705,11 @@ export const TicketSidebar = ({
             const esLaUltimaCuenta = cuentasActivas.length === 1 && cuentasActivas[0] === cuenta;
 
             if (tipo === 'mesa' || esLaUltimaCuenta) {
-                if (onCancelFullOrder) await onCancelFullOrder(motivo);
-                toast(esLaUltimaCuenta ? 'Última cuenta cancelada. Mesa liberada.' : 'Orden completa cancelada', 'success');
+              if (onCancelFullOrder) await onCancelFullOrder(motivo);
+              toast(esLaUltimaCuenta ? 'Última cuenta cancelada. Mesa liberada.' : 'Orden completa cancelada', 'success');
             } else {
-                if (onCancelAccount) await onCancelAccount(cuenta, motivo);
-                toast(`Cuenta ${parseAccountName(cuenta)} cancelada exitosamente`, 'success');
+              if (onCancelAccount) await onCancelAccount(cuenta, motivo);
+              toast(`Cuenta ${parseAccountName(cuenta)} cancelada exitosamente`, 'success');
             }
           } catch (e) {
             toast('Error durante la cancelación', 'error');

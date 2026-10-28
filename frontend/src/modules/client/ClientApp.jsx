@@ -38,7 +38,9 @@ const SESSION_STORAGE_KEYS = [
   'lya_client_order_paid',
   'lya_client_is_confirmed',
   'lya_client_last_activity',
-  'lya_client_session_expired'
+  'lya_client_session_expired',
+  'lya_client_all_transferred',
+  'lya_client_transferred_to'
 ];
 
 const purgeClientSessionStorage = () => {

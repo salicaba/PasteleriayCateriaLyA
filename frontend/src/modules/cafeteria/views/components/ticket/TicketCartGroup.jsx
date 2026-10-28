@@ -28,6 +28,7 @@ export const TicketCartGroup = ({
   processingItems, handleToggleStatus, handleRemoveUnsent, onAdd,
   handleDeleteUnsent, handleCancelItem, toggleItemTakeaway, onCancelItem,
   onOpenMergeModal,
+  isMerging,
   onDragStart, onDragEnd,
   showToast 
 }) => {
@@ -312,12 +313,22 @@ export const TicketCartGroup = ({
             {/* 🔥 BOTÓN UNIR CUENTAS */}
             {!isCuentaPagada && !isCompletamentePagada && availableAccs.length > 1 && displayItems.filter(i => !i.isVirtualDiscount).length > 0 && !isVitrina && !isLlevar && onOpenMergeModal && (
               <motion.button 
-                  whileTap={{ scale: 0.95 }}
-                  onClick={(e) => { e.stopPropagation(); onOpenMergeModal(cuentaName); }} 
-                  className="text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 md:hover:bg-orange-100 outline-none touch-manipulation flex items-center gap-1"
+                  whileTap={!isMerging ? { scale: 0.95 } : {}}
+                  disabled={isMerging}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isMerging) onOpenMergeModal(cuentaName);
+                  }} 
+                  className={clsx(
+                    "text-[9px] font-black px-2 py-1 rounded-lg uppercase transition-colors shadow-sm border outline-none touch-manipulation flex items-center gap-1",
+                    isMerging
+                      ? "bg-orange-100/60 dark:bg-orange-900/10 text-orange-400 border-orange-200/50 cursor-wait opacity-70"
+                      : "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 md:hover:bg-orange-100"
+                  )}
                   title="Unir los productos de esta cuenta con otra cuenta de la mesa"
               >
-                <ArrowRightLeft size={10} /> Unir
+                {isMerging ? <Loader2 size={10} className="animate-spin" /> : <ArrowRightLeft size={10} />}
+                {isMerging ? 'Uniendo...' : 'Unir'}
               </motion.button>
             )}
             
