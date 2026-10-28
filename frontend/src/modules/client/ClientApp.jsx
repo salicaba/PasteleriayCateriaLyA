@@ -22,7 +22,7 @@ import { usePWA } from '../../hooks/usePWA';
 const THEME_CLASSES = ['light', 'dark', 'theme-lya'];
 
 const SIZES = [
-  { label: 'Normal', val: '16px' },
+  { label: 'Chica', val: '16px' },
   { label: 'Mediana', val: '18px' },
   { label: 'Grande', val: '20px' }
 ];
