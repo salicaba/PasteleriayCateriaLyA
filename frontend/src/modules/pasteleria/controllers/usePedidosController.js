@@ -119,6 +119,11 @@ export const usePedidosController = () => {
       return true;
     });
 
+    // 🔥 En Papelera Hoy y Entregados Hoy ordenamos del más reciente al más antiguo
+    if (activeTab === 'canceladosHoy' || activeTab === 'entregadosHoy') {
+      return filtrados.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    }
+
     return filtrados.sort((a, b) => new Date(a.fechaEntrega) - new Date(b.fechaEntrega));
   };
 
@@ -138,13 +143,14 @@ export const usePedidosController = () => {
       let pedidoActualizado;
       
       if (tipo === 'cancelar' && motivoPersonalizado) {
-        // 🔥 FIX 1: Primero guardamos el motivo como edición normal
         await editarPedidoReal(pedido.id, {
           ...pedido,
           motivoCancelacion: motivoPersonalizado
         });
-        // 🔥 Y LUEGO obligamos al sistema a usar la ruta de estado para que afecte la Caja
         pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, 'cancelado');
+        if (pedidoActualizado) {
+          pedidoActualizado.motivoCancelacion = motivoPersonalizado;
+        }
       } else {
         pedidoActualizado = await actualizarEstadoPedidoReal(pedido.id, nuevoEstado);
       }
@@ -190,7 +196,6 @@ export const usePedidosController = () => {
     setPedidoAEditar(null);
   };
 
-  // 🔥 Se añade el parámetro del método de reembolso
   const guardarPedido = async (datosPedido, skipRefundCheck = false, metodoReembolso = 'efectivo') => {
     setIsSubmitting(true);
     try {
@@ -199,7 +204,6 @@ export const usePedidosController = () => {
       let pedidoAEnviar = { ...datosPedido };
       pedidoAEnviar.costoTotal = parseFloat(datosPedido.costoTotal);
 
-      // Si nos saltamos el chequeo de reembolso, le adjuntamos el método para que viaje al backend
       if (skipRefundCheck) {
         pedidoAEnviar.metodoReembolso = metodoReembolso;
       }
@@ -267,7 +271,6 @@ export const usePedidosController = () => {
     }
   };
 
-  // 🔥 Ahora recibe el método desde el componente del Modal
   const confirmarReembolso = async (metodoReembolso) => {
     const datos = refundConfirmModal.datosPedido;
     await guardarPedido(datos, true, metodoReembolso); 
@@ -280,7 +283,6 @@ export const usePedidosController = () => {
 
     setIsSubmitting(true);
     try {
-      // 🔥 FIX 2: ¡Aquí faltaba enviar el metodoPago!
       await registrarAbonoReal(pedidoId, monto, metodoPago); 
 
       const pedidoActual = pedidos.find(p => p.id === pedidoId);
@@ -344,7 +346,6 @@ export const usePedidosController = () => {
     registrarAbono,
     successScreen, 
     isSubmitting,
-    // ... resto de tus exports
     refundConfirmModal, 
     setRefundConfirmModal, 
     confirmarReembolso 

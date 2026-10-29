@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
   DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, 
-  MessageCircle, Loader2, Trash2, RotateCcw, Calculator, Flame, Timer, CalendarDays
+  MessageCircle, Loader2, Trash2, RotateCcw, Calculator, Flame, Timer, CalendarDays,
+  PackageX, Receipt
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
@@ -133,6 +134,21 @@ export default function PasteleriaDashboard() {
     return { hoy, manana, proximos7, today, tomorrow, dayAfterTomorrow };
   }, [pedidos]);
 
+  // 🔥 Métricas de resumen para el panel lateral (Papelera Hoy / Entregados Hoy)
+  const panelSummaryMetrics = useMemo(() => {
+    const totalPedidos = pedidosFiltrados.length;
+    const montoTotal = pedidosFiltrados.reduce(
+      (sum, p) => sum + (parseFloat(p.costoTotal) || 0),
+      0
+    );
+    const totalAbonadoAnulado = pedidosFiltrados.reduce((sum, p) => {
+      const pagado = p.abonos?.reduce((s, ab) => s + (parseFloat(ab.monto) || 0), 0) || 0;
+      return sum + Math.max(0, pagado);
+    }, 0);
+
+    return { totalPedidos, montoTotal, totalAbonadoAnulado };
+  }, [pedidosFiltrados]);
+
   if (loading) return <PasteleriaLoader />; 
 
   const getConfirmacionDetalles = () => {
@@ -152,7 +168,6 @@ export default function PasteleriaDashboard() {
         return {
           icon: <Ban size={28} className="text-red-500 lya:text-red-500" />,
           title: 'Cancelar Pedido',
-          // 🔥 TEXTO ACTUALIZADO Y CORREGIDO
           description: 'El pedido se marcará como cancelado. Esta acción es definitiva y no se puede deshacer.',
           color: 'bg-red-500 hover:bg-red-600',
           bgIcon: 'bg-red-50 dark:bg-red-500/10',
@@ -413,10 +428,12 @@ export default function PasteleriaDashboard() {
         </div>
       )}
 
-      {/* --- PANEL LATERAL DESLIZANTE PARA CANCELADOS Y ENTREGADOS --- */}
+      {/* ========================================================================= */}
+      {/* 🔥 PANEL LATERAL DESLIZANTE UNIFICADO (ESTILO CAFETERÍA)                  */}
+      {/* ========================================================================= */}
       <AnimatePresence>
         {(showCancelados || showEntregados) && (
-          <div className="fixed inset-0 z-40 flex justify-end overflow-hidden">
+          <div className="fixed inset-0 z-[9990] flex justify-end overflow-hidden">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
               transition={{ duration: 0.2, ease: "easeOut" }} 
@@ -425,17 +442,25 @@ export default function PasteleriaDashboard() {
             />
             <motion.div 
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} 
-              transition={{ duration: 0.25, ease: "easeOut" }} 
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }} 
               className="relative z-10 w-full max-w-md h-[100dvh] bg-white dark:bg-gray-900 lya:bg-lya-surface shadow-2xl flex flex-col"
             >
+              {/* ENCABEZADO DEL PANEL */}
               <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/40 shrink-0">
                 <div className={`flex items-center gap-3 ${showCancelados ? 'text-red-500' : 'text-emerald-500 lya:text-lya-primary'}`}>
                   <div className={`p-2 rounded-xl ${showCancelados ? 'bg-red-100 dark:bg-red-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30 lya:bg-lya-primary/20'}`}>
                     {showCancelados ? <Trash2 size={24} /> : <CheckCircle2 size={24} />}
                   </div>
-                  <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text">
-                    {showCancelados ? 'Papelera Hoy' : 'Entregados Hoy'}
-                  </h2>
+                  <div>
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white lya:text-lya-text leading-tight">
+                      {showCancelados ? 'Papelera Hoy' : 'Entregados Hoy'}
+                    </h2>
+                    <p className="text-xs font-medium text-gray-400">
+                      {showCancelados
+                        ? 'Auditoría de pedidos y anticipos anulados'
+                        : 'Resumen de pedidos entregados hoy'}
+                    </p>
+                  </div>
                 </div>
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
@@ -446,81 +471,253 @@ export default function PasteleriaDashboard() {
                 </motion.button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pb-10">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
+                {/* RESUMEN EJECUTIVO SUPERIOR */}
+                {pedidosFiltrados.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 p-3.5 bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-200/70 dark:border-gray-800 lya:border-lya-border/40 rounded-2xl">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-2 rounded-xl ${showCancelados ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                        {showCancelados ? <PackageX size={18} /> : <PackageCheck size={18} />}
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                          {showCancelados ? 'Pedidos Anulados' : 'Entregados'}
+                        </p>
+                        <p className="text-base font-black text-gray-900 dark:text-white lya:text-lya-text">
+                          {panelSummaryMetrics.totalPedidos} {panelSummaryMetrics.totalPedidos === 1 ? 'pedido' : 'pedidos'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 border-l border-gray-200 dark:border-gray-700 pl-3">
+                      <div className={`p-2 rounded-xl ${showCancelados ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                        <Receipt size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                          {showCancelados ? 'Monto Anulado' : 'Total Cobrado'}
+                        </p>
+                        <p className={`text-base font-black ${showCancelados ? 'text-red-500 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          ${panelSummaryMetrics.montoTotal.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {pedidosFiltrados.length === 0 ? (
                   <div className="text-center text-gray-400 mt-10">
-                    {showCancelados ? <Trash2 size={40} className="mx-auto mb-3 opacity-30" /> : <PackageCheck size={40} className="mx-auto mb-3 opacity-30" />}
-                    <p className="font-bold">{showCancelados ? 'Papelera vacía' : 'Aún no hay entregas'}</p>
-                    <p className="text-xs">{showCancelados ? 'No hay pedidos cancelados hoy.' : 'Los pedidos entregados aparecerán aquí.'}</p>
+                    {showCancelados ? <CheckCircle2 size={40} className="mx-auto mb-3 opacity-30" /> : <PackageCheck size={40} className="mx-auto mb-3 opacity-30" />}
+                    <p className="font-bold">{showCancelados ? 'Día limpio' : 'Aún no hay entregas'}</p>
+                    <p className="text-xs">{showCancelados ? 'No hay pedidos cancelados el día de hoy.' : 'Los pedidos entregados aparecerán aquí.'}</p>
                   </div>
                 ) : (
-                  pedidosFiltrados.map(pedido => {
-                    const fechaActualizacion = new Date(pedido.updatedAt || pedido.fechaEntrega).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
-                    
-                    if (showCancelados) {
-                      const motivoMostrar = pedido.motivoCancelacion || pedido.cancelReason || pedido.motivo || 'Cancelado desde POS';
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest">
+                        {showCancelados
+                          ? `Pedidos Anulados (${pedidosFiltrados.length})`
+                          : `Pedidos Entregados (${pedidosFiltrados.length})`}
+                      </h3>
+                    </div>
 
-                      return (
-                        <div key={pedido.id} className="p-4 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 rounded-2xl transition-all shadow-sm">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
-                              {pedido.id}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">Anulada</span>
+                    <div className="space-y-3">
+                      {pedidosFiltrados.map(pedido => {
+                        const fechaActualizacion = new Date(pedido.updatedAt || pedido.fechaEntrega).toLocaleTimeString('es-MX', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        });
+                        const costoNum = parseFloat(pedido.costoTotal) || 0;
+                        const totalPagado = pedido.abonos?.reduce((sum, ab) => sum + (parseFloat(ab.monto) || 0), 0) || 0;
+                        const porcionesList = Array.isArray(pedido.porciones)
+                          ? pedido.porciones
+                          : (pedido.porciones ? [pedido.porciones] : []);
+                        const saboresList = Array.isArray(pedido.saborPan)
+                          ? pedido.saborPan
+                          : (pedido.saborPan ? [pedido.saborPan] : []);
+
+                        if (showCancelados) {
+                          const motivoMostrar = pedido.motivoCancelacion || pedido.cancelReason || pedido.motivo || 'Cancelado desde POS';
+
+                          return (
+                            <div
+                              key={pedido.id}
+                              onClick={() => abrirDetalles(pedido)}
+                              className="cursor-pointer p-4 border border-red-200/80 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/20 rounded-2xl transition-all hover:shadow-md"
+                            >
+                              {/* CABECERA DE LA TARJETA */}
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
+                                  {pedido.id}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  {costoNum > 0 && (
+                                    <span className="text-xs font-black text-gray-400 line-through">
+                                      ${costoNum.toFixed(2)}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">
+                                    Pedido Anulado
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* INSIGNIA DEL CLIENTE Y SERVICIO */}
+                              <div className="mb-3">
+                                <div className="inline-flex flex-col bg-white dark:bg-gray-800 lya:bg-lya-bg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
+                                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                    Cliente: {pedido.cliente || 'Público General'}
+                                    {pedido.telefono ? ` | Cel: ${pedido.telefono}` : ''}
+                                  </span>
+                                  <span className="text-[9px] font-bold mt-1.5 pt-1 border-t border-red-100 dark:border-red-900/50 opacity-90 leading-none uppercase">
+                                    Entrega: {pedido.tipoEntrega || 'Sucursal'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 🔥 DESGLOSE DEL PRODUCTO (IGUAL QUE CAFETERÍA) */}
+                              <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-red-100 dark:border-red-900/30 space-y-1.5">
+                                <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1">
+                                  Detalle del pedido anulado
+                                </p>
+                                <div className="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-gray-800">
+                                  <div className="flex items-center gap-1.5 pr-2">
+                                    <span className="font-black text-red-500">1x</span>
+                                    <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">
+                                      {pedido.categoria || 'Pastel Personalizado'}
+                                    </span>
+                                  </div>
+                                  <span className="font-bold text-gray-400 line-through shrink-0">
+                                    ${costoNum.toFixed(2)}
+                                  </span>
+                                </div>
+
+                                {(porcionesList.length > 0 || saboresList.length > 0) && (
+                                  <div className="flex flex-wrap gap-1 pt-1">
+                                    {porcionesList.map((p, idx) => (
+                                      <span key={idx} className="text-[9px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-900/30">
+                                        {p}
+                                      </span>
+                                    ))}
+                                    {saboresList.map((s, idx) => (
+                                      <span key={idx} className="text-[9px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900/30">
+                                        {s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {pedido.descripcion && (
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400 italic line-clamp-2 pt-0.5">
+                                    "{pedido.descripcion}"
+                                  </p>
+                                )}
+
+                                {totalPagado > 0 && (
+                                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-gray-100 dark:border-gray-800 text-red-500 font-bold">
+                                    <span>Anticipo anulado en caja:</span>
+                                    <span className="line-through">${totalPagado.toFixed(2)}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] text-gray-500 leading-snug">
+                                Motivo: {motivoMostrar}
+                              </p>
+                              <div className="flex items-center justify-between gap-2 mt-2.5">
+                                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                                  🕒 {fechaActualizacion}
+                                </span>
+                                <motion.button
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    abrirTicket(pedido);
+                                  }}
+                                  className="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/40 hover:bg-red-50 text-red-500 transition-colors flex items-center gap-1 shadow-sm"
+                                >
+                                  <FileText size={12} /> Ticket
+                                </motion.button>
+                              </div>
                             </div>
-                          </div>
-                          <div className="mb-2">
-                            <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-2.5 py-1.5 rounded-lg shadow-sm">
-                              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                                Nombre: {pedido.cliente}
-                              </span>
+                          );
+                        } else {
+                          return (
+                            <div
+                              key={pedido.id}
+                              onClick={() => abrirDetalles(pedido)}
+                              className="cursor-pointer p-4 border border-green-200/80 dark:border-green-900/40 bg-green-50/50 dark:bg-green-950/20 rounded-2xl transition-all hover:shadow-md"
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
+                                  {pedido.id}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded uppercase">
+                                    Entregado
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mb-3">
+                                <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-green-200 dark:border-green-900/50 text-emerald-600 dark:text-emerald-400 px-2.5 py-1.5 rounded-lg shadow-sm">
+                                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                    Cliente: {pedido.cliente || 'Público General'}
+                                    {pedido.telefono ? ` | Cel: ${pedido.telefono}` : ''}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* DESGLOSE DEL PEDIDO ENTREGADO */}
+                              <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-green-100 dark:border-green-900/30 space-y-1.5">
+                                <div className="flex items-center justify-between text-xs py-0.5">
+                                  <div className="flex items-center gap-1.5 pr-2">
+                                    <span className="font-black text-emerald-600">1x</span>
+                                    <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">
+                                      {pedido.categoria || 'Pastel Personalizado'}
+                                    </span>
+                                  </div>
+                                  <span className="font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                                    ${costoNum.toFixed(2)}
+                                  </span>
+                                </div>
+                                {(porcionesList.length > 0 || saboresList.length > 0) && (
+                                  <div className="flex flex-wrap gap-1 pt-0.5">
+                                    {porcionesList.map((p, idx) => (
+                                      <span key={idx} className="text-[9px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                                        {p}
+                                      </span>
+                                    ))}
+                                    {saboresList.map((s, idx) => (
+                                      <span key={idx} className="text-[9px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded">
+                                        {s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between mt-3">
+                                <span className="bg-green-100 dark:bg-green-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
+                                  🕒 {fechaActualizacion}
+                                </span>
+                                <motion.button
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    abrirTicket(pedido);
+                                  }}
+                                  className="text-[10px] font-black px-2.5 py-1.5 rounded-lg uppercase tracking-widest bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 dark:text-gray-300 transition-colors flex items-center gap-1.5 shadow-sm"
+                                >
+                                  <FileText size={14} /> Ticket
+                                </motion.button>
+                              </div>
                             </div>
-                          </div>
-                          <p className="text-[11px] text-gray-500 leading-snug">Motivo: {motivoMostrar}</p>
-                          <div className="flex items-center gap-2 mt-3">
-                            <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
-                              🕒 {fechaActualizacion}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div key={pedido.id} className="p-4 border border-green-100 dark:border-green-900/30 bg-green-50/50 dark:bg-green-950/20 rounded-2xl transition-all shadow-sm">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-black text-gray-900 dark:text-white lya:text-lya-text text-base">
-                              {pedido.id}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded uppercase">Entregado</span>
-                            </div>
-                          </div>
-                          <div className="mb-2">
-                            <div className="inline-flex flex-col bg-white dark:bg-gray-800 border border-green-200 dark:border-green-900/50 text-emerald-600 dark:text-emerald-400 px-2.5 py-1.5 rounded-lg shadow-sm">
-                              <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                                Nombre: {pedido.cliente}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center justify-between mt-3">
-                            <div className="flex items-center gap-2">
-                              <span className="bg-green-100 dark:bg-green-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider">
-                                🕒 {fechaActualizacion}
-                              </span>
-                              <motion.button whileTap={{ scale: 0.95 }} onClick={() => abrirTicket(pedido)} className="text-[10px] font-black px-2 py-1.5 rounded-lg uppercase tracking-widest bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 dark:text-gray-300 transition-colors flex items-center gap-1.5 shadow-sm">
-                                <FileText size={14} /> Ticket
-                              </motion.button>
-                            </div>
-                            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 lya:text-lya-primary">
-                              ${parseFloat(pedido.costoTotal).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }
-                  })
+                          );
+                        }
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </motion.div>

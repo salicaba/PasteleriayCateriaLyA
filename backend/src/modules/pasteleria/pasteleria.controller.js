@@ -51,7 +51,6 @@ export const getPedidoById = async (req, res) => {
 const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
   let imagenes = imagenesEntrantes;
 
-  // 1. Decodificar si el frontend mandó el Array como un String (JSON)
   if (typeof imagenes === 'string') {
     try {
       imagenes = JSON.parse(imagenes);
@@ -61,7 +60,6 @@ const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
     }
   }
 
-  // 2. Validar que sea un arreglo válido y con contenido
   if (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0) return [];
 
   const urlsFinales = [];
@@ -69,29 +67,23 @@ const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
   for (let i = 0; i < imagenes.length; i++) {
     const img = imagenes[i];
 
-    // Si la imagen ya es un link de Supabase (modo edición), la conservamos
     if (typeof img === 'string' && img.startsWith('http')) {
       urlsFinales.push(img);
       continue;
     }
 
-    // Si es Base64 crudo del Frontend, lo transformamos y lo subimos a la nube
     if (typeof img === 'string' && img.startsWith('data:image')) {
       try {
-        // 🔥 FIX: Extracción simplificada y a prueba de errores para el Base64
         const partes = img.split(',');
-        if (partes.length !== 2) continue; // Si no tiene coma, no es un Base64 válido
+        if (partes.length !== 2) continue;
 
-        // Extraer el MimeType (ej: "data:image/png;base64" -> "image/png")
         const mimeType = partes[0].split(';')[0].split(':')[1] || 'image/jpeg';
         const base64Data = partes[1];
         
-        // Convertir a buffer físico
         const buffer = Buffer.from(base64Data, 'base64');
         const extension = mimeType.split('/')[1] || 'jpg';
         const fileName = `${pedidoId}_${Date.now()}_${i}.${extension}`;
 
-        // Subimos al bucket físico "pedidos"
         const { error } = await supabase.storage
           .from('pedidos')
           .upload(fileName, buffer, {
@@ -104,7 +96,6 @@ const uploadImagesToStorage = async (imagenesEntrantes, pedidoId) => {
           continue;
         }
 
-        // Recuperamos la URL pública
         const { data: publicUrlData } = supabase.storage
           .from('pedidos')
           .getPublicUrl(fileName);
@@ -129,7 +120,6 @@ export const createPedido = async (req, res) => {
   try {
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
     
-    // 🔥 FIX: Extraemos todas las posibles variables del método de pago
     const { abonos, anticipo, metodoPagoAnticipo, metodoPago, metodo, imagenesReferencia, ...pedidoData } = req.body;
 
     const randomNum = Math.floor(100 + Math.random() * 900);
@@ -140,8 +130,6 @@ export const createPedido = async (req, res) => {
 
     const montoAnticipo = parseFloat(anticipo);
     if (montoAnticipo > 0) {
-      
-      // 🔥 FIX: Consolidamos lo que sea que mande el frontend
       const metodoReal = metodoPagoAnticipo || metodoPago || metodo || '';
       const metodoSafe = String(metodoReal).toLowerCase();
       
@@ -196,7 +184,6 @@ export const updatePedido = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    // 🛡️ BLINDAJE 1: Limpieza del Payload y Extracción del método de reembolso
     const { 
         id: reqId, 
         createdAt, 
@@ -205,15 +192,17 @@ export const updatePedido = async (req, res) => {
         imagenesReferencia, 
         anticipo, 
         metodoPagoAnticipo,
-        metodoReembolso, // 🔥 NUEVO: Extraemos el método de reembolso
+        metodoReembolso,
         ...updateData 
     } = req.body;
 
-    // Procesamos imágenes...
-    if (imagenesReferencia && imagenesReferencia.length > 0) {
+    // 🔥 BLINDAJE: Solo tocamos imagenesReferencia si fue enviado explícitamente en el body
+    if (imagenesReferencia !== undefined) {
+      if (Array.isArray(imagenesReferencia) && imagenesReferencia.length > 0) {
         updateData.imagenesReferencia = await uploadImagesToStorage(imagenesReferencia, pedido.id);
-    } else {
+      } else {
         updateData.imagenesReferencia = [];
+      }
     }
 
     const localNow = new Date();
@@ -229,7 +218,6 @@ export const updatePedido = async (req, res) => {
       if (totalPagado > nuevoCosto) {
         const devolucion = totalPagado - nuevoCosto;
         
-        // 🔥 FIX: Evaluamos si el reembolso fue en Efectivo o Transferencia
         const metodoSafe = String(metodoReembolso || 'efectivo').toLowerCase();
         let dbMethod = 'CASH';
         if (metodoSafe.includes('transf')) dbMethod = 'TRANSFER';
@@ -237,7 +225,7 @@ export const updatePedido = async (req, res) => {
 
         const tx = await Transaction.create({
           source: 'PASTELERIA',
-          paymentMethod: dbMethod, // 🔥 Aplicamos el método correcto
+          paymentMethod: dbMethod,
           amount: -Math.abs(devolucion), 
           description: `Devolución de saldo a favor por ajuste de precio. Pedido: ${updateData.cliente || pedido.cliente} ${pedido.id}`,
           referenceId: pedido.id,
@@ -249,7 +237,7 @@ export const updatePedido = async (req, res) => {
           id: tx.id,
           fecha: localNow.toISOString(),
           monto: -Math.abs(devolucion), 
-          metodo: metodoSafe === 'transferencia' ? 'transferencia' : 'efectivo', // 🔥 Aplicamos el método en el recibo
+          metodo: metodoSafe === 'transferencia' ? 'transferencia' : 'efectivo',
           nota: 'Devolución automática'
         };
         
@@ -275,7 +263,6 @@ export const updatePedido = async (req, res) => {
 export const addAbono = async (req, res) => {
   try {
     const { id } = req.params;
-    // 🔥 FIX: Abarcamos ambas opciones posibles del frontend
     const { monto, metodo, metodoPago } = req.body; 
     
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
@@ -285,7 +272,6 @@ export const addAbono = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    // 🔥 FIX: Normalizamos el texto del abono
     const metodoReal = metodo || metodoPago || '';
     const metodoSafe = String(metodoReal).toLowerCase();
     
@@ -335,7 +321,7 @@ export const addAbono = async (req, res) => {
 export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
-    const { estado } = req.body;
+    const { estado, motivoCancelacion, cancelReason } = req.body;
 
     const pedido = await PasteleriaOrder.findByPk(id);
     if (!pedido) {
@@ -343,9 +329,11 @@ export const updateEstado = async (req, res) => {
     }
 
     pedido.estado = estado;
+    if (motivoCancelacion || cancelReason) {
+      pedido.motivoCancelacion = motivoCancelacion || cancelReason;
+    }
     await pedido.save();
 
-    // 🔥 FIX 3: Solo actualizamos el status para evitar el Error 500
     if (estado === 'cancelado') {
       await Transaction.update(
         { status: 'CANCELLED' },
@@ -386,6 +374,7 @@ export const cancelarPedido = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
+    const { motivoCancelacion, cancelReason } = req.body || {};
     const userId = req.user?.id || req.userId || req.usuario?.id || null;
     const pedido = await PasteleriaOrder.findByPk(id, { transaction: t });
 
@@ -395,9 +384,11 @@ export const cancelarPedido = async (req, res) => {
     }
 
     pedido.estado = 'cancelado';
+    if (motivoCancelacion || cancelReason) {
+      pedido.motivoCancelacion = motivoCancelacion || cancelReason;
+    }
     await pedido.save({ transaction: t });
 
-    // 🔥 BLINDAJE ZONA HORARIA
     const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const localNow = new Date(nowLocalStr);
 
@@ -537,9 +528,7 @@ export const sharePedidoTicket = async (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Ticket de Pedido #${pedido.id} - 𝓛𝔂𝓪</title>
 
-      <!-- 🔥 ICONO PARA LA PESTAÑA DEL NAVEGADOR (FAVICON) 🔥 -->
       <link rel="icon" type="image/png" href="https://menu-lya.vercel.app/logo.jpeg" />
-      <!-- 🔥 ETIQUETAS OPEN GRAPH PARA WHATSAPP (LOGO) 🔥 -->
       <meta property="og:title" content="Ticket de Pedido - 𝓛𝔂𝓪" />
       <meta property="og:description" content="¡Gracias por tu preferencia! Aquí tienes tu comprobante de pastelería." />
       <meta property="og:image" content="https://menu-lya.vercel.app/logo.jpeg" />
@@ -549,7 +538,6 @@ export const sharePedidoTicket = async (req, res) => {
       <script>
         tailwind.config = { corePlugins: { preflight: true } }
       </script>
-      <!-- 🔥 JS PARA TICKET TÉRMICO DIGITAL 🔥 -->
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
       <style>
@@ -561,7 +549,6 @@ export const sharePedidoTicket = async (req, res) => {
     <body class="text-slate-800 antialiased flex flex-col items-center justify-start min-h-screen pt-8 px-2 sm:px-6 select-none bg-slate-50">
       
       <div id="ticket-download-area" class="w-full flex flex-col items-center p-2 bg-transparent overflow-x-auto">
-        <!-- 🔥 CENTRADOR FIJO 🔥 -->
         <div class="w-full flex justify-center">
           <div id="ticket-card" style="width: 380px; min-width: 380px; max-width: 380px;" class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8 relative transition-all duration-300">
             
@@ -594,7 +581,6 @@ export const sharePedidoTicket = async (req, res) => {
                 <span class="text-slate-900 font-black uppercase tracking-wide text-right">${pedido.tipoEntrega || 'sucursal'}</span>
               </div>
               
-              <!-- 🔥 FIX: Inyección de Dirección para Domicilio -->
               ${pedido.tipoEntrega === 'domicilio' && pedido.direccion ? `
               <div class="flex flex-col gap-1 mt-4 bg-slate-100/80 p-3 rounded-xl border border-slate-200">
                 <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">📍 Dirección de Entrega:</span>
@@ -705,7 +691,6 @@ export const sharePedidoTicket = async (req, res) => {
       </div>
 
       <script>
-        // 🔥 MOTOR DE GENERACIÓN PDF TIPO "TICKET ROLLO"
         async function descargarPDF() {
           const btn = document.getElementById('btn-descargar');
           const originalText = btn.innerHTML;
@@ -716,7 +701,6 @@ export const sharePedidoTicket = async (req, res) => {
           const element = document.getElementById('ticket-card');
 
           try {
-            // Asegurar que estamos hasta arriba y que la fuente cargó
             window.scrollTo(0, 0);
             await document.fonts.ready;
 
