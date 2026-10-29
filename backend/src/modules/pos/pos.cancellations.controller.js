@@ -30,7 +30,6 @@ const getCleanAccountName = (str) => {
 // =====================================================================
 const getOrigenProducto = (departamento) => {
   if (!departamento) return 'CAFETERIA';
-  // Convierte "Pastelería" a "PASTELERIA" quitando acentos
   const deptoNormalizado = String(departamento).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (deptoNormalizado.includes('PASTELERIA')) return 'PASTELERIA';
   return 'CAFETERIA';
@@ -42,7 +41,6 @@ const getOrigenProducto = (departamento) => {
 const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detalle, userId = null, cuentaName = null, baseDateForDb, sourceToMatch = null) => {
   let whereClause = { referenceId: orderId, type: 'INCOME' };
   
-  // 1. Buscamos todas las transacciones de ingresos de esta orden (tanto anuladas como activas)
   let txs = await Transaction.findAll({
       where: whereClause,
       order: [['createdAt', 'DESC']]
@@ -50,15 +48,12 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 
   let targetTxs = txs;
   
-  // 2. FILTRO DE ORO: Intentamos filtrar por origen si nos lo proveen (Cafetería vs Pastelería)
   if (sourceToMatch) {
       const sourceFiltered = txs.filter(tx => tx.source === sourceToMatch);
       if (sourceFiltered.length > 0) {
           targetTxs = sourceFiltered;
       }
-  } 
-  // 3. PLAN B: Si no hay origen, intentamos el viejo filtro por nombre de cuenta en Mesas
-  else if (cuentaName) {
+  } else if (cuentaName) {
     const cleanTarget = getCleanAccountName(cuentaName);
     const filteredTxs = txs.filter(tx => 
       tx.description && tx.description.includes(`Cuenta: ${cleanTarget}`)
@@ -77,13 +72,11 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
       let appliedAmount = 0;
 
       if (tipoOperacion === 'restar') {
-          // Si estamos anulando, le quitamos dinero hasta llegar a 0
           appliedAmount = Math.min(nuevoMonto, remainingMonto);
           nuevoMonto -= appliedAmount;
           remainingMonto -= appliedAmount;
           tx.description += ` | 📉 -$${appliedAmount.toFixed(2)} (Anulado: ${detalle})`;
       } else if (tipoOperacion === 'sumar') {
-          // Si estamos restaurando, le devolvemos el dinero sin límite
           appliedAmount = remainingMonto;
           nuevoMonto += appliedAmount;
           remainingMonto -= appliedAmount;
@@ -98,7 +91,7 @@ const modificarTransaccionOriginal = async (orderId, monto, tipoOperacion, detal
 
       if (nuevoMonto === 0 && tx.status !== 'CANCELLED') {
           newStatus = 'CANCELLED';
-          cancelledAt = baseDateForDb; // 🔥 Recibe la fecha pura de la BD
+          cancelledAt = baseDateForDb;
           cancelledBy = userId;
       } else if (nuevoMonto > 0 && tx.status === 'CANCELLED') {
           newStatus = 'ACTIVE';
@@ -146,12 +139,10 @@ export const cancelOrderItem = async (req, res) => {
 
     let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
 
-    // 🔥 FIX: Fecha pura (UTC) para que no truene la BD al guardar en "cancelledAt"
     const dbNow = new Date();
 
     if (wasPaid && refundAmount > 0) {
       const nombreProducto = item.product?.name || item.nombre || 'Producto';
-      // 🔥 Usamos el nuevo helper blindado
       const origen = getOrigenProducto(item.product?.departamento);
       
       await modificarTransaccionOriginal(order.id, refundAmount, 'restar', `${qtyToCancel}x ${nombreProducto}`, userId, item.cuenta, dbNow, origen);
@@ -175,7 +166,7 @@ export const cancelOrderItem = async (req, res) => {
             notes: JSON.stringify(cancelledNotes),
             kitchenStatus: item.kitchenStatus,
             status: 'CANCELLED',
-            cancelledAt: dbNow, // 🔥 Fecha limpia
+            cancelledAt: dbNow,
             cancelReason: cancelReason || `Cancelación parcial desde POS`,
             cancelledBy: userId
         });
@@ -188,7 +179,7 @@ export const cancelOrderItem = async (req, res) => {
     } else {
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: dbNow, // 🔥 Fecha limpia
+          cancelledAt: dbNow,
           cancelReason: cancelReason || `Cancelado desde POS`,
           cancelledBy: userId
         });
@@ -217,7 +208,7 @@ export const cancelOrderItem = async (req, res) => {
       await order.update({ 
         status: 'CANCELLED', 
         totalAmount: 0, 
-        cancelledAt: dbNow, // 🔥 Fecha limpia
+        cancelledAt: dbNow,
         cancelReason: motivoMecanismoSeguridad, 
         cancelledBy: userId 
       });
@@ -284,17 +275,17 @@ export const cancelOrder = async (req, res) => {
       textoPapelera = `Mostrador Express`;
     }
     
-    const motivoFinal = cancelReason ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` : `Cancelación de ${textoPapelera}`;
+    const motivoFinal = cancelReason 
+      ? `Cancelación de ${textoPapelera} - Motivo: ${cancelReason}` 
+      : `Cancelación de ${textoPapelera}`;
 
     let totalRefundByAccount = {};
-    // 🔥 FIX: Fecha pura para la Base de Datos
     const dbNow = new Date();
 
     for (const item of order.items) {
       if (item.status === 'ACTIVE') {
         let wasPaid = order.status === 'PAID' || (order.paidAccounts && order.paidAccounts.includes(item.cuenta));
         if (wasPaid) {
-           // 🔥 Usamos el nuevo helper blindado
            const origen = getOrigenProducto(item.product?.departamento);
            const key = `${item.cuenta}||${origen}`;
            totalRefundByAccount[key] = (totalRefundByAccount[key] || 0) + Number(item.subtotal);
@@ -302,7 +293,7 @@ export const cancelOrder = async (req, res) => {
 
         await item.update({
           status: 'CANCELLED',
-          cancelledAt: dbNow, // 🔥 Fecha limpia
+          cancelledAt: dbNow,
           cancelReason: motivoFinal, 
           cancelledBy: userId
         });
@@ -321,7 +312,7 @@ export const cancelOrder = async (req, res) => {
     await order.update({
       status: 'CANCELLED',
       totalAmount: 0,
-      cancelledAt: dbNow, // 🔥 Fecha limpia
+      cancelledAt: dbNow,
       cancelReason: motivoFinal, 
       cancelledBy: userId
     });
@@ -348,7 +339,6 @@ export const cancelOrder = async (req, res) => {
 // ==========================================
 export const getDailySummary = async (req, res) => {
   try {
-    // 🔥 BLINDAJE DE ZONA HORARIA: Evita que el servidor UTC revuelva los días
     const nowLocalStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const localNow = new Date(nowLocalStr);
 
@@ -357,7 +347,6 @@ export const getDailySummary = async (req, res) => {
     const day = String(localNow.getDate()).padStart(2, '0');
     const todayStr = `${year}-${month}-${day}`;
 
-    // Forzamos el límite a las 00:00 y 23:59:59 con el offset de Chiapas (-06:00)
     const startOfDay = new Date(`${todayStr}T00:00:00.000-06:00`);
     const endOfDay = new Date(`${todayStr}T23:59:59.999-06:00`);
 
@@ -398,9 +387,15 @@ export const getDailySummary = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    // 🔥 ESTÁNDAR POS: Contamos unidades reales de productos cancelados (sin sumar las cuentas contenedoras)
+    const totalCancelledUnits = cancelledItems.reduce(
+      (sum, item) => sum + (Number(item.quantity) || 1),
+      0
+    );
+
     res.json({
       vendidosCount: vendidosOrders.length,
-      papeleraCount: cancelledOrders.length + cancelledItems.length,
+      papeleraCount: totalCancelledUnits,
       vendidosOrders,
       cancelledOrders,
       cancelledItems,

@@ -92,12 +92,10 @@ export const useMesasController = () => {
   const [zonaActiva, setZonaActiva] = useState('salon');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estado unificado del resumen diario para que la pantalla de carga espere todo
   const [dailySummary, setDailySummary] = useState({
     vendidosCount: 0, papeleraCount: 0, vendidosOrders: [], cancelledOrders: [], cancelledItems: [], transactions: []
   });
 
-  // 🔥 Candado de concurrencia para evitar creación múltiple de tickets
   const isProcessingRef = useRef(false);
 
   const zonas = [ 
@@ -108,7 +106,6 @@ export const useMesasController = () => {
 
   const loadMesas = useCallback(async () => {
     try {
-      // 🔥 CARGA CONCURRENTE ATÓMICA: Mesas, Órdenes activas, Resumen Diario y Promociones
       const [tablesRes, activeOrdersRes, summaryRes, promosRes] = await Promise.all([
         client.get('/pos/tables'), 
         client.get('/pos/orders/active'),
@@ -122,7 +119,15 @@ export const useMesasController = () => {
       const promotionsList = Array.isArray(rawPromos) ? rawPromos : (rawPromos?.data || rawPromos?.promotions || []);
       
       if (summaryRes.data) {
-        setDailySummary(summaryRes.data);
+        const rawCancelledItems = summaryRes.data.cancelledItems || [];
+        const calculatedUnits = rawCancelledItems.reduce(
+          (sum, item) => sum + (Number(item.quantity) || 1),
+          0
+        );
+        setDailySummary({
+          ...summaryRes.data,
+          papeleraCount: calculatedUnits
+        });
       }
 
       const mergedMesas = catalog.map(table => {
@@ -190,7 +195,6 @@ export const useMesasController = () => {
     } catch (error) { 
       console.error("Error al sincronizar mesas:", error); 
     } finally { 
-      // 🚀 El loader principal SÓLO se apaga cuando TODO está descargado en memoria
       setIsLoading(false); 
     }
   }, []);
