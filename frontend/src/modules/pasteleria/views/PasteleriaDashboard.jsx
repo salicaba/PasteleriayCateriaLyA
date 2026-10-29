@@ -134,15 +134,19 @@ export default function PasteleriaDashboard() {
     return { hoy, manana, proximos7, today, tomorrow, dayAfterTomorrow };
   }, [pedidos]);
 
-  // 🔥 Calcula el valor total de los pedidos (lo que cuestan los pasteles en total)
+  // 🔥 Métricas de resumen para el panel lateral (Papelera Hoy / Entregados Hoy)
   const panelSummaryMetrics = useMemo(() => {
     const totalPedidos = pedidosFiltrados.length;
-    const valorTotalPedidos = pedidosFiltrados.reduce(
+    const montoTotal = pedidosFiltrados.reduce(
       (sum, p) => sum + (parseFloat(p.costoTotal) || 0),
       0
     );
+    const totalAbonadoAnulado = pedidosFiltrados.reduce((sum, p) => {
+      const pagado = p.abonos?.reduce((s, ab) => s + (parseFloat(ab.monto) || 0), 0) || 0;
+      return sum + Math.max(0, pagado);
+    }, 0);
 
-    return { totalPedidos, valorTotalPedidos };
+    return { totalPedidos, montoTotal, totalAbonadoAnulado };
   }, [pedidosFiltrados]);
 
   if (loading) return <PasteleriaLoader />; 
@@ -453,8 +457,8 @@ export default function PasteleriaDashboard() {
                     </h2>
                     <p className="text-xs font-medium text-gray-400">
                       {showCancelados
-                        ? 'Valor y detalle de pedidos cancelados hoy'
-                        : 'Valor y detalle de pedidos entregados hoy'}
+                        ? 'Auditoría de pedidos y anticipos anulados'
+                        : 'Resumen de pedidos entregados hoy'}
                     </p>
                   </div>
                 </div>
@@ -468,7 +472,7 @@ export default function PasteleriaDashboard() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
-                {/* RESUMEN EJECUTIVO SUPERIOR (ENFOCADO EN EL PRECIO TOTAL DE LOS PEDIDOS) */}
+                {/* RESUMEN EJECUTIVO SUPERIOR */}
                 {pedidosFiltrados.length > 0 && (
                   <div className="grid grid-cols-2 gap-3 p-3.5 bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-200/70 dark:border-gray-800 lya:border-lya-border/40 rounded-2xl">
                     <div className="flex items-center gap-2.5">
@@ -477,7 +481,7 @@ export default function PasteleriaDashboard() {
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          {showCancelados ? 'Pedidos Cancelados' : 'Pedidos Entregados'}
+                          {showCancelados ? 'Pedidos Anulados' : 'Entregados'}
                         </p>
                         <p className="text-base font-black text-gray-900 dark:text-white lya:text-lya-text">
                           {panelSummaryMetrics.totalPedidos} {panelSummaryMetrics.totalPedidos === 1 ? 'pedido' : 'pedidos'}
@@ -490,10 +494,10 @@ export default function PasteleriaDashboard() {
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          {showCancelados ? 'Valor Cancelado' : 'Valor Entregado'}
+                          {showCancelados ? 'Monto Anulado' : 'Total Cobrado'}
                         </p>
                         <p className={`text-base font-black ${showCancelados ? 'text-red-500 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          ${panelSummaryMetrics.valorTotalPedidos.toFixed(2)}
+                          ${panelSummaryMetrics.montoTotal.toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -511,7 +515,7 @@ export default function PasteleriaDashboard() {
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest">
                         {showCancelados
-                          ? `Pedidos Cancelados (${pedidosFiltrados.length})`
+                          ? `Pedidos Anulados (${pedidosFiltrados.length})`
                           : `Pedidos Entregados (${pedidosFiltrados.length})`}
                       </h3>
                     </div>
@@ -524,6 +528,7 @@ export default function PasteleriaDashboard() {
                           hour12: true
                         });
                         const costoNum = parseFloat(pedido.costoTotal) || 0;
+                        const totalPagado = pedido.abonos?.reduce((sum, ab) => sum + (parseFloat(ab.monto) || 0), 0) || 0;
                         const porcionesList = Array.isArray(pedido.porciones)
                           ? pedido.porciones
                           : (pedido.porciones ? [pedido.porciones] : []);
@@ -552,7 +557,7 @@ export default function PasteleriaDashboard() {
                                     </span>
                                   )}
                                   <span className="text-[10px] font-black text-red-500 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded uppercase">
-                                    Cancelado
+                                    Pedido Anulado
                                   </span>
                                 </div>
                               </div>
@@ -570,16 +575,11 @@ export default function PasteleriaDashboard() {
                                 </div>
                               </div>
 
-                              {/* 🔥 DESGLOSE DEL PRODUCTO Y SU PRECIO TOTAL */}
+                              {/* 🔥 DESGLOSE DEL PRODUCTO (IGUAL QUE CAFETERÍA) */}
                               <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-red-100 dark:border-red-900/30 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-400">
-                                    Producto cancelado
-                                  </p>
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-400">
-                                    Valor del pedido
-                                  </p>
-                                </div>
+                                <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1">
+                                  Detalle del pedido anulado
+                                </p>
                                 <div className="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-gray-800">
                                   <div className="flex items-center gap-1.5 pr-2">
                                     <span className="font-black text-red-500">1x</span>
@@ -587,7 +587,7 @@ export default function PasteleriaDashboard() {
                                       {pedido.categoria || 'Pastel Personalizado'}
                                     </span>
                                   </div>
-                                  <span className="font-black text-red-500 line-through shrink-0">
+                                  <span className="font-bold text-gray-400 line-through shrink-0">
                                     ${costoNum.toFixed(2)}
                                   </span>
                                 </div>
@@ -611,6 +611,13 @@ export default function PasteleriaDashboard() {
                                   <p className="text-[11px] text-gray-500 dark:text-gray-400 italic line-clamp-2 pt-0.5">
                                     "{pedido.descripcion}"
                                   </p>
+                                )}
+
+                                {totalPagado > 0 && (
+                                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-gray-100 dark:border-gray-800 text-red-500 font-bold">
+                                    <span>Anticipo anulado en caja:</span>
+                                    <span className="line-through">${totalPagado.toFixed(2)}</span>
+                                  </div>
                                 )}
                               </div>
 
@@ -661,16 +668,8 @@ export default function PasteleriaDashboard() {
                                 </div>
                               </div>
 
-                              {/* DESGLOSE DEL PEDIDO ENTREGADO Y SU PRECIO TOTAL */}
+                              {/* DESGLOSE DEL PEDIDO ENTREGADO */}
                               <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-green-100 dark:border-green-900/30 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-400">
-                                    Producto entregado
-                                  </p>
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-400">
-                                    Precio del pedido
-                                  </p>
-                                </div>
                                 <div className="flex items-center justify-between text-xs py-0.5">
                                   <div className="flex items-center gap-1.5 pr-2">
                                     <span className="font-black text-emerald-600">1x</span>
