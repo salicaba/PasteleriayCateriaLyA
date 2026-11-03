@@ -494,7 +494,7 @@ export default function PasteleriaDashboard() {
                       </div>
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          {showCancelados ? 'Monto Anulado' : 'Total Cobrado'}
+                          {showCancelados ? 'Total que Tenían y Acumulan los Productos que Fueron Anulados' : 'Total que Suman los Productos que Fueron Entregados'}
                         </p>
                         <p className={`text-base font-black ${showCancelados ? 'text-red-500 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           ${panelSummaryMetrics.montoTotal.toFixed(2)}

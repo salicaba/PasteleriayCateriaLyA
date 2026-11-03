@@ -117,11 +117,17 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       if (draftStr) recoveredDraft = JSON.parse(draftStr);
     } catch (e) {}
 
-    // 🔥 FIX: Seguro de Vida para Mesas Virtuales
+    // 🔥 FIX: Seguro de Vida para Mesas Virtuales y Mostrador
     const isLlevarVirtual = mesaActual?.zona === 'llevar' || mesaActual?.orderType === 'LLEVAR';
     const isMesaActiva = isVitrina || isLlevarVirtual || mesaEstado === 'ocupada' || mesaOrderId != null || activeOrderId != null || rawItems.length > 0;
 
-    if (isMesaActiva) {
+    // Si es mostrador y la orden ya viene limpia de la BD sin items, forzamos limpieza total de drafts
+    if (isVitrina && rawItems.length === 0 && (!mesaActual?.estado || mesaActual?.estado === 'libre')) {
+      localStorage.removeItem(`lya_draft_${mesaId}`);
+      recoveredDraft = [];
+    }
+
+    if (isMesaActiva && (rawItems.length > 0 || recoveredDraft.length > 0 || mesaOrderId)) {
       setActiveOrderId(mesaOrderId || activeOrderId);
       setOrderStatus(mesaActual?.status || mesaActual?.orderStatus || orderStatus || 'OPEN');
       
@@ -154,13 +160,10 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
         }
         if (!Array.isArray(parsedPreps)) parsedPreps = [parsedPreps || {}];
 
-        // 🔥 Rescatar metadata de descuento por ticket si la cuenta ya fue cobrada
         const savedTicketDiscount = parsedPreps.find(n => n && n._isTicketDiscountMeta) || null;
 
-        // Limpiar metadatos internos para que no ensucien las preparaciones
         parsedPreps = parsedPreps.filter(n => n && !n._isPromoMeta && !n._isTicketDiscountMeta && !n._isReleased);
 
-        // 🛡️ ESCUDO ANTI-ZOMBIES
         const prevLocal = cartLogic.cart.find(p => String(p.backendItemId) === String(item.id));
         const safeStatus = (prevLocal && prevLocal.status === 'CANCELLED') ? 'CANCELLED' : (item.status || 'ACTIVE');
 
@@ -233,6 +236,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       setActiveOrderId(null);
       setOrderStatus('OPEN');
       setPaidAccounts([]);
+      localStorage.removeItem(`lya_draft_${mesaId}`);
 
       setCart(prev => {
         const localItems = prev.filter(p => !p.enviadoCocina && !p.isVirtualDiscount);
@@ -251,11 +255,15 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mesaId, mesaOrderId, dbItemsString, paidAccountsString, activeOrderId, mesaActual?.status, mutations.isProcessing, isSyncLocked]);
 
-  // 🔥 WRAPPERS CON ANIMACIÓN DE CARGA Y ACTUALIZACIÓN FLUIDA
+  // 🔥 WRAPPERS CON LIMPIEZA EXHAUSTIVA DE LOCALSTORAGE AL CERRAR/LIBERAR
   const wrappedCancelFullOrder = async (motivo) => {
     await mutations.cancelFullOrder(motivo);
     if (clearEntireCart) clearEntireCart();
     localStorage.removeItem(`lya_draft_${mesaId}`);
+    if (activeOrderId) {
+      localStorage.removeItem(`lya_paid_${activeOrderId}`);
+      localStorage.removeItem(`lya_phones_${activeOrderId}`);
+    }
     
     setCart(prev => prev.map(item => ({ ...item, status: 'CANCELLED' })));
     setActiveOrderId(null); 
@@ -294,7 +302,6 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     }));
   };
 
-  // 🔥 WRAPPER PARA UNIR CUENTAS: Solo elimina la pestaña si la unión fue confirmada
   const wrappedMergeAccount = async (sourceCuenta, targetCuenta) => {
     const wasMerged = await mutations.mergeAccountToCuenta(sourceCuenta, targetCuenta);
     if (!wasMerged) return;
@@ -302,6 +309,23 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
       setNombresCuentas(prev => prev.filter(c => c !== sourceCuenta));
     }
     setCuentaActiva(targetCuenta);
+  };
+
+  // 🔥 LÓGICA REFORZADA PARA "SIGUIENTE VENTA" / CIERRE DE MOSTRADOR
+  const wrappedHandleCloseTable = async (onComplete) => {
+    if (mesaId) {
+      localStorage.removeItem(`lya_draft_${mesaId}`);
+    }
+    if (activeOrderId) {
+      localStorage.removeItem(`lya_paid_${activeOrderId}`);
+      localStorage.removeItem(`lya_phones_${activeOrderId}`);
+    }
+    await mutations.handleCloseTable(onComplete);
+    setCart([]);
+    setActiveOrderId(null);
+    setOrderStatus('OPEN');
+    setPaidAccounts([]);
+    if (onTableRelease) onTableRelease(mesaId);
   };
 
   const cuentasDisponibles = useMemo(() => 
@@ -360,7 +384,7 @@ export const usePosController = (mesaInicial, isOpen, todasLasMesas = [], showTo
     mergeAccountToCuenta: wrappedMergeAccount,
     toggleDeliveredStatus: mutations.toggleDeliveredStatus,
     handleCheckout: mutations.handleCheckout, 
-    handleCloseTable: mutations.handleCloseTable, 
+    handleCloseTable: wrappedHandleCloseTable, // 👈 Usamos el wrapper blindado
     handlePrintTicket: mutations.handlePrintTicket,
     payCuenta: mutations.payCuenta,
     validateAllDelivered: mutations.validateAllDelivered,
