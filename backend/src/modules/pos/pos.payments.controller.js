@@ -18,6 +18,16 @@ const parseAccountName = (str) => {
   return s;
 };
 
+// 🔥 DETECTOR BLINDADO DE DEPARTAMENTO (ignora tildes y mayúsculas)
+const isPasteleriaDepartamento = (departamento) => {
+  if (!departamento) return false;
+  const norm = String(departamento)
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return norm.includes('PASTELERIA');
+};
+
 // ==========================================
 // 💰 REGISTRAR PAGO (Parcial o Total)
 // ==========================================
@@ -77,7 +87,7 @@ export const payOrder = async (req, res) => {
 
       itemsToPay.forEach(item => {
         const dept = productMap[item.productId] || 'cafeteria';
-        if (dept === 'pasteleria') {
+        if (isPasteleriaDepartamento(dept)) {
           amountPasteleria += Number(item.subtotal);
         } else {
           amountCafeteria += Number(item.subtotal);
@@ -98,7 +108,6 @@ export const payOrder = async (req, res) => {
         amountPasteleria = Math.max(0, amountPasteleria - remainingDiscount);
       }
 
-      // Guardamos la metadata del descuento en el primer item de esta cuenta para que el ticket físico y digital lo impriman
       const anchorItem = itemsToPay[0];
       let anchorNotes = [];
       try { anchorNotes = JSON.parse(anchorItem.notes || '[]'); } catch(e) {}

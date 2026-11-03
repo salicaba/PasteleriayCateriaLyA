@@ -1,5 +1,5 @@
 // src/modules/cafeteria/views/MesasPage.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Grid, ShoppingBag, Plus, Store, Loader2, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -120,7 +120,26 @@ export const MesasPage = () => {
     }
   }, [mesasSalon, mesasLlevar, selectedMesa, isLoading]);
 
-  const ingresosTotales = dailySummary.transactions?.filter(t => t.type === 'INCOME') || [];
+  // 🔥 Filtramos solo ingresos activos (excluyendo los anulados en $0.00)
+  const ingresosTotales = useMemo(() => {
+    return (dailySummary.transactions || []).filter(
+      t => t.type === 'INCOME' && t.status !== 'CANCELLED' && Number(t.amount) !== 0
+    );
+  }, [dailySummary.transactions]);
+
+  // 🔥 Conteo unificado de ventas (un ticket mixto CAF+PAS cuenta como 1 sola venta, no 2)
+  const ventasUnificadasCount = useMemo(() => {
+    const uniqueKeys = new Set();
+    ingresosTotales.forEach(tx => {
+      const rawFolio = String(tx.folio || '');
+      if (rawFolio.startsWith('CAF-') || rawFolio.startsWith('PAS-')) {
+        uniqueKeys.add(`POS_${rawFolio.replace(/^(CAF-|PAS-)/, '')}`);
+      } else {
+        uniqueKeys.add(`TX_${tx.id}`);
+      }
+    });
+    return uniqueKeys.size;
+  }, [ingresosTotales]);
 
   const onRestoreOrder = async (orderId) => {
     setRestoringOrderId(orderId);
@@ -242,7 +261,7 @@ export const MesasPage = () => {
         mesasOcupadas={mesasOcupadas}
         mesasSalonLength={mesasSalon.length}
         mesasLlevarLength={mesasLlevar.length}
-        ingresosTotalesLength={ingresosTotales.length}
+        ingresosTotalesLength={ventasUnificadasCount}
         papeleraCount={dailySummary.papeleraCount}
         showVendidos={showVendidos}
         setShowVendidos={setShowVendidos}
@@ -393,6 +412,7 @@ export const MesasPage = () => {
             isOpen={showVendidos}
             onClose={() => setShowVendidos(false)}
             ingresosTotales={ingresosTotales}
+            vendidosOrders={dailySummary.vendidosOrders || []}
           />
         </>,
         document.body
