@@ -2,6 +2,9 @@
 import InventoryTransaction from '../inventory/InventoryTransaction.model.js';
 import Transaction from './Transaction.model.js';
 import Order from '../pos/Order.model.js';
+import OrderItem from '../pos/OrderItem.model.js';
+import Table from '../pos/Table.model.js';
+import Product from '../menu/Product.model.js';
 import PasteleriaOrder from '../pasteleria/PasteleriaOrder.model.js';
 import User from '../users/User.model.js';
 import { Op } from 'sequelize';
@@ -18,7 +21,7 @@ export const getTransactions = async (req, res) => {
     const { date, startDate, endDate, type, source } = req.query; 
     let whereClause = {};
 
-    // 🔥 BLINDAJE ZONA HORARIA: Forzamos el límite a las 00:00 y 23:59:59 pero con el offset -06:00
+    // 🔥 BLINDAJE ZONA HORARIA: Forzamos el límite a las 00:00 y 23:59:59 con el offset -06:00
     if (startDate && endDate) {
       const start = new Date(`${startDate}T00:00:00.000-06:00`);
       const end = new Date(`${endDate}T23:59:59.999-06:00`);
@@ -30,7 +33,6 @@ export const getTransactions = async (req, res) => {
       whereClause.createdAt = { [Op.between]: [start, end] };
     } 
     else {
-      // Si no hay filtro, obtenemos las del día "actual" en Chiapas
       const localNow = getLocalNow();
       const todayStr = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
       const start = new Date(`${todayStr}T00:00:00.000-06:00`);
@@ -54,7 +56,71 @@ export const getTransactions = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    res.json(transactions);
+    // 🔥 ENRIQUECIMIENTO DE DATOS: Cruzamos órdenes de POS y Pedidos de Pastelería
+    const posOrderIds = [
+      ...new Set(
+        transactions
+          .map(t => t.referenceId)
+          .filter(ref => ref && !String(ref).startsWith('PED-'))
+      )
+    ];
+
+    const pasteleriaOrderIds = [
+      ...new Set(
+        transactions
+          .map(t => t.referenceId)
+          .filter(ref => ref && String(ref).startsWith('PED-'))
+      )
+    ];
+
+    const [posOrders, pasteleriaOrders] = await Promise.all([
+      posOrderIds.length > 0
+        ? Order.findAll({
+            where: { id: posOrderIds },
+            include: [
+              { model: Table, as: 'table', required: false },
+              {
+                model: OrderItem,
+                as: 'items',
+                required: false,
+                include: [
+                  {
+                    model: Product,
+                    as: 'product',
+                    attributes: ['id', 'name', 'departamento', 'basePrice'],
+                    required: false
+                  }
+                ]
+              }
+            ]
+          })
+        : Promise.resolve([]),
+      pasteleriaOrderIds.length > 0
+        ? PasteleriaOrder.findAll({
+            where: { id: pasteleriaOrderIds },
+            attributes: { exclude: ['imagenesReferencia'] }
+          })
+        : Promise.resolve([])
+    ]);
+
+    const posOrdersMap = new Map(posOrders.map(o => [String(o.id), o.toJSON ? o.toJSON() : o]));
+    const pasteleriaOrdersMap = new Map(pasteleriaOrders.map(p => [String(p.id), p.toJSON ? p.toJSON() : p]));
+
+    const enrichedTransactions = transactions.map(tx => {
+      const txJSON = tx.toJSON ? tx.toJSON() : tx;
+      const refId = txJSON.referenceId ? String(txJSON.referenceId) : null;
+
+      if (refId) {
+        if (refId.startsWith('PED-')) {
+          txJSON.pasteleriaOrder = pasteleriaOrdersMap.get(refId) || null;
+        } else {
+          txJSON.posOrder = posOrdersMap.get(refId) || null;
+        }
+      }
+      return txJSON;
+    });
+
+    res.json(enrichedTransactions);
   } catch (error) {
     console.error("❌ ERROR EN CAJA (getTransactions):", error);
     res.status(500).json({ message: 'Error al obtener transacciones', error: error.message });
@@ -68,9 +134,7 @@ export const registerManualTransaction = async (req, res) => {
     if (!amount || amount <= 0) return res.status(400).json({ message: 'El monto debe ser mayor a 0' });
     if (!description) return res.status(400).json({ message: 'La descripción es obligatoria' });
 
-    // 🔥 BLINDAJE ZONA HORARIA
     const realExecutionDate = getLocalNow(); 
-    // 🔥 FIX: Aquí usamos new Date() estándar para que la base de datos lo acepte si es un gasto normal de hoy
     let accountingDate = new Date(); 
     let isRetroactive = false;
 
@@ -79,14 +143,11 @@ export const registerManualTransaction = async (req, res) => {
     const localDay = String(realExecutionDate.getDate()).padStart(2, '0');
     const todayLocalStr = `${localYear}-${localMonth}-${localDay}`;
 
-    // Si enviaste una fecha distinta a "hoy", es un Gasto Diferido
     if (expenseDate && expenseDate !== todayLocalStr) {
       isRetroactive = true;
-      // Rompemos el YYYY-MM-DD para forzar la inserción al final de ese día en horario local
       accountingDate = new Date(`${expenseDate}T23:59:59.999-06:00`); 
     }
 
-    // Inyectamos la fecha real de captura en la descripción (oculta al cliente, visible para auditoría)
     const finalDescription = isRetroactive 
       ? `[Registrado el: ${realExecutionDate.toLocaleString('es-MX')}] ${description}` 
       : description;
@@ -98,7 +159,7 @@ export const registerManualTransaction = async (req, res) => {
       expenseCategory: expenseCategory || 'OTHER',
       amount,
       description: finalDescription, 
-      createdAt: accountingDate,     // 🔥 Se envía limpio (ya sea el UTC exacto o el formateado válido de arriba)
+      createdAt: accountingDate,
       createdBy: req.user.id
     });
 
@@ -145,7 +206,6 @@ export const cancelTransaction = async (req, res) => {
 
     tx.status = 'CANCELLED';
     tx.cancelledBy = req.user.id;
-    // 🔥 FIX: Enviamos new Date() puro a la base de datos para evitar el error 500 al cancelar
     tx.cancelledAt = new Date();
     
     if (reason && reason.trim() !== '') {
@@ -217,18 +277,15 @@ export const getFinancialSummary = async (req, res) => {
     const { startDate, endDate } = req.query;
     let start, end;
 
-    // 🔥 BLINDAJE DE ZONA HORARIA
     if (startDate && endDate) {
       start = new Date(`${startDate}T00:00:00.000-06:00`);
       end = new Date(`${endDate}T23:59:59.999-06:00`);
     } else {
       const localNow = getLocalNow();
-      // Inicio de Mes en Chiapas
       start = new Date(localNow.getFullYear(), localNow.getMonth(), 1); 
       const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
       start = new Date(`${startStr}T00:00:00.000-06:00`);
 
-      // Fin de mes en Chiapas
       const endOfM = new Date(localNow.getFullYear(), localNow.getMonth() + 1, 0); 
       const endStr = `${endOfM.getFullYear()}-${String(endOfM.getMonth() + 1).padStart(2, '0')}-${String(endOfM.getDate()).padStart(2, '0')}`;
       end = new Date(`${endStr}T23:59:59.999-06:00`);

@@ -1,8 +1,47 @@
-// src/modules/cash/views/CashRegister.jsx
+// src/modules/cash/views/CashRegisterPage.jsx
 import React, { useState, useMemo } from 'react';
 import { useCashController } from '../controllers/useCashController';
-import { Calculator, XCircle, Coffee, Cake, Calendar as CalendarIcon, UserCheck, RotateCcw, Filter, AlertTriangle, Banknote, Landmark, Eye, EyeOff, Loader2, Search } from 'lucide-react';
+import {
+  Calculator,
+  XCircle,
+  Coffee,
+  Cake,
+  Calendar as CalendarIcon,
+  UserCheck,
+  RotateCcw,
+  Filter,
+  AlertTriangle,
+  Banknote,
+  Landmark,
+  Eye,
+  EyeOff,
+  Loader2,
+  Search,
+  CheckCircle2,
+  Link2
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const parseCleanAccount = (str) => {
+  if (!str) return 'General';
+  let s = String(str);
+  if (s.includes(' | ')) s = s.split(' | ')[0].trim();
+  if (s.includes(' - ')) {
+    const parts = s.split(' - ');
+    const possiblePhone = parts[parts.length - 1].replace(/\D/g, '');
+    if (possiblePhone.length >= 10) s = parts.slice(0, -1).join(' - ').trim();
+  }
+  return s || 'General';
+};
+
+const isPasteleriaDept = (dept) => {
+  if (!dept) return false;
+  return String(dept)
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .includes('PASTELERIA');
+};
 
 export const CashRegisterPage = ({ user }) => {
   const { 
@@ -12,10 +51,10 @@ export const CashRegisterPage = ({ user }) => {
   } = useCashController(user);
 
   const [filterSource, setFilterSource] = useState('ALL');
-  const [showModDetails, setShowModDetails] = useState(false);
+  // 🔥 Inicia en true para lucir el nuevo desglose de productos y pasteles desde el inicio
+  const [showModDetails, setShowModDetails] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // PILAR 3: Estado local para bloqueo asíncrono del modal
   const [isProcessing, setIsProcessing] = useState(false);
 
   const setToday = () => {
@@ -26,24 +65,37 @@ export const CashRegisterPage = ({ user }) => {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  // 🔥 Filtro directo y sin retrasos
   const handleFilterChange = (source) => {
     setFilterSource(source);
   };
 
-  // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia (Tarjetas eliminadas)
+  // REGLA ESTRICTA DE NEGOCIO: Solo Efectivo y Transferencia
   const getPaymentInfo = (tx) => {
     const methodStr = String(tx.paymentMethod || '').toUpperCase();
     const isTransfer = methodStr === 'TRANSFER' || tx.description?.toLowerCase().includes('transferencia');
 
     if (isTransfer) {
-      return { label: 'Transferencia', icon: Landmark, color: 'text-blue-600 dark:text-blue-400 lya:text-blue-700', bg: 'bg-blue-100 dark:bg-blue-500/20 lya:bg-blue-100' };
+      return {
+        label: 'Transferencia',
+        icon: Landmark,
+        color: 'text-blue-600 dark:text-blue-400 lya:text-blue-700',
+        bg: 'bg-blue-100 dark:bg-blue-500/20 lya:bg-blue-100'
+      };
     }
     
-    return { label: 'Efectivo', icon: Banknote, color: 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-700', bg: 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-emerald-100' };
+    return {
+      label: 'Efectivo',
+      icon: Banknote,
+      color: 'text-emerald-600 dark:text-emerald-400 lya:text-emerald-700',
+      bg: 'bg-emerald-100 dark:bg-emerald-500/20 lya:bg-emerald-100'
+    };
   };
 
-  const activeTransactions = transactions.filter(tx => tx.status === 'ACTIVE');
+  const activeTransactions = useMemo(
+    () => transactions.filter(tx => tx.status === 'ACTIVE'),
+    [transactions]
+  );
+
   const paymentStats = useMemo(() => {
     return activeTransactions.reduce((acc, tx) => {
       const amount = parseFloat(tx.amount) || 0;
@@ -56,7 +108,6 @@ export const CashRegisterPage = ({ user }) => {
     }, { efectivo: 0, digital: 0 });
   }, [activeTransactions]);
 
-  // PILAR 3: Envoltura asíncrona para la confirmación
   const handleConfirmLock = async () => {
     setIsProcessing(true);
     try {
@@ -64,6 +115,275 @@ export const CashRegisterPage = ({ user }) => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // 🔥 MOTOR DE AGRUPACIÓN INTELIGENTE (Unifica Tickets Mixtos CAF+PAS y estructura Pedidos Pastelería)
+  const groupedMovements = useMemo(() => {
+    const groupsMap = new Map();
+
+    transactions.forEach((tx) => {
+      const rawFolio = String(tx.folio || '');
+      const isPosFolio = rawFolio.startsWith('CAF-') || rawFolio.startsWith('PAS-');
+      const baseFolio = isPosFolio ? rawFolio.replace(/^(CAF-|PAS-)/, '') : null;
+
+      // Si es cobro de POS, agrupamos por baseFolio para unir CAF-xxxxxx y PAS-xxxxxx en una sola tarjeta
+      const groupKey = baseFolio ? `POS_${baseFolio}` : `TX_${tx.id}`;
+
+      if (!groupsMap.has(groupKey)) {
+        groupsMap.set(groupKey, {
+          id: groupKey,
+          rawTxId: tx.id,
+          baseFolio,
+          folios: [],
+          sources: [],
+          referenceId: tx.referenceId,
+          paymentMethod: tx.paymentMethod,
+          createdAt: tx.createdAt,
+          creator: tx.creator,
+          canceller: tx.canceller,
+          totalActiveAmount: 0,
+          cafeteriaActiveAmount: 0,
+          pasteleriaActiveAmount: 0,
+          totalCancelledAmount: 0,
+          hasActiveTx: false,
+          allCancelled: true,
+          descriptions: [],
+          modificaciones: [],
+          posOrder: tx.posOrder || null,
+          pasteleriaOrder: tx.pasteleriaOrder || null,
+          rawTransactions: []
+        });
+      }
+
+      const group = groupsMap.get(groupKey);
+      const amt = parseFloat(tx.amount) || 0;
+      const isCancelled = tx.status === 'CANCELLED';
+
+      if (tx.folio && !group.folios.includes(tx.folio)) {
+        group.folios.push(tx.folio);
+      }
+      if (tx.source && !group.sources.includes(tx.source)) {
+        group.sources.push(tx.source);
+      }
+      if (!group.posOrder && tx.posOrder) group.posOrder = tx.posOrder;
+      if (!group.pasteleriaOrder && tx.pasteleriaOrder) group.pasteleriaOrder = tx.pasteleriaOrder;
+      if (!group.canceller && tx.canceller) group.canceller = tx.canceller;
+
+      if (!isCancelled) {
+        group.hasActiveTx = true;
+        group.allCancelled = false;
+        group.totalActiveAmount += amt;
+        if (tx.source === 'CAFETERIA') group.cafeteriaActiveAmount += amt;
+        if (tx.source === 'PASTELERIA') group.pasteleriaActiveAmount += amt;
+      } else {
+        group.totalCancelledAmount += Math.abs(amt);
+      }
+
+      const partes = String(tx.description || '').split(' | ');
+      const descOriginal = partes[0]?.trim();
+      const mods = partes.slice(1).filter((m) => !m.includes('Ticket Mixto'));
+
+      if (descOriginal && !group.descriptions.includes(descOriginal)) {
+        group.descriptions.push(descOriginal);
+      }
+      mods.forEach((m) => {
+        const taggedMod =
+          baseFolio && group.sources.length > 0
+            ? `${m} [${tx.source === 'PASTELERIA' ? 'Pastelería' : 'Cafetería'}]`
+            : m;
+        if (!group.modificaciones.includes(taggedMod) && !group.modificaciones.includes(m)) {
+          group.modificaciones.push(m);
+        }
+      });
+
+      group.rawTransactions.push(tx);
+    });
+
+    return Array.from(groupsMap.values()).sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+  }, [transactions]);
+
+  // 🔥 FILTRADO POR CAJA (ALL / CAFETERIA / PASTELERIA) Y BÚSQUEDA PROFUNDA
+  const filteredMovements = useMemo(() => {
+    return groupedMovements.filter((group) => {
+      // 1. Filtro por origen de Caja
+      if (filterSource !== 'ALL') {
+        const hasSource = group.rawTransactions.some((t) => t.source === filterSource);
+        if (!hasSource) return false;
+      }
+
+      // 2. Búsqueda por folio, cliente, mesa, producto o monto
+      if (searchTerm.trim() !== '') {
+        const term = searchTerm.toLowerCase();
+        const descMatch = group.descriptions.some((d) => d.toLowerCase().includes(term));
+        const folioMatch = group.folios.some((f) => f.toLowerCase().includes(term));
+        const refMatch = String(group.referenceId || '').toLowerCase().includes(term);
+        const amountMatch =
+          String(group.totalActiveAmount).includes(term) ||
+          String(group.cafeteriaActiveAmount).includes(term) ||
+          String(group.pasteleriaActiveAmount).includes(term);
+
+        const posProductMatch = (group.posOrder?.items || []).some((i) =>
+          (i.product?.name || '').toLowerCase().includes(term)
+        );
+        const pasteleriaClientMatch =
+          (group.pasteleriaOrder?.cliente || '').toLowerCase().includes(term) ||
+          (group.pasteleriaOrder?.categoria || '').toLowerCase().includes(term);
+
+        if (
+          !descMatch &&
+          !folioMatch &&
+          !refMatch &&
+          !amountMatch &&
+          !posProductMatch &&
+          !pasteleriaClientMatch
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [groupedMovements, filterSource, searchTerm]);
+
+  // Helper para estructurar los datos visuales de cada fila (POS vs Pedido Pastelería vs Manual)
+  const buildMovementPresentation = (group) => {
+    const mainDesc = group.descriptions[0] || '';
+    const isPasteleriaOrder =
+      String(group.referenceId || '').startsWith('PED-') || Boolean(group.pasteleriaOrder);
+    const isMixedPos =
+      group.sources.includes('CAFETERIA') && group.sources.includes('PASTELERIA');
+
+    // --- CASO 1: PEDIDO ESPECIAL DE PASTELERÍA (PED-xxxxxx) ---
+    if (isPasteleriaOrder) {
+      const ped = group.pasteleriaOrder;
+      let tipoOp = 'Movimiento de Pedido';
+      let badgeStyle =
+        'bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800/50';
+
+      if (mainDesc.toLowerCase().startsWith('anticipo')) {
+        tipoOp = '🎂 Anticipo Inicial';
+        badgeStyle =
+          'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800/50';
+      } else if (mainDesc.toLowerCase().startsWith('abono')) {
+        tipoOp = '💳 Abono Parcial';
+        badgeStyle =
+          'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50';
+      } else if (mainDesc.toLowerCase().startsWith('liquidaci')) {
+        tipoOp = '✅ Liquidación Final';
+        badgeStyle =
+          'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800/50';
+      } else if (group.totalActiveAmount < 0 || mainDesc.toLowerCase().includes('devoluci')) {
+        tipoOp = '↩️ Devolución por Ajuste';
+        badgeStyle =
+          'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/50';
+      }
+
+      const clienteNombre =
+        ped?.cliente ||
+        mainDesc.match(/Pedido:\s*(.*?)\s+PED-/i)?.[1] ||
+        'Público General';
+
+      const costoTotalPed = parseFloat(ped?.costoTotal || 0);
+      const totalAbonadoPed =
+        ped?.abonos?.reduce((s, a) => s + (parseFloat(a.monto) || 0), 0) || 0;
+      const restaPed = Math.max(0, costoTotalPed - totalAbonadoPed);
+
+      const porcionesList = Array.isArray(ped?.porciones)
+        ? ped.porciones
+        : ped?.porciones
+        ? [ped.porciones]
+        : [];
+      const saboresList = Array.isArray(ped?.saborPan)
+        ? ped.saborPan
+        : ped?.saborPan
+        ? [ped.saborPan]
+        : [];
+
+      return {
+        kind: 'PASTELERIA_ORDER',
+        tituloPrincipal: `Pedido ${group.referenceId || ''}`,
+        subtituloCuenta: `Cliente: ${clienteNombre}${ped?.telefono ? ` • Cel: ${ped.telefono}` : ''}`,
+        tipoOp,
+        badgeStyle,
+        costoTotalPed,
+        totalAbonadoPed,
+        restaPed,
+        categoriaPastel: ped?.categoria || 'Pastel Personalizado',
+        descripcionPastel: ped?.descripcion || null,
+        porcionesList,
+        saboresList,
+        cleanDesc: mainDesc
+      };
+    }
+
+    // --- CASO 2: VENTA DE PUNTO DE VENTA (MESAS, LLEVAR, MOSTRADOR, MIXTOS) ---
+    const posOrder = group.posOrder;
+    let cuentaPagada = null;
+    const cuentaMatch = mainDesc.match(/Cuenta:\s*([^\[\|]+?)(?:\s+\[Promo|\s+(?:CAF|PAS)-|$)/i);
+    if (cuentaMatch && cuentaMatch[1]) {
+      cuentaPagada = cuentaMatch[1].trim();
+    }
+
+    let promoText = null;
+    const promoMatch = mainDesc.match(/\[(Promo\s*-\$[\d.]+)\]/i);
+    if (promoMatch && promoMatch[1]) {
+      promoText = promoMatch[1];
+    }
+
+    let tituloPrincipal = 'Cobro en Punto de Venta';
+    const parenMatch = mainDesc.match(/\((.*?)\)/);
+    if (parenMatch && parenMatch[1]) {
+      tituloPrincipal = parenMatch[1];
+    } else if (posOrder?.table?.number) {
+      tituloPrincipal = `Mesa #${posOrder.table.number}`;
+    } else if (posOrder?.ticketId) {
+      tituloPrincipal = posOrder.ticketId.toUpperCase().includes('MOSTRADOR')
+        ? 'Mostrador'
+        : posOrder.ticketId.split(' - ')[0];
+    } else if (group.sources.includes('MANUAL')) {
+      tituloPrincipal = 'Movimiento Manual';
+    }
+
+    const subtituloCuenta = cuentaPagada ? `Cuenta: ${cuentaPagada}` : 'Cuenta General';
+
+    let itemsVendidos = [];
+    if (posOrder && Array.isArray(posOrder.items)) {
+      const validItems = posOrder.items.filter((i) => i.status === 'ACTIVE' || !i.status);
+      if (cuentaPagada) {
+        itemsVendidos = validItems.filter(
+          (i) => parseCleanAccount(i.cuenta).toLowerCase() === cuentaPagada.toLowerCase()
+        );
+      } else {
+        itemsVendidos = validItems;
+      }
+
+      // Si el usuario filtró específicamente por CAFETERIA o PASTELERIA, ponemos primero los productos de esa caja
+      if (filterSource === 'CAFETERIA' || filterSource === 'PASTELERIA') {
+        itemsVendidos = [...itemsVendidos].sort((a, b) => {
+          const aIsPas = isPasteleriaDept(a.product?.departamento);
+          const bIsPas = isPasteleriaDept(b.product?.departamento);
+          if (filterSource === 'PASTELERIA') return Number(bIsPas) - Number(aIsPas);
+          return Number(!bIsPas) - Number(!aIsPas);
+        });
+      }
+    }
+
+    const cleanDesc = mainDesc
+      .replace(/\s*(CAF|PAS)-\d+/g, '')
+      .replace(/\s*\[Promo\s*-\$[\d.]+\]/i, '')
+      .trim();
+
+    return {
+      kind: 'POS_ORDER',
+      isMixedPos,
+      tituloPrincipal,
+      subtituloCuenta,
+      promoText,
+      itemsVendidos,
+      cleanDesc
+    };
   };
 
   if (loading) {
@@ -86,24 +406,6 @@ export const CashRegisterPage = ({ user }) => {
     );
   }
 
-  // 🔥 LÓGICA DE FILTRADO Y BÚSQUEDA INSTANTÁNEA
-  const filteredTransactions = transactions.filter(tx => {
-    if (filterSource !== 'ALL' && tx.source !== filterSource) return false;
-    
-    if (searchTerm.trim() !== '') {
-      const term = searchTerm.toLowerCase();
-      const desc = (tx.description || '').toLowerCase();
-      const folio = (tx.folio || '').toLowerCase();
-      const amount = String(tx.amount || '');
-
-      if (!desc.includes(term) && !folio.includes(term) && !amount.includes(term)) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
-
   const containerVariants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.05 } }
@@ -114,12 +416,10 @@ export const CashRegisterPage = ({ user }) => {
     show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } }
   };
 
-  // 🔥 LÍMITE DE FECHA: Calculamos "Hoy" en Chiapas para bloquear el futuro
   const todayForLimit = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
   const maxDateLimit = `${todayForLimit.getFullYear()}-${String(todayForLimit.getMonth() + 1).padStart(2, '0')}-${String(todayForLimit.getDate()).padStart(2, '0')}`;
 
   return (
-    // PILAR 1: Contenedor Raíz bloqueado
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -127,7 +427,7 @@ export const CashRegisterPage = ({ user }) => {
       className="h-full w-full flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-4 md:p-8 transition-colors duration-300 relative overflow-hidden"
     >
       
-      {/* HEADER: PILAR 4 Geometría premium */}
+      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white dark:bg-gray-900 lya:bg-lya-surface p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0 z-10 relative">
         <div className="flex items-center space-x-4">
           <div className="bg-orange-500 lya:bg-lya-primary text-white lya:text-lya-surface p-3 rounded-2xl shadow-md shadow-orange-500/20 lya:shadow-lya-primary/20">
@@ -135,12 +435,11 @@ export const CashRegisterPage = ({ user }) => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-white lya:text-lya-text tracking-tight">Caja</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Control de ingresos y anulaciones de Cafetería y Pastelería</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-1">Control de ingresos, tickets mixtos y pedidos de Cafetería y Pastelería</p>
           </div>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {/* PILAR 2: Botón con whileTap y md:hover */}
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={setToday}
@@ -149,15 +448,13 @@ export const CashRegisterPage = ({ user }) => {
             Hoy
           </motion.button>
 
-          {/* 🔥 FIX: Cuadro de fecha 100% clickeable (como Agenda Pastelería) */}
-          {/* 🔥 FIX: Calendario estrictamente clickeable (Bloquea escritura) */}
           <div className="flex w-full sm:w-auto items-center bg-gray-50 dark:bg-gray-800 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner lya:bg-lya-bg lya:border-lya-border/40 focus-within:ring-2 focus-within:ring-orange-500 lya:focus-within:ring-lya-primary transition-all relative">
             <CalendarIcon size={20} className="text-gray-400 lya:text-lya-text/50 mx-2 shrink-0 pointer-events-none" />
             <input 
               id="cash-date-picker"
               type="date" 
               value={selectedDate}
-              max={maxDateLimit} // 🔥 AQUÍ ESTÁ EL SEGURO ANTI-FUTURO
+              max={maxDateLimit}
               onChange={(e) => setSelectedDate(e.target.value)}
               onClick={(e) => e.stopPropagation()} 
               className="bg-transparent border-none text-gray-700 dark:text-white lya:text-lya-text font-bold outline-none cursor-pointer w-full
@@ -173,7 +470,7 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </header>
 
-      {/* KPIs: PILAR 4 Geometría */}
+      {/* KPIs */}
       <motion.div 
         variants={containerVariants}
         initial="hidden"
@@ -227,21 +524,21 @@ export const CashRegisterPage = ({ user }) => {
         </motion.div>
       </motion.div>
 
+      {/* BARRA DE FILTROS Y BÚSQUEDA */}
       <div className="mb-4 bg-white dark:bg-gray-900 lya:bg-lya-surface p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
         <h3 className="text-gray-700 dark:text-gray-300 lya:text-lya-text font-bold flex items-center gap-2 pl-2 whitespace-nowrap">
-          <Filter size={18} className="text-gray-400 lya:text-lya-text/50" /> Movimientos
+          <Filter size={18} className="text-gray-400 lya:text-lya-text/50" /> Movimientos ({filteredMovements.length})
         </h3>
         
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar p-1">
           
-          {/* 🔥 BARRA DE BÚSQUEDA */}
           <div className="relative w-full sm:w-64 flex-shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={16} className="text-gray-400 lya:text-lya-text/50" />
             </div>
             <input
               type="text"
-              placeholder="Buscar folio, cliente..."
+              placeholder="Buscar folio, cliente, producto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-xl text-sm font-bold text-gray-800 dark:text-white lya:text-lya-text focus:outline-none focus:ring-2 focus:ring-orange-500/30 lya:focus:ring-lya-primary/30 transition-all placeholder-gray-400"
@@ -249,7 +546,6 @@ export const CashRegisterPage = ({ user }) => {
           </div>
 
           <div className="flex bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg p-1 rounded-xl border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 w-full sm:w-auto flex-shrink-0">
-            {/* PILAR 2: Botones de filtro táctiles */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => handleFilterChange('ALL')}
@@ -283,29 +579,28 @@ export const CashRegisterPage = ({ user }) => {
             } border shadow-sm`}
           >
             {showModDetails ? <EyeOff size={14}/> : <Eye size={14}/>}
-            {showModDetails ? 'Ocultar Detalles' : 'Ver Detalles'}
+            {showModDetails ? 'Ocultar Desglose' : 'Ver Desglose'}
           </motion.button>
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL */}
+      {/* TABLA PRINCIPAL CON TARJETAS DE DESGLOSE */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4 min-h-[300px]">
         <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
           <table className="w-full text-left border-collapse relative min-w-max">
             <thead className="bg-gray-100 dark:bg-gray-950 lya:bg-lya-bg sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30">
               <tr>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Hora</th>
-                <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Origen</th>
-                <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Descripción / Pago</th>
+                <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Origen / Caja</th>
+                <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider lya:text-lya-text/50">Desglose del Movimiento</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-right lya:text-lya-text/50">Monto</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-center lya:text-lya-text/50">Estado</th>
                 <th className="p-5 text-xs font-black text-gray-400 uppercase tracking-wider text-center lya:text-lya-text/50">Acciones</th>
               </tr>
             </thead>
             
-            {/* 🔥 ANIMAMOS EL TBODY COMPLETO DE MANERA FLUIDA */}
             <AnimatePresence mode="wait">
-              {filteredTransactions.length === 0 && !loading ? (
+              {filteredMovements.length === 0 && !loading ? (
                 <motion.tbody 
                   key="empty-state"
                   initial={{ opacity: 0, y: 15 }}
@@ -334,91 +629,283 @@ export const CashRegisterPage = ({ user }) => {
                   transition={{ duration: 0.2, ease: "easeOut" }}
                   className="divide-y divide-gray-100 dark:divide-gray-800 lya:divide-lya-border/10"
                 >
-                  {filteredTransactions.map((tx) => {
-                    const isCancelled = tx.status === 'CANCELLED';
-                    const creatorName = tx.creator 
-                      ? (tx.creator.fullName?.split(' ')[0] || tx.creator.username) 
+                  {filteredMovements.map((group) => {
+                    const isCancelled = group.allCancelled;
+                    const creatorName = group.creator 
+                      ? (group.creator.fullName?.split(' ')[0] || group.creator.username) 
                       : 'Sistema';
                     
-                    const payInfo = getPaymentInfo(tx);
+                    const payInfo = getPaymentInfo(group.rawTransactions[0] || {});
+                    const details = buildMovementPresentation(group);
 
-                    const rawAmount = parseFloat(tx.amount) || 0;
-                    const isNegative = rawAmount < 0;
-                    const absAmount = Math.abs(rawAmount).toFixed(2);
+                    // Monto inteligente según el filtro activo (Todos vs Solo Cafetería vs Solo Pastelería)
+                    let displayAmount = group.totalActiveAmount;
+                    if (isCancelled) {
+                      displayAmount = group.totalCancelledAmount;
+                    } else if (filterSource === 'CAFETERIA') {
+                      displayAmount = group.cafeteriaActiveAmount;
+                    } else if (filterSource === 'PASTELERIA') {
+                      displayAmount = group.pasteleriaActiveAmount;
+                    }
+
+                    const isNegative = !isCancelled && displayAmount < 0;
+                    const absAmount = Math.abs(displayAmount).toFixed(2);
+                    const isManual = group.sources.includes('MANUAL');
 
                     return (
                       <tr 
-                        key={tx.id} 
-                        className={`${isCancelled ? 'bg-red-50/50 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
+                        key={group.id} 
+                        className={`align-top ${isCancelled ? 'bg-red-50/40 dark:bg-red-900/5 lya:bg-red-500/5' : 'md:hover:bg-gray-50/80 dark:md:hover:bg-gray-800/40 lya:md:hover:bg-lya-bg/40'} transition-colors`}
                       >
-                        <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                          {new Date(tx.createdAt).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
+                        {/* 1. HORA */}
+                        <td className="p-5 text-sm font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 whitespace-nowrap">
+                          {new Date(group.createdAt).toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
                         </td>
+
+                        {/* 2. ORIGEN / CAJA */}
                         <td className="p-5">
-                          <span className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit ${tx.source === 'CAFETERIA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]' : tx.source === 'PASTELERIA' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
-                            {tx.source === 'CAFETERIA' ? <Coffee size={12} /> : tx.source === 'PASTELERIA' ? <Cake size={12} /> : <Calculator size={12} />}
-                            {tx.source}
-                          </span>
-                        </td>
-                        <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">
-                          
-                          {(() => {
-                            const partes = (tx.description || '').split(' | ');
-                            const descOriginal = partes[0];
-                            const modificaciones = partes.slice(1);
-                            
-                            return (
-                              <div className="flex flex-col gap-1.5">
-                                <p className={isCancelled ? 'line-through opacity-50' : ''}>
-                                  {descOriginal}
-                                </p>
-                                
-                                {modificaciones.length > 0 && showModDetails && (
-                                  <div className="flex flex-col gap-1 mt-0.5">
-                                    {modificaciones.map((mod, i) => {
-                                      const isRestaurado = mod.includes('📈');
-                                      const isMixto = mod.includes('🔗');
-                                      
-                                      let badgeClasses = 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500';
-                                      
-                                      if (isRestaurado) {
-                                        badgeClasses = 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50 lya:bg-blue-500/10 lya:border-blue-500/20 lya:text-blue-500';
-                                      } else if (isMixto) {
-                                        badgeClasses = 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/50 lya:bg-purple-500/10 lya:border-purple-500/20 lya:text-purple-500';
-                                      }
-
-                                      return (
-                                        <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${badgeClasses}`}>
-                                          {mod}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                {modificaciones.length > 0 && !showModDetails && (
-                                   <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold italic flex items-center gap-1">
-                                     <RotateCcw size={10}/> {modificaciones.length} etiqueta(s) oculta(s)
-                                   </span>
-                                )}
-
-                              </div>
-                            );
-                          })()}
-
-                          <div className={`text-[11px] font-semibold mt-1.5 flex flex-wrap items-center gap-2 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
-                            <span className="flex items-center gap-1"><UserCheck size={12} /> Por: {creatorName}</span>
-                            {!isCancelled && (
+                          <div className="flex flex-col gap-1.5">
+                            {details.isMixedPos && filterSource === 'ALL' ? (
                               <>
-                                <span className="text-gray-300 dark:text-gray-700 lya:text-lya-border">•</span>
-                                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest ${payInfo.bg} ${payInfo.color}`}>
-                                  <payInfo.icon size={10} /> {payInfo.label}
+                                <div className="flex items-center gap-1">
+                                  <span className="px-2.5 py-1 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]">
+                                    <Coffee size={11} /> Cafetería
+                                  </span>
+                                  <span className="px-2.5 py-1 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]">
+                                    <Cake size={11} /> Pastelería
+                                  </span>
+                                </div>
+                                <span className="px-2 py-0.5 text-[9px] uppercase font-black tracking-widest rounded-md flex items-center gap-1 w-fit bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                  <Link2 size={10} /> Ticket Mixto Unificado
                                 </span>
+                              </>
+                            ) : (
+                              <>
+                                {(() => {
+                                  const activeSource =
+                                    filterSource !== 'ALL'
+                                      ? filterSource
+                                      : group.sources[0] || 'CAFETERIA';
+                                  return (
+                                    <span
+                                      className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit ${
+                                        activeSource === 'CAFETERIA'
+                                          ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]'
+                                          : activeSource === 'PASTELERIA'
+                                          ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]'
+                                          : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                      }`}
+                                    >
+                                      {activeSource === 'CAFETERIA' ? (
+                                        <Coffee size={12} />
+                                      ) : activeSource === 'PASTELERIA' ? (
+                                        <Cake size={12} />
+                                      ) : (
+                                        <Calculator size={12} />
+                                      )}
+                                      {activeSource}
+                                    </span>
+                                  );
+                                })()}
+                                {details.isMixedPos && filterSource !== 'ALL' && (
+                                  <span className="px-2 py-0.5 text-[9px] uppercase font-black tracking-wider rounded-md flex items-center gap-1 w-fit bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                    <Link2 size={10} /> Ticket Mixto
+                                  </span>
+                                )}
                               </>
                             )}
                           </div>
                         </td>
+
+                        {/* 3. DESCRIPCIÓN / DESGLOSE DEL MOVIMIENTO */}
+                        <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text max-w-xl">
+                          <div className="flex flex-col gap-2">
+                            {/* CABECERA DEL MOVIMIENTO */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`text-base font-black text-gray-900 dark:text-white lya:text-lya-text ${isCancelled ? 'line-through opacity-50' : ''}`}>
+                                {details.tituloPrincipal}
+                              </span>
+
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                {details.subtituloCuenta}
+                              </span>
+
+                              {details.kind === 'PASTELERIA_ORDER' && (
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${details.badgeStyle}`}>
+                                  {details.tipoOp}
+                                </span>
+                              )}
+
+                              {group.folios.length > 0 && (
+                                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase">
+                                  {group.folios.join(' • ')}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* PASTILLAS DE REPARTO POR CAJA EN TICKETS MIXTOS */}
+                            {(details.isMixedPos || details.promoText) && (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {group.cafeteriaActiveAmount !== 0 && (
+                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200/70 dark:border-orange-800/40">
+                                    ☕ Caja Cafetería: ${group.cafeteriaActiveAmount.toFixed(2)}
+                                  </span>
+                                )}
+                                {group.pasteleriaActiveAmount !== 0 && (
+                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-pink-50 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 border border-pink-200/70 dark:border-pink-800/40">
+                                    🎂 Caja Pastelería: ${group.pasteleriaActiveAmount.toFixed(2)}
+                                  </span>
+                                )}
+                                {details.promoText && (
+                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/40">
+                                    🏷️ {details.promoText}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* 🔥 CAJITA DE DESGLOSE DE PRODUCTOS (POS) O DETALLES DEL PASTEL (PASTELERÍA) */}
+                            {showModDetails && details.kind === 'POS_ORDER' && details.itemsVendidos?.length > 0 && (
+                              <div className="bg-gray-50/90 dark:bg-gray-950/60 lya:bg-lya-bg rounded-xl p-2.5 border border-gray-200/70 dark:border-gray-800 space-y-1 max-w-md">
+                                <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1">
+                                  Productos en la cuenta ({details.itemsVendidos.reduce((s, i) => s + (Number(i.quantity) || 1), 0)})
+                                </p>
+                                {details.itemsVendidos.map((item) => {
+                                  const esPas = isPasteleriaDept(item.product?.departamento);
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-center justify-between text-xs py-0.5 border-b last:border-b-0 border-gray-200/50 dark:border-gray-800/60"
+                                    >
+                                      <div className="flex items-center gap-1.5 pr-2">
+                                        <span className="font-black text-emerald-600 dark:text-emerald-400">
+                                          {item.quantity}x
+                                        </span>
+                                        <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">
+                                          {item.product?.name || 'Producto'}
+                                        </span>
+                                        <span
+                                          className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                            esPas
+                                              ? 'bg-pink-100/80 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400'
+                                              : 'bg-orange-100/80 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+                                          }`}
+                                        >
+                                          {esPas ? 'Pastelería' : 'Cafetería'}
+                                        </span>
+                                      </div>
+                                      <span className="font-bold text-gray-600 dark:text-gray-300 shrink-0">
+                                        ${Number(item.subtotal || 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {showModDetails && details.kind === 'PASTELERIA_ORDER' && group.pasteleriaOrder && (
+                              <div className="bg-pink-50/40 dark:bg-pink-950/20 lya:bg-lya-bg rounded-xl p-2.5 border border-pink-200/60 dark:border-pink-900/30 space-y-1.5 max-w-md">
+                                <div className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-black text-pink-600 dark:text-pink-400">1x</span>
+                                    <span className="font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text">
+                                      {details.categoriaPastel}
+                                    </span>
+                                  </div>
+                                  <span className="text-[11px] font-black text-gray-600 dark:text-gray-300">
+                                    Valor Pastel: ${details.costoTotalPed.toFixed(2)}
+                                  </span>
+                                </div>
+
+                                {(details.porcionesList.length > 0 || details.saboresList.length > 0) && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {details.porcionesList.map((p, idx) => (
+                                      <span key={idx} className="text-[9px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-200/60 dark:border-amber-800/40">
+                                        {p}
+                                      </span>
+                                    ))}
+                                    {details.saboresList.map((s, idx) => (
+                                      <span key={idx} className="text-[9px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
+                                        {s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {details.descripcionPastel && (
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400 italic line-clamp-1">
+                                    "{details.descripcionPastel}"
+                                  </p>
+                                )}
+
+                                <div className="flex items-center justify-between text-[10px] pt-1 border-t border-pink-200/40 dark:border-pink-900/30 font-bold text-gray-500 dark:text-gray-400">
+                                  <span>Acumulado pagado: <b className="text-emerald-600 dark:text-emerald-400">${details.totalAbonadoPed.toFixed(2)}</b></span>
+                                  {details.restaPed <= 0 ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                      <CheckCircle2 size={11} /> Pedido Liquidado
+                                    </span>
+                                  ) : (
+                                    <span className="text-amber-600 dark:text-amber-400">
+                                      Resta por cobrar: ${details.restaPed.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Si no hay orden vinculada o se ocultó el desglose, mostramos la descripción limpia */}
+                            {(!showModDetails ||
+                              (details.kind === 'POS_ORDER' && (!details.itemsVendidos || details.itemsVendidos.length === 0)) ||
+                              (details.kind === 'PASTELERIA_ORDER' && !group.pasteleriaOrder)) && (
+                              <p className={`text-xs text-gray-500 dark:text-gray-400 font-medium ${isCancelled ? 'line-through opacity-50' : ''}`}>
+                                {details.cleanDesc}
+                              </p>
+                            )}
+
+                            {/* ETIQUETAS DE ANULACIONES PARCIALES O RESTAURACIONES */}
+                            {group.modificaciones.length > 0 && showModDetails && (
+                              <div className="flex flex-col gap-1 mt-0.5">
+                                {group.modificaciones.map((mod, i) => {
+                                  const isRestaurado = mod.includes('📈');
+                                  const badgeClasses = isRestaurado
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50'
+                                    : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50';
+
+                                  return (
+                                    <span key={i} className={`text-[10px] font-black px-2 py-1 rounded-md border w-fit flex items-center shadow-sm ${badgeClasses}`}>
+                                      {mod}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {group.modificaciones.length > 0 && !showModDetails && (
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold italic flex items-center gap-1">
+                                <RotateCcw size={10}/> {group.modificaciones.length} ajuste(s) registrado(s)
+                              </span>
+                            )}
+
+                            {/* PIE DE MOVIMIENTO: USUARIO Y MÉTODO DE PAGO */}
+                            <div className={`text-[11px] font-semibold mt-0.5 flex flex-wrap items-center gap-2 ${isCancelled ? 'text-gray-400 lya:text-lya-text/40' : 'text-blue-500 dark:text-blue-400 lya:text-lya-primary'}`}>
+                              <span className="flex items-center gap-1"><UserCheck size={12} /> Por: {creatorName}</span>
+                              {!isCancelled && (
+                                <>
+                                  <span className="text-gray-300 dark:text-gray-700 lya:text-lya-border">•</span>
+                                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] uppercase font-black tracking-widest ${payInfo.bg} ${payInfo.color}`}>
+                                    <payInfo.icon size={10} /> {payInfo.label}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         
+                        {/* 4. MONTO */}
                         <td className="p-5 text-base font-black text-right text-gray-900 dark:text-white lya:text-lya-text whitespace-nowrap">
                           <span className={
                             isCancelled 
@@ -431,13 +918,14 @@ export const CashRegisterPage = ({ user }) => {
                           </span>
                         </td>
 
+                        {/* 5. ESTADO */}
                         <td className="p-5 text-center">
                           {isCancelled ? (
                             <div className="flex flex-col items-center">
                               <span className="text-[10px] font-black uppercase text-red-600 bg-red-100 dark:bg-red-900/30 px-3 py-1.5 rounded-lg mb-1 border border-red-200 dark:border-red-800/50 lya:bg-red-500/10 lya:border-red-500/20 lya:text-red-500">Anulado</span>
-                              {tx.canceller && (
+                              {group.canceller && (
                                 <span className="text-[10px] text-gray-500 dark:text-gray-400 lya:text-lya-text/50 font-bold whitespace-nowrap">
-                                  Por: {tx.canceller.fullName?.split(' ')[0] || tx.canceller.username}
+                                  Por: {group.canceller.fullName?.split(' ')[0] || group.canceller.username}
                                 </span>
                               )}
                             </div>
@@ -446,11 +934,12 @@ export const CashRegisterPage = ({ user }) => {
                           )}
                         </td>
 
+                        {/* 6. ACCIONES */}
                         <td className="p-5 text-center">
-                          {tx.source !== 'MANUAL' ? (
+                          {!isManual ? (
                             <span 
                               className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-lg select-none"
-                              title={`Los movimientos de ${tx.source === 'CAFETERIA' ? 'Cafetería' : 'Pastelería'} solo se pueden anular o restaurar desde su módulo correspondiente.`}
+                              title="Los movimientos automáticos de Punto de Venta y Pastelería se gestionan desde su módulo correspondiente."
                             >
                               Automático
                             </span>
@@ -458,7 +947,7 @@ export const CashRegisterPage = ({ user }) => {
                             <>
                               {!isCancelled && user?.role === 'Administrador' && (
                                 <button 
-                                  onClick={() => handleCancelTransaction(tx.id)}
+                                  onClick={() => handleCancelTransaction(group.rawTxId)}
                                   className="text-red-500 hover:text-red-700 transition-colors p-2 bg-red-50 dark:bg-red-900/20 md:hover:bg-red-100 dark:md:hover:bg-red-900/40 rounded-xl outline-none lya:bg-red-500/10 lya:text-red-500 lya:md:hover:bg-red-500/20"
                                   title="Anular Movimiento Manual"
                                 >
@@ -467,7 +956,7 @@ export const CashRegisterPage = ({ user }) => {
                               )}
                               {isCancelled && user?.role === 'Administrador' && (
                                 <button 
-                                  onClick={() => handleRestoreTransaction(tx.id)}
+                                  onClick={() => handleRestoreTransaction(group.rawTxId)}
                                   className="text-blue-500 hover:text-blue-700 transition-colors p-2 bg-blue-50 dark:bg-blue-900/20 md:hover:bg-blue-100 dark:md:hover:bg-blue-900/40 rounded-xl outline-none lya:bg-lya-primary/10 lya:text-lya-primary lya:md:hover:bg-lya-primary/20"
                                   title="Restaurar Movimiento Manual"
                                 >

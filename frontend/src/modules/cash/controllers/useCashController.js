@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+// src/modules/cash/controllers/useCashController.js
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../../api/client';
+import { socket } from '../../../api/socket';
 import toast from 'react-hot-toast';
 
 export const useCashController = (user) => {
@@ -21,23 +23,37 @@ export const useCashController = (user) => {
     message: ''
   });
 
-  const fetchTransactions = async (date) => {
-    setLoading(true);
+  const fetchTransactions = useCallback(async (date, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const response = await api.get(`/cash?date=${date}&type=INCOME`);
-      setTransactions(response.data);
-      toast.dismiss('fetch-cash-error'); // Quitamos el error si esta vez sí tuvo éxito
+      setTransactions(response.data || []);
+      toast.dismiss('fetch-cash-error');
     } catch (error) {
-      // 🔥 SOLUCIÓN: Le ponemos un "id" para que react-hot-toast no lo duplique jamás
       toast.error('Error al cargar los movimientos de caja', { id: 'fetch-cash-error' });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTransactions(selectedDate);
-  }, [selectedDate]);
+  }, [selectedDate, fetchTransactions]);
+
+  // 🔥 Sincronización en tiempo real cuando se cobra o anula en otra terminal
+  useEffect(() => {
+    const onPosUpdate = () => fetchTransactions(selectedDate, true);
+    socket.on('pos:update', onPosUpdate);
+    socket.on('orderPaid', onPosUpdate);
+    socket.on('orderCancelled', onPosUpdate);
+    socket.on('orderItemCancelled', onPosUpdate);
+    return () => {
+      socket.off('pos:update', onPosUpdate);
+      socket.off('orderPaid', onPosUpdate);
+      socket.off('orderCancelled', onPosUpdate);
+      socket.off('orderItemCancelled', onPosUpdate);
+    };
+  }, [selectedDate, fetchTransactions]);
 
   const requestCancelTransaction = (id) => {
     if (user?.role !== 'Administrador') {
@@ -85,7 +101,7 @@ export const useCashController = (user) => {
         await api.post(`/cash/${transactionId}/restore`);
         toast.success('Movimiento restaurado exitosamente');
       }
-      fetchTransactions(selectedDate);
+      fetchTransactions(selectedDate, true);
     } catch (error) {
       toast.error(error.response?.data?.message || `Error al ${actionType === 'CANCEL' ? 'anular' : 'restaurar'} transacción`);
     }
@@ -109,14 +125,11 @@ export const useCashController = (user) => {
     }
 
     // 2. SUMAR AL RESUMEN
-    // Siempre sumamos el dinero de las etiquetas, sin importar si el ticket se canceló completo o no
     let dineroAnulado = anuladoParcial;
 
     if (tx.status === 'CANCELLED') {
-      // Sumamos el valor remanente (para cancelaciones manuales que no bajan a 0)
       dineroAnulado += Math.abs(val);
     } else {
-      // Si está activo pero es negativo (ej. una devolución pura)
       if (val < 0) {
         dineroAnulado += Math.abs(val);
       }
