@@ -5,7 +5,7 @@ import {
   CalendarClock, Plus, Search, CheckCircle2, Check, AlertTriangle, Wallet, Banknote,
   DollarSign, X, FileText, ShoppingBasket, ClockAlert, PackageCheck, Ban, Undo2, Smartphone, 
   MessageCircle, Loader2, Trash2, RotateCcw, Calculator, Flame, Timer, CalendarDays,
-  PackageX, Receipt
+  PackageX, Receipt, CalendarCheck
 } from 'lucide-react';
 import { usePedidosController } from '../controllers/usePedidosController';
 import NuevoPedidoModal from './NuevoPedidoModal';
@@ -134,19 +134,44 @@ export default function PasteleriaDashboard() {
     return { hoy, manana, proximos7, today, tomorrow, dayAfterTomorrow };
   }, [pedidos]);
 
-  // 🔥 Métricas de resumen para el panel lateral (Papelera Hoy / Entregados Hoy)
+  // 🔥 Métricas inteligentes que separan "Valor del Pedido" vs "Dinero Real en Caja Hoy"
   const panelSummaryMetrics = useMemo(() => {
+    const hoyStr = new Date().toDateString();
     const totalPedidos = pedidosFiltrados.length;
-    const montoTotal = pedidosFiltrados.reduce(
+    const valorPedidos = pedidosFiltrados.reduce(
       (sum, p) => sum + (parseFloat(p.costoTotal) || 0),
       0
     );
-    const totalAbonadoAnulado = pedidosFiltrados.reduce((sum, p) => {
-      const pagado = p.abonos?.reduce((s, ab) => s + (parseFloat(ab.monto) || 0), 0) || 0;
-      return sum + Math.max(0, pagado);
-    }, 0);
 
-    return { totalPedidos, montoTotal, totalAbonadoAnulado };
+    let cajaAfectadaCancelados = 0;
+    let cobradoHoyEntregados = 0;
+    let abonadoAntesEntregados = 0;
+
+    pedidosFiltrados.forEach(p => {
+      const abonosList = Array.isArray(p.abonos) ? p.abonos : [];
+      const pagadoTotalPedido = abonosList.reduce((s, ab) => s + (parseFloat(ab.monto) || 0), 0);
+      cajaAfectadaCancelados += Math.max(0, pagadoTotalPedido);
+
+      abonosList.forEach(ab => {
+        const montoAb = parseFloat(ab.monto) || 0;
+        if (ab.fecha && new Date(ab.fecha).toDateString() === hoyStr) {
+          cobradoHoyEntregados += montoAb;
+        } else {
+          abonadoAntesEntregados += montoAb;
+        }
+      });
+    });
+
+    const sinCobrarCancelados = Math.max(0, valorPedidos - cajaAfectadaCancelados);
+
+    return {
+      totalPedidos,
+      valorPedidos,
+      cajaAfectadaCancelados,
+      sinCobrarCancelados,
+      cobradoHoyEntregados: Math.max(0, cobradoHoyEntregados),
+      abonadoAntesEntregados: Math.max(0, abonadoAntesEntregados)
+    };
   }, [pedidosFiltrados]);
 
   if (loading) return <PasteleriaLoader />; 
@@ -429,7 +454,7 @@ export default function PasteleriaDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* 🔥 PANEL LATERAL DESLIZANTE UNIFICADO (ESTILO CAFETERÍA)                  */}
+      {/* 🔥 PANEL LATERAL DESLIZANTE CON DESGLOSE CONTABLE CLARO                   */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {(showCancelados || showEntregados) && (
@@ -472,35 +497,91 @@ export default function PasteleriaDashboard() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-10">
-                {/* RESUMEN EJECUTIVO SUPERIOR */}
+                {/* 🔥 RESUMEN EJECUTIVO COMPACTO + DESGLOSE DE CAJA */}
                 {pedidosFiltrados.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3 p-3.5 bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-200/70 dark:border-gray-800 lya:border-lya-border/40 rounded-2xl">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`p-2 rounded-xl ${showCancelados ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                        {showCancelados ? <PackageX size={18} /> : <PackageCheck size={18} />}
+                  <div className="space-y-2.5">
+                    {/* FILA 1: CANTIDAD DE PEDIDOS Y VALOR COMERCIAL DE LOS PASTELES */}
+                    <div className="grid grid-cols-2 gap-3 p-3.5 bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-200/70 dark:border-gray-800 lya:border-lya-border/40 rounded-2xl">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-xl shrink-0 ${showCancelados ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                          {showCancelados ? <PackageX size={18} /> : <PackageCheck size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 truncate">
+                            {showCancelados ? 'Anulados' : 'Entregados'}
+                          </p>
+                          <p className="text-base font-black text-gray-900 dark:text-white lya:text-lya-text">
+                            {panelSummaryMetrics.totalPedidos} {panelSummaryMetrics.totalPedidos === 1 ? 'pedido' : 'pedidos'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          {showCancelados ? 'Pedidos Anulados' : 'Entregados'}
-                        </p>
-                        <p className="text-base font-black text-gray-900 dark:text-white lya:text-lya-text">
-                          {panelSummaryMetrics.totalPedidos} {panelSummaryMetrics.totalPedidos === 1 ? 'pedido' : 'pedidos'}
-                        </p>
+
+                      <div className="flex items-center gap-2.5 border-l border-gray-200 dark:border-gray-700 pl-3">
+                        <div className={`p-2 rounded-xl shrink-0 ${showCancelados ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                          <Receipt size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 truncate">
+                            Valor Pedidos
+                          </p>
+                          <p className={`text-base font-black ${showCancelados ? 'text-gray-500 line-through' : 'text-gray-900 dark:text-white lya:text-lya-text'}`}>
+                            ${panelSummaryMetrics.valorPedidos.toFixed(2)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2.5 border-l border-gray-200 dark:border-gray-700 pl-3">
-                      <div className={`p-2 rounded-xl ${showCancelados ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                        <Receipt size={18} />
+
+                    {/* FILA 2: REALIDAD EN CAJA (PARA QUE EL DUEÑO O CAJERO NO SE CONFUNDA) */}
+                    {showCancelados ? (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200/70 dark:border-red-900/40">
+                          <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                            <Wallet size={13} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">
+                              En Caja Anulado
+                            </span>
+                          </div>
+                          <span className="text-xs font-black text-red-600 dark:text-red-400">
+                            -${panelSummaryMetrics.cajaAfectadaCancelados.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/60 border border-gray-200/70 dark:border-gray-700/60">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            No Cobrado
+                          </span>
+                          <span className="text-xs font-black text-gray-600 dark:text-gray-300">
+                            ${panelSummaryMetrics.sinCobrarCancelados.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                          {showCancelados ? 'Total que Tenían y Acumulan los Productos que Fueron Anulados' : 'Total que Suman los Productos que Fueron Entregados'}
-                        </p>
-                        <p className={`text-base font-black ${showCancelados ? 'text-red-500 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          ${panelSummaryMetrics.montoTotal.toFixed(2)}
-                        </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40">
+                          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                            <Banknote size={13} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">
+                              Cobrado Hoy
+                            </span>
+                          </div>
+                          <span className="text-xs font-black text-emerald-700 dark:text-emerald-300">
+                            +${panelSummaryMetrics.cobradoHoyEntregados.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40">
+                          <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                            <CalendarCheck size={13} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">
+                              Abonado Antes
+                            </span>
+                          </div>
+                          <span className="text-xs font-black text-blue-700 dark:text-blue-300">
+                            ${panelSummaryMetrics.abonadoAntesEntregados.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -522,13 +603,20 @@ export default function PasteleriaDashboard() {
 
                     <div className="space-y-3">
                       {pedidosFiltrados.map(pedido => {
+                        const hoyStr = new Date().toDateString();
                         const fechaActualizacion = new Date(pedido.updatedAt || pedido.fechaEntrega).toLocaleTimeString('es-MX', {
                           hour: '2-digit',
                           minute: '2-digit',
                           hour12: true
                         });
                         const costoNum = parseFloat(pedido.costoTotal) || 0;
-                        const totalPagado = pedido.abonos?.reduce((sum, ab) => sum + (parseFloat(ab.monto) || 0), 0) || 0;
+                        const abonosList = Array.isArray(pedido.abonos) ? pedido.abonos : [];
+                        const totalPagado = abonosList.reduce((sum, ab) => sum + (parseFloat(ab.monto) || 0), 0);
+                        const pagadoHoyPedido = abonosList
+                          .filter(ab => ab.fecha && new Date(ab.fecha).toDateString() === hoyStr)
+                          .reduce((sum, ab) => sum + (parseFloat(ab.monto) || 0), 0);
+                        const pagadoAntesPedido = Math.max(0, totalPagado - pagadoHoyPedido);
+
                         const porcionesList = Array.isArray(pedido.porciones)
                           ? pedido.porciones
                           : (pedido.porciones ? [pedido.porciones] : []);
@@ -575,7 +663,7 @@ export default function PasteleriaDashboard() {
                                 </div>
                               </div>
 
-                              {/* 🔥 DESGLOSE DEL PRODUCTO (IGUAL QUE CAFETERÍA) */}
+                              {/* DESGLOSE DEL PRODUCTO */}
                               <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-red-100 dark:border-red-900/30 space-y-1.5">
                                 <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1">
                                   Detalle del pedido anulado
@@ -613,12 +701,12 @@ export default function PasteleriaDashboard() {
                                   </p>
                                 )}
 
-                                {totalPagado > 0 && (
-                                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-gray-100 dark:border-gray-800 text-red-500 font-bold">
-                                    <span>Anticipo anulado en caja:</span>
-                                    <span className="line-through">${totalPagado.toFixed(2)}</span>
-                                  </div>
-                                )}
+                                <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-gray-100 dark:border-gray-800 font-bold">
+                                  <span className="text-red-500">Anticipo anulado en caja:</span>
+                                  <span className={totalPagado > 0 ? 'text-red-500 line-through' : 'text-gray-400'}>
+                                    ${Math.max(0, totalPagado).toFixed(2)}
+                                  </span>
+                                </div>
                               </div>
 
                               <p className="text-[11px] text-gray-500 leading-snug">
@@ -668,7 +756,7 @@ export default function PasteleriaDashboard() {
                                 </div>
                               </div>
 
-                              {/* DESGLOSE DEL PEDIDO ENTREGADO */}
+                              {/* DESGLOSE DEL PEDIDO ENTREGADO + HISTORIAL DE PAGO */}
                               <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-green-100 dark:border-green-900/30 space-y-1.5">
                                 <div className="flex items-center justify-between text-xs py-0.5">
                                   <div className="flex items-center gap-1.5 pr-2">
@@ -695,6 +783,14 @@ export default function PasteleriaDashboard() {
                                     ))}
                                   </div>
                                 )}
+
+                                {/* Aclaración automática de cuándo se cobró este pedido */}
+                                <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-gray-100 dark:border-gray-800 font-bold text-gray-500 dark:text-gray-400">
+                                  <span>Cobrado hoy: <b className="text-emerald-600 dark:text-emerald-400">+${pagadoHoyPedido.toFixed(2)}</b></span>
+                                  {pagadoAntesPedido > 0 && (
+                                    <span>Abonado antes: <b className="text-blue-600 dark:text-blue-400">${pagadoAntesPedido.toFixed(2)}</b></span>
+                                  )}
+                                </div>
                               </div>
 
                               <div className="flex items-center justify-between mt-3">
