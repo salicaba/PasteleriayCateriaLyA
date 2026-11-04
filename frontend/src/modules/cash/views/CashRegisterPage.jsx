@@ -43,6 +43,12 @@ const isPasteleriaDept = (dept) => {
     .includes('PASTELERIA');
 };
 
+const formatSourceLabel = (source) => {
+  if (source === 'CAFETERIA') return 'CAFETERÍA';
+  if (source === 'PASTELERIA') return 'PASTELERÍA';
+  return source || 'CAJA';
+};
+
 export const CashRegisterPage = ({ user }) => {
   const { 
     transactions, loading, selectedDate, setSelectedDate, resumen, 
@@ -51,10 +57,8 @@ export const CashRegisterPage = ({ user }) => {
   } = useCashController(user);
 
   const [filterSource, setFilterSource] = useState('ALL');
-  // 🔥 Inicia en true para lucir el nuevo desglose de productos y pasteles desde el inicio
   const [showModDetails, setShowModDetails] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
   const [isProcessing, setIsProcessing] = useState(false);
 
   const setToday = () => {
@@ -117,7 +121,7 @@ export const CashRegisterPage = ({ user }) => {
     }
   };
 
-  // 🔥 MOTOR DE AGRUPACIÓN INTELIGENTE (Unifica Tickets Mixtos CAF+PAS y estructura Pedidos Pastelería)
+  // 🔥 MOTOR DE AGRUPACIÓN INTELIGENTE (Unifica Tickets Mixtos CAF+PAS)
   const groupedMovements = useMemo(() => {
     const groupsMap = new Map();
 
@@ -126,7 +130,6 @@ export const CashRegisterPage = ({ user }) => {
       const isPosFolio = rawFolio.startsWith('CAF-') || rawFolio.startsWith('PAS-');
       const baseFolio = isPosFolio ? rawFolio.replace(/^(CAF-|PAS-)/, '') : null;
 
-      // Si es cobro de POS, agrupamos por baseFolio para unir CAF-xxxxxx y PAS-xxxxxx en una sola tarjeta
       const groupKey = baseFolio ? `POS_${baseFolio}` : `TX_${tx.id}`;
 
       if (!groupsMap.has(groupKey)) {
@@ -187,11 +190,7 @@ export const CashRegisterPage = ({ user }) => {
         group.descriptions.push(descOriginal);
       }
       mods.forEach((m) => {
-        const taggedMod =
-          baseFolio && group.sources.length > 0
-            ? `${m} [${tx.source === 'PASTELERIA' ? 'Pastelería' : 'Cafetería'}]`
-            : m;
-        if (!group.modificaciones.includes(taggedMod) && !group.modificaciones.includes(m)) {
+        if (!group.modificaciones.includes(m)) {
           group.modificaciones.push(m);
         }
       });
@@ -204,16 +203,14 @@ export const CashRegisterPage = ({ user }) => {
     );
   }, [transactions]);
 
-  // 🔥 FILTRADO POR CAJA (ALL / CAFETERIA / PASTELERIA) Y BÚSQUEDA PROFUNDA
+  // 🔥 FILTRADO POR CAJA Y BÚSQUEDA
   const filteredMovements = useMemo(() => {
     return groupedMovements.filter((group) => {
-      // 1. Filtro por origen de Caja
       if (filterSource !== 'ALL') {
         const hasSource = group.rawTransactions.some((t) => t.source === filterSource);
         if (!hasSource) return false;
       }
 
-      // 2. Búsqueda por folio, cliente, mesa, producto o monto
       if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
         const descMatch = group.descriptions.some((d) => d.toLowerCase().includes(term));
@@ -247,7 +244,7 @@ export const CashRegisterPage = ({ user }) => {
     });
   }, [groupedMovements, filterSource, searchTerm]);
 
-  // Helper para estructurar los datos visuales de cada fila (POS vs Pedido Pastelería vs Manual)
+  // Helper para estructurar los datos visuales sin duplicar textos
   const buildMovementPresentation = (group) => {
     const mainDesc = group.descriptions[0] || '';
     const isPasteleriaOrder =
@@ -346,28 +343,61 @@ export const CashRegisterPage = ({ user }) => {
       tituloPrincipal = 'Movimiento Manual';
     }
 
-    const subtituloCuenta = cuentaPagada ? `Cuenta: ${cuentaPagada}` : 'Cuenta General';
+    // 🔥 Estandarizamos "CUENTA GENERAL" sin dos puntos, y "CUENTA: NOMBRE" solo para personalizadas
+    const cleanAccountName = parseCleanAccount(cuentaPagada);
+    const isGeneralAccount =
+      !cuentaPagada ||
+      cleanAccountName.toUpperCase() === 'GENERAL' ||
+      cleanAccountName.toUpperCase() === 'CUENTA GENERAL';
+    const subtituloCuenta = isGeneralAccount
+      ? 'CUENTA GENERAL'
+      : `CUENTA: ${cleanAccountName.toUpperCase()}`;
 
     let itemsVendidos = [];
     if (posOrder && Array.isArray(posOrder.items)) {
       const validItems = posOrder.items.filter((i) => i.status === 'ACTIVE' || !i.status);
+
+      let accountFilteredItems = validItems;
       if (cuentaPagada) {
-        itemsVendidos = validItems.filter(
-          (i) => parseCleanAccount(i.cuenta).toLowerCase() === cuentaPagada.toLowerCase()
+        const matched = validItems.filter(
+          (i) => parseCleanAccount(i.cuenta).toLowerCase() === cleanAccountName.toLowerCase()
         );
-      } else {
-        itemsVendidos = validItems;
+        if (matched.length > 0) accountFilteredItems = matched;
       }
 
-      // Si el usuario filtró específicamente por CAFETERIA o PASTELERIA, ponemos primero los productos de esa caja
-      if (filterSource === 'CAFETERIA' || filterSource === 'PASTELERIA') {
-        itemsVendidos = [...itemsVendidos].sort((a, b) => {
-          const aIsPas = isPasteleriaDept(a.product?.departamento);
-          const bIsPas = isPasteleriaDept(b.product?.departamento);
-          if (filterSource === 'PASTELERIA') return Number(bIsPas) - Number(aIsPas);
-          return Number(!bIsPas) - Number(!aIsPas);
-        });
+      // Si el usuario está filtrando por una caja específica (Cafetería o Pastelería), filtramos solo los productos de esa caja
+      if (filterSource === 'CAFETERIA') {
+        accountFilteredItems = accountFilteredItems.filter(
+          (i) => !isPasteleriaDept(i.product?.departamento)
+        );
+      } else if (filterSource === 'PASTELERIA') {
+        accountFilteredItems = accountFilteredItems.filter((i) =>
+          isPasteleriaDept(i.product?.departamento)
+        );
       }
+
+      // 🔥 Agrupamos productos idénticos para que no se repitan renglones del mismo producto
+      const groupedItemsMap = new Map();
+      accountFilteredItems.forEach((item) => {
+        const prodName = item.product?.name || 'Producto';
+        const dept = item.product?.departamento || 'cafeteria';
+        const key = `${item.productId || prodName}_${dept}`;
+
+        if (!groupedItemsMap.has(key)) {
+          groupedItemsMap.set(key, {
+            id: item.id,
+            quantity: Number(item.quantity) || 1,
+            subtotal: Number(item.subtotal) || 0,
+            product: item.product
+          });
+        } else {
+          const existing = groupedItemsMap.get(key);
+          existing.quantity += Number(item.quantity) || 1;
+          existing.subtotal += Number(item.subtotal) || 0;
+        }
+      });
+
+      itemsVendidos = Array.from(groupedItemsMap.values());
     }
 
     const cleanDesc = mainDesc
@@ -376,7 +406,7 @@ export const CashRegisterPage = ({ user }) => {
       .trim();
 
     return {
-      kind: 'POS_ORDER',
+      kind: group.sources.includes('MANUAL') ? 'MANUAL' : 'POS_ORDER',
       isMixedPos,
       tituloPrincipal,
       subtituloCuenta,
@@ -532,13 +562,13 @@ export const CashRegisterPage = ({ user }) => {
         
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar p-1">
           
-          <div className="relative w-full sm:w-64 flex-shrink-0">
+          <div className="relative w-full sm:w-72 flex-shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={16} className="text-gray-400 lya:text-lya-text/50" />
             </div>
             <input
               type="text"
-              placeholder="Buscar folio, cliente, producto..."
+              placeholder="Buscar folio, cliente o producto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg border border-gray-200 dark:border-gray-800 lya:border-lya-border/30 rounded-xl text-sm font-bold text-gray-800 dark:text-white lya:text-lya-text focus:outline-none focus:ring-2 focus:ring-orange-500/30 lya:focus:ring-lya-primary/30 transition-all placeholder-gray-400"
@@ -584,7 +614,7 @@ export const CashRegisterPage = ({ user }) => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL CON TARJETAS DE DESGLOSE */}
+      {/* TABLA PRINCIPAL SIN REPETICIONES */}
       <div className="flex-1 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden relative lya:bg-lya-surface lya:border-lya-border/30 mb-4 min-h-[300px]">
         <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
           <table className="w-full text-left border-collapse relative min-w-max">
@@ -615,7 +645,7 @@ export const CashRegisterPage = ({ user }) => {
                         ? `No se encontraron resultados para "${searchTerm}"`
                         : filterSource === 'ALL' 
                           ? 'No hay movimientos registrados en esta fecha.' 
-                          : `No hay movimientos de ${filterSource.toLowerCase()} en esta fecha.`
+                          : `No hay movimientos de ${formatSourceLabel(filterSource).toLowerCase()} en esta fecha.`
                       }
                     </td>
                   </tr>
@@ -638,7 +668,6 @@ export const CashRegisterPage = ({ user }) => {
                     const payInfo = getPaymentInfo(group.rawTransactions[0] || {});
                     const details = buildMovementPresentation(group);
 
-                    // Monto inteligente según el filtro activo (Todos vs Solo Cafetería vs Solo Pastelería)
                     let displayAmount = group.totalActiveAmount;
                     if (isCancelled) {
                       displayAmount = group.totalCancelledAmount;
@@ -651,6 +680,8 @@ export const CashRegisterPage = ({ user }) => {
                     const isNegative = !isCancelled && displayAmount < 0;
                     const absAmount = Math.abs(displayAmount).toFixed(2);
                     const isManual = group.sources.includes('MANUAL');
+                    // Solo mostramos la etiqueta de departamento por producto cuando estamos viendo un ticket mixto en la pestaña "Todos"
+                    const showProductDeptBadge = details.isMixedPos && filterSource === 'ALL';
 
                     return (
                       <tr 
@@ -666,22 +697,26 @@ export const CashRegisterPage = ({ user }) => {
                           })}
                         </td>
 
-                        {/* 2. ORIGEN / CAJA */}
+                        {/* 2. ORIGEN / CAJA (Con desglose de montos aquí mismo si es Ticket Mixto) */}
                         <td className="p-5">
                           <div className="flex flex-col gap-1.5">
                             {details.isMixedPos && filterSource === 'ALL' ? (
                               <>
-                                <div className="flex items-center gap-1">
-                                  <span className="px-2.5 py-1 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]">
-                                    <Coffee size={11} /> Cafetería
-                                  </span>
-                                  <span className="px-2.5 py-1 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 lya:bg-[#FCE8F3] lya:text-[#9D174D]">
-                                    <Cake size={11} /> Pastelería
-                                  </span>
-                                </div>
-                                <span className="px-2 py-0.5 text-[9px] uppercase font-black tracking-widest rounded-md flex items-center gap-1 w-fit bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
-                                  <Link2 size={10} /> Ticket Mixto Unificado
+                                <span className="px-2.5 py-1 text-[10px] uppercase font-black tracking-wider rounded-lg flex items-center gap-1.5 w-fit bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                  <Link2 size={12} /> Ticket Mixto
                                 </span>
+                                <div className="flex flex-col gap-1">
+                                  {group.cafeteriaActiveAmount !== 0 && (
+                                    <span className="px-2 py-0.5 text-[9px] uppercase font-black tracking-wider rounded-md flex items-center gap-1 w-fit bg-orange-100/80 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 lya:bg-[#FDE8E8] lya:text-[#9B1C1C]">
+                                      <Coffee size={10} /> Cafetería: ${group.cafeteriaActiveAmount.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {group.pasteleriaActiveAmount !== 0 && (
+                                    <span className="px-2 py-0.5 text-[9px] uppercase font-black tracking-wider rounded-md flex items-center gap-1 w-fit bg-pink-100/80 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 lya:bg-[#FCE8F3] lya:text-[#9D174D]">
+                                      <Cake size={10} /> Pastelería: ${group.pasteleriaActiveAmount.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
                               </>
                             ) : (
                               <>
@@ -707,7 +742,7 @@ export const CashRegisterPage = ({ user }) => {
                                       ) : (
                                         <Calculator size={12} />
                                       )}
-                                      {activeSource}
+                                      {formatSourceLabel(activeSource)}
                                     </span>
                                   );
                                 })()}
@@ -721,10 +756,10 @@ export const CashRegisterPage = ({ user }) => {
                           </div>
                         </td>
 
-                        {/* 3. DESCRIPCIÓN / DESGLOSE DEL MOVIMIENTO */}
+                        {/* 3. DESGLOSE DEL MOVIMIENTO (Limpio y sin redundancias) */}
                         <td className="p-5 text-sm font-bold text-gray-800 dark:text-gray-200 lya:text-lya-text max-w-xl">
                           <div className="flex flex-col gap-2">
-                            {/* CABECERA DEL MOVIMIENTO */}
+                            {/* CABECERA ÚNICA DEL MOVIMIENTO */}
                             <div className="flex flex-wrap items-center gap-2">
                               <span className={`text-base font-black text-gray-900 dark:text-white lya:text-lya-text ${isCancelled ? 'line-through opacity-50' : ''}`}>
                                 {details.tituloPrincipal}
@@ -740,6 +775,12 @@ export const CashRegisterPage = ({ user }) => {
                                 </span>
                               )}
 
+                              {details.promoText && (
+                                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/40">
+                                  🏷️ {details.promoText}
+                                </span>
+                              )}
+
                               {group.folios.length > 0 && (
                                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase">
                                   {group.folios.join(' • ')}
@@ -747,32 +788,11 @@ export const CashRegisterPage = ({ user }) => {
                               )}
                             </div>
 
-                            {/* PASTILLAS DE REPARTO POR CAJA EN TICKETS MIXTOS */}
-                            {(details.isMixedPos || details.promoText) && (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {group.cafeteriaActiveAmount !== 0 && (
-                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200/70 dark:border-orange-800/40">
-                                    ☕ Caja Cafetería: ${group.cafeteriaActiveAmount.toFixed(2)}
-                                  </span>
-                                )}
-                                {group.pasteleriaActiveAmount !== 0 && (
-                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-pink-50 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 border border-pink-200/70 dark:border-pink-800/40">
-                                    🎂 Caja Pastelería: ${group.pasteleriaActiveAmount.toFixed(2)}
-                                  </span>
-                                )}
-                                {details.promoText && (
-                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/40">
-                                    🏷️ {details.promoText}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* 🔥 CAJITA DE DESGLOSE DE PRODUCTOS (POS) O DETALLES DEL PASTEL (PASTELERÍA) */}
+                            {/* 🔥 CAJITA DE DESGLOSE DE PRODUCTOS (SOLO CUANDO showModDetails ESTÁ ACTIVO) */}
                             {showModDetails && details.kind === 'POS_ORDER' && details.itemsVendidos?.length > 0 && (
                               <div className="bg-gray-50/90 dark:bg-gray-950/60 lya:bg-lya-bg rounded-xl p-2.5 border border-gray-200/70 dark:border-gray-800 space-y-1 max-w-md">
                                 <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1">
-                                  Productos en la cuenta ({details.itemsVendidos.reduce((s, i) => s + (Number(i.quantity) || 1), 0)})
+                                  Productos cobrados ({details.itemsVendidos.reduce((s, i) => s + (Number(i.quantity) || 1), 0)})
                                 </p>
                                 {details.itemsVendidos.map((item) => {
                                   const esPas = isPasteleriaDept(item.product?.departamento);
@@ -788,15 +808,17 @@ export const CashRegisterPage = ({ user }) => {
                                         <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">
                                           {item.product?.name || 'Producto'}
                                         </span>
-                                        <span
-                                          className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                            esPas
-                                              ? 'bg-pink-100/80 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400'
-                                              : 'bg-orange-100/80 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
-                                          }`}
-                                        >
-                                          {esPas ? 'Pastelería' : 'Cafetería'}
-                                        </span>
+                                        {showProductDeptBadge && (
+                                          <span
+                                            className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                              esPas
+                                                ? 'bg-pink-100/80 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400'
+                                                : 'bg-orange-100/80 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+                                            }`}
+                                          >
+                                            {esPas ? 'Pastelería' : 'Cafetería'}
+                                          </span>
+                                        )}
                                       </div>
                                       <span className="font-bold text-gray-600 dark:text-gray-300 shrink-0">
                                         ${Number(item.subtotal || 0).toFixed(2)}
@@ -807,6 +829,7 @@ export const CashRegisterPage = ({ user }) => {
                               </div>
                             )}
 
+                            {/* 🔥 CAJITA DE DESGLOSE DE PEDIDO DE PASTELERÍA (SOLO CUANDO showModDetails ESTÁ ACTIVO) */}
                             {showModDetails && details.kind === 'PASTELERIA_ORDER' && group.pasteleriaOrder && (
                               <div className="bg-pink-50/40 dark:bg-pink-950/20 lya:bg-lya-bg rounded-xl p-2.5 border border-pink-200/60 dark:border-pink-900/30 space-y-1.5 max-w-md">
                                 <div className="flex items-center justify-between text-xs">
@@ -857,10 +880,8 @@ export const CashRegisterPage = ({ user }) => {
                               </div>
                             )}
 
-                            {/* Si no hay orden vinculada o se ocultó el desglose, mostramos la descripción limpia */}
-                            {(!showModDetails ||
-                              (details.kind === 'POS_ORDER' && (!details.itemsVendidos || details.itemsVendidos.length === 0)) ||
-                              (details.kind === 'PASTELERIA_ORDER' && !group.pasteleriaOrder)) && (
+                            {/* Solo mostramos descripción en texto si es un movimiento MANUAL */}
+                            {details.kind === 'MANUAL' && (
                               <p className={`text-xs text-gray-500 dark:text-gray-400 font-medium ${isCancelled ? 'line-through opacity-50' : ''}`}>
                                 {details.cleanDesc}
                               </p>
@@ -1043,4 +1064,3 @@ export const CashRegisterPage = ({ user }) => {
     </motion.div>
   );
 };
-// Probar
