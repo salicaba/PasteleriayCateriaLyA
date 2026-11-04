@@ -11,7 +11,8 @@ import {
   ShoppingBag,
   Receipt,
   Coffee,
-  CakeSlice
+  CakeSlice,
+  Link2
 } from 'lucide-react';
 
 const parseCleanAccount = (str) => {
@@ -127,10 +128,11 @@ export const VentasHoyModal = ({
     };
   }, [groupedSales]);
 
-  // Helper para extraer origen, cuenta y productos vendidos de cada cobro
+  // Helper para extraer origen, cuenta y productos vendidos sin duplicar textos
   const resolveSaleDetails = (sale) => {
     const mainDesc = sale.descriptions[0] || '';
     const orderObj = (vendidosOrders || []).find((o) => o.id === sale.referenceId);
+    const isPedidoPasteleria = String(sale.referenceId || '').startsWith('PED-');
 
     // Detectar si fue cobro de una cuenta específica ("Cuenta: Nombre")
     let cuentaPagada = null;
@@ -151,7 +153,7 @@ export const VentasHoyModal = ({
     const parenMatch = mainDesc.match(/\((.*?)\)/);
     if (parenMatch && parenMatch[1]) {
       tituloOrigen = parenMatch[1];
-    } else if (String(sale.referenceId || '').startsWith('PED-')) {
+    } else if (isPedidoPasteleria) {
       tituloOrigen = `Pedido ${sale.referenceId}`;
     } else if (orderObj?.table?.number) {
       tituloOrigen = `Mesa #${orderObj.table.number}`;
@@ -161,40 +163,79 @@ export const VentasHoyModal = ({
         : orderObj.ticketId.split(' - ')[0];
     }
 
-    // Subtítulo de la cuenta o cliente
-    let etiquetaCuenta = cuentaPagada ? `Cuenta: ${cuentaPagada}` : 'Cuenta General';
-    if (String(sale.referenceId || '').startsWith('PED-')) {
+    // Subtítulo estandarizado ("CUENTA GENERAL" sin dos puntos, o "CUENTA: NOMBRE")
+    const cleanAccountName = parseCleanAccount(cuentaPagada);
+    const isGeneralAccount =
+      !cuentaPagada ||
+      cleanAccountName.toUpperCase() === 'GENERAL' ||
+      cleanAccountName.toUpperCase() === 'CUENTA GENERAL';
+
+    let etiquetaCuenta = isGeneralAccount
+      ? 'CUENTA GENERAL'
+      : `CUENTA: ${cleanAccountName.toUpperCase()}`;
+
+    let tipoMovimientoPasteleria = null;
+    if (isPedidoPasteleria) {
       const clienteMatch = mainDesc.match(/Pedido:\s*(.*?)\s+PED-/i);
       etiquetaCuenta = clienteMatch?.[1]
-        ? `Cliente: ${clienteMatch[1]}`
-        : 'Anticipo / Abono Pastelería';
+        ? `CLIENTE: ${clienteMatch[1].toUpperCase()}`
+        : 'PEDIDO PASTELERÍA';
+
+      if (mainDesc.toLowerCase().startsWith('anticipo')) {
+        tipoMovimientoPasteleria = '🎂 Anticipo Inicial';
+      } else if (mainDesc.toLowerCase().startsWith('abono')) {
+        tipoMovimientoPasteleria = '💳 Abono Parcial';
+      } else if (mainDesc.toLowerCase().startsWith('liquidaci')) {
+        tipoMovimientoPasteleria = '✅ Liquidación Final';
+      } else if (sale.totalAmount < 0) {
+        tipoMovimientoPasteleria = '↩️ Devolución por Ajuste';
+      }
     }
 
-    // Productos asociados a esta venta
+    // Productos asociados a esta venta (agrupados para no repetir renglones idénticos)
     let itemsVendidos = [];
     if (orderObj && Array.isArray(orderObj.items)) {
       const activeOrderItems = orderObj.items.filter(
         (i) => i.status === 'ACTIVE' || !i.status
       );
+
+      let rawItems = activeOrderItems;
       if (cuentaPagada) {
-        itemsVendidos = activeOrderItems.filter(
-          (i) =>
-            parseCleanAccount(i.cuenta).toLowerCase() === cuentaPagada.toLowerCase()
+        const matched = activeOrderItems.filter(
+          (i) => parseCleanAccount(i.cuenta).toLowerCase() === cleanAccountName.toLowerCase()
         );
-      } else {
-        itemsVendidos = activeOrderItems;
+        if (matched.length > 0) rawItems = matched;
       }
+
+      const groupedItemsMap = new Map();
+      rawItems.forEach((item) => {
+        const prodName = item.product?.name || 'Producto';
+        const dept = item.product?.departamento || 'cafeteria';
+        const key = `${item.productId || prodName}_${dept}`;
+
+        if (!groupedItemsMap.has(key)) {
+          groupedItemsMap.set(key, {
+            id: item.id,
+            quantity: Number(item.quantity) || 1,
+            subtotal: Number(item.subtotal) || 0,
+            product: item.product
+          });
+        } else {
+          const existing = groupedItemsMap.get(key);
+          existing.quantity += Number(item.quantity) || 1;
+          existing.subtotal += Number(item.subtotal) || 0;
+        }
+      });
+
+      itemsVendidos = Array.from(groupedItemsMap.values());
     }
 
     return {
       tituloOrigen,
       etiquetaCuenta,
+      tipoMovimientoPasteleria,
       promoText,
-      itemsVendidos,
-       limpiarDesc: mainDesc
-        .replace(/\s*(CAF|PAS)-\d+/g, '')
-        .replace(/\s*\[Promo\s*-\$[\d.]+\]/i, '')
-        .trim()
+      itemsVendidos
     };
   };
 
@@ -302,7 +343,7 @@ export const VentasHoyModal = ({
                 </div>
               )}
 
-              {/* LISTA DE VENTAS UNIFICADAS */}
+              {/* LISTA DE VENTAS UNIFICADAS SIN ETIQUETAS REPETIDAS */}
               {groupedSales.length > 0 ? (
                 <div>
                   <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-3">
@@ -312,13 +353,13 @@ export const VentasHoyModal = ({
                     {groupedSales.map((sale) => {
                       const esReembolso = sale.totalAmount < 0;
                       const isMixed =
-                        sale.cafeteriaAmount > 0 && sale.pasteleriaAmount > 0;
+                        sale.cafeteriaAmount !== 0 && sale.pasteleriaAmount !== 0;
                       const {
                         tituloOrigen,
                         etiquetaCuenta,
+                        tipoMovimientoPasteleria,
                         promoText,
-                        itemsVendidos,
-                        limpiarDesc
+                        itemsVendidos
                       } = resolveSaleDetails(sale);
 
                       const metodoTexto =
@@ -338,7 +379,7 @@ export const VentasHoyModal = ({
                           }`}
                         >
                           {/* CABECERA DE LA TARJETA */}
-                          <div className="flex justify-between items-start mb-2">
+                          <div className="flex justify-between items-start mb-2.5">
                             <div className="flex items-center gap-2.5">
                               <div
                                 className={`p-2 rounded-xl shadow-sm shrink-0 flex items-center justify-center border ${
@@ -362,7 +403,7 @@ export const VentasHoyModal = ({
                                   {tituloOrigen}
                                 </span>
                                 {sale.folios.length > 0 && (
-                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider">
                                     {sale.folios.join(' • ')}
                                   </span>
                                 )}
@@ -391,7 +432,7 @@ export const VentasHoyModal = ({
                             </div>
                           </div>
 
-                          {/* INSIGNIAS DE CUENTA Y REPARTO A CAJAS */}
+                          {/* INSIGNIAS DE CUENTA Y CAJA (Sin repetir el monto si es de una sola caja) */}
                           <div className="flex flex-wrap items-center gap-1.5 mb-3">
                             <div className="inline-flex items-center bg-white dark:bg-gray-800 lya:bg-lya-bg border border-green-200 dark:border-green-900/50 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-lg shadow-sm">
                               <span className="text-[10px] font-black uppercase tracking-widest leading-none">
@@ -399,33 +440,43 @@ export const VentasHoyModal = ({
                               </span>
                             </div>
 
-                            {sale.cafeteriaAmount !== 0 && (
-                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-orange-100/80 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40">
-                                ☕ Cafetería: ${sale.cafeteriaAmount.toFixed(2)}
-                              </span>
-                            )}
-
-                            {sale.pasteleriaAmount !== 0 && (
+                            {isMixed ? (
+                              <>
+                                <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-purple-100/80 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40 flex items-center gap-1">
+                                  <Link2 size={10} /> Ticket Mixto
+                                </span>
+                                <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-orange-100/80 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40">
+                                  ☕ Cafetería: ${sale.cafeteriaAmount.toFixed(2)}
+                                </span>
+                                <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-pink-100/80 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40">
+                                  🎂 Pastelería: ${sale.pasteleriaAmount.toFixed(2)}
+                                </span>
+                              </>
+                            ) : sale.pasteleriaAmount !== 0 ? (
                               <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-pink-100/80 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40">
-                                🎂 Pastelería: ${sale.pasteleriaAmount.toFixed(2)}
+                                🎂 Caja Pastelería
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-orange-100/80 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40">
+                                ☕ Caja Cafetería
                               </span>
                             )}
 
-                            {isMixed && (
-                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-purple-100/80 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                                🔗 Mixto
+                            {tipoMovimientoPasteleria && (
+                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-blue-100/80 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
+                                {tipoMovimientoPasteleria}
                               </span>
                             )}
 
                             {promoText && (
-                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                              <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
                                 🏷️ {promoText}
                               </span>
                             )}
                           </div>
 
-                          {/* 🔥 DESGLOSE DE PRODUCTOS VENDIDOS EN ESTA CUENTA */}
-                          {itemsVendidos.length > 0 ? (
+                          {/* 🔥 DESGLOSE DE PRODUCTOS VENDIDOS (Solo muestra etiqueta de caja por producto si es Ticket Mixto) */}
+                          {itemsVendidos.length > 0 && (
                             <div className="mb-3 bg-white/90 dark:bg-gray-900/60 lya:bg-lya-bg rounded-xl p-2.5 border border-green-100 dark:border-green-900/30 space-y-1.5">
                               <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1">
                                 Productos cobrados (
@@ -451,15 +502,17 @@ export const VentasHoyModal = ({
                                       <span className="font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text">
                                         {item.product?.name || 'Producto'}
                                       </span>
-                                      <span
-                                        className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                          esPasteleria
-                                            ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400'
-                                            : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                                        }`}
-                                      >
-                                        {esPasteleria ? 'Pastelería' : 'Cafetería'}
-                                      </span>
+                                      {isMixed && (
+                                        <span
+                                          className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                            esPasteleria
+                                              ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400'
+                                              : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                                          }`}
+                                        >
+                                          {esPasteleria ? 'Pastelería' : 'Cafetería'}
+                                        </span>
+                                      )}
                                     </div>
                                     <span className="font-bold text-gray-700 dark:text-gray-300 shrink-0">
                                       ${Number(item.subtotal || 0).toFixed(2)}
@@ -468,10 +521,6 @@ export const VentasHoyModal = ({
                                 );
                               })}
                             </div>
-                          ) : (
-                            <p className="text-[11px] text-gray-500 font-medium leading-snug mb-2">
-                              {limpiarDesc}
-                            </p>
                           )}
 
                           {/* HISTORIAL DE AJUSTES PARCIALES O RESTAURACIONES */}

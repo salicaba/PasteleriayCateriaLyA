@@ -24,7 +24,7 @@ export const usePosMutations = ({
   cuentasPagadasReales,
   triggerNotification,
   checkAndExecuteMove,
-  checkAndExecuteMerge // 👈 Recibido aquí
+  checkAndExecuteMerge
 }) => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
@@ -45,6 +45,8 @@ export const usePosMutations = ({
 
   const mapDBItemToLocal = (dbItem, itemsNuevos = []) => {
       let parsedPreps = [];
+      let savedTicketDiscount = null;
+
       if (dbItem.notes) { 
         try { parsedPreps = JSON.parse(dbItem.notes); } 
         catch(e) { parsedPreps = [{ detalles: "Personalización" }]; } 
@@ -53,12 +55,15 @@ export const usePosMutations = ({
       
       let isTransferredVal = dbItem.isTransferred || false;
       try {
-        const notesObj = JSON.parse(dbItem.notes || '[]');
-        if (Array.isArray(notesObj)) {
-          const promoMeta = notesObj.find(n => n && n._isPromoMeta);
-          if (promoMeta && promoMeta.isTransferred) isTransferredVal = true;
-        }
+        const promoMeta = parsedPreps.find(n => n && n._isPromoMeta);
+        if (promoMeta && promoMeta.isTransferred) isTransferredVal = true;
+        savedTicketDiscount = parsedPreps.find(n => n && n._isTicketDiscountMeta) || null;
       } catch(e) {}
+
+      // Limpiamos metadatos internos para que no se pinten como notas de cocina
+      const cleanPreps = parsedPreps.filter(
+        n => n && !n._isPromoMeta && !n._isTicketDiscountMeta && !n._isReleased
+      );
       
       return { 
         id: dbItem.productId, 
@@ -66,18 +71,21 @@ export const usePosMutations = ({
         imagen: dbItem.product?.imageUrl || null, 
         precio: parseFloat(dbItem.subtotal) / (dbItem.quantity || 1), 
         qty: dbItem.quantity, 
-        preparaciones: parsedPreps, 
+        preparaciones: cleanPreps.length > 0 ? cleanPreps : [{}], 
         enviadoCocina: true, 
         kitchenStatus: dbItem.kitchenStatus, 
         status: dbItem.status || 'ACTIVE', 
         cuenta: dbItem.cuenta || 'General', 
         isTakeaway: dbItem.isTakeaway || false, 
         backendItemId: String(dbItem.id), 
-        requiereCocina: itemsNuevos.find(n => String(n.id) === String(dbItem.productId))?.requiereCocina !== false,
+        requiereCocina: dbItem.product?.requiereCocina !== undefined
+          ? dbItem.product.requiereCocina !== false
+          : itemsNuevos.find(n => String(n.id) === String(dbItem.productId))?.requiereCocina !== false,
         isAutoPromo: dbItem.isAutoPromo || false,
         promoLabel: dbItem.promoLabel || null,
         precioOriginal: dbItem.precioOriginal || null,
-        isTransferred: isTransferredVal
+        isTransferred: isTransferredVal,
+        savedTicketDiscount
       };
   };
 
@@ -146,8 +154,7 @@ export const usePosMutations = ({
           const updatedNewItems = allItemsFromDB.map(dbItem => mapDBItemToLocal(dbItem, itemsNuevos));
           setCart(prev => {
               const unsentLocal = prev.filter(p => (!p.enviadoCocina && !itemsNuevos.includes(p)) || p.isVirtualDiscount);
-              const previouslySent = prev.filter(p => p.enviadoCocina && !p.isVirtualDiscount && !allItemsFromDB.some(db => String(db.id) === String(p.backendItemId)));
-              return [...previouslySent, ...updatedNewItems, ...unsentLocal];
+              return [...updatedNewItems, ...unsentLocal];
           });
       } else {
           setCart(prev => prev.map(p => 
@@ -327,32 +334,32 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 FUNCIÓN PÚBLICA DE MOVIMIENTO INDIVIDUAL (Con alerta de ruptura)
+  // 🔥 FUNCIÓN PÚBLICA DE MOVIMIENTO INDIVIDUAL
   const moveItemToCuenta = (item, target, qtyToMove = item.qty) => { 
-  if (cuentasPagadasReales.includes(target)) {
+    if (cuentasPagadasReales.includes(target)) {
       triggerNotification(`La cuenta "${parseAccountName(target)}" ya está cobrada. No puedes moverle más productos.`, 'error');
       return Promise.resolve(false);
-  }
-
-  return new Promise((resolve) => {
-    if (typeof checkAndExecuteMove === 'function') {
-      checkAndExecuteMove(
-        item,
-        target,
-        qtyToMove,
-        async (ruptureData) => {
-          await executeMoveItemToCuenta(item, target, qtyToMove, ruptureData);
-          resolve(true);
-        },
-        () => {
-          resolve(false);
-        }
-      );
-    } else {
-      executeMoveItemToCuenta(item, target, qtyToMove).then(() => resolve(true));
     }
-  });
-};
+
+    return new Promise((resolve) => {
+      if (typeof checkAndExecuteMove === 'function') {
+        checkAndExecuteMove(
+          item,
+          target,
+          qtyToMove,
+          async (ruptureData) => {
+            await executeMoveItemToCuenta(item, target, qtyToMove, ruptureData);
+            resolve(true);
+          },
+          () => {
+            resolve(false);
+          }
+        );
+      } else {
+        executeMoveItemToCuenta(item, target, qtyToMove).then(() => resolve(true));
+      }
+    });
+  };
 
   // 🔥 EJECUTOR INTERNO DE UNIÓN DE CUENTAS
   const executeMergeAccountToCuenta = async (sourceCuenta, targetCuenta) => {
@@ -422,7 +429,7 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 FUNCIÓN PÚBLICA DE UNIÓN DE CUENTAS (Con alerta de ruptura y retorno booleano)
+  // 🔥 FUNCIÓN PÚBLICA DE UNIÓN DE CUENTAS
   const mergeAccountToCuenta = (sourceCuenta, targetCuenta) => {
     if (!sourceCuenta || !targetCuenta || sourceCuenta === targetCuenta) return Promise.resolve(false);
     if (cuentasPagadasReales.includes(sourceCuenta) || cuentasPagadasReales.includes(targetCuenta)) {
@@ -479,6 +486,7 @@ export const usePosMutations = ({
     try {
         const targetQty = qtyToDeliver ? parseInt(qtyToDeliver, 10) : itemsToUpdate.reduce((acc, curr) => acc + curr.qty, 0);
         
+        // 1. Actualización optimista inmediata
         setCart(prev => { 
             const newCart = [...prev]; 
             let remainingLocal = targetQty;
@@ -501,22 +509,30 @@ export const usePosMutations = ({
             return newCart; 
         });
 
+        // 2. Peticiones al servidor y sincronización de nuevos IDs en caso de split
         let remainingToDeliver = targetQty;
-        const peticiones = [];
+        let latestOrderItems = null;
 
         for (const subItem of itemsToUpdate) {
             if (remainingToDeliver <= 0) break;
             const qtyFromThisRow = Math.min(subItem.qty, remainingToDeliver);
             
             if (newStatus === 'DELIVERED') {
-                peticiones.push(client.post(`/pos/orders/items/${subItem.backendItemId}/split-deliver`, { qtyToDeliver: qtyFromThisRow }));
+                const res = await client.post(`/pos/orders/items/${subItem.backendItemId}/split-deliver`, { qtyToDeliver: qtyFromThisRow });
+                if (res.data?.orderItems) latestOrderItems = res.data.orderItems;
             } else {
-                peticiones.push(client.put(`/kitchen/tickets/${subItem.backendItemId}/status`, { status: newStatus }));
+                await client.put(`/kitchen/tickets/${subItem.backendItemId}/status`, { status: newStatus });
             }
             remainingToDeliver -= qtyFromThisRow;
         }
 
-        await Promise.all(peticiones);
+        if (latestOrderItems) {
+            const syncedItems = latestOrderItems.map(dbItem => mapDBItemToLocal(dbItem));
+            setCart(prev => {
+                const unsentLocal = prev.filter(p => !p.enviadoCocina || p.isVirtualDiscount);
+                return [...syncedItems, ...unsentLocal];
+            });
+        }
 
     } catch (e) { 
       triggerNotification("No se pudo actualizar el estado de entrega.", "error");
@@ -527,6 +543,7 @@ export const usePosMutations = ({
     }
   };
 
+  // 🔥 ENTREGAR TODOS LOS PRODUCTOS LISTOS (Blindado contra errores 400 y con actualización optimista)
   const deliverAllActiveItems = async () => {
     if (!activeOrderId) return;
     if (lockRef.current) return;
@@ -537,25 +554,41 @@ export const usePosMutations = ({
         const itemsListos = cart.filter(item => 
           item.enviadoCocina && 
           item.kitchenStatus === 'READY' && 
-          item.status !== 'CANCELLED'
+          item.status !== 'CANCELLED' &&
+          !item.isVirtualDiscount
         );
 
         if (itemsListos.length === 0) {
             triggerNotification("No hay productos listos para entregar en cocina.", "warning");
-            lockRef.current = false;
-            setIsProcessing(false);
             return;
         }
 
-        await Promise.all(itemsListos.map(item => 
-          client.post(`/pos/orders/items/${item.backendItemId}/split-deliver`, { qtyToDeliver: item.qty })
-        ));
-
+        // 1. Actualización optimista instantánea en pantalla
         setCart(prev => prev.map(item => 
           itemsListos.some(listo => String(listo.backendItemId) === String(item.backendItemId))
           ? { ...item, kitchenStatus: 'DELIVERED' } 
           : item
         ));
+
+        // 2. Ejecución tolerante a fallos individuales (allSettled)
+        const results = await Promise.allSettled(
+          itemsListos.map(item => 
+            client.post(`/pos/orders/items/${item.backendItemId}/split-deliver`, { qtyToDeliver: item.qty })
+          )
+        );
+
+        // Si el backend nos devolvió la lista fresca de orderItems, sincronizamos los IDs
+        const fulfilledWithItems = results
+          .filter(r => r.status === 'fulfilled' && r.value?.data?.orderItems)
+          .pop();
+
+        if (fulfilledWithItems) {
+          const syncedItems = fulfilledWithItems.value.data.orderItems.map(dbItem => mapDBItemToLocal(dbItem));
+          setCart(prev => {
+            const unsentLocal = prev.filter(p => !p.enviadoCocina || p.isVirtualDiscount);
+            return [...syncedItems, ...unsentLocal];
+          });
+        }
         
         triggerNotification("Productos entregados a la mesa.", "success");
     } catch (error) { 
@@ -708,6 +741,9 @@ export const usePosMutations = ({
           localStorage.removeItem(`lya_phones_${activeOrderId}`); 
           localStorage.removeItem(`lya_paid_${activeOrderId}`); 
         }
+        if (mesaActual?.id) {
+          localStorage.removeItem(`lya_draft_${mesaActual.id}`);
+        }
         setCart([]); setActiveOrderId(null); setOrderStatus('OPEN'); setPaidAccounts([]);
         if(onComplete) onComplete();
       } catch (error) { throw error; } 
@@ -717,14 +753,53 @@ export const usePosMutations = ({
       }
   };
 
+  // 🔥 LIBERAR CUENTA / SIGUIENTE VENTA EN MOSTRADOR (Elimina inmediatamente la cuenta de memoria para que no rebote)
   const releaseAccount = async (cuentaName) => {
     if (lockRef.current) return;
     lockRef.current = true;
     setIsProcessing(true);
 
+    const targetAcc = cuentaName || 'General';
+
     try {
+      let orderClosed = false;
       if (activeOrderId) {
-        await client.put(`/pos/orders/${activeOrderId}/close-account`, { cuentaName });
+        const res = await client.put(`/pos/orders/${activeOrderId}/close-account`, { cuentaName: targetAcc });
+        orderClosed = Boolean(res.data?.orderClosed);
+      }
+
+      // 1. Purgamos inmediatamente los ítems de la cuenta liberada en la UI
+      const remainingCart = cart.filter(
+        item => (item.cuenta || 'General') !== targetAcc && item.status !== 'CANCELLED' && !item.isVirtualDiscount
+      );
+
+      setCart(prev => prev.filter(item => (item.cuenta || 'General') !== targetAcc));
+
+      setPaidAccounts(prev => {
+        const updatedPaid = prev.filter(acc => acc !== targetAcc);
+        if (activeOrderId) {
+          if (updatedPaid.length > 0 && !orderClosed && remainingCart.length > 0) {
+            localStorage.setItem(`lya_paid_${activeOrderId}`, JSON.stringify(updatedPaid));
+          } else {
+            localStorage.removeItem(`lya_paid_${activeOrderId}`);
+          }
+        }
+        return updatedPaid;
+      });
+
+      // 2. Si era la última cuenta activa (como en Mostrador Express), reiniciamos la orden limpia
+      if (orderClosed || remainingCart.length === 0) {
+        if (activeOrderId) {
+          localStorage.removeItem(`lya_phones_${activeOrderId}`);
+          localStorage.removeItem(`lya_paid_${activeOrderId}`);
+        }
+        if (mesaActual?.id) {
+          localStorage.removeItem(`lya_draft_${mesaActual.id}`);
+        }
+        setCart([]);
+        setActiveOrderId(null);
+        setOrderStatus('OPEN');
+        setPaidAccounts([]);
       }
     } catch (error) {
       throw error;

@@ -246,7 +246,7 @@ export const addItemsToOrder = async (req, res) => {
 
     const allItems = await OrderItem.findAll({
       where: { orderId, status: 'ACTIVE' },
-      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
     });
 
     getIO().emit('pos:update');
@@ -274,7 +274,7 @@ export const getActiveOrderByTable = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false, 
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }] 
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }] 
         }
       ]
     });
@@ -310,14 +310,14 @@ export const closeOrder = async (req, res) => {
       await Table.update({ status: 'active' }, { where: { id: order.tableId } });
     }
     getIO().emit('pos:update');
-    res.json({ message: 'Mesa liberada y orden archivada.' });
+    res.json({ message: 'Mesa liberada y orden archivada.', orderClosed: true });
   } catch (error) { 
     res.status(500).json({ message: 'Error al cerrar mesa', error: error.message }); 
   }
 };
 
 // ==========================================
-// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta)
+// 🔒 CERRAR CUENTA INDIVIDUAL (Liberar Cuenta / Siguiente Venta)
 // ==========================================
 export const closeAccount = async (req, res) => {
   try {
@@ -341,15 +341,18 @@ export const closeAccount = async (req, res) => {
       }
     }
 
-    const allActiveItems = await OrderItem.findAll({ where: { orderId, status: 'ACTIVE' } });
-    const remainingVisible = allActiveItems.filter(item => {
-      try {
-        const n = JSON.parse(item.notes || '[]');
-        return !(Array.isArray(n) && n.some(x => x && x._isReleased));
-      } catch(e) { return true; }
+    const allActiveItems = await OrderItem.findAll({
+      where: { orderId, status: 'ACTIVE' },
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
     });
 
+    const remainingVisible = allActiveItems
+      .map(extractPromoMeta)
+      .filter(item => !item._isReleased);
+
+    let orderClosed = false;
     if (remainingVisible.length === 0) {
+      orderClosed = true;
       const order = await Order.findByPk(orderId);
       if (order && order.status !== 'CLOSED') {
         await order.update({ status: 'CLOSED' });
@@ -360,7 +363,12 @@ export const closeAccount = async (req, res) => {
     }
 
     getIO().emit('pos:update');
-    return res.status(200).json({ success: true, message: `La cuenta ${cuentaName} ha sido liberada exitosamente.` });
+    return res.status(200).json({
+      success: true,
+      orderClosed,
+      orderItems: remainingVisible,
+      message: `La cuenta ${cuentaName} ha sido liberada exitosamente.`
+    });
   } catch (error) {
     console.error("Error al cerrar la cuenta:", error);
     return res.status(500).json({ message: "Error interno al liberar la cuenta." });
@@ -381,7 +389,7 @@ export const getActiveOrders = async (req, res) => {
           as: 'items', 
           where: { status: 'ACTIVE' },
           required: false,
-          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }] 
+          include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }] 
         } 
       ]
     });
@@ -442,7 +450,6 @@ export const moveItemAccount = async (req, res) => {
       ? Number(metaObj?.precioOriginal || item.product?.basePrice || originalUnitPrice)
       : originalUnitPrice;
 
-    // 🔥 RASTREO DE TRANSFERENCIAS ENTRE CUENTAS (Para vista del cliente)
     const prevTransfers = Array.isArray(metaObj?.transfers) ? metaObj.transfers.map(t => ({ ...t })) : [];
     const totalPrevTransferred = prevTransfers.reduce((sum, t) => sum + Number(t.qty || 0), 0);
     const ownUnitsInSource = Math.max(0, item.quantity - totalPrevTransferred);
@@ -465,7 +472,6 @@ export const moveItemAccount = async (req, res) => {
       if (take > 0) {
         t.qty -= take;
         remToTakeFromPrev -= take;
-        // Si no está regresando a la cuenta original del dueño, actualizamos el nuevo destino
         if (cleanAccountBase(t.fromCuenta) !== cleanAccountBase(targetCuenta)) {
           movedTransfers.push({
             fromCuenta: t.fromCuenta,
@@ -568,7 +574,6 @@ export const moveItemAccount = async (req, res) => {
       }
     }
 
-    // 🔥 Si al mover este ítem se rompió una promoción de otro ítem en la cuenta origen, revertimos su precio a normal
     if (Array.isArray(revokePromos) && revokePromos.length > 0) {
       for (const rev of revokePromos) {
         const ghostItem = await OrderItem.findByPk(rev.itemId, {
@@ -631,7 +636,7 @@ export const moveItemAccount = async (req, res) => {
 
     const allItems = await OrderItem.findAll({
       where: { orderId: item.orderId, status: 'ACTIVE' },
-      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl'] }]
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
     });
 
     const newOrderTotal = allItems.reduce((sum, i) => sum + Number(i.subtotal), 0);
@@ -657,16 +662,26 @@ export const deliverAllItems = async (req, res) => {
       { kitchenStatus: 'DELIVERED' },
       { where: { orderId: id, status: 'ACTIVE', kitchenStatus: 'READY' } }
     );
+
+    const allItems = await OrderItem.findAll({
+      where: { orderId: id, status: 'ACTIVE' },
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
+    });
+    const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
+
     getIO().emit('orderDeliveredAll', { orderId: id });
     getIO().emit('pos:update');
-    res.json({ message: 'Todos los productos listos han sido marcados como entregados' });
+    res.json({
+      message: 'Todos los productos listos han sido marcados como entregados',
+      orderItems: cleanItems
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error al marcar todo como entregado' });
   }
 };
 
 // ==========================================
-// 🍕🔥 DIVISIÓN DE ENTREGAS (Split Deliver)
+// 🍕🔥 DIVISIÓN DE ENTREGAS (Split Deliver Idempotente)
 // ==========================================
 export const splitDeliverItem = async (req, res) => {
   try {
@@ -675,9 +690,24 @@ export const splitDeliverItem = async (req, res) => {
     
     const item = await OrderItem.findByPk(itemId);
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
-    if (item.kitchenStatus === 'DELIVERED') return res.status(400).json({ message: 'El producto ya está entregado' });
 
-    if (qtyToDeliver >= item.quantity) {
+    // 🔥 FIX: Si el producto ya estaba en DELIVERED, respondemos 200 OK de forma idempotente (sin error 400)
+    if (item.kitchenStatus === 'DELIVERED') {
+      const currentItems = await OrderItem.findAll({
+        where: { orderId: item.orderId, status: 'ACTIVE' },
+        include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
+      });
+      const cleanCurrent = currentItems.map(extractPromoMeta).filter(i => !i._isReleased);
+      return res.status(200).json({
+        message: 'El producto ya se encontraba entregado',
+        alreadyDelivered: true,
+        orderItems: cleanCurrent
+      });
+    }
+
+    const safeQty = Number(qtyToDeliver) || item.quantity;
+
+    if (safeQty >= item.quantity) {
       await item.update({ kitchenStatus: 'DELIVERED' });
     } else {
       const unitPrice = Number(item.subtotal) / item.quantity;
@@ -690,12 +720,12 @@ export const splitDeliverItem = async (req, res) => {
       const metaIdx = moveNotes.findIndex(n => n && n._isPromoMeta);
       if (metaIdx >= 0) { metaObj = moveNotes.splice(metaIdx, 1)[0]; }
 
-      const deliveredNotes = moveNotes.slice(0, qtyToDeliver);
-      const remainingNotes = moveNotes.slice(qtyToDeliver);
+      const deliveredNotes = moveNotes.slice(0, safeQty);
+      const remainingNotes = moveNotes.slice(safeQty);
 
       if (metaObj) {
         const prevTransfers = Array.isArray(metaObj.transfers) ? metaObj.transfers.map(t => ({ ...t })) : [];
-        let remDel = qtyToDeliver;
+        let remDel = safeQty;
         const delTransfers = [];
         for (const t of prevTransfers) {
           if (remDel <= 0) break;
@@ -712,16 +742,16 @@ export const splitDeliverItem = async (req, res) => {
       }
 
       await item.update({ 
-        quantity: item.quantity - qtyToDeliver, 
-        subtotal: unitPrice * (item.quantity - qtyToDeliver), 
+        quantity: item.quantity - safeQty, 
+        subtotal: unitPrice * (item.quantity - safeQty), 
         notes: JSON.stringify(remainingNotes) 
       });
 
       await OrderItem.create({ 
         orderId: item.orderId, 
         productId: item.productId, 
-        quantity: qtyToDeliver, 
-        subtotal: unitPrice * qtyToDeliver, 
+        quantity: safeQty, 
+        subtotal: unitPrice * safeQty, 
         cuenta: item.cuenta, 
         notes: JSON.stringify(deliveredNotes), 
         kitchenStatus: 'DELIVERED',
@@ -730,8 +760,15 @@ export const splitDeliverItem = async (req, res) => {
       });
     }
 
+    // 🔥 Devolvemos siempre los ítems actualizados con sus nuevos IDs para que el frontend no pierda sincronía
+    const allItems = await OrderItem.findAll({
+      where: { orderId: item.orderId, status: 'ACTIVE' },
+      include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
+    });
+    const cleanItems = allItems.map(extractPromoMeta).filter(i => !i._isReleased);
+
     getIO().emit('pos:update');
-    res.json({ message: 'Entrega parcial registrada con éxito' });
+    res.json({ message: 'Entrega registrada con éxito', orderItems: cleanItems });
   } catch (error) {
     console.error("Error en splitDeliverItem:", error);
     res.status(500).json({ message: 'Error al registrar entrega', error: error.message });
@@ -759,7 +796,6 @@ export const checkOrderStatus = async (req, res) => {
       });
     }
 
-    // 1. Buscar productos propios de esta cuenta
     const itemsCuenta = targetCuenta ? allOrderItems.filter(i => {
       if (order.orderType === 'LLEVAR') return (i.cuenta || 'General') === 'General';
       return i.cuenta === targetCuenta || cleanAccountBase(i.cuenta) === targetBase;
@@ -767,7 +803,6 @@ export const checkOrderStatus = async (req, res) => {
 
     const activeOwnItems = itemsCuenta.filter(i => i.status === 'ACTIVE');
 
-    // 2. Buscar productos que fueron trasladados desde esta cuenta hacia otra cuenta de la mesa
     const transferredItems = [];
     const transferredToSet = new Set();
 
