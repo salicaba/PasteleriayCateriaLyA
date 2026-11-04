@@ -611,7 +611,7 @@ export const LoginScreen = ({ onLogin }) => {
                     </motion.div>
                   </motion.form>
                 ) : (
-                  /* VISTA DE RECUPERACIÓN / ACCESO RESTRINGIDO */
+                  /* VISTA RECUPERACIÓN / ACCESO RESTRINGIDO */
                   <motion.div 
                     key="forgot-form"
                     initial={{ opacity: 0, x: 10 }} 
