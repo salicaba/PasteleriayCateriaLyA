@@ -1043,3 +1043,4 @@ export const CashRegisterPage = ({ user }) => {
     </motion.div>
   );
 };
+// Probar
