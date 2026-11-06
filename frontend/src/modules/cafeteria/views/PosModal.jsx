@@ -1,7 +1,7 @@
 // frontend/src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift, Sparkles, Layers, Tag, Filter } from 'lucide-react';
+import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift, Sparkles, Layers, Tag, Filter, Receipt } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -29,9 +29,19 @@ const parseAccountName = (str) => {
   return s;
 };
 
+// ✨ Incluye la explicación detallada para TICKET_DISCOUNT
 const getPromoRuleDescription = (promo) => {
   if (!promo) return '';
   const type = promo.type;
+  if (type === 'TICKET_DISCOUNT') {
+    const minAmount = Number(promo.minTicketAmount || promo.min_ticket_amount || 0);
+    const disc = Number(promo.discountValue || promo.discount_value || 0);
+    const isPct = (promo.discountType || promo.discount_type) === 'PERCENTAGE';
+    const benefit = isPct ? `un ${disc}% de descuento` : `$${disc.toFixed(2)} de descuento`;
+    return minAmount > 0
+      ? `Al acumular $${minAmount.toFixed(2)} o más de cualquier producto en una misma cuenta, se aplica automáticamente ${benefit} sobre el total.`
+      : `Se aplica automáticamente ${benefit} sobre el total de la cuenta.`;
+  }
   if (type === 'NxM') {
     const buy = promo.buyQty || promo.buy_qty || 3;
     const pay = promo.payQty || promo.pay_qty || 2;
@@ -65,6 +75,11 @@ const getPromoRuleDescription = (promo) => {
 const getShortPromoLabel = (promo) => {
   if (!promo) return 'Promo';
   const type = promo.type;
+  if (type === 'TICKET_DISCOUNT') {
+    const disc = Number(promo.discountValue || promo.discount_value || 0);
+    const isPct = (promo.discountType || promo.discount_type) === 'PERCENTAGE';
+    return isPct ? `-${disc}% en Ticket` : `-$${disc.toFixed(0)} en Ticket`;
+  }
   if (type === 'NxM') return `${promo.buyQty || promo.buy_qty || 3}x${promo.payQty || promo.pay_qty || 2}`;
   if (type === 'FIXED') return `-$${Number(promo.discountValue || promo.discount_value || 0).toFixed(0)}`;
   if (type === 'NTH_FIXED') return `${promo.buyQty || promo.buy_qty || 2}ª con Desc.`;
@@ -138,12 +153,14 @@ export const PosModal = ({
 
   const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
+  // ✨ Ahora incluye tanto las promos de productos como las promos de TICKET_DISCOUNT activas hoy
   const validTodayPromos = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
       : (activePromotions?.data || activePromotions?.promotions || []);
 
-    const today = new Date().getDay();
+    const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const today = new Date(nowInChiapasStr).getDay();
 
     return promosArray.filter(p => {
       const rawActive = p.isActive ?? p.is_active ?? p.status;
@@ -160,6 +177,22 @@ export const PosModal = ({
       if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) return false;
       return true;
     }).map(p => {
+      const isTicketDiscount = p.type === 'TICKET_DISCOUNT';
+
+      if (isTicketDiscount) {
+        return {
+          promo: p,
+          colorScheme: {
+            badge: 'bg-emerald-600 text-white',
+            btn: 'bg-emerald-600 text-white shadow-emerald-500/30 md:hover:bg-emerald-700',
+            bannerBg: 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/60'
+          },
+          products: [],
+          isCombinable: true,
+          isTicketDiscount: true
+        };
+      }
+
       const triggerIds = (Array.isArray(p.applyToProducts) && p.applyToProducts.length > 0)
         ? p.applyToProducts.map(id => String(id).toLowerCase())
         : [String(p.productId || p.product_id || '').toLowerCase()];
@@ -173,13 +206,22 @@ export const PosModal = ({
         promo: p,
         colorScheme: getPromoColor(p.id),
         products: matchingProducts,
-        isCombinable: matchingProducts.length > 1
+        isCombinable: matchingProducts.length > 1,
+        isTicketDiscount: false
       };
-    }).filter(item => item.products.length > 0);
+    }).filter(item => item.isTicketDiscount || item.products.length > 0);
   }, [activePromotions, allGlobalProducts, isVitrina]);
 
+  // Promociones de descuento por ticket activas hoy (ordenadas de menor a mayor requisito)
+  const activeTicketPromos = useMemo(() => {
+    return validTodayPromos
+      .filter(item => item.isTicketDiscount)
+      .map(item => item.promo)
+      .sort((a, b) => Number(a.minTicketAmount || a.min_ticket_amount || 0) - Number(b.minTicketAmount || b.min_ticket_amount || 0));
+  }, [validTodayPromos]);
+
   const handleTogglePromoFilter = (promo) => {
-    if (!promo) {
+    if (!promo || promo.type === 'TICKET_DISCOUNT') {
       setPromoFiltro(null);
       return;
     }
@@ -205,6 +247,14 @@ export const PosModal = ({
   const cuentasPagadasReales = Array.from(new Set([...(paidAccounts || [])]));
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
+
+  // Subtotal físico acumulado en la cuenta activa para calcular el progreso hacia el Descuento por Ticket
+  const activeAccountPhysicalSubtotal = useMemo(() => {
+    const targetAcc = cuentaActiva || 'General';
+    return activeCart
+      .filter(i => (i.cuenta || 'General') === targetAcc && !i.isVirtualDiscount)
+      .reduce((sum, i) => sum + ((Number(i.precio) || 0) * (i.qty || 1)), 0);
+  }, [activeCart, cuentaActiva]);
 
   const cleanCuentasDisponibles = cuentasDisponibles.filter(cuenta => {
     const itemsDeCuenta = cart.filter(i => (i.cuenta || 'General') === cuenta);
@@ -476,6 +526,16 @@ export const PosModal = ({
   const activeFilterColorScheme = promoFiltro ? getPromoColor(promoFiltro.id) : null;
   const isFilteredPromoCombinable = promoFiltro && Array.isArray(promoFiltro.applyToProducts) && promoFiltro.applyToProducts.length > 1;
 
+  // Calculamos el estado actual del Descuento por Ticket para mostrarlo en el cintillo informativo
+  const ticketPromoStatus = useMemo(() => {
+    if (activeTicketPromos.length === 0) return null;
+    const qualifying = [...activeTicketPromos]
+      .reverse()
+      .find(p => activeAccountPhysicalSubtotal >= Number(p.minTicketAmount || p.min_ticket_amount || 0));
+    const nextTarget = activeTicketPromos.find(p => activeAccountPhysicalSubtotal < Number(p.minTicketAmount || p.min_ticket_amount || 0));
+    return { qualifying, nextTarget, primary: nextTarget || qualifying || activeTicketPromos[0] };
+  }, [activeTicketPromos, activeAccountPhysicalSubtotal]);
+
   const posContent = (
     <div className={`relative h-full w-full flex-1 flex flex-col md:flex-row bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300 overflow-hidden ${!inline ? 'md:rounded-[2.5rem] shadow-2xl lya:border lya:border-lya-border/40' : 'rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/30'}`}>
       
@@ -564,7 +624,46 @@ export const PosModal = ({
 
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative flex flex-col">
             
-            {/* ✨ CINTILLO DE FILTRO DE PROMOCIÓN ACTIVO (Sin animación de height para evitar reflujo del DOM) */}
+            {/* ✨ AVISO INTELIGENTE DE PROMO DE DESCUENTO POR TICKET ACTIVA HOY */}
+            {ticketPromoStatus && !promoFiltro && (
+              <div className="mb-4 shrink-0">
+                <div className="p-3 sm:px-4 sm:py-3 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
+                  <div className="flex items-start sm:items-center gap-2.5">
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-sm">
+                      <Receipt size={12} strokeWidth={2.5} />
+                      {getShortPromoLabel(ticketPromoStatus.primary)}
+                    </span>
+                    <div className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-snug">
+                      <span className="font-black text-emerald-700 dark:text-emerald-400 mr-1.5">
+                        {ticketPromoStatus.primary.name || 'Promo en Ticket'}:
+                      </span>
+                      {getPromoRuleDescription(ticketPromoStatus.primary)}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    {ticketPromoStatus.qualifying ? (
+                      <span className="px-2.5 py-1 rounded-xl bg-emerald-600/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px] font-black border border-emerald-500/30">
+                        ✅ Aplicado en {parseAccountName(cuentaActiva)}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-xl bg-white/90 dark:bg-gray-900/70 text-gray-700 dark:text-gray-300 text-[11px] font-black border border-emerald-200 dark:border-emerald-800/50">
+                        Faltan ${Math.max(0, Number(ticketPromoStatus.primary.minTicketAmount || ticketPromoStatus.primary.min_ticket_amount || 0) - activeAccountPhysicalSubtotal).toFixed(2)} en {parseAccountName(cuentaActiva)}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPromoGuide(true)}
+                      className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 underline underline-offset-2 md:hover:opacity-80 px-1"
+                    >
+                      Ver detalles
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ✨ CINTILLO DE FILTRO DE PROMOCIÓN ACTIVO */}
             {promoFiltro && activeFilterColorScheme && (
               <motion.div
                 key={`banner-${promoFiltro.id}`}
@@ -608,7 +707,7 @@ export const PosModal = ({
               </motion.div>
             )}
 
-            {/* ✨ CUADRÍCULA CON KEY DINÁMICA: Garantiza que todas las tarjetas animen parejo siempre */}
+            {/* ✨ CUADRÍCULA CON KEY DINÁMICA */}
             <div
               key={`grid-${categoriaActiva}-${promoFiltro?.id || 'all'}`}
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
@@ -741,7 +840,7 @@ export const PosModal = ({
                       ¿Cómo funcionan las Promociones?
                     </h3>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                      Guía rápida de colores y combinaciones en el menú
+                      Guía rápida de colores, combinaciones y descuentos por ticket
                     </p>
                   </div>
                 </div>
@@ -754,7 +853,7 @@ export const PosModal = ({
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
                       <span className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-[11px]">1</span>
@@ -777,11 +876,21 @@ export const PosModal = ({
 
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
-                      <span className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-[11px]">3</span>
+                      <span className="w-6 h-6 rounded-lg bg-violet-500 text-white flex items-center justify-center text-[11px]">3</span>
                       Aplicación Automática
                     </div>
                     <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
                       Solo agrega los productos a la misma cuenta de la comanda. Al cumplirse la cantidad requerida, el sistema aplicará el descuento o abrirá el regalo automáticamente.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px]">4</span>
+                      Descuento por Ticket / Cuenta
+                    </div>
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
+                      Cuando hay una promo por <strong>monto mínimo de ticket</strong>, suma cualquier producto del menú en una misma cuenta y al llegar a la meta se descontará el monto o porcentaje automáticamente.
                     </p>
                   </div>
                 </div>
@@ -799,54 +908,72 @@ export const PosModal = ({
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {validTodayPromos.map(({ promo, colorScheme, products, isCombinable }) => (
-                        <div
-                          key={promo.id}
-                          className={`p-4 rounded-2xl border-2 transition-all ${colorScheme.bannerBg}`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                              <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${colorScheme.badge}`}>
-                                {isCombinable ? <Layers size={12} strokeWidth={3} /> : <Tag size={12} strokeWidth={3} />}
-                                {getShortPromoLabel(promo)}
-                              </span>
-                              <span className="font-black text-sm text-gray-900 dark:text-white lya:text-lya-text">
-                                {promo.name}
-                              </span>
-                              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/90 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 border border-black/5">
-                                {isCombinable ? `🔗 Combinable (${products.length} productos)` : '🎯 Producto individual'}
-                              </span>
+                      {validTodayPromos.map(({ promo, colorScheme, products, isCombinable, isTicketDiscount }) => {
+                        const minAmount = Number(promo.minTicketAmount || promo.min_ticket_amount || 0);
+
+                        return (
+                          <div
+                            key={promo.id}
+                            className={`p-4 rounded-2xl border-2 transition-all ${colorScheme.bannerBg}`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${colorScheme.badge}`}>
+                                  {isTicketDiscount ? <Receipt size={12} strokeWidth={2.5} /> : isCombinable ? <Layers size={12} strokeWidth={3} /> : <Tag size={12} strokeWidth={3} />}
+                                  {getShortPromoLabel(promo)}
+                                </span>
+                                <span className="font-black text-sm text-gray-900 dark:text-white lya:text-lya-text">
+                                  {promo.name}
+                                </span>
+                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/90 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 border border-black/5">
+                                  {isTicketDiscount
+                                    ? `🧾 Descuento por Ticket (Mín. $${minAmount.toFixed(2)})`
+                                    : isCombinable
+                                      ? `🔗 Combinable (${products.length} productos)`
+                                      : '🎯 Producto individual'}
+                                </span>
+                              </div>
+
+                              {!isTicketDiscount && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPromoFiltro(promo);
+                                    setShowPromoGuide(false);
+                                  }}
+                                  className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-sm transition-transform active:scale-95 shrink-0 ${colorScheme.btn}`}
+                                >
+                                  <Filter size={13} strokeWidth={2.5} />
+                                  Ver en el menú
+                                </button>
+                              )}
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPromoFiltro(promo);
-                                setShowPromoGuide(false);
-                              }}
-                              className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-sm transition-transform active:scale-95 shrink-0 ${colorScheme.btn}`}
-                            >
-                              <Filter size={13} strokeWidth={2.5} />
-                              Ver en el menú
-                            </button>
-                          </div>
+                            <p className="text-xs font-bold text-gray-700 dark:text-gray-200 mb-2.5">
+                              {getPromoRuleDescription(promo)}
+                            </p>
 
-                          <p className="text-xs font-bold text-gray-700 dark:text-gray-200 mb-2.5">
-                            {getPromoRuleDescription(promo)}
-                          </p>
-
-                          <div className="flex flex-wrap gap-1.5">
-                            {products.map(prod => (
-                              <span
-                                key={prod.id}
-                                className="px-2.5 py-1 rounded-lg bg-white/80 dark:bg-gray-900/70 text-gray-800 dark:text-gray-200 text-[11px] font-bold border border-black/5 dark:border-white/10"
-                              >
-                                {prod.nombre || prod.name}
-                              </span>
-                            ))}
+                            {isTicketDiscount ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="px-3 py-1 rounded-lg bg-white/85 dark:bg-gray-900/75 text-emerald-700 dark:text-emerald-300 text-[11px] font-black border border-emerald-500/20">
+                                  ✨ Participan todos los productos del menú dentro de la misma cuenta
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {products.map(prod => (
+                                  <span
+                                    key={prod.id}
+                                    className="px-2.5 py-1 rounded-lg bg-white/80 dark:bg-gray-900/70 text-gray-800 dark:text-gray-200 text-[11px] font-bold border border-black/5 dark:border-white/10"
+                                  >
+                                    {prod.nombre || prod.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
