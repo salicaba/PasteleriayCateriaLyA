@@ -1,26 +1,37 @@
 // frontend/src/modules/cafeteria/views/ProductCard.jsx
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Loader2, Lock, Flame, Tag } from 'lucide-react';
+import { Plus, Loader2, Lock, Flame, Tag, Layers } from 'lucide-react';
 
-const PROMO_COLORS = [
-  { border: 'border-rose-400/60 dark:border-rose-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)]', badge: 'bg-rose-500 text-white', btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600', text: 'text-rose-600 dark:text-rose-400' },
-  { border: 'border-blue-400/60 dark:border-blue-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.2)]', badge: 'bg-blue-500 text-white', btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600', text: 'text-blue-600 dark:text-blue-400' },
-  { border: 'border-emerald-400/60 dark:border-emerald-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.2)]', badge: 'bg-emerald-500 text-white', btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600', text: 'text-emerald-600 dark:text-emerald-400' },
-  { border: 'border-violet-400/60 dark:border-violet-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(139,92,246,0.2)]', badge: 'bg-violet-500 text-white', btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600', text: 'text-violet-600 dark:text-violet-400' },
-  { border: 'border-amber-400/60 dark:border-amber-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.2)]', badge: 'bg-amber-500 text-white', btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600', text: 'text-amber-600 dark:text-amber-400' }
+export const PROMO_COLORS = [
+  { name: 'Rosa', border: 'border-rose-400/60 dark:border-rose-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(244,63,94,0.2)]', badge: 'bg-rose-500 text-white', btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600', text: 'text-rose-600 dark:text-rose-400', bannerBg: 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/50' },
+  { name: 'Azul', border: 'border-blue-400/60 dark:border-blue-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(59,130,246,0.2)]', badge: 'bg-blue-500 text-white', btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600', text: 'text-blue-600 dark:text-blue-400', bannerBg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50' },
+  { name: 'Esmeralda', border: 'border-emerald-400/60 dark:border-emerald-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(16,185,129,0.2)]', badge: 'bg-emerald-500 text-white', btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600', text: 'text-emerald-600 dark:text-emerald-400', bannerBg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50' },
+  { name: 'Violeta', border: 'border-violet-400/60 dark:border-violet-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(139,92,246,0.2)]', badge: 'bg-violet-500 text-white', btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600', text: 'text-violet-600 dark:text-violet-400', bannerBg: 'bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800/50' },
+  { name: 'Ámbar', border: 'border-amber-400/60 dark:border-amber-500/30', shadowHover: 'md:hover:shadow-[0_10px_30px_rgba(245,158,11,0.2)]', badge: 'bg-amber-500 text-white', btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600', text: 'text-amber-600 dark:text-amber-400', bannerBg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50' }
 ];
 
-const getPromoColor = (promoId) => {
+export const getPromoColor = (promoId) => {
   if (!promoId) return PROMO_COLORS[0];
   let hash = 0;
-  for (let i = 0; i < promoId.length; i++) {
-    hash = promoId.charCodeAt(i) + ((hash << 5) - hash);
+  const str = String(promoId);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
   return PROMO_COLORS[Math.abs(hash) % PROMO_COLORS.length];
 };
 
-export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, cartQty = 0, onLimitReached, activePromotions = [] }) => {
+export const ProductCard = ({ 
+  product, 
+  onClick, 
+  onQuickAdd, 
+  isLocked = false, 
+  cartQty = 0, 
+  onLimitReached, 
+  activePromotions = [],
+  onPromoClick, // ✨ Nuevo prop para filtrar al tocar la etiqueta de promo
+  isPromoFiltered = false // ✨ Indica si esta promo está siendo filtrada actualmente
+}) => {
   const [imgError, setImgError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   
@@ -123,6 +134,12 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
   const activePromo = promoData?.promo;
   const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
 
+  // Detectamos si es una promoción combinable (más de 1 producto asignado)
+  const isCombinablePromo = useMemo(() => {
+    if (!activePromo) return false;
+    return Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 1;
+  }, [activePromo]);
+
   // 🔥 FIX: En FIXED se resta discountVal al precio del producto
   const promoFixedPrice = useMemo(() => {
     if (!activePromo || activePromo.type !== 'FIXED') return 0;
@@ -210,6 +227,13 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
     }
   };
 
+  const handlePromoBadgeClick = (e) => {
+    e.stopPropagation();
+    if (onPromoClick && activePromo) {
+      onPromoClick(activePromo);
+    }
+  };
+
   const pName = product.nombre || product.name || 'Producto';
 
   return (
@@ -250,10 +274,17 @@ export const ProductCard = ({ product, onClick, onQuickAdd, isLocked = false, ca
       <div className="h-28 w-full rounded-[1.25rem] bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg mb-3 flex items-center justify-center overflow-hidden p-2 relative group transition-colors shadow-inner shrink-0">
         
         {activePromo && !isAgotado && (
-          <div className={`absolute top-2 left-2 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-widest ${colorScheme.badge}`}>
-            <Tag size={10} strokeWidth={3} />
-            {promoBadgeText}
-          </div>
+          <button
+            type="button"
+            onClick={handlePromoBadgeClick}
+            title={isCombinablePromo ? "Promo combinable: Toca para filtrar todos los productos de este mismo color" : "Toca para filtrar esta promoción"}
+            className={`absolute top-2 left-2 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-widest transition-transform md:hover:scale-105 active:scale-95 outline-none ${colorScheme.badge} ${
+              isPromoFiltered ? 'ring-2 ring-white dark:ring-gray-900 shadow-xl' : ''
+            }`}
+          >
+            {isCombinablePromo ? <Layers size={10} strokeWidth={3} /> : <Tag size={10} strokeWidth={3} />}
+            <span>{promoBadgeText}</span>
+          </button>
         )}
 
         {showScarcity && (

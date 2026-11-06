@@ -9,6 +9,7 @@ export const usePosMenu = (isVitrina) => {
   const [activePromotions, setActivePromotions] = useState([]); 
   const [filtroTexto, setFiltroTexto] = useState('');
   const [categoriaActiva, setCategoriaActiva] = useState('todas');
+  const [promoFiltro, setPromoFiltro] = useState(null); // ✨ Estado para filtrar por promoción/color
 
   const loadData = useCallback(async () => {
     try {
@@ -104,16 +105,36 @@ export const usePosMenu = (isVitrina) => {
     };
   }, [loadData]);
 
+  // Si el usuario cambia de categoría manualmente, limpiamos el filtro de promoción
+  const handleSelectCategoria = useCallback((catId) => {
+    setCategoriaActiva(catId);
+    setPromoFiltro(null);
+  }, []);
+
   const filteredProducts = useMemo(() => {
     return dbProducts.filter(p => {
-       const productName = p.nombre || p.name || '';
-       const matchText = productName.toLowerCase().includes((filtroTexto || '').toLowerCase());
-       const matchCat = categoriaActiva === 'todas' || p.categoria === categoriaActiva || p.categoryId === categoriaActiva;
-       
-       if (isVitrina) return matchText && matchCat && p.requiereCocina === false;
-       return matchText && matchCat;
+      const productName = p.nombre || p.name || '';
+      const matchText = productName.toLowerCase().includes((filtroTexto || '').toLowerCase());
+
+      // ✨ Si hay una promoción seleccionada, mostramos todos los productos que participan en ella (sin importar categoría)
+      if (promoFiltro) {
+        const pIdStr = String(p.id).toLowerCase();
+        const isSingle = String(promoFiltro.productId || promoFiltro.product_id || '').toLowerCase() === pIdStr;
+        const isTrigger = Array.isArray(promoFiltro.applyToProducts) && promoFiltro.applyToProducts.length > 0
+          ? promoFiltro.applyToProducts.map(id => String(id).toLowerCase()).includes(pIdStr)
+          : isSingle;
+
+        if (!isTrigger) return false;
+        if (isVitrina) return matchText && p.requiereCocina === false;
+        return matchText;
+      }
+
+      const matchCat = categoriaActiva === 'todas' || p.categoria === categoriaActiva || p.categoryId === categoriaActiva;
+      
+      if (isVitrina) return matchText && matchCat && p.requiereCocina === false;
+      return matchText && matchCat;
     });
-  }, [filtroTexto, categoriaActiva, dbProducts, isVitrina]);
+  }, [filtroTexto, categoriaActiva, dbProducts, isVitrina, promoFiltro]);
 
   return {
     dbProducts, 
@@ -122,7 +143,9 @@ export const usePosMenu = (isVitrina) => {
     filtroTexto, 
     setFiltroTexto,
     categoriaActiva, 
-    setCategoriaActiva,
+    setCategoriaActiva: handleSelectCategoria,
+    promoFiltro,
+    setPromoFiltro,
     filteredProducts
   };
 };
