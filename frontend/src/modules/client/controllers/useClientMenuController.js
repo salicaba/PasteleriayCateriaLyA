@@ -15,6 +15,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   const [isLoading, setIsLoading] = useState(true);
   
   const [activeCategory, setActiveCategory] = useState('todas');
+  const [promoFiltro, setPromoFiltro] = useState(null); // ✨ Estado para filtrar por promoción/color
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -568,9 +569,26 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     };
   }, [loadMenuData]);
 
+  // ✨ Al cambiar de categoría en el Header, limpiamos cualquier filtro de promoción activo
+  const handleSelectCategory = useCallback((catId) => {
+    setActiveCategory(catId);
+    setPromoFiltro(null);
+  }, []);
+
   const activeCatObj = categories.find(c => c.id === activeCategory);
   const isTodasCategory = !activeCategory || activeCategory === 'todas' || (activeCatObj && activeCatObj.name?.trim().toLowerCase() === 'todas');
-  const visibleProducts = isTodasCategory ? products : products.filter(p => p.categoria === activeCategory);
+
+  const visibleProducts = useMemo(() => {
+    if (promoFiltro) {
+      const pIdSingle = String(promoFiltro.productId || promoFiltro.product_id || '').toLowerCase();
+      const triggerIds = (Array.isArray(promoFiltro.applyToProducts) && promoFiltro.applyToProducts.length > 0)
+        ? promoFiltro.applyToProducts.map(id => String(id).toLowerCase())
+        : [pIdSingle];
+
+      return products.filter(p => triggerIds.includes(String(p.id).toLowerCase()));
+    }
+    return isTodasCategory ? products : products.filter(p => p.categoria === activeCategory);
+  }, [products, isTodasCategory, activeCategory, promoFiltro]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -713,7 +731,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   };
 
   return {
-    categories, products, isLoading, activeCategory, setActiveCategory,
+    categories, products, isLoading,
+    activeCategory, setActiveCategory: handleSelectCategory,
+    promoFiltro, setPromoFiltro,
     showCheckout, setShowCheckout, selectedProduct, setSelectedProduct,
     showSettings, setShowSettings, showLogoutConfirm, setShowLogoutConfirm,
     themeIndex, sizeIndex, isSubmitting, addingToCartId, notification,

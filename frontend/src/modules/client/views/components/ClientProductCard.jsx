@@ -1,18 +1,18 @@
 // src/modules/client/views/components/ClientProductCard.jsx
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Image as ImageIcon, Flame, Gift, Tag, Lock, Plus, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Flame, Gift, Tag, Lock, Plus, Loader2, Layers } from 'lucide-react';
 import { getProductModifiers } from '../utils/clientMenuUtils';
 
-const PROMO_COLORS = [
-  { border: 'border-rose-400/60 dark:border-rose-500/40 lya:border-rose-400/60', badge: 'bg-rose-500 text-white', btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600', text: 'text-rose-500 dark:text-rose-400' },
-  { border: 'border-blue-400/60 dark:border-blue-500/40 lya:border-blue-400/60', badge: 'bg-blue-500 text-white', btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600', text: 'text-blue-600 dark:text-blue-400' },
-  { border: 'border-emerald-400/60 dark:border-emerald-500/40 lya:border-emerald-400/60', badge: 'bg-emerald-500 text-white', btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600', text: 'text-emerald-600 dark:text-emerald-400' },
-  { border: 'border-violet-400/60 dark:border-violet-500/40 lya:border-violet-400/60', badge: 'bg-violet-500 text-white', btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600', text: 'text-violet-600 dark:text-violet-400' },
-  { border: 'border-amber-400/60 dark:border-amber-500/40 lya:border-amber-400/60', badge: 'bg-amber-500 text-white', btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600', text: 'text-amber-600 dark:text-amber-400' }
+export const PROMO_COLORS = [
+  { name: 'Rosa', border: 'border-rose-400/60 dark:border-rose-500/40 lya:border-rose-400/60', badge: 'bg-rose-500 text-white', btn: 'bg-rose-500 text-white shadow-rose-500/30 md:hover:bg-rose-600', text: 'text-rose-500 dark:text-rose-400', bannerBg: 'bg-rose-50 dark:bg-rose-950/40 lya:bg-rose-50/90 border-rose-200 dark:border-rose-800/50 lya:border-rose-300' },
+  { name: 'Azul', border: 'border-blue-400/60 dark:border-blue-500/40 lya:border-blue-400/60', badge: 'bg-blue-500 text-white', btn: 'bg-blue-500 text-white shadow-blue-500/30 md:hover:bg-blue-600', text: 'text-blue-600 dark:text-blue-400', bannerBg: 'bg-blue-50 dark:bg-blue-950/40 lya:bg-blue-50/90 border-blue-200 dark:border-blue-800/50 lya:border-blue-300' },
+  { name: 'Esmeralda', border: 'border-emerald-400/60 dark:border-emerald-500/40 lya:border-emerald-400/60', badge: 'bg-emerald-500 text-white', btn: 'bg-emerald-500 text-white shadow-emerald-500/30 md:hover:bg-emerald-600', text: 'text-emerald-600 dark:text-emerald-400', bannerBg: 'bg-emerald-50 dark:bg-emerald-950/40 lya:bg-emerald-50/90 border-emerald-200 dark:border-emerald-800/50 lya:border-emerald-300' },
+  { name: 'Violeta', border: 'border-violet-400/60 dark:border-violet-500/40 lya:border-violet-400/60', badge: 'bg-violet-500 text-white', btn: 'bg-violet-500 text-white shadow-violet-500/30 md:hover:bg-violet-600', text: 'text-violet-600 dark:text-violet-400', bannerBg: 'bg-violet-50 dark:bg-violet-950/40 lya:bg-violet-50/90 border-violet-200 dark:border-violet-800/50 lya:border-violet-300' },
+  { name: 'Ámbar', border: 'border-amber-400/60 dark:border-amber-500/40 lya:border-amber-400/60', badge: 'bg-amber-500 text-white', btn: 'bg-amber-500 text-white shadow-amber-500/30 md:hover:bg-amber-600', text: 'text-amber-600 dark:text-amber-400', bannerBg: 'bg-amber-50 dark:bg-amber-950/40 lya:bg-amber-50/90 border-amber-200 dark:border-amber-800/50 lya:border-amber-300' }
 ];
 
-const getPromoColor = (promoId) => {
+export const getPromoColor = (promoId) => {
   if (!promoId) return PROMO_COLORS[0];
   let hash = 0;
   const idStr = String(promoId);
@@ -24,6 +24,7 @@ const getPromoColor = (promoId) => {
 
 export default function ClientProductCard({
   product,
+  index = 0, // ✨ Índice para animación fluida en cascada
   cart,
   getCategoryName,
   addingToCartId,
@@ -31,7 +32,9 @@ export default function ClientProductCard({
   setSelectedProduct,
   handleAddDirectly,
   getPromoBadge,
-  itemVariants
+  activePromotions = [],
+  onPromoClick, // ✨ Handler al tocar la insignia de promoción
+  isPromoFiltered = false
 }) {
   const hasImage = product.imagen && !product.imagen.includes('default-product');
   const isCustomizable = getProductModifiers(product).length > 0;
@@ -91,6 +94,17 @@ export default function ClientProductCard({
   const promoData = getPromoBadge ? getPromoBadge(product.id, finalPriceWithDefaults, product.stock, product.controlarStock) : null;
   const colorScheme = useMemo(() => getPromoColor(promoData?.id), [promoData?.id]);
 
+  // Buscamos el objeto completo de la promoción para saber si es combinable con otros productos
+  const matchedFullPromo = useMemo(() => {
+    if (!promoData?.id || !Array.isArray(activePromotions)) return null;
+    return activePromotions.find(p => String(p.id) === String(promoData.id)) || null;
+  }, [promoData?.id, activePromotions]);
+
+  const isCombinablePromo = useMemo(() => {
+    if (!matchedFullPromo) return false;
+    return Array.isArray(matchedFullPromo.applyToProducts) && matchedFullPromo.applyToProducts.length > 1;
+  }, [matchedFullPromo]);
+
   let displayOriginalPrice = null;
   let displayFinalPrice = finalPriceWithDefaults;
 
@@ -104,10 +118,13 @@ export default function ClientProductCard({
     }
   }
 
+  const staggerDelay = Math.min(index * 0.02, 0.2);
+
   return (
     <motion.div 
-      layout 
-      variants={itemVariants} 
+      initial={{ opacity: 0, scale: 0.96, y: 12 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.22, delay: staggerDelay, ease: [0.22, 1, 0.36, 1] }}
       whileTap={isCustomizable && !isAgotado && !isLimitReached ? { scale: 0.98 } : {}} 
       onClick={() => {
         if (isAgotado) return;
@@ -117,7 +134,7 @@ export default function ClientProductCard({
         }
         if (isCustomizable) setSelectedProduct(product);
       }} 
-      className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-2 shadow-sm transition-all overflow-hidden outline-none touch-manipulation ${
+      className={`relative flex items-center gap-4 p-3 rounded-[2rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border-2 shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-200 will-change-transform overflow-hidden outline-none touch-manipulation ${
         isAgotado 
           ? 'border-gray-200 dark:border-gray-700 opacity-60 grayscale-[50%]' 
           : isLimitReached
@@ -160,10 +177,26 @@ export default function ClientProductCard({
           
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             {promoData && !isAgotado && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full border border-transparent shadow-sm uppercase tracking-wider ${colorScheme.badge}`}>
-                {promoData.type === 'NxM' || promoData.type === 'BOGO' ? <Gift size={10} strokeWidth={2.5} /> : <Tag size={10} strokeWidth={3} />}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onPromoClick) onPromoClick(matchedFullPromo || promoData.id);
+                }}
+                title={isCombinablePromo ? "Toca para ver con qué otros productos puedes combinar esta promo" : "Toca para filtrar esta promoción"}
+                className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full border border-transparent shadow-sm uppercase tracking-wider transition-transform active:scale-95 md:hover:scale-105 outline-none touch-manipulation ${colorScheme.badge} ${
+                  isPromoFiltered ? 'ring-2 ring-gray-900 dark:ring-white lya:ring-[#3E2723]' : ''
+                }`}
+              >
+                {isCombinablePromo ? (
+                  <Layers size={10} strokeWidth={3} />
+                ) : promoData.type === 'NxM' || promoData.type === 'BOGO' ? (
+                  <Gift size={10} strokeWidth={2.5} />
+                ) : (
+                  <Tag size={10} strokeWidth={3} />
+                )}
                 <span>{promoData.text}</span>
-              </span>
+              </button>
             )}
             {isCustomizable && !isLimitReached && (
               <span className="inline-flex text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20 lya:bg-[#EADCC9] px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800/30 lya:border-transparent">

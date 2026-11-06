@@ -1,7 +1,7 @@
 // frontend/src/modules/client/views/ClientMenu.jsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift } from 'lucide-react';
+import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter } from 'lucide-react';
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -14,26 +14,113 @@ import { ClientServiceShield } from './components/ClientServiceShield';
 import ClientOrderSuccess from './ClientOrderSuccess';
 
 import ClientHeader from './components/ClientHeader';
-import ClientProductCard from './components/ClientProductCard';
+import ClientProductCard, { getPromoColor } from './components/ClientProductCard';
 
 import { useClientMenuController } from '../controllers/useClientMenuController';
+
+const getPromoRuleDescription = (promo) => {
+  if (!promo) return '';
+  const type = promo.type;
+  if (type === 'NxM') {
+    const buy = promo.buyQty || promo.buy_qty || 3;
+    const pay = promo.payQty || promo.pay_qty || 2;
+    return `Lleva ${buy} productos participantes y paga solo ${pay}.`;
+  }
+  if (type === 'FIXED') {
+    const disc = Number(promo.discountValue || promo.discount_value || 0);
+    return `Descuento directo de $${disc.toFixed(2)} en cada unidad.`;
+  }
+  if (type === 'NTH_FIXED') {
+    const nth = promo.buyQty || promo.buy_qty || 2;
+    const disc = Number(promo.discountValue || promo.discount_value || 0);
+    return `Al llevar ${nth} productos del grupo, el ${nth}º recibe $${disc.toFixed(2)} de descuento.`;
+  }
+  if (type === 'COMBO') {
+    const price = Number(promo.discountValue || promo.discount_value || 0);
+    return `Lleva todos los productos del paquete por un precio especial de $${price.toFixed(2)}.`;
+  }
+  if (type === 'BOGO') {
+    const buy = promo.buyQty || promo.buy_qty || 1;
+    const pay = promo.payQty || promo.pay_qty || 1;
+    const discVal = promo.discountValue ?? promo.discount_value;
+    const rewardText = (discVal === 0 || discVal === undefined || discVal === null)
+      ? 'GRATIS'
+      : `por $${Number(discVal).toFixed(2)}`;
+    return `Compra ${buy} producto(s) participante(s) y llévate ${pay} de recompensa ${rewardText}.`;
+  }
+  return 'Promoción especial activa.';
+};
+
+const getShortPromoLabel = (promo) => {
+  if (!promo) return 'Promo';
+  const type = promo.type;
+  if (type === 'NxM') return `${promo.buyQty || promo.buy_qty || 3}x${promo.payQty || promo.pay_qty || 2}`;
+  if (type === 'FIXED') return `-$${Number(promo.discountValue || promo.discount_value || 0).toFixed(0)}`;
+  if (type === 'NTH_FIXED') return `${promo.buyQty || promo.buy_qty || 2}ª con Desc.`;
+  if (type === 'COMBO') return `Combo $${Number(promo.discountValue || promo.discount_value || 0).toFixed(0)}`;
+  if (type === 'BOGO') return `Compra ${promo.buyQty || 1} y Llévate ${promo.payQty || 1}`;
+  return promo.name || 'Promo';
+};
 
 export default function ClientMenu(props) {
   const ctrl = useClientMenuController(props);
   const [claimingRewardId, setClaimingRewardId] = useState(null);
+  const [showPromoGuide, setShowPromoGuide] = useState(false);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.08 } }
-  };
+  const allPromotions = useMemo(() => ctrl.cartUtils.promotions || [], [ctrl.cartUtils.promotions]);
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 30, scale: 0.95 },
-    show: { 
-      opacity: 1, 
-      y: 0, 
-      scale: 1, 
-      transition: { duration: 0.2, ease: "easeOut" } 
+  // ✨ Calculamos las promociones válidas hoy con su color y lista de productos
+  const validTodayPromos = useMemo(() => {
+    const today = new Date().getDay();
+
+    return allPromotions.filter(p => {
+      if (p.type === 'TICKET_DISCOUNT') return false;
+      const rawActive = p.isActive ?? p.is_active ?? p.status;
+      if (rawActive !== true && rawActive !== 1 && rawActive !== 'true' && rawActive !== '1') return false;
+
+      const daysRaw = p.validDays || p.valid_days;
+      let validDaysAsNumbers = [];
+      if (Array.isArray(daysRaw)) {
+        validDaysAsNumbers = daysRaw.map(Number);
+      } else if (typeof daysRaw === 'string') {
+        try { validDaysAsNumbers = JSON.parse(daysRaw).map(Number); } 
+        catch (e) { validDaysAsNumbers = daysRaw.replace(/[\[\]]/g, '').split(',').map(n => Number(n.trim())); }
+      }
+      if (validDaysAsNumbers.length > 0 && !validDaysAsNumbers.includes(today)) return false;
+      return true;
+    }).map(p => {
+      const triggerIds = (Array.isArray(p.applyToProducts) && p.applyToProducts.length > 0)
+        ? p.applyToProducts.map(id => String(id).toLowerCase())
+        : [String(p.productId || p.product_id || '').toLowerCase()];
+
+      const matchingProducts = (ctrl.products || []).filter(prod =>
+        triggerIds.includes(String(prod.id).toLowerCase())
+      );
+
+      return {
+        promo: p,
+        colorScheme: getPromoColor(p.id),
+        products: matchingProducts,
+        isCombinable: matchingProducts.length > 1
+      };
+    }).filter(item => item.products.length > 0);
+  }, [allPromotions, ctrl.products]);
+
+  const handleTogglePromoFilter = (promoOrId) => {
+    if (!promoOrId) {
+      ctrl.setPromoFiltro(null);
+      return;
+    }
+    const targetPromo = typeof promoOrId === 'object'
+      ? promoOrId
+      : allPromotions.find(p => String(p.id) === String(promoOrId));
+
+    if (!targetPromo) return;
+
+    if (ctrl.promoFiltro && String(ctrl.promoFiltro.id) === String(targetPromo.id)) {
+      ctrl.setPromoFiltro(null);
+    } else {
+      ctrl.setPromoFiltro(targetPromo);
     }
   };
 
@@ -151,6 +238,8 @@ export default function ClientMenu(props) {
 
   const rewardModalData = ctrl.cartUtils.pendingPromoReward;
   const hasNoteToView = ctrl.confirmedSnapshot.items.length > 0 || (ctrl.transferredItems && ctrl.transferredItems.length > 0);
+  const activeFilterColorScheme = ctrl.promoFiltro ? getPromoColor(ctrl.promoFiltro.id) : null;
+  const isFilteredPromoCombinable = ctrl.promoFiltro && Array.isArray(ctrl.promoFiltro.applyToProducts) && ctrl.promoFiltro.applyToProducts.length > 1;
 
   // 6. Vista Principal del Menú
   return (
@@ -200,31 +289,121 @@ export default function ClientMenu(props) {
         type={props.type}
         tableId={props.tableNumber || props.tableId}
         categories={ctrl.categories}
-        activeCategory={ctrl.activeCategory}
+        activeCategory={ctrl.promoFiltro ? 'todas' : ctrl.activeCategory}
         setActiveCategory={ctrl.setActiveCategory}
         setShowSettings={ctrl.setShowSettings}
       />
 
-      <motion.div key={ctrl.activeCategory} variants={containerVariants} initial="hidden" animate="show" className="flex-1 overflow-y-auto px-6 py-4 pb-32 space-y-4 custom-scrollbar">
-        {ctrl.visibleProducts.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-[#7A6353] font-medium text-sm">No se encontraron productos en esta categoría.</div>
-        ) : (
-          ctrl.visibleProducts.map(product => (
-            <ClientProductCard 
-              key={product.id}
-              product={product}
-              cart={ctrl.cartUtils.cart}
-              getCategoryName={ctrl.getCategoryName}
-              addingToCartId={ctrl.addingToCartId}
-              triggerNotification={ctrl.triggerNotification}
-              setSelectedProduct={ctrl.setSelectedProduct}
-              handleAddDirectly={ctrl.handleAddDirectly}
-              getPromoBadge={ctrl.cartUtils.getPromoBadge}
-              itemVariants={itemVariants}
-            />
-          ))
+      <div className="flex-1 overflow-y-auto px-6 py-4 pb-32 custom-scrollbar">
+        
+        {/* ✨ BARRA INTERACTIVA: ¿CÓMO FUNCIONAN LAS PROMOS? */}
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowPromoGuide(true)}
+            className="w-full py-2.5 px-4 rounded-2xl bg-orange-50/90 dark:bg-orange-950/30 lya:bg-[#F3EBE0] border border-orange-200/80 dark:border-orange-800/40 lya:border-[#D9C4A9] flex items-center justify-between gap-3 shadow-sm transition-colors outline-none touch-manipulation"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white flex items-center justify-center shrink-0 shadow-sm">
+                <Sparkles size={16} strokeWidth={2.5} />
+              </div>
+              <div className="text-left min-w-0">
+                <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723] truncate">
+                  ¿Cómo funcionan las promos?
+                </p>
+                <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400 lya:text-[#7A6353] truncate">
+                  Mismo color de etiqueta = combinables entre sí
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {validTodayPromos.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white text-[10px] font-black">
+                  {validTodayPromos.length} {validTodayPromos.length === 1 ? 'activa' : 'activas'}
+                </span>
+              )}
+              <span className="text-[11px] font-black text-orange-600 dark:text-orange-400 lya:text-[#78350F] underline decoration-2 underline-offset-2">
+                Ver guía
+              </span>
+            </div>
+          </motion.button>
+        </div>
+
+        {/* ✨ CINTILLO DE FILTRO DE PROMOCIÓN ACTIVO (Sin animación de height para evitar tirones) */}
+        {ctrl.promoFiltro && activeFilterColorScheme && (
+          <motion.div
+            key={`client-banner-${ctrl.promoFiltro.id}`}
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="mb-4"
+          >
+            <div className={`p-3.5 rounded-[1.5rem] border-2 flex flex-col gap-2.5 shadow-sm ${activeFilterColorScheme.bannerBg}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-sm ${activeFilterColorScheme.badge}`}>
+                    {isFilteredPromoCombinable ? <Layers size={12} strokeWidth={2.5} /> : <Tag size={12} strokeWidth={2.5} />}
+                    {getShortPromoLabel(ctrl.promoFiltro)}
+                  </span>
+                  <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white lya:text-[#3E2723]">
+                    {ctrl.promoFiltro.name || 'Promoción Activa'}
+                  </h4>
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
+                    {isFilteredPromoCombinable ? '🔗 Combinable' : '🎯 Individual'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => ctrl.setPromoFiltro(null)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-gray-800 lya:bg-[#FAF6F0] text-gray-700 dark:text-gray-200 lya:text-[#3E2723] text-[11px] font-black border border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] active:scale-95 flex items-center gap-1 shrink-0 shadow-sm transition-all touch-manipulation"
+                >
+                  <X size={13} strokeWidth={2.5} />
+                  Ver todo
+                </button>
+              </div>
+
+              <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-snug text-left">
+                {isFilteredPromoCombinable
+                  ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos como gustes para armar tu promoción.'
+                  : getPromoRuleDescription(ctrl.promoFiltro)}
+              </p>
+            </div>
+          </motion.div>
         )}
-      </motion.div>
+
+        {/* ✨ LISTADO DE PRODUCTOS CON KEY DINÁMICA Y ANIMACIÓN FLUIDA */}
+        {ctrl.visibleProducts.length === 0 ? (
+          <div className="text-center py-12 text-gray-400 dark:text-gray-500 lya:text-[#7A6353] font-medium text-sm">
+            No se encontraron productos en esta categoría.
+          </div>
+        ) : (
+          <div
+            key={`client-grid-${ctrl.activeCategory}-${ctrl.promoFiltro?.id || 'all'}`}
+            className="space-y-4"
+          >
+            {ctrl.visibleProducts.map((product, idx) => (
+              <ClientProductCard 
+                key={product.id}
+                index={idx}
+                product={product}
+                cart={ctrl.cartUtils.cart}
+                getCategoryName={ctrl.getCategoryName}
+                addingToCartId={ctrl.addingToCartId}
+                triggerNotification={ctrl.triggerNotification}
+                setSelectedProduct={ctrl.setSelectedProduct}
+                handleAddDirectly={ctrl.handleAddDirectly}
+                getPromoBadge={ctrl.cartUtils.getPromoBadge}
+                activePromotions={allPromotions}
+                onPromoClick={handleTogglePromoFilter}
+                isPromoFiltered={!!ctrl.promoFiltro}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 🔥 Botón "Mi Nota" visible si tiene productos propios o productos trasladados a otra cuenta */}
       <AnimatePresence>
@@ -264,6 +443,149 @@ export default function ClientMenu(props) {
               {ctrl.addingToCartId !== null || ctrl.isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${Math.max(0, ctrl.cartUtils.totalCart).toFixed(2)}</span>}
             </motion.button>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ✨ MODAL GUÍA DE PROMOCIONES PARA CLIENTES */}
+      <AnimatePresence>
+        {showPromoGuide && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="bg-white dark:bg-gray-900 lya:bg-[#FAF6F0] max-w-md w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl p-6 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] overflow-hidden"
+            >
+              <div className="flex items-start justify-between gap-3 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-500 lya:text-[#78350F] flex items-center justify-center shrink-0">
+                    <Sparkles size={22} strokeWidth={2.5} />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight leading-snug">
+                      ¿Cómo funcionan las Promos?
+                    </h3>
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
+                      Combina tus productos favoritos del mismo color
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPromoGuide(false)}
+                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 lya:bg-[#F3EBE0] text-gray-500 dark:text-gray-400 lya:text-[#7A6353] outline-none"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-4 text-left">
+                <div className="space-y-2.5">
+                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
+                      <span className="w-5 h-5 rounded-md bg-rose-500 text-white flex items-center justify-center text-[10px]">1</span>
+                      Mismo Color = Combinables
+                    </div>
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
+                      Si varios productos tienen una etiqueta del <strong>mismo color</strong> y la misma promo, puedes <strong>combinarlos entre sí</strong> aunque sean productos distintos.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
+                      <span className="w-5 h-5 rounded-md bg-blue-500 text-white flex items-center justify-center text-[10px]">2</span>
+                      Toca la Etiqueta para Filtrar
+                    </div>
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
+                      Toca directamente la <strong>insignia de color</strong> de cualquier producto para ver en pantalla todos los productos con los que puedes armar esa promo.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
+                      <span className="w-5 h-5 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px]">3</span>
+                      Descuento Automático
+                    </div>
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
+                      Solo agrégalos a tu pedido. Al completar la cantidad de la promoción, el descuento o producto de regalo se activará automáticamente.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-[#7A6353] mb-2.5 flex items-center gap-1.5">
+                    <Tag size={13} />
+                    Promociones de Hoy ({validTodayPromos.length})
+                  </h4>
+
+                  {validTodayPromos.length === 0 ? (
+                    <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/40 lya:bg-[#F3EBE0]/60 text-center border border-dashed border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9]">
+                      <p className="text-xs font-black text-gray-600 dark:text-gray-300 lya:text-[#3E2723]">
+                        No hay promociones activas por ahora
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {validTodayPromos.map(({ promo, colorScheme, products, isCombinable }) => (
+                        <div
+                          key={promo.id}
+                          className={`p-3.5 rounded-2xl border-2 transition-all ${colorScheme.bannerBg}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm ${colorScheme.badge}`}>
+                                {isCombinable ? <Layers size={10} strokeWidth={3} /> : <Tag size={10} strokeWidth={3} />}
+                                {getShortPromoLabel(promo)}
+                              </span>
+                              <span className="font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723]">
+                                {promo.name}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                ctrl.setPromoFiltro(promo);
+                                setShowPromoGuide(false);
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1 shadow-sm active:scale-95 shrink-0 ${colorScheme.btn}`}
+                            >
+                              <Filter size={11} strokeWidth={2.5} />
+                              Ver productos
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] font-bold text-gray-700 dark:text-gray-200 lya:text-[#5D4037] mb-2">
+                            {getPromoRuleDescription(promo)}
+                          </p>
+
+                          <div className="flex flex-wrap gap-1">
+                            {products.map(prod => (
+                              <span
+                                key={prod.id}
+                                className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-gray-900/70 text-gray-800 dark:text-gray-200 text-[10px] font-bold border border-black/5 dark:border-white/10"
+                              >
+                                {prod.nombre || prod.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPromoGuide(false)}
+                className="w-full py-3.5 bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 font-black rounded-2xl transition-colors outline-none shrink-0 touch-manipulation"
+              >
+                ¡Entendido!
+              </button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
