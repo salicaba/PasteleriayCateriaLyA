@@ -1,7 +1,7 @@
 // frontend/src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift, Sparkles, Layers, Tag, HelpCircle, Filter } from 'lucide-react';
+import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift, Sparkles, Layers, Tag, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -29,7 +29,6 @@ const parseAccountName = (str) => {
   return s;
 };
 
-// Helper para describir la regla de una promoción de forma amigable para empleados y clientes
 const getPromoRuleDescription = (promo) => {
   if (!promo) return '';
   const type = promo.type;
@@ -108,7 +107,7 @@ export const PosModal = ({
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOpcionesMesa, setShowOpcionesMesa] = useState(false);
-  const [showPromoGuide, setShowPromoGuide] = useState(false); // ✨ Estado para abrir el modal de Guía de Promos
+  const [showPromoGuide, setShowPromoGuide] = useState(false);
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
   const [previewTicketData, setPreviewTicketData] = useState(null);
   const [checkoutTarget, setCheckoutTarget] = useState({ type: 'full', cuentaName: null, amount: 0 });
@@ -139,7 +138,6 @@ export const PosModal = ({
 
   const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
-  // ✨ Calculamos las promociones válidas hoy con sus productos participantes y esquema de color
   const validTodayPromos = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
@@ -509,7 +507,7 @@ export const PosModal = ({
               />
             </div>
 
-            {/* ✨ BOTÓN PÍLDORA: ¿CÓMO FUNCIONAN LAS PROMOS? (OPCIÓN 1) */}
+            {/* ✨ BOTÓN PÍLDORA: ¿CÓMO FUNCIONAN LAS PROMOS? */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowPromoGuide(true)}
@@ -566,59 +564,56 @@ export const PosModal = ({
 
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-32 md:pb-5 relative flex flex-col">
             
-            {/* ✨ CINTILLO DE FILTRO DE PROMOCIÓN ACTIVO (OPCIÓN 2) */}
-            <AnimatePresence>
-              {promoFiltro && activeFilterColorScheme && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -10, height: 0 }}
-                  className="mb-4 overflow-hidden shrink-0"
-                >
-                  <div className={`p-3.5 sm:p-4 rounded-[1.5rem] border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${activeFilterColorScheme.bannerBg}`}>
-                    <div className="flex items-start sm:items-center gap-3">
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-sm ${activeFilterColorScheme.badge}`}>
-                        {isFilteredPromoCombinable ? <Layers size={13} strokeWidth={2.5} /> : <Tag size={13} strokeWidth={2.5} />}
-                        {getShortPromoLabel(promoFiltro)}
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white lya:text-lya-text">
-                            {promoFiltro.name || 'Promoción Activa'}
-                          </h4>
-                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
-                            {isFilteredPromoCombinable ? '🔗 Combinable entre sí' : '🎯 Producto único'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] sm:text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 mt-0.5 leading-snug">
-                          {isFilteredPromoCombinable
-                            ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos como quieras para completar la promo.'
-                            : getPromoRuleDescription(promoFiltro)}
-                        </p>
+            {/* ✨ CINTILLO DE FILTRO DE PROMOCIÓN ACTIVO (Sin animación de height para evitar reflujo del DOM) */}
+            {promoFiltro && activeFilterColorScheme && (
+              <motion.div
+                key={`banner-${promoFiltro.id}`}
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="mb-4 shrink-0"
+              >
+                <div className={`p-3.5 sm:p-4 rounded-[1.5rem] border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${activeFilterColorScheme.bannerBg}`}>
+                  <div className="flex items-start sm:items-center gap-3">
+                    <span className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-sm ${activeFilterColorScheme.badge}`}>
+                      {isFilteredPromoCombinable ? <Layers size={13} strokeWidth={2.5} /> : <Tag size={13} strokeWidth={2.5} />}
+                      {getShortPromoLabel(promoFiltro)}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white lya:text-lya-text">
+                          {promoFiltro.name || 'Promoción Activa'}
+                        </h4>
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
+                          {isFilteredPromoCombinable ? '🔗 Combinable entre sí' : '🎯 Producto único'}
+                        </span>
                       </div>
+                      <p className="text-[11px] sm:text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 mt-0.5 leading-snug">
+                        {isFilteredPromoCombinable
+                          ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos como quieras para completar la promo.'
+                          : getPromoRuleDescription(promoFiltro)}
+                      </p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setPromoFiltro(null)}
-                      className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-black border border-gray-200 dark:border-gray-700 md:hover:bg-gray-100 dark:md:hover:bg-gray-700 flex items-center gap-1.5 shrink-0 shadow-sm transition-colors"
-                    >
-                      <X size={14} strokeWidth={2.5} />
-                      Ver todo el menú
-                    </button>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
-            <motion.div
-              key="product-grid"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+                  <button
+                    type="button"
+                    onClick={() => setPromoFiltro(null)}
+                    className="self-end sm:self-center px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-black border border-gray-200 dark:border-gray-700 md:hover:bg-gray-100 dark:md:hover:bg-gray-700 active:scale-95 flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
+                  >
+                    <X size={14} strokeWidth={2.5} />
+                    Ver todo el menú
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ✨ CUADRÍCULA CON KEY DINÁMICA: Garantiza que todas las tarjetas animen parejo siempre */}
+            <div
+              key={`grid-${categoriaActiva}-${promoFiltro?.id || 'all'}`}
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
             >
-              {filteredProducts.map(product => {
+              {filteredProducts.map((product, idx) => {
                 const currentCartQty = activeCart
                   .filter(item => item.id === product.id && !item.enviadoCocina && !item.isAutoPromo)
                   .reduce((acc, item) => acc + item.qty, 0);
@@ -626,6 +621,7 @@ export const PosModal = ({
                 return (
                   <ProductCard 
                     key={product.id} 
+                    index={idx}
                     product={product} 
                     activePromotions={activePromotions}
                     isLocked={isAccountLocked}
@@ -649,7 +645,7 @@ export const PosModal = ({
                   />
                 );
               })}
-            </motion.div>
+            </div>
         </div>
       </div>
 
@@ -722,11 +718,10 @@ export const PosModal = ({
     </div>
   );
 
-  // 🔥 Capas flotantes compartidas (Funcionan tanto en modal normal como en modo inline/Mostrador)
   const floatingOverlays = typeof document !== 'undefined' ? createPortal(
     <div className="relative z-[9999]">
 
-      {/* ✨ MODAL GUÍA DE PROMOCIONES Y FILTRO RÁPIDO (OPCIÓN 1 + 2) */}
+      {/* ✨ MODAL GUÍA DE PROMOCIONES Y FILTRO RÁPIDO */}
       <AnimatePresence>
         {showPromoGuide && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
@@ -759,7 +754,6 @@ export const PosModal = ({
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-5">
-                {/* Bloques explicativos clave */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
@@ -792,7 +786,6 @@ export const PosModal = ({
                   </div>
                 </div>
 
-                {/* Lista en vivo de promociones activas hoy */}
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-lya-text/50 mb-3 flex items-center gap-2">
                     <Tag size={14} />
@@ -950,7 +943,7 @@ export const PosModal = ({
         )}
       </AnimatePresence>
 
-      {/* 🌟 MODAL CÁPSULA: ALERTA DE RUPTURA DE PROMOCIÓN (Al eliminar, mover o unir cuentas) */}
+      {/* 🌟 MODAL CÁPSULA: ALERTA DE RUPTURA DE PROMOCIÓN */}
       <AnimatePresence>
         {promoWarning?.isOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">

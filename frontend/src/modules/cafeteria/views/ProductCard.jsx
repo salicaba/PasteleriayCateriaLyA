@@ -23,14 +23,15 @@ export const getPromoColor = (promoId) => {
 
 export const ProductCard = ({ 
   product, 
+  index = 0, // ✨ Recibimos el índice para animar en cascada fluida
   onClick, 
   onQuickAdd, 
   isLocked = false, 
   cartQty = 0, 
   onLimitReached, 
   activePromotions = [],
-  onPromoClick, // ✨ Nuevo prop para filtrar al tocar la etiqueta de promo
-  isPromoFiltered = false // ✨ Indica si esta promo está siendo filtrada actualmente
+  onPromoClick,
+  isPromoFiltered = false
 }) => {
   const [imgError, setImgError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -134,13 +135,11 @@ export const ProductCard = ({
   const activePromo = promoData?.promo;
   const colorScheme = useMemo(() => getPromoColor(activePromo?.id), [activePromo?.id]);
 
-  // Detectamos si es una promoción combinable (más de 1 producto asignado)
   const isCombinablePromo = useMemo(() => {
     if (!activePromo) return false;
     return Array.isArray(activePromo.applyToProducts) && activePromo.applyToProducts.length > 1;
   }, [activePromo]);
 
-  // 🔥 FIX: En FIXED se resta discountVal al precio del producto
   const promoFixedPrice = useMemo(() => {
     if (!activePromo || activePromo.type !== 'FIXED') return 0;
     const discountVal = Number(activePromo.discountValue || activePromo.discount_value || 0);
@@ -236,13 +235,15 @@ export const ProductCard = ({
 
   const pName = product.nombre || product.name || 'Producto';
 
+  // ✨ Delay escalonado súper ligero (topado a 0.2s para que nunca se sienta lento en menús grandes)
+  const staggerDelay = Math.min(index * 0.02, 0.2);
+
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      whileTap={!isAgotado && !isLocked && !isLimitReached ? { scale: 0.95 } : {}}
+      initial={{ opacity: 0, scale: 0.94, y: 12 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.22, delay: staggerDelay, ease: [0.22, 1, 0.36, 1] }}
+      whileTap={!isAgotado && !isLocked && !isLimitReached ? { scale: 0.96 } : {}}
       onClick={() => {
         if (isAgotado || isLocked) return;
         if (isLimitReached) {
@@ -251,7 +252,7 @@ export const ProductCard = ({
         }
         if (onClick) onClick(product);
       }}
-      className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-3 transition-all duration-300 overflow-hidden border-2 h-full transform ${
+      className={`relative flex flex-col bg-white dark:bg-gray-900 lya:bg-lya-surface rounded-[2rem] p-3 transition-[transform,box-shadow,border-color,background-color] duration-200 overflow-hidden border-2 h-full will-change-transform ${
         isAgotado 
           ? 'border-gray-100 dark:border-gray-800 lya:border-lya-border/30 opacity-60 grayscale-[80%] cursor-not-allowed' 
           : isLocked
