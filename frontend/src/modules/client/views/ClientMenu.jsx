@@ -1,7 +1,7 @@
 // frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter, Receipt } from 'lucide-react';
+import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter, Receipt, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -18,7 +18,6 @@ import ClientProductCard, { getPromoColor } from './components/ClientProductCard
 
 import { useClientMenuController } from '../controllers/useClientMenuController';
 
-// ✨ Incluye explicación detallada para TICKET_DISCOUNT
 const getPromoRuleDescription = (promo) => {
   if (!promo) return '';
   const type = promo.type;
@@ -84,7 +83,6 @@ export default function ClientMenu(props) {
 
   const allPromotions = useMemo(() => ctrl.cartUtils.promotions || [], [ctrl.cartUtils.promotions]);
 
-  // ✨ Ahora incluye tanto promociones de productos como promociones TICKET_DISCOUNT activas hoy
   const validTodayPromos = useMemo(() => {
     const nowInChiapasStr = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const today = new Date(nowInChiapasStr).getDay();
@@ -145,7 +143,6 @@ export default function ClientMenu(props) {
       .sort((a, b) => Number(a.minTicketAmount || a.min_ticket_amount || 0) - Number(b.minTicketAmount || b.min_ticket_amount || 0));
   }, [validTodayPromos]);
 
-  // Subtotal físico acumulado por el cliente (lo ya confirmado en su nota + lo que lleva en el carrito actual)
   const clientPhysicalSubtotal = useMemo(() => {
     const confirmedSum = (ctrl.confirmedSnapshot?.items || [])
       .filter(i => !i.isVirtualDiscount && i.status !== 'CANCELLED')
@@ -372,7 +369,7 @@ export default function ClientMenu(props) {
                   ¿Cómo funcionan las promos?
                 </p>
                 <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400 lya:text-[#7A6353] truncate">
-                  Mismo color = combinables • Descuentos en ticket
+                  Mismo color = combinables • Reglas por cuenta
                 </p>
               </div>
             </div>
@@ -446,7 +443,7 @@ export default function ClientMenu(props) {
                     {ctrl.promoFiltro.name || 'Promoción Activa'}
                   </h4>
                   <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
-                    {isFilteredPromoCombinable ? '🔗 Combinable' : '🎯 Individual'}
+                    {isFilteredPromoCombinable ? '🔗 Combinable en tu cuenta' : '🎯 Individual'}
                   </span>
                 </div>
 
@@ -462,7 +459,7 @@ export default function ClientMenu(props) {
 
               <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-snug text-left">
                 {isFilteredPromoCombinable
-                  ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos como gustes para armar tu promoción.'
+                  ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos dentro de tu misma cuenta para armar tu promoción.'
                   : getPromoRuleDescription(ctrl.promoFiltro)}
               </p>
             </div>
@@ -541,7 +538,7 @@ export default function ClientMenu(props) {
         )}
       </AnimatePresence>
 
-      {/* ✨ MODAL GUÍA DE PROMOCIONES PARA CLIENTES */}
+      {/* ✨ MODAL GUÍA DE PROMOCIONES, REGLAS POR CUENTA Y RUPTURA PARA CLIENTES */}
       <AnimatePresence>
         {showPromoGuide && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
@@ -562,7 +559,7 @@ export default function ClientMenu(props) {
                       ¿Cómo funcionan las Promos?
                     </h3>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
-                      Colores combinables y descuentos en tu cuenta
+                      Colores combinables y reglas de tu cuenta
                     </p>
                   </div>
                 </div>
@@ -576,6 +573,7 @@ export default function ClientMenu(props) {
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-4 text-left">
+                {/* 1. Reglas de uso */}
                 <div className="space-y-2.5">
                   <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
@@ -600,10 +598,10 @@ export default function ClientMenu(props) {
                   <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
                       <span className="w-5 h-5 rounded-md bg-violet-500 text-white flex items-center justify-center text-[10px]">3</span>
-                      Descuento o Regalo Automático
+                      Estrictamente por Cuenta y Pedido
                     </div>
                     <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
-                      Solo agrégalos a tu pedido. Al completar la cantidad de la promoción, el descuento o producto de regalo se activará automáticamente.
+                      Las promociones de productos (2x1, 3x2, Combos o Regalos) deben agregarse <strong>dentro de tu misma cuenta y en el mismo pedido</strong> antes de confirmarlo. Cuentas separadas en la misma mesa no se suman entre sí.
                     </p>
                   </div>
 
@@ -618,6 +616,46 @@ export default function ClientMenu(props) {
                   </div>
                 </div>
 
+                {/* ✨ 2. BLOQUE IMPORTANTE: UNIÓN DE CUENTAS Y CUÁNDO SE ROMPE UNA PROMO */}
+                <div className="p-3.5 rounded-2xl bg-amber-50/85 dark:bg-amber-950/30 lya:bg-[#F3EBE0] border-2 border-amber-200 dark:border-amber-800/50 lya:border-[#D9C4A9] space-y-2.5">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 lya:text-[#78350F] font-black text-xs">
+                    <ShieldAlert size={16} strokeWidth={2.5} className="shrink-0" />
+                    <span>Unión de Cuentas y ¿Cuándo se rompe una Promo?</span>
+                  </div>
+
+                  <div className="space-y-2 text-[11px] font-bold text-gray-700 dark:text-gray-200 lya:text-[#5D4037] leading-relaxed">
+                    <div className="p-2.5 rounded-xl bg-white/85 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9]">
+                      <p className="font-black text-amber-700 dark:text-amber-400 lya:text-[#78350F] mb-0.5">
+                        🚫 Unir cuentas NO desbloquea promos
+                      </p>
+                      <p>
+                        Pedir en cuentas separadas y pedir en caja que <strong>unan las cuentas al final NO activa</strong> 2x1, 3x2, Combos ni Regalos. Además, si una cuenta que se va a unir <strong>ya tenía promociones aplicadas, estas se romperán</strong> y pasarán a precio normal.
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white/85 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-emerald-200/70 dark:border-emerald-800/40 lya:border-emerald-300/60">
+                      <p className="font-black text-emerald-700 dark:text-emerald-400 mb-0.5">
+                        ✅ Única excepción: Descuento por Ticket
+                      </p>
+                      <p>
+                        El <strong>Descuento por Ticket</strong> (por monto mínimo de compra) es la <strong>única promoción que sí se activa o mantiene al unir cuentas</strong> o pasar productos a una misma cuenta.
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white/85 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9]">
+                      <p className="font-black text-rose-600 dark:text-rose-400 mb-0.5">
+                        🔄 Otras formas en que se rompe una promo
+                      </p>
+                      <p>
+                        • <strong>Cambiar productos de cuenta:</strong> Pasar un producto en promoción (o el producto base que la activó) a otra cuenta anula el descuento.<br />
+                        • <strong>Quitar o cancelar productos:</strong> Reducir o eliminar un producto base de la promo retira también su regalo o descuento.<br />
+                        • <strong>Stock agotado:</strong> Si un producto se agota antes de enviar tu pedido, la promoción se desactiva.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Promociones activas hoy */}
                 <div>
                   <h4 className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-[#7A6353] mb-2.5 flex items-center gap-1.5">
                     <Tag size={13} />

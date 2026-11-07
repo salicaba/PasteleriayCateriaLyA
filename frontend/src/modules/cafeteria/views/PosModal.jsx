@@ -1,7 +1,7 @@
 // frontend/src/modules/cafeteria/views/PosModal.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift, Sparkles, Layers, Tag, Filter, Receipt } from 'lucide-react';
+import { Loader2, X, Search, CheckCircle2, AlertCircle, AlertTriangle, ShoppingBag, ChevronDown, Gift, Sparkles, Layers, Tag, Filter, Receipt, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import client from '../../../api/client'; 
@@ -29,7 +29,6 @@ const parseAccountName = (str) => {
   return s;
 };
 
-// ✨ Incluye la explicación detallada para TICKET_DISCOUNT
 const getPromoRuleDescription = (promo) => {
   if (!promo) return '';
   const type = promo.type;
@@ -153,7 +152,6 @@ export const PosModal = ({
 
   const allGlobalProducts = useMemo(() => dbProducts || [], [dbProducts]);
 
-  // ✨ Ahora incluye tanto las promos de productos como las promos de TICKET_DISCOUNT activas hoy
   const validTodayPromos = useMemo(() => {
     const promosArray = Array.isArray(activePromotions) 
       ? activePromotions 
@@ -212,7 +210,6 @@ export const PosModal = ({
     }).filter(item => item.isTicketDiscount || item.products.length > 0);
   }, [activePromotions, allGlobalProducts, isVitrina]);
 
-  // Promociones de descuento por ticket activas hoy (ordenadas de menor a mayor requisito)
   const activeTicketPromos = useMemo(() => {
     return validTodayPromos
       .filter(item => item.isTicketDiscount)
@@ -248,7 +245,6 @@ export const PosModal = ({
   const isAccountLocked = cuentasPagadasReales.includes(cuentaActiva || 'General');
   const activeCart = cart.filter(item => item.status !== 'CANCELLED');
 
-  // Subtotal físico acumulado en la cuenta activa para calcular el progreso hacia el Descuento por Ticket
   const activeAccountPhysicalSubtotal = useMemo(() => {
     const targetAcc = cuentaActiva || 'General';
     return activeCart
@@ -526,7 +522,6 @@ export const PosModal = ({
   const activeFilterColorScheme = promoFiltro ? getPromoColor(promoFiltro.id) : null;
   const isFilteredPromoCombinable = promoFiltro && Array.isArray(promoFiltro.applyToProducts) && promoFiltro.applyToProducts.length > 1;
 
-  // Calculamos el estado actual del Descuento por Ticket para mostrarlo en el cintillo informativo
   const ticketPromoStatus = useMemo(() => {
     if (activeTicketPromos.length === 0) return null;
     const qualifying = [...activeTicketPromos]
@@ -572,7 +567,7 @@ export const PosModal = ({
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowPromoGuide(true)}
               className="px-3.5 py-3 bg-orange-50 dark:bg-orange-950/30 lya:bg-lya-primary/10 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 rounded-[1.25rem] flex items-center gap-2 font-black text-xs md:hover:bg-orange-100 dark:md:hover:bg-orange-900/40 transition-all shadow-sm shrink-0 outline-none"
-              title="Guía de promociones y productos combinables"
+              title="Guía de promociones, reglas por cuenta y productos combinables"
             >
               <Sparkles size={17} className="shrink-0" />
               <span className="hidden lg:inline">¿Cómo funcionan las promos?</span>
@@ -656,7 +651,7 @@ export const PosModal = ({
                       onClick={() => setShowPromoGuide(true)}
                       className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 underline underline-offset-2 md:hover:opacity-80 px-1"
                     >
-                      Ver detalles
+                      Ver reglas
                     </button>
                   </div>
                 </div>
@@ -684,12 +679,12 @@ export const PosModal = ({
                           {promoFiltro.name || 'Promoción Activa'}
                         </h4>
                         <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
-                          {isFilteredPromoCombinable ? '🔗 Combinable entre sí' : '🎯 Producto único'}
+                          {isFilteredPromoCombinable ? '🔗 Combinable en la misma cuenta' : '🎯 Producto único'}
                         </span>
                       </div>
                       <p className="text-[11px] sm:text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 mt-0.5 leading-snug">
                         {isFilteredPromoCombinable
-                          ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos como quieras para completar la promo.'
+                          ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos dentro de la misma cuenta para completar la promo.'
                           : getPromoRuleDescription(promoFiltro)}
                       </p>
                     </div>
@@ -820,7 +815,7 @@ export const PosModal = ({
   const floatingOverlays = typeof document !== 'undefined' ? createPortal(
     <div className="relative z-[9999]">
 
-      {/* ✨ MODAL GUÍA DE PROMOCIONES Y FILTRO RÁPIDO */}
+      {/* ✨ MODAL GUÍA DE PROMOCIONES, REGLAS POR CUENTA Y RUPTURA DE PROMOS */}
       <AnimatePresence>
         {showPromoGuide && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
@@ -840,7 +835,7 @@ export const PosModal = ({
                       ¿Cómo funcionan las Promociones?
                     </h3>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
-                      Guía rápida de colores, combinaciones y descuentos por ticket
+                      Guía de colores, reglas por cuenta y cuándo se rompe una promoción
                     </p>
                   </div>
                 </div>
@@ -853,6 +848,7 @@ export const PosModal = ({
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-5">
+                {/* 1. Los 4 pilares básicos */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
@@ -877,10 +873,10 @@ export const PosModal = ({
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
                       <span className="w-6 h-6 rounded-lg bg-violet-500 text-white flex items-center justify-center text-[11px]">3</span>
-                      Aplicación Automática
+                      Estrictamente por Cuenta y Ronda
                     </div>
                     <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
-                      Solo agrega los productos a la misma cuenta de la comanda. Al cumplirse la cantidad requerida, el sistema aplicará el descuento o abrirá el regalo automáticamente.
+                      Las promos de productos (2x1, 3x2, Combos o Regalos) se calculan <strong>únicamente dentro de la misma cuenta</strong> y antes de enviar la ronda a cocina. Productos en cuentas separadas no se suman entre sí.
                     </p>
                   </div>
 
@@ -890,11 +886,58 @@ export const PosModal = ({
                       Descuento por Ticket / Cuenta
                     </div>
                     <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
-                      Cuando hay una promo por <strong>monto mínimo de ticket</strong>, suma cualquier producto del menú en una misma cuenta y al llegar a la meta se descontará el monto o porcentaje automáticamente.
+                      Cuando hay una promo por <strong>monto mínimo de ticket</strong>, suma cualquier producto del menú dentro de una misma cuenta y al llegar a la meta se descuenta automáticamente.
                     </p>
                   </div>
                 </div>
 
+                {/* ✨ 2. BLOQUE IMPORTANTE: REGLAS AL UNIR CUENTAS Y CÓMO SE ROMPE UNA PROMOCIÓN */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/25 border-2 border-amber-200/80 dark:border-amber-800/50 space-y-3">
+                  <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-400 font-black text-xs sm:text-sm">
+                    <ShieldAlert size={18} strokeWidth={2.5} className="shrink-0" />
+                    <span>Importante: Unión de Cuentas y ¿Cuándo se rompe una Promo?</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-bold text-gray-700 dark:text-gray-200 leading-relaxed">
+                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-amber-200/60 dark:border-amber-800/40">
+                      <p className="font-black text-amber-700 dark:text-amber-400 mb-1">
+                        🚫 Unir cuentas NO desbloquea promos de productos
+                      </p>
+                      <p>
+                        Si dos cuentas separadas pidieron productos por su lado y después deciden <strong>unir sus cuentas</strong>, no se desbloquearán promos como 2x1, 3x2, Combos o Regalos. Además, si la cuenta que se va a unir <strong>ya tenía una promo aplicada, esta se romperá</strong> y sus productos pasarán a precio normal.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-emerald-200/70 dark:border-emerald-800/40">
+                      <p className="font-black text-emerald-700 dark:text-emerald-400 mb-1">
+                        ✅ Única excepción al unir: Descuento por Ticket
+                      </p>
+                      <p>
+                        La <strong>única promoción que sí se activa o actualiza al unir cuentas</strong> (o al pasar productos a una cuenta) es la de <strong>Descuento por Ticket</strong>, ya que evalúa el total acumulado en dinero de la cuenta final (si ambas ya tenían descuento por ticket, se unifican en uno solo).
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-amber-200/60 dark:border-amber-800/40">
+                      <p className="font-black text-rose-600 dark:text-rose-400 mb-1">
+                        🔄 Mover un producto individual a otra cuenta
+                      </p>
+                      <p>
+                        Si trasladas un producto con beneficio a otra cuenta, <strong>pierde la promo y se cobra a precio normal</strong>. Y si mueves el producto base que sostenía una promo, el regalo o descuento que se quedó en la cuenta original también perderá el beneficio.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-amber-200/60 dark:border-amber-800/40">
+                      <p className="font-black text-rose-600 dark:text-rose-400 mb-1">
+                        🗑️ Quitar, cancelar o falta de stock
+                      </p>
+                      <p>
+                        Si restas o eliminas del carrito (o cancelas en cocina) uno de los artículos base que activaban una promoción, <strong>el descuento o regalo se anula automáticamente</strong>. Igual ocurre si un producto se queda sin stock antes de confirmar.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Lista en vivo de promociones activas hoy */}
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-lya-text/50 mb-3 flex items-center gap-2">
                     <Tag size={14} />
@@ -956,7 +999,7 @@ export const PosModal = ({
                             {isTicketDiscount ? (
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="px-3 py-1 rounded-lg bg-white/85 dark:bg-gray-900/75 text-emerald-700 dark:text-emerald-300 text-[11px] font-black border border-emerald-500/20">
-                                  ✨ Participan todos los productos del menú dentro de la misma cuenta
+                                  ✨ Participan todos los productos del menú dentro de la misma cuenta (incluso al unir cuentas)
                                 </span>
                               </div>
                             ) : (
