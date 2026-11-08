@@ -1,7 +1,7 @@
 // frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter, Receipt, ShieldAlert, PlusCircle } from 'lucide-react';
+import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter, Receipt, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -350,56 +350,6 @@ export default function ClientMenu(props) {
 
       <div className="flex-1 overflow-y-auto px-6 py-4 pb-36 custom-scrollbar">
         
-        {/* 🔥 TARJETA DE SALDO ACUMULADO AL VOLVER A PEDIR */}
-        {hasConfirmedBalance && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-3 p-3.5 rounded-2xl bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm flex flex-col gap-2"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-600 dark:text-orange-400 lya:text-[#78350F] flex items-center justify-center shrink-0">
-                  <ReceiptText size={16} strokeWidth={2.5} />
-                </div>
-                <div className="text-left min-w-0">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-[#7A6353]">
-                    Ya confirmado en tu nota ({ctrl.confirmedItemsCount} {ctrl.confirmedItemsCount === 1 ? 'prod.' : 'prods.'})
-                  </p>
-                  <p className="text-sm font-black text-gray-900 dark:text-white lya:text-[#3E2723]">
-                    ${ctrl.confirmedTotal.toFixed(2)} <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">por pagar</span>
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => ctrl.setIsConfirmed(true)}
-                className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-700 lya:bg-white text-gray-800 dark:text-gray-200 lya:text-[#3E2723] text-[11px] font-black border border-gray-200 dark:border-gray-600 lya:border-[#D9C4A9] active:scale-95 transition-transform shrink-0"
-              >
-                Ver mi nota
-              </button>
-            </div>
-
-            {ctrl.cartUtils.cart.length > 0 && (
-              <div className="pt-2 border-t border-dashed border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] flex items-center justify-between text-xs">
-                <span className="font-bold text-orange-600 dark:text-orange-400 lya:text-[#78350F] flex items-center gap-1">
-                  <PlusCircle size={13} strokeWidth={2.5} />
-                  Nuevo en carrito: +${ctrl.cartUtils.cartPhysicalSubtotal.toFixed(2)}
-                  {ctrl.cartUtils.cartTicketDiscount < 0 && (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-black">
-                      {' '}(Desc. -${Math.abs(ctrl.cartUtils.cartTicketDiscount).toFixed(2)})
-                    </span>
-                  )}
-                </span>
-                <span className="font-black text-gray-900 dark:text-white lya:text-[#3E2723]">
-                  Total si confirmas: ${projectedGrandTotal.toFixed(2)}
-                </span>
-              </div>
-            )}
-          </motion.div>
-        )}
-
         {/* ✨ BARRA INTERACTIVA: ¿CÓMO FUNCIONAN LAS PROMOS? */}
         <div className="mb-3 flex items-center justify-between gap-2">
           <motion.button
@@ -573,7 +523,7 @@ export default function ClientMenu(props) {
         )}
       </AnimatePresence>
 
-      {/* 🔥 Barra inferior "Revisar Pedido" con desglose de Confirmado + Nuevo = Total */}
+      {/* 🔥 Barra inferior "Revisar Pedido" con desglose de Nota + Nuevo = Total */}
       <AnimatePresence>
         {ctrl.cartUtils.cart.length > 0 && !ctrl.showCheckout && !ctrl.selectedProduct && (
           <motion.div 
@@ -596,8 +546,8 @@ export default function ClientMenu(props) {
                 <div className="text-left min-w-0">
                   <span className="text-base font-black block leading-tight">Revisar Pedido</span>
                   {hasConfirmedBalance && (
-                    <span className="text-[10px] font-bold opacity-85 block truncate mt-0.5">
-                      Ya confirmado: ${ctrl.confirmedTotal.toFixed(2)} + Nuevo: ${ctrl.cartUtils.cartPhysicalSubtotal.toFixed(2)}
+                    <span className="text-[10.5px] font-bold opacity-85 block truncate mt-0.5">
+                      Nota: ${ctrl.confirmedTotal.toFixed(2)} + Nuevo: ${ctrl.cartUtils.cartPhysicalSubtotal.toFixed(2)}
                     </span>
                   )}
                 </div>
