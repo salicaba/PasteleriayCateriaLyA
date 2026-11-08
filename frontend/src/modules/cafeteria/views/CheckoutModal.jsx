@@ -1,7 +1,7 @@
 // src/modules/cafeteria/views/CheckoutModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Banknote, Smartphone, CheckCircle, Calculator, Users, Minus, Plus, LayoutList, User, PieChart, MessageCircle, Loader2, AlertCircle, Lock, Clock } from 'lucide-react';
+import { X, Banknote, Smartphone, CheckCircle, Calculator, LayoutList, User, MessageCircle, Loader2, AlertCircle, Lock, Clock } from 'lucide-react';
 import client from '../../../api/client'; 
 
 const parseAccountName = (str) => {
@@ -38,7 +38,6 @@ export const CheckoutModal = ({
   const [transferInfo, setTransferInfo] = useState(null); 
   
   const [cobroMode, setCobroMode] = useState('full');
-  const [splitCount, setSplitCount] = useState(1);
   const [selectedCuentas, setSelectedCuentas] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -60,7 +59,6 @@ export const CheckoutModal = ({
       setMethod('efectivo');
       setAmountReceived('');
       setChange(0);
-      setSplitCount(1);
       setTransferInfo(null);
       setIsProcessing(false); 
       lockRef.current = false; 
@@ -90,19 +88,19 @@ export const CheckoutModal = ({
     if (isOpen && method === 'transferencia') {
       client.get('/settings')
         .then(res => { if (res.data) setTransferInfo(res.data); })
-        .catch(err => {
+        .catch(() => {
           showToast("No se pudieron cargar los datos de transferencia.", "error");
         });
     }
   }, [isOpen, method]);
 
   const amountToPay = 
-    cobroMode === 'full' ? total :
-    cobroMode === 'equal' ? total / splitCount :
-    selectedCuentas.reduce((acc, nombre) => {
-        const c = cuentasResumen.find(x => x.nombre === nombre);
-        return acc + (c ? c.subtotal : 0);
-    }, 0);
+    cobroMode === 'full'
+      ? total
+      : selectedCuentas.reduce((acc, nombre) => {
+          const c = cuentasResumen.find(x => x.nombre === nombre);
+          return acc + (c ? c.subtotal : 0);
+        }, 0);
 
   useEffect(() => {
     if (method === 'efectivo') {
@@ -141,27 +139,21 @@ export const CheckoutModal = ({
     
     try {
       if (cobroMode === 'nominal' && selectedCuentas.length > 0) {
-          for (let i = 0; i < selectedCuentas.length; i++) {
-              const cuentaTarget = selectedCuentas[i];
-              const cuentaMonto = cuentasResumen.find(c => c.nombre === cuentaTarget).subtotal;
-              const isLast = (i === selectedCuentas.length - 1);
-              
-              await onConfirmPayment({ 
-                method, amountReceived: cuentaMonto, change: 0, amountPaid: cuentaMonto,
-                targetType: 'partial', cuentaName: cuentaTarget, isLastInBatch: isLast
-              });
-          }
-      } else if (cobroMode === 'full' && orderType === 'salon') {
+        for (let i = 0; i < selectedCuentas.length; i++) {
+          const cuentaTarget = selectedCuentas[i];
+          const cuentaMonto = cuentasResumen.find(c => c.nombre === cuentaTarget).subtotal;
+          const isLast = (i === selectedCuentas.length - 1);
+          
           await onConfirmPayment({ 
-            method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
-            change, amountPaid: amountToPay, targetType: 'full', cuentaName: null, isLastInBatch: true
+            method, amountReceived: cuentaMonto, change: 0, amountPaid: cuentaMonto,
+            targetType: 'partial', cuentaName: cuentaTarget, isLastInBatch: isLast
           });
+        }
       } else {
-          await onConfirmPayment({ 
-            method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
-            change, amountPaid: amountToPay, targetType: cobroMode === 'equal' ? 'equal' : 'full',
-            cuentaName: null, isLastInBatch: true
-          });
+        await onConfirmPayment({ 
+          method, amountReceived: method === 'efectivo' ? parseFloat(amountReceived) : amountToPay, 
+          change, amountPaid: amountToPay, targetType: 'full', cuentaName: null, isLastInBatch: true
+        });
       }
       // Nota: No liberamos el candado aquí porque si el cobro es exitoso, el modal se desmontará.
     } catch(e) {
@@ -265,23 +257,6 @@ export const CheckoutModal = ({
                 <span className="text-center px-1">Por Cuentas</span>
               </motion.button>
             )}
-            
-            <motion.button 
-              whileTap={(!isProcessing && (isTableFullyDelivered || orderType !== 'salon')) ? { scale: 0.95 } : {}}
-              onClick={() => setCobroMode('equal')} 
-              disabled={isProcessing || (!isTableFullyDelivered && orderType === 'salon')}
-              className={`flex-1 py-2.5 text-[10px] sm:text-[11px] uppercase tracking-wider font-black rounded-xl flex flex-col items-center gap-1.5 transition-all outline-none ${
-                cobroMode === 'equal' 
-                  ? 'bg-white dark:bg-gray-700 lya:bg-lya-surface shadow-md text-orange-600 dark:text-orange-400 lya:text-lya-primary scale-[1.02]' 
-                  : 'text-gray-500 md:hover:text-gray-700 dark:text-gray-400 dark:md:hover:text-gray-200 lya:text-lya-text/60 md:hover:bg-gray-200/50 dark:md:hover:bg-gray-700/50'
-              } ${(!isTableFullyDelivered && orderType === 'salon') ? 'opacity-40 cursor-not-allowed' : ''}`}
-            >
-              <PieChart size={18}/> 
-              <span className="text-center px-1 flex items-center justify-center gap-1">
-                Dividir
-                {!isTableFullyDelivered && orderType === 'salon' && <Lock size={10} className="text-gray-400" />}
-              </span>
-            </motion.button>
           </div>
 
           <div className="min-h-[60px] flex items-center justify-center">
@@ -336,26 +311,12 @@ export const CheckoutModal = ({
                   </div>
                 </motion.div>
               )}
-              
-              {cobroMode === 'equal' && (
-                <motion.div key="equal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2, ease: "easeOut" }} className="w-full flex justify-between items-center bg-gray-50 dark:bg-gray-800/80 lya:bg-lya-bg p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 lya:border-lya-border/40 shadow-inner">
-                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 lya:text-lya-text">
-                    <div className="p-1.5 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm"><Users size={16} className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60" /></div>
-                    <span className="text-xs font-black uppercase tracking-wider">Dividir:</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSplitCount(Math.max(1, splitCount - 1))} disabled={isProcessing} className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/50 disabled:opacity-50 outline-none"><Minus size={16}/></motion.button>
-                    <span className="font-black text-xl w-6 text-center text-gray-900 dark:text-white lya:text-lya-text">{splitCount}</span>
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSplitCount(splitCount + 1)} disabled={isProcessing} className="p-2 bg-white dark:bg-gray-700 lya:bg-lya-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 lya:border-lya-border/50 disabled:opacity-50 outline-none"><Plus size={16}/></motion.button>
-                  </div>
-                </motion.div>
-              )}
             </AnimatePresence>
           </div>
 
           <div className="text-center py-3 sm:py-4 bg-gray-50 dark:bg-gray-800/30 lya:bg-lya-bg/50 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 dark:border-gray-800 lya:border-lya-border/20">
             <span className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 lya:text-lya-primary uppercase tracking-widest font-black block mb-0.5">
-              {cobroMode === 'full' ? getFullModeTextTotal() : cobroMode === 'equal' ? `Parte a cobrar (1 de ${splitCount})` : `Cobrando ${selectedCuentas.length} Cuentas`}
+              {cobroMode === 'full' ? getFullModeTextTotal() : `Cobrando ${selectedCuentas.length} ${selectedCuentas.length === 1 ? 'Cuenta' : 'Cuentas'}`}
             </span>
             <div className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tighter drop-shadow-sm">
               ${amountToPay.toFixed(2)}

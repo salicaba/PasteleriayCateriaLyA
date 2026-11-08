@@ -20,7 +20,7 @@ const parseAccountDisplayName = (str) => {
 };
 
 // ==========================================
-// 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN Y LIBERACIÓN
+// 🧙‍♂️ UTILIDAD: DESEMPAQUETAR METADATA DE PROMOCIÓN, PAGO Y LIBERACIÓN
 // ==========================================
 const extractPromoMeta = (item) => {
   const plainItem = item.toJSON ? item.toJSON() : item;
@@ -30,6 +30,7 @@ const extractPromoMeta = (item) => {
   plainItem.isTransferred = false;
   plainItem.transfers = [];
   plainItem._isReleased = false; 
+  plainItem._isPaid = false;
   
   if (plainItem.notes) {
     try {
@@ -46,10 +47,26 @@ const extractPromoMeta = (item) => {
         if (parsedNotes.some(n => n && n._isReleased)) {
           plainItem._isReleased = true;
         }
+        if (parsedNotes.some(n => n && n._isPaid)) {
+          plainItem._isPaid = true;
+        }
       }
     } catch(e) {}
   }
   return plainItem;
+};
+
+// Reconstruye las cuentas pagadas a partir de los ítems visibles y/o order.paidAccounts
+const computeVisiblePaidAccounts = (visibleItems = [], rawPaidAccounts = []) => {
+  const visibleAccounts = Array.from(new Set(visibleItems.map(i => i.cuenta || 'General')));
+  const paidFromItems = visibleAccounts.filter(acc => {
+    const accItems = visibleItems.filter(i => (i.cuenta || 'General') === acc);
+    return accItems.length > 0 && accItems.every(i => i._isPaid);
+  });
+  const validRawPaid = Array.isArray(rawPaidAccounts)
+    ? rawPaidAccounts.filter(acc => visibleAccounts.includes(acc))
+    : [];
+  return Array.from(new Set([...validRawPaid, ...paidFromItems]));
 };
 
 // Combina historiales de transferencia agrupando por cuenta origen
@@ -112,7 +129,7 @@ export const createOrder = async (req, res) => {
            nombreCliente = String(ticketId).replace(/Llevar\s*#?[0-9\-\s]*/i, '').trim();
            if (!nombreCliente) nombreCliente = 'Cliente';
         }
-        finalTicketId = `Llevar #${folioSeguro} - ${nombreCliente}`;
+        finalTicketId = `Llevar #${folioSeguro}\n${nombreCliente}`;
       }
     }
 
@@ -284,11 +301,7 @@ export const getActiveOrderByTable = async (req, res) => {
     if (validOrder && validOrder.items) {
       validOrder.items = validOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
       validOrder.totalAmount = validOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-      
-      if (validOrder.paidAccounts && Array.isArray(validOrder.paidAccounts)) {
-        const visibleAccounts = new Set(validOrder.items.map(i => i.cuenta || 'General'));
-        validOrder.paidAccounts = validOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
-      }
+      validOrder.paidAccounts = computeVisiblePaidAccounts(validOrder.items, validOrder.paidAccounts);
     }
     
     res.json({ order: validOrder });
@@ -404,11 +417,7 @@ export const getActiveOrders = async (req, res) => {
       if (plainOrder.items) {
         plainOrder.items = plainOrder.items.map(extractPromoMeta).filter(i => !i._isReleased);
         plainOrder.totalAmount = plainOrder.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-        
-        if (plainOrder.paidAccounts && Array.isArray(plainOrder.paidAccounts)) {
-          const visibleAccounts = new Set(plainOrder.items.map(i => i.cuenta || 'General'));
-          plainOrder.paidAccounts = plainOrder.paidAccounts.filter(acc => visibleAccounts.has(acc));
-        }
+        plainOrder.paidAccounts = computeVisiblePaidAccounts(plainOrder.items, plainOrder.paidAccounts);
       }
       validOrders.push(plainOrder);
     }
@@ -691,7 +700,6 @@ export const splitDeliverItem = async (req, res) => {
     const item = await OrderItem.findByPk(itemId);
     if (!item) return res.status(404).json({ message: 'Producto no encontrado' });
 
-    // 🔥 FIX: Si el producto ya estaba en DELIVERED, respondemos 200 OK de forma idempotente (sin error 400)
     if (item.kitchenStatus === 'DELIVERED') {
       const currentItems = await OrderItem.findAll({
         where: { orderId: item.orderId, status: 'ACTIVE' },
@@ -760,7 +768,6 @@ export const splitDeliverItem = async (req, res) => {
       });
     }
 
-    // 🔥 Devolvemos siempre los ítems actualizados con sus nuevos IDs para que el frontend no pierda sincronía
     const allItems = await OrderItem.findAll({
       where: { orderId: item.orderId, status: 'ACTIVE' },
       include: [{ model: Product, as: 'product', attributes: ['name', 'basePrice', 'imageUrl', 'requiereCocina'] }]
@@ -871,28 +878,24 @@ export const checkOrderStatus = async (req, res) => {
       });
     }
     
-    // 🔥 FIX: En SALON el estado por defecto de una cuenta individual es 'OPEN' a menos que esa cuenta esté pagada
     let accountStatus = order.orderType === 'LLEVAR' ? order.status : 'OPEN';
     let clientItems = []; 
     
-    const isAccountInPaidList = order.paidAccounts && Array.isArray(order.paidAccounts) && 
+    const isAccountInPaidColumn = order.paidAccounts && Array.isArray(order.paidAccounts) && 
       order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase);
 
     if (targetCuenta) {
       if (itemsCuenta.length > 0) {
         const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
-        
-        const isReleased = !allCancelled && activeOwnItems.length > 0 && activeOwnItems.every(item => {
-          try {
-            const n = JSON.parse(item.notes || '[]');
-            return Array.isArray(n) && n.some(x => x && x._isReleased);
-          } catch(e) { return false; }
-        });
+        const unpackedActiveOwn = activeOwnItems.map(extractPromoMeta);
+        const visibleOwn = unpackedActiveOwn.filter(item => !item._isReleased);
 
-        // En SALON es pagada si está en paidAccounts o si toda la orden sigue en PAID teniendo ya productos propios
+        const isReleased = !allCancelled && unpackedActiveOwn.length > 0 && visibleOwn.length === 0;
+        const areAllOwnItemsPaid = visibleOwn.length > 0 && visibleOwn.every(item => item._isPaid);
+
         const isPaid = order.orderType === 'LLEVAR'
-          ? (order.status === 'PAID' || isAccountInPaidList)
-          : (isAccountInPaidList || order.status === 'PAID');
+          ? (order.status === 'PAID' || areAllOwnItemsPaid || isAccountInPaidColumn)
+          : (areAllOwnItemsPaid || isAccountInPaidColumn);
 
         if (allCancelled) {
           accountStatus = 'CANCELLED';
@@ -900,11 +903,12 @@ export const checkOrderStatus = async (req, res) => {
           accountStatus = 'CLOSED';
         } else if (isPaid) {
           accountStatus = 'PAID';
+          clientItems = visibleOwn;
         } else {
           accountStatus = 'OPEN';
-          clientItems = activeOwnItems.map(extractPromoMeta).filter(i => !i._isReleased);
+          clientItems = visibleOwn;
         }
-      } else if (isAccountInPaidList) {
+      } else if (isAccountInPaidColumn) {
         accountStatus = 'PAID';
       }
     }

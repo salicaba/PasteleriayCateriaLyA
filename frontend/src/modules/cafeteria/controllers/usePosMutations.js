@@ -37,9 +37,35 @@ export const usePosMutations = ({
     );
     if (!discountItem) return null;
     return {
+      cuenta: cuentaTarget || 'General',
       promoId: discountItem.promoId,
       name: discountItem.nombre || 'Descuento Promoción',
       amount: Math.abs(Number(discountItem.precio) * (discountItem.qty || 1))
+    };
+  };
+
+  // 🔥 Obtiene la suma y el desglose de descuentos por ticket de todas las cuentas pendientes al cobrar toda la mesa
+  const getFullOrderTicketDiscounts = () => {
+    const unpaidDiscountItems = cart.filter(
+      i => i.isVirtualDiscount && i.status !== 'CANCELLED' && !cuentasPagadasReales.includes(i.cuenta || 'General')
+    );
+    if (unpaidDiscountItems.length === 0) return { ticketDiscount: null, ticketDiscountsByAccount: [] };
+
+    const ticketDiscountsByAccount = unpaidDiscountItems.map(d => ({
+      cuenta: d.cuenta || 'General',
+      promoId: d.promoId,
+      name: d.nombre || 'Descuento Promoción',
+      amount: Math.abs(Number(d.precio) * (d.qty || 1))
+    }));
+
+    const totalDiscountAmount = ticketDiscountsByAccount.reduce((sum, d) => sum + d.amount, 0);
+    return {
+      ticketDiscount: {
+        promoId: ticketDiscountsByAccount[0].promoId,
+        name: ticketDiscountsByAccount.map(d => d.name).join(' + '),
+        amount: totalDiscountAmount
+      },
+      ticketDiscountsByAccount
     };
   };
 
@@ -62,7 +88,7 @@ export const usePosMutations = ({
 
       // Limpiamos metadatos internos para que no se pinten como notas de cocina
       const cleanPreps = parsedPreps.filter(
-        n => n && !n._isPromoMeta && !n._isTicketDiscountMeta && !n._isReleased
+        n => n && !n._isPromoMeta && !n._isTicketDiscountMeta && !n._isReleased && !n._isPaid
       );
       
       return { 
@@ -198,13 +224,14 @@ export const usePosMutations = ({
       }
       
       const method = paymentDetails?.method || 'efectivo';
-      const ticketDiscount = getAccountTicketDiscount('General');
+      const { ticketDiscount, ticketDiscountsByAccount } = getFullOrderTicketDiscounts();
       
       if (targetOrderId) {
         await client.put(`/pos/orders/${targetOrderId}/pay`, { 
           isFullPayment: true, 
           paymentMethod: method,
-          ticketDiscount 
+          ticketDiscount,
+          ticketDiscountsByAccount
         });
       }
       
@@ -543,7 +570,7 @@ export const usePosMutations = ({
     }
   };
 
-  // 🔥 ENTREGAR TODOS LOS PRODUCTOS LISTOS (Blindado contra errores 400 y con actualización optimista)
+  // 🔥 ENTREGAR TODOS LOS PRODUCTOS LISTOS
   const deliverAllActiveItems = async () => {
     if (!activeOrderId) return;
     if (lockRef.current) return;
@@ -577,7 +604,6 @@ export const usePosMutations = ({
           )
         );
 
-        // Si el backend nos devolvió la lista fresca de orderItems, sincronizamos los IDs
         const fulfilledWithItems = results
           .filter(r => r.status === 'fulfilled' && r.value?.data?.orderItems)
           .pop();
@@ -753,7 +779,7 @@ export const usePosMutations = ({
       }
   };
 
-  // 🔥 LIBERAR CUENTA / SIGUIENTE VENTA EN MOSTRADOR (Elimina inmediatamente la cuenta de memoria para que no rebote)
+  // 🔥 LIBERAR CUENTA / SIGUIENTE VENTA EN MOSTRADOR
   const releaseAccount = async (cuentaName) => {
     if (lockRef.current) return;
     lockRef.current = true;
@@ -768,7 +794,6 @@ export const usePosMutations = ({
         orderClosed = Boolean(res.data?.orderClosed);
       }
 
-      // 1. Purgamos inmediatamente los ítems de la cuenta liberada en la UI
       const remainingCart = cart.filter(
         item => (item.cuenta || 'General') !== targetAcc && item.status !== 'CANCELLED' && !item.isVirtualDiscount
       );
@@ -787,7 +812,6 @@ export const usePosMutations = ({
         return updatedPaid;
       });
 
-      // 2. Si era la última cuenta activa (como en Mostrador Express), reiniciamos la orden limpia
       if (orderClosed || remainingCart.length === 0) {
         if (activeOrderId) {
           localStorage.removeItem(`lya_phones_${activeOrderId}`);

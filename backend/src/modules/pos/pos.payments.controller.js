@@ -5,6 +5,8 @@ import Table from './Table.model.js';
 import Transaction from '../cash/Transaction.model.js';
 import Product from '../menu/Product.model.js';
 
+const cleanAccountBase = (str) => String(str || '').split(' | ')[0].split(' - ')[0].trim().toLowerCase();
+
 // 🔥 CEREBRO EXTRACTOR VISUAL
 const parseAccountName = (str) => {
   if (!str) return 'General';
@@ -16,6 +18,16 @@ const parseAccountName = (str) => {
     if (possiblePhone.length >= 10) return parts.slice(0, -1).join(' - ').trim();
   }
   return s;
+};
+
+// 🔥 Verifica si un ítem ya tiene sello de pagado en sus notas
+const isItemMarkedPaid = (item) => {
+  try {
+    const notes = JSON.parse(item.notes || '[]');
+    return Array.isArray(notes) && notes.some(n => n && n._isPaid);
+  } catch (e) {
+    return false;
+  }
 };
 
 // 🔥 DETECTOR BLINDADO DE DEPARTAMENTO (ignora tildes y mayúsculas)
@@ -34,7 +46,7 @@ const isPasteleriaDepartamento = (departamento) => {
 export const payOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cuentaName, isFullPayment, paymentMethod, ticketDiscount } = req.body;
+    const { cuentaName, isFullPayment, paymentMethod, ticketDiscount, ticketDiscountsByAccount } = req.body;
     
     const order = await Order.findByPk(orderId, { 
       include: ['items', { model: Table, as: 'table' }] 
@@ -42,7 +54,22 @@ export const payOrder = async (req, res) => {
     
     if (!order) return res.status(404).json({ message: 'Orden no encontrada' });
     
-    let paidAccounts = [...(order.paidAccounts || [])];
+    const orderItems = order.items || [];
+    const activeItems = orderItems.filter(i => (i.status === 'ACTIVE' || !i.status) && ! (() => {
+      try {
+        const n = JSON.parse(i.notes || '[]');
+        return Array.isArray(n) && n.some(x => x && x._isReleased);
+      } catch (e) { return false; }
+    })());
+
+    // Reconstruimos las cuentas que ya estaban pagadas previamente (por columna o por sello _isPaid en sus ítems)
+    const allOrderAccounts = Array.from(new Set(activeItems.map(i => i.cuenta || 'General')));
+    const previouslyPaidFromItems = allOrderAccounts.filter(acc => {
+      const accItems = activeItems.filter(i => (i.cuenta || 'General') === acc);
+      return accItems.length > 0 && accItems.every(isItemMarkedPaid);
+    });
+
+    let paidAccounts = Array.from(new Set([...(order.paidAccounts || []), ...previouslyPaidFromItems]));
     
     const randomNum = Math.floor(100 + Math.random() * 900);
     const timestamp = Date.now().toString().slice(-6);
@@ -68,13 +95,15 @@ export const payOrder = async (req, res) => {
     if (paymentMethod === 'transferencia' || paymentMethod === 'TRANSFER') dbMethod = 'TRANSFER';
     else if (paymentMethod === 'tarjeta' || paymentMethod === 'CARD') dbMethod = 'CARD';
 
-    const orderItems = order.items || [];
-    const activeItems = orderItems.filter(i => i.status === 'ACTIVE' || !i.status);
     const targetAccountName = cuentaName || 'General';
+    const targetBase = cleanAccountBase(targetAccountName);
     
     const itemsToPay = isFullPayment
-      ? activeItems.filter(i => !paidAccounts.includes(i.cuenta || 'General'))
-      : activeItems.filter(i => (i.cuenta || 'General') === targetAccountName);
+      ? activeItems.filter(i => !paidAccounts.includes(i.cuenta || 'General') && !isItemMarkedPaid(i))
+      : activeItems.filter(i => {
+          const itemAcc = i.cuenta || 'General';
+          return (itemAcc === targetAccountName || cleanAccountBase(itemAcc) === targetBase) && !isItemMarkedPaid(i);
+        });
 
     let amountCafeteria = 0;
     let amountPasteleria = 0;
@@ -108,30 +137,63 @@ export const payOrder = async (req, res) => {
         amountPasteleria = Math.max(0, amountPasteleria - remainingDiscount);
       }
 
-      const anchorItem = itemsToPay[0];
-      let anchorNotes = [];
-      try { anchorNotes = JSON.parse(anchorItem.notes || '[]'); } catch(e) {}
-      if (!Array.isArray(anchorNotes)) anchorNotes = [anchorNotes];
+      if (isFullPayment && Array.isArray(ticketDiscountsByAccount) && ticketDiscountsByAccount.length > 0) {
+        for (const accDisc of ticketDiscountsByAccount) {
+          if (!accDisc || Number(accDisc.amount) <= 0) continue;
+          const accAnchor = itemsToPay.find(i => (i.cuenta || 'General') === (accDisc.cuenta || 'General')) || itemsToPay[0];
+          if (accAnchor) {
+            let anchorNotes = [];
+            try { anchorNotes = JSON.parse(accAnchor.notes || '[]'); } catch(e) {}
+            if (!Array.isArray(anchorNotes)) anchorNotes = [anchorNotes];
 
-      anchorNotes = anchorNotes.filter(n => !(n && n._isTicketDiscountMeta));
-      anchorNotes.push({
-        _isTicketDiscountMeta: true,
-        promoId: ticketDiscount.promoId || null,
-        name: ticketDiscount.name || 'Descuento Promoción',
-        amount: discountAmt
-      });
-      await anchorItem.update({ notes: JSON.stringify(anchorNotes) });
+            anchorNotes = anchorNotes.filter(n => !(n && n._isTicketDiscountMeta));
+            anchorNotes.push({
+              _isTicketDiscountMeta: true,
+              promoId: accDisc.promoId || null,
+              name: accDisc.name || 'Descuento Promoción',
+              amount: Number(accDisc.amount)
+            });
+            await accAnchor.update({ notes: JSON.stringify(anchorNotes) });
+          }
+        }
+      } else {
+        const anchorItem = itemsToPay[0];
+        let anchorNotes = [];
+        try { anchorNotes = JSON.parse(anchorItem.notes || '[]'); } catch(e) {}
+        if (!Array.isArray(anchorNotes)) anchorNotes = [anchorNotes];
+
+        anchorNotes = anchorNotes.filter(n => !(n && n._isTicketDiscountMeta));
+        anchorNotes.push({
+          _isTicketDiscountMeta: true,
+          promoId: ticketDiscount.promoId || null,
+          name: ticketDiscount.name || 'Descuento Promoción',
+          amount: discountAmt
+        });
+        await anchorItem.update({ notes: JSON.stringify(anchorNotes) });
+      }
+    }
+
+    // 🔥 Sellar cada ítem cobrado con { _isPaid: true } en sus notas
+    for (const item of itemsToPay) {
+      let currentNotes = [];
+      try { currentNotes = JSON.parse(item.notes || '[]'); } catch (e) {}
+      if (!Array.isArray(currentNotes)) currentNotes = [currentNotes];
+
+      if (!currentNotes.some(n => n && n._isPaid)) {
+        currentNotes.push({ _isPaid: true });
+        await item.update({ notes: JSON.stringify(currentNotes) });
+      }
     }
 
     if (isFullPayment) {
-      const allActiveAccs = Array.from(new Set(activeItems.map(i => i.cuenta || 'General')));
-      paidAccounts = Array.from(new Set([...paidAccounts, ...allActiveAccs]));
+      paidAccounts = Array.from(new Set([...paidAccounts, ...allOrderAccounts]));
     } else if (targetAccountName && !paidAccounts.includes(targetAccountName)) {
       paidAccounts.push(targetAccountName);
     }
 
-    const allOrderAccounts = Array.from(new Set(activeItems.map(i => i.cuenta || 'General')));
-    const areAllAccountsPaid = allOrderAccounts.length > 0 && allOrderAccounts.every(acc => paidAccounts.includes(acc));
+    const areAllAccountsPaid = allOrderAccounts.length > 0 && allOrderAccounts.every(
+      acc => paidAccounts.some(p => p === acc || cleanAccountBase(p) === cleanAccountBase(acc))
+    );
 
     const updatedTotalAmount = Math.max(0, Number(order.totalAmount) - discountAmt);
 
@@ -188,8 +250,10 @@ export const payOrder = async (req, res) => {
       orderId: order.id, 
       tableId: order.tableId, 
       ticketId: order.ticketId, 
-      isFullPayment: isFullPayment || areAllAccountsPaid, 
-      cuentaName: targetAccountName 
+      isFullPayment: Boolean(isFullPayment), 
+      areAllAccountsPaid,
+      cuentaName: targetAccountName,
+      paidAccounts
     });
 
     res.json({ message: 'Pago registrado con éxito en Caja', order });
