@@ -1,12 +1,15 @@
 // frontend/src/modules/client/views/components/ClientCheckoutModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2, BadgePercent, Gift } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, AlertTriangle, Loader2, CheckCircle, Lock, Tag, Trash2, BadgePercent, Gift, ReceiptText, PlusCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ClientCheckoutModal({
   cart = [], 
   totalCart = 0,
+  cartPhysicalSubtotal = 0,
+  confirmedTotal = 0,
+  confirmedItemsCount = 0,
   isSubmitting,
   onClose,
   onConfirmOrder,
@@ -30,6 +33,10 @@ export default function ClientCheckoutModal({
 
   const regularItems = cart.filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT');
   const ticketDiscounts = cart.filter(i => i.isVirtualDiscount || i.promoType === 'TICKET_DISCOUNT');
+
+  const hasConfirmedBalance = Number(confirmedItemsCount || 0) > 0;
+  const computedPhysicalCartSubtotal = cartPhysicalSubtotal || regularItems.reduce((acc, i) => acc + (Number(i.precioUnitario || 0) * Number(i.qty || 0)), 0);
+  const projectedGrandTotal = Math.max(0, Number(confirmedTotal || 0) + Number(totalCart || 0));
 
   // Si el cliente vacía todos los productos de su carrito previo, cerramos el modal automáticamente
   useEffect(() => {
@@ -80,10 +87,19 @@ export default function ClientCheckoutModal({
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex flex-col justify-end p-4">
       <div className="absolute inset-0" onClick={() => !isSubmitting && !actionLoading && !promoWarning?.isOpen && onClose()} />
-      <motion.div initial={{ y: '100%', scale: 0.95, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: '100%', scale: 0.95, opacity: 0 }} transition={{ type: 'spring', damping: 26, stiffness: 220 }} className="relative bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] rounded-[2.5rem] p-6 pb-8 space-y-5 shadow-2xl max-w-md mx-auto w-full border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex flex-col max-h-[85vh] overflow-hidden">
+      <motion.div initial={{ y: '100%', scale: 0.95, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: '100%', scale: 0.95, opacity: 0 }} transition={{ type: 'spring', damping: 26, stiffness: 220 }} className="relative bg-gray-50 dark:bg-gray-900 lya:bg-[#FAF6F0] rounded-[2.5rem] p-6 pb-8 space-y-4 shadow-2xl max-w-md mx-auto w-full border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] flex flex-col max-h-[88vh] overflow-hidden">
         
         <div className="flex items-center justify-between shrink-0">
-          <h3 className="text-3xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight">Tu Orden</h3>
+          <div>
+            <h3 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight leading-none">
+              {hasConfirmedBalance ? 'Nuevo Pedido' : 'Tu Orden'}
+            </h3>
+            {hasConfirmedBalance && (
+              <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] mt-1">
+                Se sumará a los productos que ya confirmaste
+              </p>
+            )}
+          </div>
           <motion.button 
             whileTap={{ scale: 0.95 }} 
             onClick={onClose} 
@@ -269,39 +285,93 @@ export default function ClientCheckoutModal({
                 key={discount.cartItemId} 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-[1.5rem] p-4 flex items-center justify-between shadow-sm shrink-0"
+                className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-[1.5rem] p-3.5 flex items-center justify-between shadow-sm shrink-0"
             >
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-800/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
-                        <BadgePercent size={20} strokeWidth={2.5} />
+                    <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-800/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
+                        <BadgePercent size={18} strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h4 className="text-emerald-800 dark:text-emerald-300 font-black text-sm">{discount.nombre}</h4>
+                        <h4 className="text-emerald-800 dark:text-emerald-300 font-black text-xs sm:text-sm">{discount.nombre}</h4>
                         <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">{discount.promoLabel || 'Descuento Extra'}</span>
                     </div>
                 </div>
-                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
                     -${Math.abs(Number(discount.precioUnitario || 0)).toFixed(2)}
                 </div>
             </motion.div>
         ))}
 
-        <div className="flex justify-between items-center py-4 border-y border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] text-gray-900 dark:text-white lya:text-[#3E2723] shrink-0 relative overflow-hidden h-16">
-          <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] z-10">Total a Pagar</span>
-          
-          <div className="flex items-center justify-end z-10">
-            {actionLoading ? (
-              <Loader2 size={24} className="animate-spin text-orange-500" />
-            ) : (
-              <span className="text-3xl font-black tracking-tight">${Math.max(0, totalCart || 0).toFixed(2)}</span>
-            )}
-          </div>
-        </div>
+        {/* 🔥 DESGLOSE DE SALDO CONFIRMADO + NUEVO PEDIDO = TOTAL ACUMULADO */}
+        {hasConfirmedBalance ? (
+          <div className="p-4 rounded-[1.75rem] bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] space-y-2.5 shrink-0 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
+              <span className="flex items-center gap-1.5">
+                <ReceiptText size={14} className="text-gray-400 dark:text-gray-500 lya:text-[#78350F]" />
+                Ya confirmado en tu nota ({confirmedItemsCount} {confirmedItemsCount === 1 ? 'prod.' : 'prods.'})
+              </span>
+              <span className="font-black text-gray-800 dark:text-gray-200 lya:text-[#3E2723]">
+                ${Number(confirmedTotal).toFixed(2)}
+              </span>
+            </div>
 
-        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-[1.5rem] p-5 flex gap-4 text-red-600 dark:text-red-400 shrink-0">
-          <AlertTriangle size={24} className="shrink-0 mt-0.5" />
-          <div className="text-xs font-medium leading-relaxed text-center">
-            <p className="font-bold uppercase tracking-wider mb-1 text-[10px]">Políticas de confirmación</p>
+            <div className="flex items-center justify-between text-xs font-bold text-orange-600 dark:text-orange-400 lya:text-[#78350F]">
+              <span className="flex items-center gap-1.5">
+                <PlusCircle size={14} />
+                Nuevo pedido en carrito
+              </span>
+              <span className="font-black">
+                +${computedPhysicalCartSubtotal.toFixed(2)}
+              </span>
+            </div>
+
+            {ticketDiscounts.length > 0 && (
+              <div className="flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <span>Descuento por Ticket aplicado</span>
+                <span className="font-black">
+                  -${Math.abs(ticketDiscounts.reduce((acc, d) => acc + Number(d.precioUnitario || 0), 0)).toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            <div className="pt-2.5 border-t border-dashed border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] flex items-center justify-between text-gray-900 dark:text-white lya:text-[#3E2723]">
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider block">
+                  Total Acumulado si Confirmas
+                </span>
+                <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 lya:text-[#7A6353]">
+                  Cuenta anterior + este pedido
+                </span>
+              </div>
+              <div className="flex items-center justify-end">
+                {actionLoading ? (
+                  <Loader2 size={24} className="animate-spin text-orange-500" />
+                ) : (
+                  <span className="text-2xl sm:text-3xl font-black tracking-tight text-orange-600 dark:text-orange-400 lya:text-[#78350F]">
+                    ${projectedGrandTotal.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-between items-center py-4 border-y border-gray-200 dark:border-gray-800 lya:border-[#EADCC9] text-gray-900 dark:text-white lya:text-[#3E2723] shrink-0 relative overflow-hidden h-16">
+            <span className="text-sm font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] z-10">Total a Pagar</span>
+            
+            <div className="flex items-center justify-end z-10">
+              {actionLoading ? (
+                <Loader2 size={24} className="animate-spin text-orange-500" />
+              ) : (
+                <span className="text-3xl font-black tracking-tight">${Math.max(0, totalCart || 0).toFixed(2)}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-[1.5rem] p-4 flex gap-3.5 text-red-600 dark:text-red-400 shrink-0">
+          <AlertTriangle size={22} className="shrink-0 mt-0.5" />
+          <div className="text-[11px] font-medium leading-relaxed text-center">
+            <p className="font-bold uppercase tracking-wider mb-0.5 text-[10px]">Políticas de confirmación</p>
             Al confirmar la orden, el pedido entra de forma automática a producción en cocina. Por seguridad operacional, <b>no se permiten cancelaciones posteriores</b>.
           </div>
         </div>
@@ -311,7 +381,7 @@ export default function ClientCheckoutModal({
           disabled={isSubmitting || actionLoading !== null} 
           onClick={onConfirmOrder} 
           className={clsx(
-            "w-full py-5 rounded-[2rem] font-black text-lg shadow-xl transition-colors flex items-center justify-center gap-3 shrink-0 outline-none select-none touch-manipulation relative overflow-hidden", 
+            "w-full py-4 sm:py-5 rounded-[2rem] font-black text-base sm:text-lg shadow-xl transition-colors flex items-center justify-center gap-3 shrink-0 outline-none select-none touch-manipulation relative overflow-hidden", 
             isSubmitting || actionLoading 
               ? "bg-gray-400 dark:bg-gray-700 lya:bg-[#EADCC9] text-white/70 cursor-not-allowed shadow-none" 
               : "bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white md:hover:brightness-105 shadow-orange-500/30 dark:shadow-orange-900/40"
@@ -321,6 +391,8 @@ export default function ClientCheckoutModal({
             <><Loader2 className="animate-spin" size={22} /><span>Enviando a cocina...</span></>
           ) : actionLoading ? (
             <><Loader2 className="animate-spin" size={22} /><span>Calculando Total...</span></>
+          ) : hasConfirmedBalance ? (
+            <><span>Confirmar y Sumar (${projectedGrandTotal.toFixed(2)})</span><CheckCircle size={22} strokeWidth={2.5} /></>
           ) : (
             <><span>Confirmar Orden</span><CheckCircle size={22} strokeWidth={2.5} /></>
           )}

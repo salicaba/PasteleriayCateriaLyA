@@ -15,7 +15,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   const [isLoading, setIsLoading] = useState(true);
   
   const [activeCategory, setActiveCategory] = useState('todas');
-  const [promoFiltro, setPromoFiltro] = useState(null); // ✨ Estado para filtrar por promoción/color
+  const [promoFiltro, setPromoFiltro] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -79,18 +79,30 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     return saved ? JSON.parse(saved) : { items: [], total: 0 };
   });
 
-  // 🔥 CÁLCULO INTELIGENTE: Subtotal ya confirmado en la nota del cliente (para acumular rondas de TICKET_DISCOUNT)
+  // 🔥 CÁLCULO EXACTO DE LA NOTA YA CONFIRMADA (Productos físicos, descuentos previos y total neto)
   const confirmedPhysicalSubtotal = useMemo(() => {
     return (confirmedSnapshot?.items || [])
-      .filter(i => !i.isVirtualDiscount && i.status !== 'CANCELLED')
+      .filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT' && i.status !== 'CANCELLED')
       .reduce((sum, i) => sum + ((Number(i.precioUnitario) || 0) * (i.qty || 1)), 0);
   }, [confirmedSnapshot]);
 
-  const hasConfirmedTicketDiscount = useMemo(() => {
-    return (confirmedSnapshot?.items || []).some(i => i.isVirtualDiscount);
+  const confirmedTicketDiscount = useMemo(() => {
+    return (confirmedSnapshot?.items || [])
+      .filter(i => (i.isVirtualDiscount || i.promoType === 'TICKET_DISCOUNT') && i.status !== 'CANCELLED')
+      .reduce((sum, i) => sum + ((Number(i.precioUnitario) || 0) * (i.qty || 1)), 0);
   }, [confirmedSnapshot]);
 
-  const cartUtils = useClientCart(triggerNotification, hasConfirmedTicketDiscount ? 0 : confirmedPhysicalSubtotal);
+  const confirmedTotal = useMemo(() => {
+    return Math.max(0, confirmedPhysicalSubtotal + confirmedTicketDiscount);
+  }, [confirmedPhysicalSubtotal, confirmedTicketDiscount]);
+
+  const confirmedItemsCount = useMemo(() => {
+    return (confirmedSnapshot?.items || [])
+      .filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT' && i.status !== 'CANCELLED')
+      .reduce((sum, i) => sum + (Number(i.qty) || 1), 0);
+  }, [confirmedSnapshot]);
+
+  const cartUtils = useClientCart(triggerNotification, confirmedPhysicalSubtotal, confirmedTicketDiscount);
   const { cart, setCart, addToCart, totalCart } = cartUtils;
 
   useEffect(() => {
@@ -273,7 +285,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     if (!bestTicketPromo || activePhysical.length === 0) return [];
 
     const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
-    const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
+    const isPercentage = (bestTicketPromo.discountType || bestTicketPromo.discount_type) === 'PERCENTAGE';
     let finalDiscountPrice = isPercentage ? (physicalSubtotal * (rawDiscount / 100)) : rawDiscount;
     finalDiscountPrice = -Math.min(physicalSubtotal, Math.abs(finalDiscountPrice));
 
@@ -569,7 +581,6 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     };
   }, [loadMenuData]);
 
-  // ✨ Al cambiar de categoría en el Header, limpiamos cualquier filtro de promoción activo
   const handleSelectCategory = useCallback((catId) => {
     setActiveCategory(catId);
     setPromoFiltro(null);
@@ -621,7 +632,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
   };
 
   const handleConfirmOrder = async () => {
-    const physicalItems = cart.filter(item => !item.isVirtualDiscount);
+    const physicalItems = cart.filter(item => !item.isVirtualDiscount && item.promoType !== 'TICKET_DISCOUNT');
     if (physicalItems.length === 0) return;
 
     setIsSubmitting(true);
@@ -675,7 +686,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       }
 
       setConfirmedSnapshot(prev => {
-        const baseItems = orderWasClosedOrDeleted ? [] : [...prev.items].filter(i => !i.isVirtualDiscount);
+        const baseItems = orderWasClosedOrDeleted ? [] : [...prev.items].filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT');
         const newPhysicalItems = [...baseItems];
         
         physicalItems.forEach(cartItem => {
@@ -739,6 +750,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     themeIndex, sizeIndex, isSubmitting, addingToCartId, notification,
     sessionExpired, finalizedStatus, isOrderPaid, showFinalizedOverlay,
     isServiceActive, isConfirmed, setIsConfirmed, isReadOnly, confirmedSnapshot,
+    confirmedTotal, confirmedPhysicalSubtotal, confirmedTicketDiscount, confirmedItemsCount,
     transferredItems, transferredToAccounts,
     isLoggingOut, displayName, displayPhone, visibleProducts,
     triggerNotification, handleLogout, handleDownloadTicket, cycleTheme, 

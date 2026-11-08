@@ -1,7 +1,7 @@
 // frontend/src/modules/client/views/ClientMenu.jsx
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter, Receipt, ShieldAlert } from 'lucide-react';
+import { ReceiptText, Loader2, CheckCircle2, AlertTriangle, Clock, Gift, Sparkles, Layers, Tag, X, Filter, Receipt, ShieldAlert, PlusCircle } from 'lucide-react';
 import clsx from 'clsx';
 import logoLyA from '../../../assets/logo.jpeg'; 
 
@@ -144,14 +144,8 @@ export default function ClientMenu(props) {
   }, [validTodayPromos]);
 
   const clientPhysicalSubtotal = useMemo(() => {
-    const confirmedSum = (ctrl.confirmedSnapshot?.items || [])
-      .filter(i => !i.isVirtualDiscount && i.status !== 'CANCELLED')
-      .reduce((sum, i) => sum + ((Number(i.precioUnitario) || 0) * (i.qty || 1)), 0);
-    const cartSum = (ctrl.cartUtils.cart || [])
-      .filter(i => !i.isVirtualDiscount && i.status !== 'CANCELLED')
-      .reduce((sum, i) => sum + ((Number(i.precioUnitario) || 0) * (i.qty || 1)), 0);
-    return confirmedSum + cartSum;
-  }, [ctrl.confirmedSnapshot?.items, ctrl.cartUtils.cart]);
+    return ctrl.confirmedPhysicalSubtotal + ctrl.cartUtils.cartPhysicalSubtotal;
+  }, [ctrl.confirmedPhysicalSubtotal, ctrl.cartUtils.cartPhysicalSubtotal]);
 
   const ticketPromoStatus = useMemo(() => {
     if (activeTicketPromos.length === 0) return null;
@@ -294,6 +288,10 @@ export default function ClientMenu(props) {
 
   const rewardModalData = ctrl.cartUtils.pendingPromoReward;
   const hasNoteToView = ctrl.confirmedSnapshot.items.length > 0 || (ctrl.transferredItems && ctrl.transferredItems.length > 0);
+  const hasConfirmedBalance = ctrl.confirmedItemsCount > 0;
+  const newCartNetTotal = ctrl.cartUtils.totalCart;
+  const projectedGrandTotal = Math.max(0, ctrl.confirmedTotal + newCartNetTotal);
+
   const activeFilterColorScheme = ctrl.promoFiltro ? getPromoColor(ctrl.promoFiltro.id) : null;
   const isFilteredPromoCombinable = ctrl.promoFiltro && Array.isArray(ctrl.promoFiltro.applyToProducts) && ctrl.promoFiltro.applyToProducts.length > 1;
 
@@ -350,8 +348,58 @@ export default function ClientMenu(props) {
         setShowSettings={ctrl.setShowSettings}
       />
 
-      <div className="flex-1 overflow-y-auto px-6 py-4 pb-32 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-6 py-4 pb-36 custom-scrollbar">
         
+        {/* 🔥 TARJETA DE SALDO ACUMULADO AL VOLVER A PEDIR */}
+        {hasConfirmedBalance && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 p-3.5 rounded-2xl bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] shadow-sm flex flex-col gap-2"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-600 dark:text-orange-400 lya:text-[#78350F] flex items-center justify-center shrink-0">
+                  <ReceiptText size={16} strokeWidth={2.5} />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-[#7A6353]">
+                    Ya confirmado en tu nota ({ctrl.confirmedItemsCount} {ctrl.confirmedItemsCount === 1 ? 'prod.' : 'prods.'})
+                  </p>
+                  <p className="text-sm font-black text-gray-900 dark:text-white lya:text-[#3E2723]">
+                    ${ctrl.confirmedTotal.toFixed(2)} <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">por pagar</span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => ctrl.setIsConfirmed(true)}
+                className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-700 lya:bg-white text-gray-800 dark:text-gray-200 lya:text-[#3E2723] text-[11px] font-black border border-gray-200 dark:border-gray-600 lya:border-[#D9C4A9] active:scale-95 transition-transform shrink-0"
+              >
+                Ver mi nota
+              </button>
+            </div>
+
+            {ctrl.cartUtils.cart.length > 0 && (
+              <div className="pt-2 border-t border-dashed border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9] flex items-center justify-between text-xs">
+                <span className="font-bold text-orange-600 dark:text-orange-400 lya:text-[#78350F] flex items-center gap-1">
+                  <PlusCircle size={13} strokeWidth={2.5} />
+                  Nuevo en carrito: +${ctrl.cartUtils.cartPhysicalSubtotal.toFixed(2)}
+                  {ctrl.cartUtils.cartTicketDiscount < 0 && (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                      {' '}(Desc. -${Math.abs(ctrl.cartUtils.cartTicketDiscount).toFixed(2)})
+                    </span>
+                  )}
+                </span>
+                <span className="font-black text-gray-900 dark:text-white lya:text-[#3E2723]">
+                  Total si confirmas: ${projectedGrandTotal.toFixed(2)}
+                </span>
+              </div>
+            )}
+          </motion.div>
+        )}
+
         {/* ✨ BARRA INTERACTIVA: ¿CÓMO FUNCIONAN LAS PROMOS? */}
         <div className="mb-3 flex items-center justify-between gap-2">
           <motion.button
@@ -497,7 +545,7 @@ export default function ClientMenu(props) {
         )}
       </div>
 
-      {/* 🔥 Botón "Mi Nota" visible si tiene productos propios o productos trasladados a otra cuenta */}
+      {/* 🔥 Botón "Mi Nota" con el monto ya confirmado */}
       <AnimatePresence>
         {hasNoteToView && !ctrl.showCheckout && !ctrl.selectedProduct && (
           <motion.div 
@@ -508,11 +556,24 @@ export default function ClientMenu(props) {
             className={clsx("fixed right-6 z-30 max-w-md mx-auto flex justify-end pointer-events-none", ctrl.cartUtils.cart.length > 0 ? "bottom-28" : "bottom-6")} 
             style={{ width: 'calc(100% - 3rem)' }}
           >
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => ctrl.setIsConfirmed(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] shadow-md border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] text-gray-800 dark:text-white lya:text-[#3E2723] font-black text-sm md:hover:scale-105 outline-none select-none touch-manipulation"><ReceiptText size={20} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" /><span>Mi Nota</span></motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => ctrl.setIsConfirmed(true)}
+              className="pointer-events-auto flex items-center gap-2 px-5 py-3.5 rounded-full bg-white dark:bg-gray-800 lya:bg-[#F3EBE0] shadow-md border border-gray-200 dark:border-gray-700 lya:border-[#EADCC9] text-gray-800 dark:text-white lya:text-[#3E2723] font-black text-sm md:hover:scale-105 outline-none select-none touch-manipulation"
+            >
+              <ReceiptText size={20} className="text-orange-500 dark:text-orange-400 lya:text-[#78350F]" />
+              <span>Mi Nota</span>
+              {hasConfirmedBalance && (
+                <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 lya:bg-[#EADCC9] text-orange-700 dark:text-orange-300 lya:text-[#78350F] text-xs font-black">
+                  ${ctrl.confirmedTotal.toFixed(2)}
+                </span>
+              )}
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* 🔥 Barra inferior "Revisar Pedido" con desglose de Confirmado + Nuevo = Total */}
       <AnimatePresence>
         {ctrl.cartUtils.cart.length > 0 && !ctrl.showCheckout && !ctrl.selectedProduct && (
           <motion.div 
@@ -526,13 +587,38 @@ export default function ClientMenu(props) {
               whileTap={{ scale: 0.98 }} 
               disabled={ctrl.isSubmitting}
               onClick={() => ctrl.setShowCheckout(true)} 
-              className={`w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 py-4 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-gray-800 dark:md:hover:bg-gray-100 lya:md:hover:bg-[#5C240A] transition-colors outline-none select-none touch-manipulation ${ctrl.isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              className={`w-full bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-white py-3.5 px-5 rounded-[2rem] flex items-center justify-between shadow-xl font-bold md:hover:bg-gray-800 dark:md:hover:bg-gray-100 lya:md:hover:bg-[#5C240A] transition-colors outline-none select-none touch-manipulation ${ctrl.isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 flex items-center justify-center font-black text-sm">{ctrl.cartUtils.totalItems}</div>
-                <span className="text-base font-black">Revisar Pedido</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-black/10 lya:bg-white/20 flex items-center justify-center font-black text-sm shrink-0">
+                  {ctrl.cartUtils.totalItems}
+                </div>
+                <div className="text-left min-w-0">
+                  <span className="text-base font-black block leading-tight">Revisar Pedido</span>
+                  {hasConfirmedBalance && (
+                    <span className="text-[10px] font-bold opacity-85 block truncate mt-0.5">
+                      Ya confirmado: ${ctrl.confirmedTotal.toFixed(2)} + Nuevo: ${ctrl.cartUtils.cartPhysicalSubtotal.toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
-              {ctrl.addingToCartId !== null || ctrl.isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <span className="font-black text-xl">${Math.max(0, ctrl.cartUtils.totalCart).toFixed(2)}</span>}
+
+              {ctrl.addingToCartId !== null || ctrl.isSubmitting ? (
+                <Loader2 size={24} className="animate-spin shrink-0" />
+              ) : hasConfirmedBalance ? (
+                <div className="text-right shrink-0 pl-2">
+                  <span className="text-[9px] uppercase font-black tracking-wider opacity-80 block leading-none mb-0.5">
+                    Total con nuevo
+                  </span>
+                  <span className="font-black text-xl leading-none">
+                    ${projectedGrandTotal.toFixed(2)}
+                  </span>
+                </div>
+              ) : (
+                <span className="font-black text-xl shrink-0">
+                  ${Math.max(0, newCartNetTotal).toFixed(2)}
+                </span>
+              )}
             </motion.button>
           </motion.div>
         )}
@@ -767,6 +853,9 @@ export default function ClientMenu(props) {
           <ClientCheckoutModal 
             cart={ctrl.cartUtils.cart} 
             totalCart={ctrl.cartUtils.totalCart} 
+            cartPhysicalSubtotal={ctrl.cartUtils.cartPhysicalSubtotal}
+            confirmedTotal={ctrl.confirmedTotal}
+            confirmedItemsCount={ctrl.confirmedItemsCount}
             isSubmitting={ctrl.isSubmitting} 
             onClose={() => ctrl.setShowCheckout(false)} 
             onConfirmOrder={ctrl.handleConfirmOrder} 

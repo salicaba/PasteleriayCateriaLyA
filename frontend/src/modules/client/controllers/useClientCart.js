@@ -35,12 +35,19 @@ const parseIdArray = (data) => {
   return [];
 };
 
-export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0) => {
+export const useClientCart = (
+  triggerNotification,
+  confirmedAccountSubtotal = 0,
+  confirmedTicketDiscount = 0
+) => {
   const [_cart, _setCart] = useState([]);
   const cartRef = useRef([]);
   const [promotions, setPromotions] = useState([]);
   const promotionsRef = useRef([]);
   const isProcessingRef = useRef(false);
+
+  const confirmedSubtotalRef = useRef(Number(confirmedAccountSubtotal || 0));
+  const confirmedDiscountRef = useRef(Number(confirmedTicketDiscount || 0));
 
   const [pendingPromoReward, setPendingPromoReward] = useState(null);
   const [suspendedPromos, setSuspendedPromos] = useState([]);
@@ -254,7 +261,7 @@ export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0)
       return item;
     });
 
-    // 2. Agrupación por Piscina (Pooling) para NxM, BOGO, NTH_FIXED y COMBO
+    // 2. Agrupación por Piscina (Pooling) para NxM, BOGO, NTH_FIXED y COMBO (solo carrito actual)
     const promoGroups = {};
 
     cleanCart.forEach(item => {
@@ -363,7 +370,10 @@ export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0)
     if (ticketPromos.length > 0) {
       const itemsCuenta = cleanCart.filter(item => item.status !== 'CANCELLED' && item.promoType !== 'TICKET_DISCOUNT' && !item.isVirtualDiscount);
       const subtotalCarritoNuevo = itemsCuenta.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0);
-      const subtotalCuentaTotal = subtotalCarritoNuevo + (itemsCuenta.length > 0 ? Number(confirmedAccountSubtotal || 0) : 0);
+      const prevConfirmedSubtotal = Number(confirmedSubtotalRef.current || 0);
+      const prevConfirmedDiscount = Number(confirmedDiscountRef.current || 0); // valor negativo o 0
+
+      const subtotalCuentaTotal = itemsCuenta.length > 0 ? (subtotalCarritoNuevo + prevConfirmedSubtotal) : 0;
 
       const qualifyingPromos = ticketPromos
         .filter(p => subtotalCuentaTotal > 0 && subtotalCuentaTotal >= Number(p.minTicketAmount || p.min_ticket_amount || 0))
@@ -371,38 +381,46 @@ export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0)
 
       const bestTicketPromo = qualifyingPromos[0];
 
-      if (bestTicketPromo) {
+      if (bestTicketPromo && itemsCuenta.length > 0) {
         const rawDiscount = Number(bestTicketPromo.discountValue || bestTicketPromo.discount_value || 0);
-        const isPercentage = bestTicketPromo.discountType === 'PERCENTAGE';
+        const isPercentage = (bestTicketPromo.discountType || bestTicketPromo.discount_type) === 'PERCENTAGE';
 
-        let finalDiscountPrice = isPercentage ? (subtotalCuentaTotal * (rawDiscount / 100)) : rawDiscount;
-        finalDiscountPrice = -Math.min(subtotalCuentaTotal, Math.abs(finalDiscountPrice));
+        let totalExpectedDiscount = isPercentage ? (subtotalCuentaTotal * (rawDiscount / 100)) : rawDiscount;
+        totalExpectedDiscount = -Math.min(subtotalCuentaTotal, Math.abs(totalExpectedDiscount));
 
-        if (existingTicketGhostIdx !== -1) {
-          if (cleanCart[existingTicketGhostIdx].precioUnitario !== finalDiscountPrice || cleanCart[existingTicketGhostIdx].promoId !== bestTicketPromo.id) {
-            cleanCart[existingTicketGhostIdx] = {
-              ...cleanCart[existingTicketGhostIdx],
+        // Restamos lo que ya se haya descontado en la nota confirmada para no duplicar descuentos fijos
+        const incrementalDiscount = totalExpectedDiscount - prevConfirmedDiscount;
+        const finalDiscountPrice = incrementalDiscount < -0.009 ? incrementalDiscount : 0;
+
+        if (finalDiscountPrice < 0) {
+          if (existingTicketGhostIdx !== -1) {
+            if (cleanCart[existingTicketGhostIdx].precioUnitario !== finalDiscountPrice || cleanCart[existingTicketGhostIdx].promoId !== bestTicketPromo.id) {
+              cleanCart[existingTicketGhostIdx] = {
+                ...cleanCart[existingTicketGhostIdx],
+                nombre: bestTicketPromo.name || 'Descuento Global',
+                precioUnitario: finalDiscountPrice,
+                precioOriginal: finalDiscountPrice,
+                promoId: bestTicketPromo.id
+              };
+            }
+          } else {
+            cleanCart.push({
+              id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
+              cartItemId: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
               nombre: bestTicketPromo.name || 'Descuento Global',
-              precioUnitario: finalDiscountPrice,
               precioOriginal: finalDiscountPrice,
-              promoId: bestTicketPromo.id
-            };
+              precioUnitario: finalDiscountPrice,
+              qty: 1,
+              status: 'ACTIVE',
+              isAutoPromo: true,
+              isVirtualDiscount: true,
+              promoId: bestTicketPromo.id,
+              promoType: 'TICKET_DISCOUNT',
+              promoLabel: 'DESCUENTO EXTRA'
+            });
           }
-        } else {
-          cleanCart.push({
-            id: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
-            cartItemId: `GLOBAL_DISCOUNT_${bestTicketPromo.id}`,
-            nombre: bestTicketPromo.name || 'Descuento Global',
-            precioOriginal: finalDiscountPrice,
-            precioUnitario: finalDiscountPrice,
-            qty: 1,
-            status: 'ACTIVE',
-            isAutoPromo: true,
-            isVirtualDiscount: true,
-            promoId: bestTicketPromo.id,
-            promoType: 'TICKET_DISCOUNT',
-            promoLabel: 'DESCUENTO EXTRA'
-          });
+        } else if (existingTicketGhostIdx !== -1) {
+          cleanCart.splice(existingTicketGhostIdx, 1);
         }
       } else if (existingTicketGhostIdx !== -1) {
         cleanCart.splice(existingTicketGhostIdx, 1);
@@ -422,6 +440,15 @@ export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0)
     _setCart(synced);
     return synced;
   };
+
+  useEffect(() => {
+    confirmedSubtotalRef.current = Number(confirmedAccountSubtotal || 0);
+    confirmedDiscountRef.current = Number(confirmedTicketDiscount || 0);
+    if (cartRef.current.length > 0) {
+      setCart(cartRef.current, promotionsRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmedAccountSubtotal, confirmedTicketDiscount]);
 
   useEffect(() => {
     if (cartRef.current.length > 0) {
@@ -1023,12 +1050,27 @@ export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0)
     });
   };
 
+  // Subtotal solo de productos físicos del carrito nuevo (sin descuentos globales de ticket)
+  const cartPhysicalSubtotal = useMemo(() =>
+    _cart
+      .filter(item => !item.isVirtualDiscount && item.promoType !== 'TICKET_DISCOUNT' && item.status !== 'CANCELLED')
+      .reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0),
+  [_cart]);
+
+  // Descuento de ticket desbloqueado en el carrito nuevo (negativo o 0)
+  const cartTicketDiscount = useMemo(() =>
+    _cart
+      .filter(item => (item.isVirtualDiscount || item.promoType === 'TICKET_DISCOUNT') && item.status !== 'CANCELLED')
+      .reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 1)), 0),
+  [_cart]);
+
+  // Neto del carrito nuevo (productos físicos + descuento de ticket incremental)
   const totalCart = useMemo(() =>
     _cart.reduce((acc, item) => acc + ((item.precioUnitario || 0) * (item.qty || 0)), 0),
   [_cart]);
 
   const totalItems = useMemo(() =>
-    _cart.filter(i => !i.isVirtualDiscount).reduce((acc, item) => acc + (item.qty || 0), 0),
+    _cart.filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT').reduce((acc, item) => acc + (item.qty || 0), 0),
   [_cart]);
 
   return {
@@ -1039,6 +1081,8 @@ export const useClientCart = (triggerNotification, confirmedAccountSubtotal = 0)
     incrementInCart,
     deleteLine,
     totalCart,
+    cartPhysicalSubtotal,
+    cartTicketDiscount,
     totalItems,
     promotions,
     getPromoBadge,
