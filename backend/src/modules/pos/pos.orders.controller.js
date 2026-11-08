@@ -871,9 +871,13 @@ export const checkOrderStatus = async (req, res) => {
       });
     }
     
-    let accountStatus = order.status;
+    // 🔥 FIX: En SALON el estado por defecto de una cuenta individual es 'OPEN' a menos que esa cuenta esté pagada
+    let accountStatus = order.orderType === 'LLEVAR' ? order.status : 'OPEN';
     let clientItems = []; 
     
+    const isAccountInPaidList = order.paidAccounts && Array.isArray(order.paidAccounts) && 
+      order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase);
+
     if (targetCuenta) {
       if (itemsCuenta.length > 0) {
         const allCancelled = itemsCuenta.every(i => i.status === 'CANCELLED');
@@ -885,8 +889,10 @@ export const checkOrderStatus = async (req, res) => {
           } catch(e) { return false; }
         });
 
-        const isPaid = order.paidAccounts && Array.isArray(order.paidAccounts) && 
-                       order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase);
+        // En SALON es pagada si está en paidAccounts o si toda la orden sigue en PAID teniendo ya productos propios
+        const isPaid = order.orderType === 'LLEVAR'
+          ? (order.status === 'PAID' || isAccountInPaidList)
+          : (isAccountInPaidList || order.status === 'PAID');
 
         if (allCancelled) {
           accountStatus = 'CANCELLED';
@@ -898,7 +904,7 @@ export const checkOrderStatus = async (req, res) => {
           accountStatus = 'OPEN';
           clientItems = activeOwnItems.map(extractPromoMeta).filter(i => !i._isReleased);
         }
-      } else if (order.paidAccounts && Array.isArray(order.paidAccounts) && order.paidAccounts.some(acc => acc === targetCuenta || cleanAccountBase(acc) === targetBase)) {
+      } else if (isAccountInPaidList) {
         accountStatus = 'PAID';
       }
     }

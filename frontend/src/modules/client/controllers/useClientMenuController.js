@@ -305,9 +305,9 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
     }];
   }, [cartUtils.promotions]);
 
-  // 🔥 SINCRONIZACIÓN DE CARRITO, TRASLADOS Y ESPEJO (Con recálculo dinámico de TICKET_DISCOUNT)
+  // 🔥 SINCRONIZACIÓN DE CARRITO, TRASLADOS Y ESPEJO (Sin falsos positivos de cuenta pagada)
   useEffect(() => {
-    if (!activeOrderId || finalizedStatus) return;
+    if (!activeOrderId || finalizedStatus || isSubmitting) return;
 
     const checkStatus = async () => {
       try {
@@ -338,15 +338,25 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
           localStorage.removeItem('lya_client_transferred_to');
         }
         
+        // 🔥 En SALON ('mesa'), cada cliente se rige por su propio accountStatus;
+        // solo cerramos/cancelamos globalmente si toda la mesa fue cerrada o eliminada.
         let finalStatus = 'OPEN';
         if (globalStatus === 'CLOSED' || globalStatus === 'CANCELLED' || globalStatus === 'DELETED') {
           finalStatus = globalStatus;
-        } else if (globalStatus === 'PAID') {
-          finalStatus = 'PAID';
-        } else if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') { 
-          finalStatus = accountStatus;
+        } else if (type === 'mesa') {
+          if (accountStatus === 'PAID' || accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') {
+            finalStatus = accountStatus;
+          } else {
+            finalStatus = 'OPEN';
+          }
         } else {
-          finalStatus = 'OPEN'; 
+          if (globalStatus === 'PAID' || accountStatus === 'PAID') {
+            finalStatus = 'PAID';
+          } else if (accountStatus === 'CLOSED' || accountStatus === 'CANCELLED') {
+            finalStatus = accountStatus;
+          } else {
+            finalStatus = 'OPEN';
+          }
         }
 
         if (serverItems && Array.isArray(serverItems)) {
@@ -418,6 +428,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
             localStorage.setItem('lya_client_order_paid', 'true');
             setIsConfirmed(true); 
           }
+        } else if (finalStatus === 'OPEN') {
+          // 🔥 FIX: Si la cuenta en el POS está abierta (sin cobrar), quitamos cualquier bloqueo de pago previo
+          if (isOrderPaid) {
+            setIsOrderPaid(false);
+            localStorage.removeItem('lya_client_order_paid');
+          }
         } else if (finalStatus === 'CLOSED') {
           triggerFinalized('CLOSED');
         } else if (finalStatus === 'CANCELLED' || finalStatus === 'DELETED') {
@@ -454,7 +470,7 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       socket.off('pos:update', checkStatus);
       socket.off('orderPaid', handleOrderPaid);
     };
-  }, [activeOrderId, finalizedStatus, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed, computeTicketDiscountForPhysicalItems]);
+  }, [activeOrderId, finalizedStatus, isSubmitting, isOrderPaid, clientData?.name, type, tableId, displayName, setIsConfirmed, computeTicketDiscountForPhysicalItems]);
 
   const triggerFinalized = (status) => {
     if (!localStorage.getItem('lya_client_finalized_at')) {
@@ -645,13 +661,12 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
       const dbOrderType = isActuallySalon ? 'SALON' : 'LLEVAR';
       let targetOrderId = activeOrderId;
 
+      // 🔥 FIX: Obtenemos el ID sin disparar setActiveOrderId todavía para evitar que checkStatus
+      // consulte la orden antes de que se inserten los ítems y se reabra a 'OPEN'.
       const createNewOrder = async () => {
         const orderPayload = { orderType: dbOrderType, tableId: isActuallySalon ? tableId : null, ticketId: clientData?.name };
         const orderRes = await client.post('/pos/orders', orderPayload);
-        const newId = orderRes.data.order.id;
-        setActiveOrderId(newId);
-        localStorage.setItem('lya_client_order_id', newId);
-        return newId;
+        return orderRes.data.order.id;
       };
 
       if (!targetOrderId) targetOrderId = await createNewOrder();
@@ -674,16 +689,26 @@ export function useClientMenuController({ clientData, type, tableId, tableNumber
 
       let orderWasClosedOrDeleted = false;
       try {
-        await client.post(`/pos/orders/${targetOrderId}/items`, itemsPayload);
+        const addRes = await client.post(`/pos/orders/${targetOrderId}/items`, itemsPayload);
+        if (addRes.data?.newOrderId) {
+          targetOrderId = addRes.data.newOrderId;
+        }
       } catch (error) {
         if (error.response && (error.response.status === 400 || error.response.status === 404)) {
           targetOrderId = await createNewOrder();
-          await client.post(`/pos/orders/${targetOrderId}/items`, itemsPayload);
+          const retryRes = await client.post(`/pos/orders/${targetOrderId}/items`, itemsPayload);
+          if (retryRes.data?.newOrderId) {
+            targetOrderId = retryRes.data.newOrderId;
+          }
           orderWasClosedOrDeleted = true;
         } else {
           throw error;
         }
       }
+
+      // Ahora que los ítems ya existen en BD y la orden está en 'OPEN', guardamos el activeOrderId
+      setActiveOrderId(targetOrderId);
+      localStorage.setItem('lya_client_order_id', targetOrderId);
 
       setConfirmedSnapshot(prev => {
         const baseItems = orderWasClosedOrDeleted ? [] : [...prev.items].filter(i => !i.isVirtualDiscount && i.promoType !== 'TICKET_DISCOUNT');
