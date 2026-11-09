@@ -350,38 +350,22 @@ export default function ClientMenu(props) {
 
       <div className="flex-1 overflow-y-auto px-6 py-4 pb-36 custom-scrollbar">
         
-        {/* ✨ BARRA INTERACTIVA: ¿CÓMO FUNCIONAN LAS PROMOS? */}
-        <div className="mb-3 flex items-center justify-between gap-2">
+        {/* ✨ BOTÓN PÍLDORA HOMOLOGADO CON EL POS: ¿CÓMO FUNCIONAN LAS PROMOS? */}
+        <div className="mb-3.5 flex items-center justify-center sm:justify-start">
           <motion.button
             type="button"
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => setShowPromoGuide(true)}
-            className="w-full py-2.5 px-4 rounded-2xl bg-orange-50/90 dark:bg-orange-950/30 lya:bg-[#F3EBE0] border border-orange-200/80 dark:border-orange-800/40 lya:border-[#D9C4A9] flex items-center justify-between gap-3 shadow-sm transition-colors outline-none touch-manipulation"
+            className="w-full sm:w-auto px-4 py-3 bg-orange-50 dark:bg-orange-950/30 lya:bg-[#F3EBE0] text-orange-600 dark:text-orange-400 lya:text-[#78350F] border border-orange-200/80 dark:border-orange-800/40 lya:border-[#D9C4A9] rounded-[1.25rem] flex items-center justify-center gap-2.5 font-black text-xs sm:text-sm leading-normal md:hover:bg-orange-100 dark:md:hover:bg-orange-900/40 lya:md:hover:bg-[#EADCC9] transition-all shadow-sm outline-none select-none touch-manipulation"
+            title="Guía de promociones, reglas por cuenta y productos combinables"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Sparkles size={16} strokeWidth={2.5} />
-              </div>
-              <div className="text-left min-w-0">
-                <p className="text-xs font-black text-gray-900 dark:text-white lya:text-[#3E2723] truncate">
-                  ¿Cómo funcionan las promos?
-                </p>
-                <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400 lya:text-[#7A6353] truncate">
-                  Mismo color = combinables • Reglas por cuenta
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              {validTodayPromos.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-orange-500 dark:bg-orange-600 lya:bg-[#78350F] text-white text-[10px] font-black">
-                  {validTodayPromos.length} {validTodayPromos.length === 1 ? 'activa' : 'activas'}
-                </span>
-              )}
-              <span className="text-[11px] font-black text-orange-600 dark:text-orange-400 lya:text-[#78350F] underline decoration-2 underline-offset-2">
-                Ver guía
+            <Sparkles size={17} className="shrink-0" />
+            <span>¿Cómo funcionan las promos?</span>
+            {validTodayPromos.length > 0 && (
+              <span className="px-2 py-0.5 text-[11px] rounded-full bg-orange-500 dark:bg-orange-500 lya:bg-[#78350F] text-white font-black leading-none flex items-center justify-center shrink-0">
+                {validTodayPromos.length}
               </span>
-            </div>
+            )}
           </motion.button>
         </div>
 
@@ -408,13 +392,13 @@ export default function ClientMenu(props) {
                     🎉 ¡Descuento activado!
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-lg bg-white/90 dark:bg-gray-900/70 text-emerald-700 dark:text-emerald-300 text-[10px] font-black border border-emerald-200 dark:border-emerald-800/50">
+                  <span className="px-2 py-0.5 rounded-lg bg-white/90 dark:bg-gray-900/70 lya:bg-[#FAF6F0] text-emerald-700 dark:text-emerald-300 text-[10px] font-black border border-emerald-200 dark:border-emerald-800/50">
                     Te faltan ${Math.max(0, Number(ticketPromoStatus.primary.minTicketAmount || ticketPromoStatus.primary.min_ticket_amount || 0) - clientPhysicalSubtotal).toFixed(2)}
                   </span>
                 )}
               </div>
 
-              <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] text-left leading-snug">
+              <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] text-justify leading-relaxed">
                 {getPromoRuleDescription(ticketPromoStatus.primary)}
               </p>
             </div>
@@ -440,7 +424,7 @@ export default function ClientMenu(props) {
                   <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white lya:text-[#3E2723]">
                     {ctrl.promoFiltro.name || 'Promoción Activa'}
                   </h4>
-                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 lya:bg-[#FAF6F0] text-gray-700 dark:text-gray-200 lya:text-[#3E2723] border border-black/5">
                     {isFilteredPromoCombinable ? '🔗 Combinable en tu cuenta' : '🎯 Individual'}
                   </span>
                 </div>
@@ -455,7 +439,7 @@ export default function ClientMenu(props) {
                 </button>
               </div>
 
-              <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-snug text-left">
+              <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed text-justify">
                 {isFilteredPromoCombinable
                   ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos dentro de tu misma cuenta para armar tu promoción.'
                   : getPromoRuleDescription(ctrl.promoFiltro)}
@@ -574,118 +558,125 @@ export default function ClientMenu(props) {
         )}
       </AnimatePresence>
 
-      {/* ✨ MODAL GUÍA DE PROMOCIONES, REGLAS POR CUENTA Y RUPTURA PARA CLIENTES */}
+      {/* ✨ MODAL GUÍA DE PROMOCIONES, REGLAS POR CUENTA Y RUPTURA PARA CLIENTES (HOMOLOGADO) */}
       <AnimatePresence>
         {showPromoGuide && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.94, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 20 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="bg-white dark:bg-gray-900 lya:bg-[#FAF6F0] max-w-md w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl p-6 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] overflow-hidden"
+              className="bg-white dark:bg-gray-900 lya:bg-[#FAF6F0] max-w-xl w-full max-h-[90dvh] rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl p-5 sm:p-7 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] overflow-hidden"
             >
               <div className="flex items-start justify-between gap-3 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-500 lya:text-[#78350F] flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-[#EADCC9] text-orange-500 lya:text-[#78350F] flex items-center justify-center shrink-0">
                     <Sparkles size={22} strokeWidth={2.5} />
                   </div>
-                  <div className="text-left">
-                    <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight leading-snug">
-                      ¿Cómo funcionan las Promos?
+                  <div className="text-left min-w-0">
+                    <h3 className="text-base sm:text-xl font-black text-gray-900 dark:text-white lya:text-[#3E2723] tracking-tight leading-snug">
+                      ¿Cómo funcionan las Promociones?
                     </h3>
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353]">
-                      Colores combinables y reglas de tu cuenta
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-[#7A6353] leading-snug">
+                      Guía de colores, reglas por cuenta y cuándo se rompe una promoción
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowPromoGuide(false)}
-                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 lya:bg-[#F3EBE0] text-gray-500 dark:text-gray-400 lya:text-[#7A6353] outline-none"
+                  className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-[#F3EBE0] text-gray-500 dark:text-gray-400 lya:text-[#7A6353] md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-[#EADCC9] transition-colors outline-none shrink-0"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-4 text-left">
-                {/* 1. Reglas de uso */}
-                <div className="space-y-2.5">
-                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
-                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
-                      <span className="w-5 h-5 rounded-md bg-rose-500 text-white flex items-center justify-center text-[10px]">1</span>
-                      Mismo Color = Combinables
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1.5 my-4 pb-2 space-y-5 text-left">
+                {/* 1. Los 4 pilares básicos */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] flex flex-col">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1.5">
+                      <span className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-[11px] shrink-0">1</span>
+                      <span>Mismo Color = Combinables</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
-                      Si varios productos tienen una etiqueta del <strong>mismo color</strong> y la misma promo, puedes <strong>combinarlos entre sí</strong> aunque sean productos distintos.
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed text-justify">
+                      Si varios productos tienen una etiqueta del <strong>mismo color</strong> y la misma promo, puedes <strong>combinarlos entre sí</strong> (incluso si son productos distintos) para completar la promoción.
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
-                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
-                      <span className="w-5 h-5 rounded-md bg-blue-500 text-white flex items-center justify-center text-[10px]">2</span>
-                      Toca la Etiqueta para Filtrar
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] flex flex-col">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1.5">
+                      <span className="w-6 h-6 rounded-lg bg-blue-500 text-white flex items-center justify-center text-[11px] shrink-0">2</span>
+                      <span>Toca la Etiqueta para Filtrar</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
-                      Toca directamente la <strong>insignia de color</strong> de cualquier producto para ver en pantalla todos los productos con los que puedes armar esa promo.
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed text-justify">
+                      Al tocar directamente la <strong>insignia de color</strong> de cualquier producto en el menú, se filtrarán automáticamente todos los productos con los que puedes combinarlo.
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
-                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
-                      <span className="w-5 h-5 rounded-md bg-violet-500 text-white flex items-center justify-center text-[10px]">3</span>
-                      Estrictamente por Cuenta y Pedido
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] flex flex-col">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1.5">
+                      <span className="w-6 h-6 rounded-lg bg-violet-500 text-white flex items-center justify-center text-[11px] shrink-0">3</span>
+                      <span>Estrictamente por Cuenta y Pedido</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
-                      Las promociones de productos (2x1, 3x2, Combos o Regalos) deben agregarse <strong>dentro de tu misma cuenta y en el mismo pedido</strong> antes de confirmarlo. Cuentas separadas en la misma mesa no se suman entre sí.
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed text-justify">
+                      Las promociones de productos (2x1, 3x2, Combos o Regalos) se calculan <strong>únicamente dentro de tu misma cuenta y en el mismo pedido</strong> antes de confirmarlo. Cuentas separadas no se suman entre sí.
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9]">
-                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1">
-                      <span className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center text-[10px]">4</span>
-                      Descuento por Ticket / Cuenta
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/70 lya:bg-[#F3EBE0] border border-gray-100 dark:border-gray-800 lya:border-[#EADCC9] flex flex-col">
+                    <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723] mb-1.5">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px] shrink-0">4</span>
+                      <span>Descuento por Ticket / Cuenta</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed">
-                      Si hay una promo por <strong>monto mínimo en tu ticket</strong>, suma cualquier producto del menú en tu cuenta y al llegar a la meta recibirás el descuento en automático.
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-[#5D4037] leading-relaxed text-justify">
+                      Cuando hay una promo por <strong>monto mínimo en tu ticket</strong>, suma cualquier producto del menú dentro de tu misma cuenta y al llegar a la meta recibirás el descuento automáticamente.
                     </p>
                   </div>
                 </div>
 
                 {/* ✨ 2. BLOQUE IMPORTANTE: UNIÓN DE CUENTAS Y CUÁNDO SE ROMPE UNA PROMO */}
-                <div className="p-3.5 rounded-2xl bg-amber-50/85 dark:bg-amber-950/30 lya:bg-[#F3EBE0] border-2 border-amber-200 dark:border-amber-800/50 lya:border-[#D9C4A9] space-y-2.5">
-                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 lya:text-[#78350F] font-black text-xs">
-                    <ShieldAlert size={16} strokeWidth={2.5} className="shrink-0" />
-                    <span>Unión de Cuentas y ¿Cuándo se rompe una Promo?</span>
+                <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/85 dark:bg-amber-950/30 lya:bg-[#F3EBE0] border-2 border-amber-200 dark:border-amber-800/50 lya:border-[#D9C4A9] space-y-3">
+                  <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-400 lya:text-[#78350F] font-black text-xs sm:text-sm">
+                    <ShieldAlert size={18} strokeWidth={2.5} className="shrink-0" />
+                    <span>Importante: Unión de Cuentas y ¿Cuándo se rompe una Promo?</span>
                   </div>
 
-                  <div className="space-y-2 text-[11px] font-bold text-gray-700 dark:text-gray-200 lya:text-[#5D4037] leading-relaxed">
-                    <div className="p-2.5 rounded-xl bg-white/85 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9]">
-                      <p className="font-black text-amber-700 dark:text-amber-400 lya:text-[#78350F] mb-0.5">
-                        🚫 Unir cuentas NO desbloquea promos
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-bold text-gray-700 dark:text-gray-200 lya:text-[#5D4037] leading-relaxed">
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9] flex flex-col">
+                      <p className="font-black text-amber-700 dark:text-amber-400 lya:text-[#78350F] mb-1">
+                        🚫 Unir cuentas NO desbloquea promos de productos
                       </p>
-                      <p>
-                        Pedir en cuentas separadas y pedir en caja que <strong>unan las cuentas al final NO activa</strong> 2x1, 3x2, Combos ni Regalos. Además, si una cuenta que se va a unir <strong>ya tenía promociones aplicadas, estas se romperán</strong> y pasarán a precio normal.
-                      </p>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-white/85 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-emerald-200/70 dark:border-emerald-800/40 lya:border-emerald-300/60">
-                      <p className="font-black text-emerald-700 dark:text-emerald-400 mb-0.5">
-                        ✅ Única excepción: Descuento por Ticket
-                      </p>
-                      <p>
-                        El <strong>Descuento por Ticket</strong> (por monto mínimo de compra) es la <strong>única promoción que sí se activa o mantiene al unir cuentas</strong> o pasar productos a una misma cuenta.
+                      <p className="text-justify leading-relaxed">
+                        Si dos cuentas separadas pidieron productos por su lado y después piden en caja <strong>unir sus cuentas</strong>, no se desbloquearán promos como 2x1, 3x2, Combos o Regalos. Además, si una cuenta que se va a unir <strong>ya tenía una promo aplicada, esta se romperá</strong> y pasará a precio normal.
                       </p>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-white/85 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9]">
-                      <p className="font-black text-rose-600 dark:text-rose-400 mb-0.5">
-                        🔄 Otras formas en que se rompe una promo
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-emerald-200/70 dark:border-emerald-800/40 lya:border-emerald-300/60 flex flex-col">
+                      <p className="font-black text-emerald-700 dark:text-emerald-400 mb-1">
+                        ✅ Única excepción al unir: Descuento por Ticket
                       </p>
-                      <p>
-                        • <strong>Cambiar productos de cuenta:</strong> Pasar un producto en promoción (o el producto base que la activó) a otra cuenta anula el descuento.<br />
-                        • <strong>Quitar o cancelar productos:</strong> Reducir o eliminar un producto base de la promo retira también su regalo o descuento.<br />
-                        • <strong>Stock agotado:</strong> Si un producto se agota antes de enviar tu pedido, la promoción se desactiva.
+                      <p className="text-justify leading-relaxed">
+                        La <strong>única promoción que sí se activa o actualiza al unir cuentas</strong> (o al pasar productos a una misma cuenta) es la de <strong>Descuento por Ticket</strong>, ya que evalúa el total acumulado en dinero de la cuenta final.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9] flex flex-col">
+                      <p className="font-black text-rose-600 dark:text-rose-400 mb-1">
+                        🔄 Mover un producto individual a otra cuenta
+                      </p>
+                      <p className="text-justify leading-relaxed">
+                        Si se traslada un producto con beneficio a otra cuenta, <strong>pierde la promo y se cobra a precio normal</strong>. Y si se mueve el producto base que sostenía una promo, el regalo o descuento en la cuenta original también perderá el beneficio.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-[#FAF6F0] border border-amber-200/60 dark:border-amber-800/40 lya:border-[#EADCC9] flex flex-col">
+                      <p className="font-black text-rose-600 dark:text-rose-400 mb-1">
+                        🗑️ Quitar, cancelar o falta de stock
+                      </p>
+                      <p className="text-justify leading-relaxed">
+                        Si restas o eliminas del carrito (o se cancela en cocina) uno de los artículos base que activaban una promoción, <strong>el descuento o regalo se anula automáticamente</strong>. Igual ocurre si un producto se agota antes de confirmar.
                       </p>
                     </div>
                   </div>
@@ -693,15 +684,18 @@ export default function ClientMenu(props) {
 
                 {/* 3. Promociones activas hoy */}
                 <div>
-                  <h4 className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-[#7A6353] mb-2.5 flex items-center gap-1.5">
-                    <Tag size={13} />
-                    Promociones de Hoy ({validTodayPromos.length})
+                  <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-[#7A6353] mb-3 flex items-center gap-2">
+                    <Tag size={14} />
+                    Promociones Activas Hoy ({validTodayPromos.length})
                   </h4>
 
                   {validTodayPromos.length === 0 ? (
                     <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/40 lya:bg-[#F3EBE0]/60 text-center border border-dashed border-gray-200 dark:border-gray-700 lya:border-[#D9C4A9]">
-                      <p className="text-xs font-black text-gray-600 dark:text-gray-300 lya:text-[#3E2723]">
-                        No hay promociones activas por ahora
+                      <p className="text-xs sm:text-sm font-black text-gray-600 dark:text-gray-300 lya:text-[#3E2723]">
+                        No hay promociones activas en este momento
+                      </p>
+                      <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 lya:text-[#7A6353] mt-1">
+                        Cuando se activen promociones para el día de hoy, aparecerán listadas aquí con su color correspondiente.
                       </p>
                     </div>
                   ) : (
@@ -712,21 +706,21 @@ export default function ClientMenu(props) {
                         return (
                           <div
                             key={promo.id}
-                            className={`p-3.5 rounded-2xl border-2 transition-all ${colorScheme.bannerBg}`}
+                            className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all ${colorScheme.bannerBg}`}
                           >
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm ${colorScheme.badge}`}>
-                                  {isTicketDiscount ? <Receipt size={10} strokeWidth={2.5} /> : isCombinable ? <Layers size={10} strokeWidth={3} /> : <Tag size={10} strokeWidth={3} />}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 shadow-sm ${colorScheme.badge}`}>
+                                  {isTicketDiscount ? <Receipt size={11} strokeWidth={2.5} /> : isCombinable ? <Layers size={11} strokeWidth={3} /> : <Tag size={11} strokeWidth={3} />}
                                   {getShortPromoLabel(promo)}
                                 </span>
-                                <span className="font-black text-xs text-gray-900 dark:text-white lya:text-[#3E2723]">
+                                <span className="font-black text-xs sm:text-sm text-gray-900 dark:text-white lya:text-[#3E2723]">
                                   {promo.name}
                                 </span>
                               </div>
 
                               {isTicketDiscount ? (
-                                <span className="px-2 py-0.5 rounded-md bg-white/90 dark:bg-gray-900/70 text-emerald-700 dark:text-emerald-300 text-[9px] font-black uppercase tracking-wider border border-emerald-500/20 shrink-0">
+                                <span className="self-start sm:self-center px-2 py-0.5 rounded-md bg-white/90 dark:bg-gray-900/70 lya:bg-[#FAF6F0] text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-500/20 shrink-0">
                                   🧾 Mín. ${minAmount.toFixed(2)}
                                 </span>
                               ) : (
@@ -736,30 +730,30 @@ export default function ClientMenu(props) {
                                     ctrl.setPromoFiltro(promo);
                                     setShowPromoGuide(false);
                                   }}
-                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1 shadow-sm active:scale-95 shrink-0 ${colorScheme.btn}`}
+                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 shrink-0 ${colorScheme.btn}`}
                                 >
-                                  <Filter size={11} strokeWidth={2.5} />
-                                  Ver productos
+                                  <Filter size={12} strokeWidth={2.5} />
+                                  Ver en el menú
                                 </button>
                               )}
                             </div>
 
-                            <p className="text-[11px] font-bold text-gray-700 dark:text-gray-200 lya:text-[#5D4037] mb-2">
+                            <p className="text-[11px] sm:text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-[#5D4037] mb-2.5 leading-relaxed text-justify">
                               {getPromoRuleDescription(promo)}
                             </p>
 
                             {isTicketDiscount ? (
                               <div className="flex flex-wrap gap-1">
-                                <span className="px-2.5 py-1 rounded-lg bg-white/85 dark:bg-gray-900/75 text-emerald-700 dark:text-emerald-300 text-[10px] font-black border border-emerald-500/20">
-                                  ✨ Participan todos los productos del menú en tu cuenta
+                                <span className="px-2.5 py-1 rounded-lg bg-white/85 dark:bg-gray-900/75 lya:bg-[#FAF6F0] text-emerald-700 dark:text-emerald-300 text-[10px] sm:text-[11px] font-black border border-emerald-500/20">
+                                  ✨ Participan todos los productos del menú dentro de tu misma cuenta
                                 </span>
                               </div>
                             ) : (
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-wrap gap-1.5">
                                 {products.map(prod => (
                                   <span
                                     key={prod.id}
-                                    className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-gray-900/70 text-gray-800 dark:text-gray-200 text-[10px] font-bold border border-black/5 dark:border-white/10"
+                                    className="px-2.5 py-0.5 rounded-lg bg-white/80 dark:bg-gray-900/70 lya:bg-[#FAF6F0] text-gray-800 dark:text-gray-200 lya:text-[#3E2723] text-[10px] sm:text-[11px] font-bold border border-black/5 dark:border-white/10"
                                   >
                                     {prod.nombre || prod.name}
                                   </span>
@@ -777,9 +771,9 @@ export default function ClientMenu(props) {
               <button
                 type="button"
                 onClick={() => setShowPromoGuide(false)}
-                className="w-full py-3.5 bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 font-black rounded-2xl transition-colors outline-none shrink-0 touch-manipulation"
+                className="w-full py-3.5 bg-gray-900 dark:bg-white lya:bg-[#78350F] text-white dark:text-gray-900 lya:text-white font-black rounded-2xl transition-colors outline-none shrink-0 touch-manipulation"
               >
-                ¡Entendido!
+                Entendido
               </button>
             </motion.div>
           </div>

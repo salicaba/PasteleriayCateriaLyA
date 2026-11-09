@@ -183,7 +183,7 @@ export const PosModal = ({
           colorScheme: {
             badge: 'bg-emerald-600 text-white',
             btn: 'bg-emerald-600 text-white shadow-emerald-500/30 md:hover:bg-emerald-700',
-            bannerBg: 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/60'
+            bannerBg: 'bg-emerald-50/90 dark:bg-emerald-950/40 lya:bg-emerald-50/90 border-emerald-300 dark:border-emerald-800/60 lya:border-emerald-300'
           },
           products: [],
           isCombinable: true,
@@ -551,7 +551,7 @@ export const PosModal = ({
       <div className="flex-1 flex flex-col h-full relative z-0 overflow-hidden">
         <div className="bg-white dark:bg-gray-900 lya:bg-lya-surface p-5 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 sticky top-0 z-20 shadow-sm transition-colors shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3 mb-4">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 lya:text-lya-text/40" size={18} />
               <input 
                 type="text" 
@@ -562,18 +562,19 @@ export const PosModal = ({
               />
             </div>
 
-            {/* ✨ BOTÓN PÍLDORA: ¿CÓMO FUNCIONAN LAS PROMOS? */}
+            {/* ✨ BOTÓN PÍLDORA HOMOLOGADO: ¿CÓMO FUNCIONAN LAS PROMOS? */}
             <motion.button
+              type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowPromoGuide(true)}
-              className="px-3.5 py-3 bg-orange-50 dark:bg-orange-950/30 lya:bg-lya-primary/10 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 rounded-[1.25rem] flex items-center gap-2 font-black text-xs md:hover:bg-orange-100 dark:md:hover:bg-orange-900/40 transition-all shadow-sm shrink-0 outline-none"
+              className="px-3.5 sm:px-4 py-3 bg-orange-50 dark:bg-orange-950/30 lya:bg-lya-primary/10 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 rounded-[1.25rem] flex items-center gap-2 font-black text-xs leading-normal md:hover:bg-orange-100 dark:md:hover:bg-orange-900/40 lya:md:hover:bg-lya-primary/20 transition-all shadow-sm shrink-0 outline-none select-none"
               title="Guía de promociones, reglas por cuenta y productos combinables"
             >
               <Sparkles size={17} className="shrink-0" />
-              <span className="hidden lg:inline">¿Cómo funcionan las promos?</span>
-              <span className="lg:hidden">Promos</span>
+              <span className="hidden sm:inline">¿Cómo funcionan las promos?</span>
+              <span className="sm:hidden">Promos</span>
               {validTodayPromos.length > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-orange-500 dark:bg-orange-500 lya:bg-lya-primary text-white font-black leading-none">
+                <span className="px-2 py-0.5 text-[10px] rounded-full bg-orange-500 dark:bg-orange-500 lya:bg-lya-primary text-white font-black leading-none flex items-center justify-center shrink-0">
                   {validTodayPromos.length}
                 </span>
               )}
@@ -622,18 +623,18 @@ export const PosModal = ({
             {/* ✨ AVISO INTELIGENTE DE PROMO DE DESCUENTO POR TICKET ACTIVA HOY */}
             {ticketPromoStatus && !promoFiltro && (
               <div className="mb-4 shrink-0">
-                <div className="p-3 sm:px-4 sm:py-3 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
-                  <div className="flex items-start sm:items-center gap-2.5">
+                <div className="p-3 sm:px-4 sm:py-3 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/30 lya:bg-emerald-50/90 border border-emerald-200 dark:border-emerald-800/50 lya:border-emerald-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
+                  <div className="flex items-start sm:items-center gap-2.5 min-w-0">
                     <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-sm">
                       <Receipt size={12} strokeWidth={2.5} />
                       {getShortPromoLabel(ticketPromoStatus.primary)}
                     </span>
-                    <div className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-snug">
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-relaxed text-justify">
                       <span className="font-black text-emerald-700 dark:text-emerald-400 mr-1.5">
                         {ticketPromoStatus.primary.name || 'Promo en Ticket'}:
                       </span>
                       {getPromoRuleDescription(ticketPromoStatus.primary)}
-                    </div>
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
@@ -642,14 +643,14 @@ export const PosModal = ({
                         ✅ Aplicado en {parseAccountName(cuentaActiva)}
                       </span>
                     ) : (
-                      <span className="px-2.5 py-1 rounded-xl bg-white/90 dark:bg-gray-900/70 text-gray-700 dark:text-gray-300 text-[11px] font-black border border-emerald-200 dark:border-emerald-800/50">
+                      <span className="px-2.5 py-1 rounded-xl bg-white/90 dark:bg-gray-900/70 lya:bg-lya-surface text-gray-700 dark:text-gray-300 lya:text-lya-text text-[11px] font-black border border-emerald-200 dark:border-emerald-800/50">
                         Faltan ${Math.max(0, Number(ticketPromoStatus.primary.minTicketAmount || ticketPromoStatus.primary.min_ticket_amount || 0) - activeAccountPhysicalSubtotal).toFixed(2)} en {parseAccountName(cuentaActiva)}
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => setShowPromoGuide(true)}
-                      className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 underline underline-offset-2 md:hover:opacity-80 px-1"
+                      className="px-2.5 py-1 rounded-xl bg-emerald-600/10 dark:bg-emerald-500/15 text-[11px] font-black text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 md:hover:bg-emerald-600/20 transition-colors leading-normal"
                     >
                       Ver reglas
                     </button>
@@ -668,21 +669,21 @@ export const PosModal = ({
                 className="mb-4 shrink-0"
               >
                 <div className={`p-3.5 sm:p-4 rounded-[1.5rem] border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${activeFilterColorScheme.bannerBg}`}>
-                  <div className="flex items-start sm:items-center gap-3">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <span className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-sm ${activeFilterColorScheme.badge}`}>
                       {isFilteredPromoCombinable ? <Layers size={13} strokeWidth={2.5} /> : <Tag size={13} strokeWidth={2.5} />}
                       {getShortPromoLabel(promoFiltro)}
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white lya:text-lya-text">
                           {promoFiltro.name || 'Promoción Activa'}
                         </h4>
-                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 text-gray-700 dark:text-gray-200 border border-black/5">
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/80 dark:bg-gray-900/60 lya:bg-lya-surface text-gray-700 dark:text-gray-200 lya:text-lya-text border border-black/5">
                           {isFilteredPromoCombinable ? '🔗 Combinable en la misma cuenta' : '🎯 Producto único'}
                         </span>
                       </div>
-                      <p className="text-[11px] sm:text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 mt-0.5 leading-snug">
+                      <p className="text-[11px] sm:text-xs font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 mt-0.5 leading-relaxed text-justify">
                         {isFilteredPromoCombinable
                           ? 'Todos estos productos tienen el mismo color de etiqueta: puedes mezclarlos dentro de la misma cuenta para completar la promo.'
                           : getPromoRuleDescription(promoFiltro)}
@@ -693,7 +694,7 @@ export const PosModal = ({
                   <button
                     type="button"
                     onClick={() => setPromoFiltro(null)}
-                    className="self-end sm:self-center px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-black border border-gray-200 dark:border-gray-700 md:hover:bg-gray-100 dark:md:hover:bg-gray-700 active:scale-95 flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
+                    className="self-end sm:self-center px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 lya:bg-lya-surface text-gray-700 dark:text-gray-200 lya:text-lya-text text-xs font-black border border-gray-200 dark:border-gray-700 lya:border-lya-border/40 md:hover:bg-gray-100 dark:md:hover:bg-gray-700 active:scale-95 flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
                   >
                     <X size={14} strokeWidth={2.5} />
                     Ver todo el menú
@@ -818,119 +819,120 @@ export const PosModal = ({
       {/* ✨ MODAL GUÍA DE PROMOCIONES, REGLAS POR CUENTA Y RUPTURA DE PROMOS */}
       <AnimatePresence>
         {showPromoGuide && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-6 bg-black/60 dark:bg-black/75 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-2xl w-full max-h-[88vh] rounded-[2.5rem] shadow-2xl p-6 sm:p-8 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-hidden"
+              className="bg-white dark:bg-gray-900 lya:bg-lya-surface max-w-2xl w-full max-h-[90dvh] rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl p-5 sm:p-7 flex flex-col border border-gray-100 dark:border-gray-800 lya:border-lya-border/40 overflow-hidden"
             >
-              <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
-                <div className="flex items-center gap-3.5">
-                  <div className="h-12 w-12 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/15 text-orange-500 lya:text-lya-primary flex items-center justify-center shrink-0">
-                    <Sparkles size={24} strokeWidth={2.5} />
+              <div className="flex items-start justify-between gap-3 pb-4 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/15 text-orange-500 lya:text-lya-primary flex items-center justify-center shrink-0">
+                    <Sparkles size={22} strokeWidth={2.5} />
                   </div>
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight">
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight leading-snug">
                       ¿Cómo funcionan las Promociones?
                     </h3>
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60">
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 leading-snug">
                       Guía de colores, reglas por cuenta y cuándo se rompe una promoción
                     </p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowPromoGuide(false)}
-                  className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 transition-colors outline-none"
+                  className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 lya:bg-lya-bg text-gray-500 dark:text-gray-400 lya:text-lya-text/70 md:hover:bg-gray-200 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-border/40 transition-colors outline-none shrink-0"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 my-4 space-y-5">
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1.5 my-4 pb-2 space-y-5">
                 {/* 1. Los 4 pilares básicos */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
-                      <span className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-[11px]">1</span>
-                      Mismo Color = Combinables
+                      <span className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-[11px] shrink-0">1</span>
+                      <span>Mismo Color = Combinables</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 leading-relaxed text-justify">
                       Si varios productos tienen una etiqueta del <strong>mismo color</strong> y la misma promo, puedes <strong>mezclarlos entre sí</strong> (incluso si son diferentes productos) para completar la promoción.
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
-                      <span className="w-6 h-6 rounded-lg bg-blue-500 text-white flex items-center justify-center text-[11px]">2</span>
-                      Toca la Etiqueta para Filtrar
+                      <span className="w-6 h-6 rounded-lg bg-blue-500 text-white flex items-center justify-center text-[11px] shrink-0">2</span>
+                      <span>Toca la Etiqueta para Filtrar</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 leading-relaxed text-justify">
                       Al tocar directamente la <strong>insignia de color</strong> arriba de cualquier producto en el menú, se filtrarán automáticamente todos los productos con los que puedes combinarlo.
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
-                      <span className="w-6 h-6 rounded-lg bg-violet-500 text-white flex items-center justify-center text-[11px]">3</span>
-                      Estrictamente por Cuenta y Ronda
+                      <span className="w-6 h-6 rounded-lg bg-violet-500 text-white flex items-center justify-center text-[11px] shrink-0">3</span>
+                      <span>Estrictamente por Cuenta y Ronda</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 leading-relaxed text-justify">
                       Las promos de productos (2x1, 3x2, Combos o Regalos) se calculan <strong>únicamente dentro de la misma cuenta</strong> y antes de enviar la ronda a cocina. Productos en cuentas separadas no se suman entre sí.
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30">
+                  <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 lya:bg-lya-bg border border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col">
                     <div className="flex items-center gap-2 font-black text-xs text-gray-900 dark:text-white lya:text-lya-text mb-1.5">
-                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px]">4</span>
-                      Descuento por Ticket / Cuenta
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px] shrink-0">4</span>
+                      <span>Descuento por Ticket / Cuenta</span>
                     </div>
-                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/75 leading-relaxed">
+                    <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 leading-relaxed text-justify">
                       Cuando hay una promo por <strong>monto mínimo de ticket</strong>, suma cualquier producto del menú dentro de una misma cuenta y al llegar a la meta se descuenta automáticamente.
                     </p>
                   </div>
                 </div>
 
                 {/* ✨ 2. BLOQUE IMPORTANTE: REGLAS AL UNIR CUENTAS Y CÓMO SE ROMPE UNA PROMOCIÓN */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/25 border-2 border-amber-200/80 dark:border-amber-800/50 space-y-3">
-                  <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-400 font-black text-xs sm:text-sm">
+                <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/25 lya:bg-lya-bg border-2 border-amber-200/80 dark:border-amber-800/50 lya:border-lya-border/40 space-y-3">
+                  <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-400 lya:text-lya-primary font-black text-xs sm:text-sm">
                     <ShieldAlert size={18} strokeWidth={2.5} className="shrink-0" />
                     <span>Importante: Unión de Cuentas y ¿Cuándo se rompe una Promo?</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-bold text-gray-700 dark:text-gray-200 leading-relaxed">
-                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-amber-200/60 dark:border-amber-800/40">
-                      <p className="font-black text-amber-700 dark:text-amber-400 mb-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text/85 leading-relaxed">
+                    <div className="p-3.5 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-lya-surface border border-amber-200/60 dark:border-amber-800/40 lya:border-lya-border/30 flex flex-col">
+                      <p className="font-black text-amber-700 dark:text-amber-400 lya:text-lya-primary mb-1">
                         🚫 Unir cuentas NO desbloquea promos de productos
                       </p>
-                      <p>
+                      <p className="text-justify leading-relaxed">
                         Si dos cuentas separadas pidieron productos por su lado y después deciden <strong>unir sus cuentas</strong>, no se desbloquearán promos como 2x1, 3x2, Combos o Regalos. Además, si la cuenta que se va a unir <strong>ya tenía una promo aplicada, esta se romperá</strong> y sus productos pasarán a precio normal.
                       </p>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-emerald-200/70 dark:border-emerald-800/40">
+                    <div className="p-3.5 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-lya-surface border border-emerald-200/70 dark:border-emerald-800/40 lya:border-emerald-300/60 flex flex-col">
                       <p className="font-black text-emerald-700 dark:text-emerald-400 mb-1">
                         ✅ Única excepción al unir: Descuento por Ticket
                       </p>
-                      <p>
+                      <p className="text-justify leading-relaxed">
                         La <strong>única promoción que sí se activa o actualiza al unir cuentas</strong> (o al pasar productos a una cuenta) es la de <strong>Descuento por Ticket</strong>, ya que evalúa el total acumulado en dinero de la cuenta final (si ambas ya tenían descuento por ticket, se unifican en uno solo).
                       </p>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-amber-200/60 dark:border-amber-800/40">
+                    <div className="p-3.5 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-lya-surface border border-amber-200/60 dark:border-amber-800/40 lya:border-lya-border/30 flex flex-col">
                       <p className="font-black text-rose-600 dark:text-rose-400 mb-1">
                         🔄 Mover un producto individual a otra cuenta
                       </p>
-                      <p>
+                      <p className="text-justify leading-relaxed">
                         Si trasladas un producto con beneficio a otra cuenta, <strong>pierde la promo y se cobra a precio normal</strong>. Y si mueves el producto base que sostenía una promo, el regalo o descuento que se quedó en la cuenta original también perderá el beneficio.
                       </p>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-white/85 dark:bg-gray-900/60 border border-amber-200/60 dark:border-amber-800/40">
+                    <div className="p-3.5 rounded-xl bg-white/90 dark:bg-gray-900/60 lya:bg-lya-surface border border-amber-200/60 dark:border-amber-800/40 lya:border-lya-border/30 flex flex-col">
                       <p className="font-black text-rose-600 dark:text-rose-400 mb-1">
                         🗑️ Quitar, cancelar o falta de stock
                       </p>
-                      <p>
+                      <p className="text-justify leading-relaxed">
                         Si restas o eliminas del carrito (o cancelas en cocina) uno de los artículos base que activaban una promoción, <strong>el descuento o regalo se anula automáticamente</strong>. Igual ocurre si un producto se queda sin stock antes de confirmar.
                       </p>
                     </div>
@@ -945,9 +947,9 @@ export const PosModal = ({
                   </h4>
 
                   {validTodayPromos.length === 0 ? (
-                    <div className="p-6 rounded-2xl bg-gray-50 dark:bg-gray-800/40 text-center border border-dashed border-gray-200 dark:border-gray-700">
-                      <p className="text-sm font-black text-gray-600 dark:text-gray-300">No hay promociones activas en este momento</p>
-                      <p className="text-xs font-bold text-gray-400 dark:text-gray-500 mt-1">Cuando se activen promociones para el día de hoy, aparecerán listadas aquí con su color correspondiente.</p>
+                    <div className="p-6 rounded-2xl bg-gray-50 dark:bg-gray-800/40 lya:bg-lya-bg text-center border border-dashed border-gray-200 dark:border-gray-700 lya:border-lya-border/40">
+                      <p className="text-sm font-black text-gray-600 dark:text-gray-300 lya:text-lya-text">No hay promociones activas en este momento</p>
+                      <p className="text-xs font-bold text-gray-400 dark:text-gray-500 lya:text-lya-text/60 mt-1">Cuando se activen promociones para el día de hoy, aparecerán listadas aquí con su color correspondiente.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -968,7 +970,7 @@ export const PosModal = ({
                                 <span className="font-black text-sm text-gray-900 dark:text-white lya:text-lya-text">
                                   {promo.name}
                                 </span>
-                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/90 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 border border-black/5">
+                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/90 dark:bg-gray-900/70 lya:bg-lya-surface text-gray-700 dark:text-gray-200 lya:text-lya-text border border-black/5">
                                   {isTicketDiscount
                                     ? `🧾 Descuento por Ticket (Mín. $${minAmount.toFixed(2)})`
                                     : isCombinable
@@ -992,13 +994,13 @@ export const PosModal = ({
                               )}
                             </div>
 
-                            <p className="text-xs font-bold text-gray-700 dark:text-gray-200 mb-2.5">
+                            <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text/85 mb-2.5 leading-relaxed text-justify">
                               {getPromoRuleDescription(promo)}
                             </p>
 
                             {isTicketDiscount ? (
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="px-3 py-1 rounded-lg bg-white/85 dark:bg-gray-900/75 text-emerald-700 dark:text-emerald-300 text-[11px] font-black border border-emerald-500/20">
+                                <span className="px-3 py-1 rounded-lg bg-white/85 dark:bg-gray-900/75 lya:bg-lya-surface text-emerald-700 dark:text-emerald-300 text-[11px] font-black border border-emerald-500/20">
                                   ✨ Participan todos los productos del menú dentro de la misma cuenta (incluso al unir cuentas)
                                 </span>
                               </div>
@@ -1007,7 +1009,7 @@ export const PosModal = ({
                                 {products.map(prod => (
                                   <span
                                     key={prod.id}
-                                    className="px-2.5 py-1 rounded-lg bg-white/80 dark:bg-gray-900/70 text-gray-800 dark:text-gray-200 text-[11px] font-bold border border-black/5 dark:border-white/10"
+                                    className="px-2.5 py-1 rounded-lg bg-white/80 dark:bg-gray-900/70 lya:bg-lya-surface text-gray-800 dark:text-gray-200 lya:text-lya-text text-[11px] font-bold border border-black/5 dark:border-white/10"
                                   >
                                     {prod.nombre || prod.name}
                                   </span>
@@ -1132,7 +1134,7 @@ export const PosModal = ({
               <h3 className="text-xl font-black text-gray-800 dark:text-white lya:text-lya-text text-center mb-3">
                 ¿Confirmar cambio en promoción?
               </h3>
-              <p className="text-sm font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 text-center mb-7 leading-relaxed">
+              <p className="text-sm font-bold text-gray-600 dark:text-gray-300 lya:text-lya-text/80 text-justify mb-7 leading-relaxed">
                 {promoWarning.message}
               </p>
               <div className="flex w-full gap-3">
