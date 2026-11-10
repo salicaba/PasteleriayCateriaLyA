@@ -759,49 +759,54 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} transition={{ duration: 0.4, ease: "easeOut" }} className="bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[90vh]">
         
-        {/* HEADER RESPONSIVO NEO-BENTO */}
-        <div className="p-5 sm:p-6 md:p-8 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-5 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
+        {/* HEADER RESPONSIVO NEO-BENTO CORREGIDO */}
+        <div className="p-5 sm:p-6 md:px-8 md:py-6 border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/40 flex flex-col lg:flex-row justify-between lg:items-center gap-4 bg-white dark:bg-gray-900 lya:bg-lya-surface shrink-0 z-10 relative">
           
-          {/* Lado Izquierdo: Títulos */}
-          <div className="flex items-center gap-3 sm:gap-4 pr-10 lg:pr-0">
+          {/* Lado Izquierdo: Títulos con min-w-0 y flex-1 para no empujar los botones fuera del modal */}
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 pr-12 lg:pr-2">
             <div className="bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-orange-200/50 dark:border-orange-800/30 lya:border-lya-primary/30 shrink-0">
-              <Tag size={24} className="sm:w-7 sm:h-7" strokeWidth={2.5} />
+              <Tag size={24} className="sm:w-6 sm:h-6" strokeWidth={2.5} />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-lg sm:text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight truncate">Motor de Promociones</h2>
-              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 truncate">Combos, descuentos por volumen y rebajas directas.</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-800 dark:text-white lya:text-lya-text tracking-tight truncate">
+                Motor de Promociones
+              </h2>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mt-0.5 truncate">
+                Combos, descuentos por volumen y rebajas directas.
+              </p>
             </div>
           </div>
           
-          {/* Lado Derecho: Botones */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0 w-full lg:w-auto justify-end">
+          {/* Lado Derecho: Botones bien contenidos dentro del margen */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0 w-full lg:w-auto justify-end">
             <motion.button 
               type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsPrintModalOpen(true)} 
-              className="w-full sm:w-auto bg-orange-50 md:hover:bg-orange-100 dark:bg-orange-950/30 dark:md:hover:bg-orange-900/40 lya:bg-lya-primary/10 lya:md:hover:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all shadow-sm outline-none"
+              className="w-full sm:w-auto bg-orange-50 md:hover:bg-orange-100 dark:bg-orange-950/30 dark:md:hover:bg-orange-900/40 lya:bg-lya-primary/10 lya:md:hover:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 px-4 py-2.5 sm:py-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm outline-none whitespace-nowrap"
               title="Descargar PDF de cómo funcionan las promociones y reglas de cuentas"
             >
-              <FileDown size={18} strokeWidth={2.5} />
-              <span>Funciones de Promos y Reglas (PDF)</span>
+              <FileDown size={17} strokeWidth={2.5} className="shrink-0" />
+              <span>Funciones y Reglas (PDF)</span>
             </motion.button>
 
             <motion.button 
               type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => { setEditingPromo(null); setIsWizardOpen(true); }} 
-              className="w-full sm:w-auto bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-5 py-3.5 sm:py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none"
+              className="w-full sm:w-auto bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 dark:md:hover:bg-orange-500 lya:bg-lya-primary lya:md:hover:bg-lya-primary/90 text-white lya:text-lya-surface px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/30 dark:shadow-orange-900/40 lya:shadow-lya-primary/30 outline-none whitespace-nowrap"
             >
-              <Plus size={20} /> <span>Nueva Promoción</span>
+              <Plus size={18} strokeWidth={2.5} className="shrink-0" />
+              <span>Nueva Promoción</span>
             </motion.button>
 
             <motion.button 
               type="button"
               whileTap={{ scale: 0.95 }} 
               onClick={onClose} 
-              className="absolute top-5 right-5 lg:relative lg:top-auto lg:right-auto p-2 sm:p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none"
+              className="absolute top-5 right-5 lg:relative lg:top-auto lg:right-auto p-2.5 sm:p-3 bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-border/30 lya:md:hover:bg-lya-border/50 text-gray-600 dark:text-gray-400 lya:text-lya-text/60 rounded-xl transition-colors outline-none shrink-0"
             >
-              <X size={20} className="sm:w-6 sm:h-6" />
+              <X size={20} />
             </motion.button>
           </div>
           
@@ -949,11 +954,11 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
             >
               {/* Encabezado */}
               <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between gap-3 shrink-0">
-                <div className="flex items-center gap-3.5 min-w-0">
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/15 text-orange-600 dark:text-orange-400 lya:text-lya-primary flex items-center justify-center shrink-0">
                     <FileDown size={24} strokeWidth={2.5} />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
                       Funciones de Promociones y Reglas (PDF)
                     </h3>
