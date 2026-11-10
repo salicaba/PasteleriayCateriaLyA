@@ -1,7 +1,7 @@
-// src/modules/admin/views/PromotionListModal.jsx
+// frontend/src/modules/admin/views/PromotionListModal.jsx
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Plus, Power, CheckCircle2, AlertCircle, AlertTriangle, X, Tag, Edit2, Trash2, Info } from 'lucide-react';
+import { Loader2, Plus, Power, CheckCircle2, AlertCircle, AlertTriangle, X, Tag, Edit2, Trash2 } from 'lucide-react';
 import api from '../../../api/client';
 
 export default function PromotionListModal({ isOpen, onClose, product, onOpenWizard }) {
@@ -15,6 +15,7 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
     if (isOpen && product) {
       fetchPromotions();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, product]);
 
   const showNotification = (type, message) => {
@@ -27,7 +28,12 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
     try {
       const res = await api.get('/promotions');
       if (res.data.success) {
-        let productPromos = res.data.data.filter(p => String(p.productId || p.product_id) === String(product.id));
+        const targetId = String(product.id).toLowerCase();
+        let productPromos = (res.data.data || []).filter(p => {
+          const directMatch = String(p.productId || p.product_id || '').toLowerCase() === targetId;
+          const poolMatch = Array.isArray(p.applyToProducts) && p.applyToProducts.some(id => String(id).toLowerCase() === targetId);
+          return directMatch || poolMatch;
+        });
         
         // 🔥 1. SISTEMA DE AUTO-APAGADO INTELIGENTE POR QUIEBRE DE STOCK
         if (product && product.controlarStock) {
@@ -45,7 +51,6 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
             
             if (isReallyActive && currentStock < reqQty) {
               try {
-                // Disparamos el apagado automático a la API
                 await api.patch(`/promotions/${promo.id}/toggle`);
                 didAutoDisable = true;
                 return { ...promo, isActive: false };
@@ -82,7 +87,6 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
   const handleToggle = async (promo) => {
     if (processingId) return; 
 
-    // Validación de seguridad al intentar encender manualmente
     const rawActive = promo.isActive ?? promo.is_active ?? promo.status;
     const isCurrentlyActive = rawActive === true || rawActive === 1 || rawActive === 'true' || rawActive === '1';
     
@@ -107,7 +111,6 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
          const updatedPromo = res.data.data;
          
          setPromotions(prev => {
-           // Actualizamos el estado y volvemos a ordenar para que la lista se reorganice sola
            const newList = prev.map(p => p.id === promo.id ? { ...p, isActive: updatedPromo.isActive } : p);
            return newList.sort((a, b) => {
              const aActive = a.isActive === true || a.isActive === 1 || a.isActive === 'true' || a.isActive === '1';
@@ -267,7 +270,7 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
 
                     <div className="flex justify-between items-center mb-5">
                       <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
-                        {promo.type === 'NxM' ? '📦 VOLUMEN (NxM)' : promo.type === 'FIXED' ? '🏷️ REBAJA DIRECTA' : '✨ UNIDAD ADICIONAL'}
+                        {promo.type === 'NxM' ? '📦 VOLUMEN (NxM)' : promo.type === 'FIXED' ? '🏷️ REBAJA DIRECTA' : promo.type === 'COMBO' ? '🍱 COMBO ARMADO' : promo.type === 'BOGO' ? '🎁 COMPRA Y LLÉVATE' : '✨ UNIDAD ADICIONAL'}
                       </span>
                       <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
                           isPromoActive 
@@ -284,12 +287,16 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
                         {promo.type === 'NxM' && `Lleva ${promo.buyQty}, Paga ${promo.payQty}`}
                         {promo.type === 'FIXED' && `Precio Especial $${parseFloat(promo.discountValue).toFixed(2)}`}
                         {promo.type === 'NTH_FIXED' && `Unidad #${promo.buyQty} a $${parseFloat(promo.discountValue).toFixed(2)}`}
+                        {promo.type === 'COMBO' && `Combo por $${parseFloat(promo.discountValue).toFixed(2)}`}
+                        {promo.type === 'BOGO' && `Compra ${promo.buyQty} y Llévate ${promo.payQty}`}
                       </h4>
                       
                       <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 leading-relaxed text-justify">
-                        {promo.type === 'NxM' && `El sistema descontará automáticamente el precio de ${promo.buyQty - promo.payQty} unidad(es) por cada múltiplo de ${promo.buyQty} en la misma cuenta.`}
+                        {promo.type === 'NxM' && `El sistema descontará automáticamente el precio de ${Number(promo.buyQty) - Number(promo.payQty)} unidad(es) por cada múltiplo de ${promo.buyQty} en la misma cuenta.`}
                         {promo.type === 'FIXED' && `Se aplicará un descuento directo para que el precio final de cada unidad añadida sea de $${parseFloat(promo.discountValue).toFixed(2)}.`}
                         {promo.type === 'NTH_FIXED' && `Cuando el cliente acumule ${promo.buyQty} unidades exactas, el sistema aplicará un descuento para que la última cueste $${parseFloat(promo.discountValue).toFixed(2)}.`}
+                        {promo.type === 'COMBO' && `Al reunir todos los artículos del paquete en la misma cuenta, el total del combo se ajusta a $${parseFloat(promo.discountValue).toFixed(2)}.`}
+                        {promo.type === 'BOGO' && `Al comprar ${promo.buyQty} producto(s) participante(s) en la misma cuenta, el cliente recibe ${promo.payQty} producto(s) de recompensa por $${parseFloat(promo.discountValue || 0).toFixed(2)}.`}
                       </p>
                     </div>
 
@@ -297,7 +304,7 @@ export default function PromotionListModal({ isOpen, onClose, product, onOpenWiz
                       
                       <div className="flex flex-wrap gap-1.5 w-full lg:w-auto">
                         {[1, 2, 3, 4, 5, 6, 0].map(dayId => {
-                          const isActiveDay = promo.validDays.includes(dayId);
+                          const isActiveDay = Array.isArray(promo.validDays) && promo.validDays.includes(dayId);
                           return (
                             <span 
                               key={dayId}
