@@ -179,7 +179,6 @@ const buildPdfBlobFromCanvas = (canvas, isLandscape = false) => {
     jpegBytes[i] = binaryStr.charCodeAt(i);
   }
 
-  // Tamaño Carta estándar en puntos tipográficos (11" x 8.5" o 8.5" x 11")
   const pageWidthPt = isLandscape ? 792 : 612;
   const pageHeightPt = isLandscape ? 612 : 792;
   const imgWidth = canvas.width;
@@ -201,24 +200,19 @@ const buildPdfBlobFromCanvas = (canvas, isLandscape = false) => {
     currentOffset += bytes.length;
   };
 
-  // Cabecera PDF 1.4
   pushStr('%PDF-1.4\n');
 
-  // Objeto 1: Catálogo
   offsets[1] = currentOffset;
   pushStr('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
 
-  // Objeto 2: Árbol de Páginas
   offsets[2] = currentOffset;
   pushStr('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
 
-  // Objeto 3: Página Carta
   offsets[3] = currentOffset;
   pushStr(
     `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt} ${pageHeightPt}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`
   );
 
-  // Objeto 4: Imagen en alta resolución (DCTDecode)
   offsets[4] = currentOffset;
   pushStr(
     `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgWidth} /Height ${imgHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`
@@ -226,19 +220,16 @@ const buildPdfBlobFromCanvas = (canvas, isLandscape = false) => {
   pushBytes(jpegBytes);
   pushStr('\nendstream\nendobj\n');
 
-  // Objeto 5: Stream de dibujo en página completa
   const contentStream = `q ${pageWidthPt} 0 0 ${pageHeightPt} 0 0 cm /Im0 Do Q\n`;
   offsets[5] = currentOffset;
   pushStr(`5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`);
 
-  // Tabla de referencias cruzadas (xref)
   const xrefOffset = currentOffset;
   pushStr('xref\n0 6\n0000000000 65535 f \n');
   for (let i = 1; i <= 5; i++) {
     pushStr(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
   }
 
-  // Trailer y cierre del PDF
   pushStr(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
 
   return new Blob(chunks, { type: 'application/pdf' });
@@ -365,7 +356,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     return types[type] || type;
   };
 
-  // ✨ Renderizado de la hoja en Canvas de Alta Resolución (240 DPI proporción Carta)
+  // ✨ Renderizado de la hoja en Canvas de Alta Resolución (Sin líneas punteadas abajo y sin traslapes)
   const generateGuideCanvas = async () => {
     const isTent = printLayout === 'tent';
     const isLya = printTheme === 'lya';
@@ -398,9 +389,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
     const drawSingleGuideOnCanvas = (originX, originY, boxW, boxH) => {
       const s = boxW / 1000;
-      const totalUnitsH = boxH / s;
-      // Distribuir espacio vertical extra cuando está en formato 2x Hoja (Mesas)
-      const extraUnits = Math.max(0, totalUnitsH - 1240);
+      const isTallCard = (boxH / boxW) > 1.4; // True en modo 2x Hoja (Mesas)
 
       const bgSheet = isLya ? '#FAF6F0' : '#FFFFFF';
       const bgCard = isLya ? '#F3EBE0' : '#F9FAFB';
@@ -411,12 +400,13 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       const warnBg = isLya ? '#FDF8EE' : '#FFFBEB';
       const warnBorder = isLya ? '#DEC6A7' : '#FDE68A';
 
+      // Contenedor exterior de la guía
       drawRoundedRect(ctx, originX, originY, boxW, boxH, 28 * s, bgSheet, borderCard, 2.5 * s);
 
       const pad = 38 * s;
       const innerX = originX + pad;
       const innerW = boxW - pad * 2;
-      let curY = originY + pad + (extraUnits * 0.08 * s);
+      let curY = originY + (isTallCard ? 46 * s : 36 * s);
 
       // 1. HEADER
       const logoSize = 74 * s;
@@ -444,7 +434,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
       ctx.font = `700 ${16 * s}px ${fontStack}`;
       ctx.fillStyle = textSub;
-      ctx.fillText('Guía de Promociones y Reglas por Cuenta', titleX, curY + 45 * s);
+      ctx.fillText('Funciones de Promociones y Reglas por Cuenta', titleX, curY + 45 * s);
 
       const badgeText = 'GUÍA EN MESA';
       ctx.font = `900 ${13 * s}px ${fontStack}`;
@@ -457,9 +447,9 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.textBaseline = 'middle';
       ctx.fillText(badgeText, badgeX + 14 * s, badgeY + badgeH / 2);
 
-      curY += logoSize + (24 + extraUnits * 0.06) * s;
+      curY += logoSize + (isTallCard ? 28 * s : 20 * s);
 
-      // Línea divisoria del header
+      // Línea divisoria sólida bajo el encabezado
       ctx.beginPath();
       ctx.moveTo(innerX, curY);
       ctx.lineTo(innerX + innerW, curY);
@@ -467,20 +457,20 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.strokeStyle = borderCard;
       ctx.stroke();
 
-      curY += (26 + extraUnits * 0.08) * s;
+      curY += (isTallCard ? 32 * s : 22 * s);
 
       // 2. TÍTULO SECCIÓN 1
       ctx.font = `900 ${18 * s}px ${fontStack}`;
       ctx.fillStyle = accentPrimary;
       ctx.textBaseline = 'top';
       ctx.fillText('✨ ¿CÓMO FUNCIONAN NUESTRAS PROMOCIONES?', innerX, curY);
-      curY += (34 + extraUnits * 0.04) * s;
+      curY += (isTallCard ? 36 * s : 30 * s);
 
       // 3. GRID 2x2 DE LOS 4 PILARES
       const colGap = 18 * s;
-      const rowGap = (18 + extraUnits * 0.05) * s;
+      const rowGap = (isTallCard ? 22 : 16) * s;
       const colW = (innerW - colGap) / 2;
-      const pillarCardH = (192 + extraUnits * 0.14) * s;
+      const pillarCardH = (isTallCard ? 215 : 185) * s;
 
       for (let i = 0; i < PILLARS_DATA.length; i++) {
         const item = PILLARS_DATA[i];
@@ -511,9 +501,9 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
           ctx,
           item.text,
           cardX + cPad,
-          cardY + cPad + numSize + (14 + extraUnits * 0.02) * s,
+          cardY + cPad + numSize + (isTallCard ? 16 : 12) * s,
           colW - cPad * 2,
-          (22.5 + extraUnits * 0.015) * s,
+          (isTallCard ? 23.5 : 21.5) * s,
           15 * s,
           fontStack,
           textSub,
@@ -521,14 +511,15 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         );
       }
 
-      curY += pillarCardH * 2 + rowGap + (28 + extraUnits * 0.1) * s;
+      curY += pillarCardH * 2 + rowGap + (isTallCard ? 36 : 24) * s;
 
       // 4. BLOQUE IMPORTANTE: UNIÓN DE CUENTAS Y RUPTURA DE PROMOS
       const warnBoxPad = 22 * s;
       const warnInnerW = innerW - warnBoxPad * 2;
       const warnColW = (warnInnerW - colGap) / 2;
-      const warnCardH = (232 + extraUnits * 0.14) * s;
-      const warnBoxH = warnBoxPad * 2 + (40 + extraUnits * 0.03) * s + warnCardH * 2 + rowGap;
+      const warnCardH = (isTallCard ? 250 : 222) * s;
+      const warnHeaderH = (isTallCard ? 42 : 36) * s;
+      const warnBoxH = warnBoxPad * 2 + warnHeaderH + warnCardH * 2 + rowGap;
 
       drawRoundedRect(ctx, innerX, curY, innerW, warnBoxH, 22 * s, warnBg, warnBorder, 2.5 * s);
 
@@ -538,7 +529,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.textBaseline = 'top';
       ctx.fillText('⚠️ Importante: Unión de Cuentas y ¿Cuándo se rompe una Promoción?', innerX + warnBoxPad, warnY);
 
-      warnY += (40 + extraUnits * 0.03) * s;
+      warnY += warnHeaderH;
 
       for (let i = 0; i < WARNING_RULES_DATA.length; i++) {
         const rule = WARNING_RULES_DATA[i];
@@ -559,36 +550,30 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
           ctx,
           rule.text,
           wCardX + wPad,
-          wCardY + wPad + (28 + extraUnits * 0.02) * s,
+          wCardY + wPad + (isTallCard ? 30 : 26) * s,
           warnColW - wPad * 2,
-          (21.5 + extraUnits * 0.015) * s,
-          14.4 * s,
+          (isTallCard ? 22.5 : 20.5) * s,
+          14.3 * s,
           fontStack,
           '#374151',
           '#111827'
         );
       }
 
-      // 5. PIE DE PÁGINA FIJO AL FONDO DE LA TARJETA
-      const footerY = originY + boxH - 68 * s;
-      ctx.save();
-      ctx.setLineDash([6 * s, 5 * s]);
-      ctx.beginPath();
-      ctx.moveTo(innerX, footerY);
-      ctx.lineTo(innerX + innerW, footerY);
-      ctx.lineWidth = 1.5 * s;
-      ctx.strokeStyle = borderCard;
-      ctx.stroke();
-      ctx.restore();
+      curY += warnBoxH + (isTallCard ? 28 : 18) * s;
 
-      ctx.font = `800 ${13.5 * s}px ${fontStack}`;
+      // 5. PIE DE PÁGINA EN PÍLDORA SUAVE (SIN LÍNEA PUNTEADA DE CORTE)
+      const footerBoxH = (isTallCard ? 48 : 42) * s;
+      drawRoundedRect(ctx, innerX, curY, innerW, footerBoxH, 14 * s, bgCard, borderCard, 1.2 * s);
+
+      ctx.font = `800 ${13.2 * s}px ${fontStack}`;
       ctx.fillStyle = accentPrimary;
       ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
+      ctx.textBaseline = 'middle';
       ctx.fillText(
         '¿Prefieres ordenar sin usar el celular? Solicita tu pedido a nuestro personal indicando tus productos y en qué cuenta van. ✨',
         originX + boxW / 2,
-        footerY + 20 * s
+        curY + footerBoxH / 2
       );
       ctx.textAlign = 'left';
     };
@@ -601,7 +586,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       drawSingleGuideOnCanvas(margin, margin, halfW, cardH);
       drawSingleGuideOnCanvas(canvas.width - margin - halfW, margin, halfW, cardH);
 
-      // Línea punteada central de recorte
+      // Única línea de recorte vertical en medio de las 2 guías (modo 2x Hoja)
       ctx.save();
       ctx.setLineDash([14, 12]);
       ctx.beginPath();
@@ -626,7 +611,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     return canvas;
   };
 
-  // ✨ Descarga directa del archivo en formato .PDF (igual que Control QR y Cuentas)
+  // ✨ Descarga directa del archivo en formato .PDF
   const handleDownloadGuidePdf = async () => {
     if (isDownloadingPdf) return;
     setIsDownloadingPdf(true);
@@ -639,14 +624,14 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       const link = document.createElement('a');
       const layoutSlug = isTent ? 'Mesas-2xHoja' : 'Cartel-1xHoja';
       const themeSlug = printTheme === 'lya' ? 'ColorLyA' : 'AhorroTinta';
-      link.download = `Guia-Promociones-Reglas-${layoutSlug}-${themeSlug}.pdf`;
+      link.download = `Funciones-Promociones-y-Reglas-${layoutSlug}-${themeSlug}.pdf`;
       link.href = blobUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 
-      if (showToast) showToast('PDF descargado exitosamente', 'success');
+      if (showToast) showToast('PDF de funciones y reglas descargado exitosamente', 'success');
     } catch (err) {
       console.error('Error generando PDF de guía:', err);
       if (showToast) showToast('Error al generar el PDF', 'error');
@@ -655,7 +640,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     }
   };
 
-  // Componente interno para renderizar la tarjeta de guía en la vista previa
+  // Componente interno para renderizar la tarjeta de guía en la vista previa (sin línea punteada abajo)
   const GuidePreviewCard = ({ compact = false }) => (
     <div
       className={`rounded-[1.75rem] ${compact ? 'p-4' : 'p-5 sm:p-7'} shadow-xl border-2 transition-colors flex flex-col justify-between ${
@@ -680,7 +665,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                 𝓛𝔂𝓪 Pastelería & Cafetería
               </h4>
               <p className={`${compact ? 'text-[10px]' : 'text-xs'} font-bold truncate ${printTheme === 'lya' ? 'text-[#6D5444]' : 'text-gray-500'}`}>
-                Guía de Promociones y Reglas por Cuenta
+                Funciones de Promociones y Reglas por Cuenta
               </p>
             </div>
           </div>
@@ -759,9 +744,11 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         </div>
       </div>
 
-      {/* Pie de la Hoja */}
-      <div className={`mt-4 pt-3 border-t border-dashed text-center text-[10px] sm:text-[11px] font-black ${
-        printTheme === 'lya' ? 'border-[#DEC6A7] text-[#78350F]' : 'border-gray-300 text-orange-600'
+      {/* Pie de la Hoja en caja suave (sin línea punteada que parezca recorte) */}
+      <div className={`mt-4 py-2.5 px-3.5 rounded-xl border text-center text-[10px] sm:text-[11px] font-black ${
+        printTheme === 'lya'
+          ? 'bg-[#F3EBE0] border-[#E5D5C0] text-[#78350F]'
+          : 'bg-gray-50 border-gray-200 text-orange-600'
       }`}>
         ¿Prefieres ordenar sin usar el celular? Solicita tu pedido a nuestro personal indicando tus productos y en qué cuenta van. ✨
       </div>
@@ -793,10 +780,10 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsPrintModalOpen(true)} 
               className="w-full sm:w-auto bg-orange-50 md:hover:bg-orange-100 dark:bg-orange-950/30 dark:md:hover:bg-orange-900/40 lya:bg-lya-primary/10 lya:md:hover:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all shadow-sm outline-none"
-              title="Descargar PDF con guía de promociones y reglas para mesas o mostrador"
+              title="Descargar PDF de cómo funcionan las promociones y reglas de cuentas"
             >
               <FileDown size={18} strokeWidth={2.5} />
-              <span>Descargar PDF para Mesas</span>
+              <span>Funciones de Promos y Reglas (PDF)</span>
             </motion.button>
 
             <motion.button 
@@ -968,7 +955,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
-                      Descargar PDF de Promociones y Reglas
+                      Funciones de Promociones y Reglas (PDF)
                     </h3>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 truncate">
                       Documento PDF tamaño Carta listo para imprimir y colocar en mesas o mostrador
@@ -1060,7 +1047,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
               <div className="p-4 sm:p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-center sm:text-left">
                   {printLayout === 'tent'
-                    ? '✂️ Se descargará 1 PDF tamaño Carta Horizontal con 2 guías idénticas y línea de recorte.'
+                    ? '✂️ Se descargará 1 PDF tamaño Carta Horizontal con 2 guías idénticas y línea central de recorte.'
                     : '📄 Se descargará 1 PDF tamaño Carta Vertical con el cartel completo.'}
                 </p>
                 <div className="flex items-center gap-2.5 w-full sm:w-auto">
