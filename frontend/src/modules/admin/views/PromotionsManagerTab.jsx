@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Tag, Plus, Edit2, Trash2, Power, Loader2, AlertTriangle, 
-  Globe, ShoppingBag, Printer, Sparkles, ShieldAlert, 
-  Columns, Palette, Download
+  Globe, ShoppingBag, Sparkles, ShieldAlert, 
+  Columns, Palette, FileDown
 } from 'lucide-react';
 import api from '../../../api/client';
 import PromotionManagerModal from './PromotionManagerModal';
@@ -82,7 +82,7 @@ const WARNING_RULES_DATA = [
   }
 ];
 
-// Helpers de dibujo en Canvas para descarga directa en alta resolución
+// Helpers de dibujo en Canvas
 const drawRoundedRect = (ctx, x, y, width, height, radius, fillColor, strokeColor, strokeWidth = 1) => {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -169,6 +169,81 @@ const drawJustifiedRichParagraph = (ctx, htmlText, x, y, maxWidth, lineHeight, f
   return cursorY;
 };
 
+// ✨ Empaquetador nativo de Canvas a archivo binario PDF 1.4 (Tamaño Carta exacto)
+const buildPdfBlobFromCanvas = (canvas, isLandscape = false) => {
+  const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+  const base64Data = jpegDataUrl.split(',')[1];
+  const binaryStr = atob(base64Data);
+  const jpegBytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    jpegBytes[i] = binaryStr.charCodeAt(i);
+  }
+
+  // Tamaño Carta estándar en puntos tipográficos (11" x 8.5" o 8.5" x 11")
+  const pageWidthPt = isLandscape ? 792 : 612;
+  const pageHeightPt = isLandscape ? 612 : 792;
+  const imgWidth = canvas.width;
+  const imgHeight = canvas.height;
+
+  const encoder = new TextEncoder();
+  const chunks = [];
+  const offsets = [0];
+  let currentOffset = 0;
+
+  const pushStr = (str) => {
+    const bytes = encoder.encode(str);
+    chunks.push(bytes);
+    currentOffset += bytes.length;
+  };
+
+  const pushBytes = (bytes) => {
+    chunks.push(bytes);
+    currentOffset += bytes.length;
+  };
+
+  // Cabecera PDF 1.4
+  pushStr('%PDF-1.4\n');
+
+  // Objeto 1: Catálogo
+  offsets[1] = currentOffset;
+  pushStr('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+  // Objeto 2: Árbol de Páginas
+  offsets[2] = currentOffset;
+  pushStr('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+  // Objeto 3: Página Carta
+  offsets[3] = currentOffset;
+  pushStr(
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt} ${pageHeightPt}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`
+  );
+
+  // Objeto 4: Imagen en alta resolución (DCTDecode)
+  offsets[4] = currentOffset;
+  pushStr(
+    `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgWidth} /Height ${imgHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`
+  );
+  pushBytes(jpegBytes);
+  pushStr('\nendstream\nendobj\n');
+
+  // Objeto 5: Stream de dibujo en página completa
+  const contentStream = `q ${pageWidthPt} 0 0 ${pageHeightPt} 0 0 cm /Im0 Do Q\n`;
+  offsets[5] = currentOffset;
+  pushStr(`5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`);
+
+  // Tabla de referencias cruzadas (xref)
+  const xrefOffset = currentOffset;
+  pushStr('xref\n0 6\n0000000000 65535 f \n');
+  for (let i = 1; i <= 5; i++) {
+    pushStr(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
+  }
+
+  // Trailer y cierre del PDF
+  pushStr(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+  return new Blob(chunks, { type: 'application/pdf' });
+};
+
 export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) => {
   const [promotions, setPromotions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,11 +255,11 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
   const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(null);
 
-  // ✨ Estados para el Modal de Descarga / Impresión de la Guía
+  // ✨ Estados para el Modal de Descarga de PDF
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printLayout, setPrintLayout] = useState('tent'); // 'poster' (1x Hoja) | 'tent' (2x Hoja Mesas)
   const [printTheme, setPrintTheme] = useState('lya'); // 'lya' (Color LyA) | 'ink_saver' (Ahorro Tinta)
-  const [isDownloadingSheet, setIsDownloadingSheet] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const fetchPromotions = async (silentLoad = false) => {
     try {
@@ -290,12 +365,11 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     return types[type] || type;
   };
 
-  // ✨ Generador de Canvas en Alta Resolución para Descarga Directa (como Control QR)
+  // ✨ Renderizado de la hoja en Canvas de Alta Resolución (240 DPI proporción Carta)
   const generateGuideCanvas = async () => {
     const isTent = printLayout === 'tent';
     const isLya = printTheme === 'lya';
 
-    // Cargar logo antes de dibujar
     const loadLogo = () => new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -307,13 +381,13 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     const logoImg = await loadLogo();
     const canvas = document.createElement('canvas');
 
-    // Tamaño Carta a alta resolución
+    // Proporción exacta US Letter (11:8.5 y 8.5:11)
     if (isTent) {
-      canvas.width = 2200;
-      canvas.height = 1700;
+      canvas.width = 2640;
+      canvas.height = 2040;
     } else {
-      canvas.width = 1700;
-      canvas.height = 2200;
+      canvas.width = 2040;
+      canvas.height = 2640;
     }
 
     const ctx = canvas.getContext('2d');
@@ -323,7 +397,10 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
     const fontStack = "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
     const drawSingleGuideOnCanvas = (originX, originY, boxW, boxH) => {
-      const s = boxW / 1000; // Factor de escala proporcional
+      const s = boxW / 1000;
+      const totalUnitsH = boxH / s;
+      // Distribuir espacio vertical extra cuando está en formato 2x Hoja (Mesas)
+      const extraUnits = Math.max(0, totalUnitsH - 1240);
 
       const bgSheet = isLya ? '#FAF6F0' : '#FFFFFF';
       const bgCard = isLya ? '#F3EBE0' : '#F9FAFB';
@@ -334,16 +411,15 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       const warnBg = isLya ? '#FDF8EE' : '#FFFBEB';
       const warnBorder = isLya ? '#DEC6A7' : '#FDE68A';
 
-      // Contenedor principal de la guía
       drawRoundedRect(ctx, originX, originY, boxW, boxH, 28 * s, bgSheet, borderCard, 2.5 * s);
 
       const pad = 38 * s;
       const innerX = originX + pad;
       const innerW = boxW - pad * 2;
-      let curY = originY + pad;
+      let curY = originY + pad + (extraUnits * 0.08 * s);
 
       // 1. HEADER
-      const logoSize = 72 * s;
+      const logoSize = 74 * s;
       if (logoImg) {
         ctx.save();
         ctx.beginPath();
@@ -368,9 +444,8 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
       ctx.font = `700 ${16 * s}px ${fontStack}`;
       ctx.fillStyle = textSub;
-      ctx.fillText('Guía de Promociones y Reglas por Cuenta', titleX, curY + 44 * s);
+      ctx.fillText('Guía de Promociones y Reglas por Cuenta', titleX, curY + 45 * s);
 
-      // Pastilla superior derecha
       const badgeText = 'GUÍA EN MESA';
       ctx.font = `900 ${13 * s}px ${fontStack}`;
       const badgeW = ctx.measureText(badgeText).width + 28 * s;
@@ -382,7 +457,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.textBaseline = 'middle';
       ctx.fillText(badgeText, badgeX + 14 * s, badgeY + badgeH / 2);
 
-      curY += logoSize + 22 * s;
+      curY += logoSize + (24 + extraUnits * 0.06) * s;
 
       // Línea divisoria del header
       ctx.beginPath();
@@ -392,20 +467,20 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.strokeStyle = borderCard;
       ctx.stroke();
 
-      curY += 24 * s;
+      curY += (26 + extraUnits * 0.08) * s;
 
       // 2. TÍTULO SECCIÓN 1
-      ctx.font = `900 ${17.5 * s}px ${fontStack}`;
+      ctx.font = `900 ${18 * s}px ${fontStack}`;
       ctx.fillStyle = accentPrimary;
       ctx.textBaseline = 'top';
       ctx.fillText('✨ ¿CÓMO FUNCIONAN NUESTRAS PROMOCIONES?', innerX, curY);
-      curY += 32 * s;
+      curY += (34 + extraUnits * 0.04) * s;
 
       // 3. GRID 2x2 DE LOS 4 PILARES
       const colGap = 18 * s;
-      const rowGap = 18 * s;
+      const rowGap = (18 + extraUnits * 0.05) * s;
       const colW = (innerW - colGap) / 2;
-      const pillarCardH = 190 * s;
+      const pillarCardH = (192 + extraUnits * 0.14) * s;
 
       for (let i = 0; i < PILLARS_DATA.length; i++) {
         const item = PILLARS_DATA[i];
@@ -436,24 +511,24 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
           ctx,
           item.text,
           cardX + cPad,
-          cardY + cPad + numSize + 12 * s,
+          cardY + cPad + numSize + (14 + extraUnits * 0.02) * s,
           colW - cPad * 2,
-          22 * s,
-          14.8 * s,
+          (22.5 + extraUnits * 0.015) * s,
+          15 * s,
           fontStack,
           textSub,
           textMain
         );
       }
 
-      curY += pillarCardH * 2 + rowGap + 26 * s;
+      curY += pillarCardH * 2 + rowGap + (28 + extraUnits * 0.1) * s;
 
       // 4. BLOQUE IMPORTANTE: UNIÓN DE CUENTAS Y RUPTURA DE PROMOS
       const warnBoxPad = 22 * s;
       const warnInnerW = innerW - warnBoxPad * 2;
       const warnColW = (warnInnerW - colGap) / 2;
-      const warnCardH = 228 * s;
-      const warnBoxH = warnBoxPad * 2 + 38 * s + warnCardH * 2 + rowGap;
+      const warnCardH = (232 + extraUnits * 0.14) * s;
+      const warnBoxH = warnBoxPad * 2 + (40 + extraUnits * 0.03) * s + warnCardH * 2 + rowGap;
 
       drawRoundedRect(ctx, innerX, curY, innerW, warnBoxH, 22 * s, warnBg, warnBorder, 2.5 * s);
 
@@ -463,7 +538,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.textBaseline = 'top';
       ctx.fillText('⚠️ Importante: Unión de Cuentas y ¿Cuándo se rompe una Promoción?', innerX + warnBoxPad, warnY);
 
-      warnY += 38 * s;
+      warnY += (40 + extraUnits * 0.03) * s;
 
       for (let i = 0; i < WARNING_RULES_DATA.length; i++) {
         const rule = WARNING_RULES_DATA[i];
@@ -484,10 +559,10 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
           ctx,
           rule.text,
           wCardX + wPad,
-          wCardY + wPad + 27 * s,
+          wCardY + wPad + (28 + extraUnits * 0.02) * s,
           warnColW - wPad * 2,
-          21.2 * s,
-          14.2 * s,
+          (21.5 + extraUnits * 0.015) * s,
+          14.4 * s,
           fontStack,
           '#374151',
           '#111827'
@@ -495,7 +570,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       }
 
       // 5. PIE DE PÁGINA FIJO AL FONDO DE LA TARJETA
-      const footerY = originY + boxH - 64 * s;
+      const footerY = originY + boxH - 68 * s;
       ctx.save();
       ctx.setLineDash([6 * s, 5 * s]);
       ctx.beginPath();
@@ -513,15 +588,14 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
       ctx.fillText(
         '¿Prefieres ordenar sin usar el celular? Solicita tu pedido a nuestro personal indicando tus productos y en qué cuenta van. ✨',
         originX + boxW / 2,
-        footerY + 18 * s
+        footerY + 20 * s
       );
       ctx.textAlign = 'left';
     };
 
     if (isTent) {
-      // 2 Guías idénticas lado a lado en hoja Carta Horizontal
-      const margin = 42;
-      const halfW = 1025;
+      const margin = 50;
+      const halfW = 1230;
       const cardH = canvas.height - margin * 2;
 
       drawSingleGuideOnCanvas(margin, margin, halfW, cardH);
@@ -529,106 +603,55 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
 
       // Línea punteada central de recorte
       ctx.save();
-      ctx.setLineDash([12, 10]);
+      ctx.setLineDash([14, 12]);
       ctx.beginPath();
-      ctx.moveTo(canvas.width / 2, 20);
-      ctx.lineTo(canvas.width / 2, canvas.height - 20);
-      ctx.lineWidth = 2.5;
+      ctx.moveTo(canvas.width / 2, 24);
+      ctx.lineTo(canvas.width / 2, canvas.height - 24);
+      ctx.lineWidth = 3;
       ctx.strokeStyle = '#9CA3AF';
       ctx.stroke();
       ctx.restore();
 
-      ctx.font = `900 22px ${fontStack}`;
+      ctx.font = `900 26px ${fontStack}`;
       ctx.fillStyle = '#6B7280';
       ctx.textAlign = 'center';
-      ctx.fillText('✂️', canvas.width / 2, 30);
-      ctx.fillText('✂️', canvas.width / 2, canvas.height - 45);
+      ctx.fillText('✂️', canvas.width / 2, 34);
+      ctx.fillText('✂️', canvas.width / 2, canvas.height - 54);
       ctx.textAlign = 'left';
     } else {
-      // 1 Cartel completo en hoja Carta Vertical
-      const margin = 55;
+      const margin = 64;
       drawSingleGuideOnCanvas(margin, margin, canvas.width - margin * 2, canvas.height - margin * 2);
     }
 
     return canvas;
   };
 
-  // ✨ Descarga directa de la hoja en PNG (como en Control QR)
-  const handleDownloadGuideSheet = async () => {
-    if (isDownloadingSheet) return;
-    setIsDownloadingSheet(true);
+  // ✨ Descarga directa del archivo en formato .PDF (igual que Control QR y Cuentas)
+  const handleDownloadGuidePdf = async () => {
+    if (isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
     try {
+      const isTent = printLayout === 'tent';
       const canvas = await generateGuideCanvas();
-      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const pdfBlob = buildPdfBlobFromCanvas(canvas, isTent);
+
+      const blobUrl = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
-      const layoutSlug = printLayout === 'tent' ? 'Mesas-2xHoja' : 'Cartel-1xHoja';
+      const layoutSlug = isTent ? 'Mesas-2xHoja' : 'Cartel-1xHoja';
       const themeSlug = printTheme === 'lya' ? 'ColorLyA' : 'AhorroTinta';
-      link.download = `Guia-Promociones-Reglas-${layoutSlug}-${themeSlug}.png`;
-      link.href = dataUrl;
+      link.download = `Guia-Promociones-Reglas-${layoutSlug}-${themeSlug}.pdf`;
+      link.href = blobUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      if (showToast) showToast('Hoja de guía descargada exitosamente', 'success');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+      if (showToast) showToast('PDF descargado exitosamente', 'success');
     } catch (err) {
-      console.error('Error generando hoja de guía:', err);
-      if (showToast) showToast('Error al descargar la hoja', 'error');
+      console.error('Error generando PDF de guía:', err);
+      if (showToast) showToast('Error al generar el PDF', 'error');
     } finally {
-      setIsDownloadingSheet(false);
-    }
-  };
-
-  // ✨ Impresión directa de la hoja generada
-  const handleDirectPrintSheet = async () => {
-    if (isDownloadingSheet) return;
-    setIsDownloadingSheet(true);
-    try {
-      const canvas = await generateGuideCanvas();
-      const dataUrl = canvas.toDataURL('image/png', 1.0);
-      const isTent = printLayout === 'tent';
-
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      document.body.appendChild(iframe);
-
-      const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Guía de Promociones - LyA</title>
-            <style>
-              @page { size: letter ${isTent ? 'landscape' : 'portrait'}; margin: 0; }
-              html, body { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #fff; }
-              img { width: 100%; height: 100%; object-fit: contain; }
-            </style>
-          </head>
-          <body>
-            <img src="${dataUrl}" />
-          </body>
-        </html>
-      `);
-      doc.close();
-
-      iframe.onload = () => {
-        setTimeout(() => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-          setTimeout(() => {
-            if (document.body.contains(iframe)) document.body.removeChild(iframe);
-          }, 1500);
-        }, 250);
-      };
-    } catch (err) {
-      console.error('Error al imprimir hoja:', err);
-      if (showToast) showToast('Error al preparar la impresión', 'error');
-    } finally {
-      setIsDownloadingSheet(false);
+      setIsDownloadingPdf(false);
     }
   };
 
@@ -770,10 +793,10 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsPrintModalOpen(true)} 
               className="w-full sm:w-auto bg-orange-50 md:hover:bg-orange-100 dark:bg-orange-950/30 dark:md:hover:bg-orange-900/40 lya:bg-lya-primary/10 lya:md:hover:bg-lya-primary/20 text-orange-600 dark:text-orange-400 lya:text-lya-primary border border-orange-200/80 dark:border-orange-800/40 lya:border-lya-primary/30 px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all shadow-sm outline-none"
-              title="Descargar o imprimir guía de promociones y reglas para mesas o mostrador"
+              title="Descargar PDF con guía de promociones y reglas para mesas o mostrador"
             >
-              <Download size={18} strokeWidth={2.5} />
-              <span>Descargar Guía para Mesas</span>
+              <FileDown size={18} strokeWidth={2.5} />
+              <span>Descargar PDF para Mesas</span>
             </motion.button>
 
             <motion.button 
@@ -927,7 +950,7 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
         </div>
       </motion.div>
 
-      {/* ✨ MODAL LIMPIO DE DESCARGA DIRECTA DE GUÍA DE PROMOCIONES Y REGLAS */}
+      {/* ✨ MODAL LIMPIO DE DESCARGA DIRECTA EN PDF */}
       <AnimatePresence>
         {isPrintModalOpen && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm">
@@ -941,14 +964,14 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
               <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-12 h-12 rounded-2xl bg-orange-100 dark:bg-orange-900/30 lya:bg-lya-primary/15 text-orange-600 dark:text-orange-400 lya:text-lya-primary flex items-center justify-center shrink-0">
-                    <Download size={24} strokeWidth={2.5} />
+                    <FileDown size={24} strokeWidth={2.5} />
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white lya:text-lya-text tracking-tight truncate">
-                      Descargar Guía de Promociones y Reglas
+                      Descargar PDF de Promociones y Reglas
                     </h3>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 truncate">
-                      Descarga directamente la hoja lista para imprimir y colocar en mesas o mostrador
+                      Documento PDF tamaño Carta listo para imprimir y colocar en mesas o mostrador
                     </p>
                   </div>
                 </div>
@@ -961,12 +984,12 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                 </button>
               </div>
 
-              {/* Barra Superior Simplificada: Solo Formato de Hoja y Modo de Tinta */}
+              {/* Barra Superior Simplificada: Solo Formato de Hoja Carta y Modo de Tinta */}
               <div className="p-4 sm:px-6 bg-gray-50 dark:bg-gray-800/50 lya:bg-lya-bg border-b border-gray-100 dark:border-gray-800 lya:border-lya-border/30 grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
                 {/* 1. Formato de Hoja Carta */}
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 lya:text-lya-text/50 flex items-center gap-1.5">
-                    <Columns size={12} /> Formato de Hoja Carta
+                    <Columns size={12} /> Formato de Hoja Carta (PDF)
                   </span>
                   <div className="grid grid-cols-2 gap-1.5 bg-white dark:bg-gray-900 lya:bg-lya-surface p-1 rounded-xl border border-gray-200 dark:border-gray-700 lya:border-lya-border/40">
                     <button
@@ -1033,41 +1056,38 @@ export const PromotionsManagerTab = ({ isOpen, onClose, products, showToast }) =
                 </div>
               </div>
 
-              {/* Pie del Modal con Descarga Directa estilo Control QR */}
+              {/* Pie del Modal con Descarga Directa en PDF */}
               <div className="p-4 sm:p-5 bg-white dark:bg-gray-900 lya:bg-lya-surface border-t border-gray-100 dark:border-gray-800 lya:border-lya-border/30 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 lya:text-lya-text/60 text-center sm:text-left">
                   {printLayout === 'tent'
-                    ? '✂️ Se descargará 1 hoja Carta Horizontal con 2 guías idénticas y línea de recorte.'
-                    : '📄 Se descargará 1 hoja Carta Vertical con el cartel completo.'}
+                    ? '✂️ Se descargará 1 PDF tamaño Carta Horizontal con 2 guías idénticas y línea de recorte.'
+                    : '📄 Se descargará 1 PDF tamaño Carta Vertical con el cartel completo.'}
                 </p>
                 <div className="flex items-center gap-2.5 w-full sm:w-auto">
                   <button
                     type="button"
-                    disabled={isDownloadingSheet}
-                    onClick={handleDirectPrintSheet}
-                    className="px-4 py-3 rounded-xl bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors outline-none disabled:opacity-50"
-                    title="Imprimir directamente"
+                    onClick={() => setIsPrintModalOpen(false)}
+                    className="px-5 py-3 rounded-xl bg-gray-100 md:hover:bg-gray-200 dark:bg-gray-800 dark:md:hover:bg-gray-700 lya:bg-lya-bg text-gray-700 dark:text-gray-200 lya:text-lya-text font-black text-xs sm:text-sm transition-colors outline-none"
                   >
-                    <Printer size={17} strokeWidth={2.5} />
-                    <span>Imprimir</span>
+                    Cerrar
                   </button>
 
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.96 }}
-                    disabled={isDownloadingSheet}
-                    onClick={handleDownloadGuideSheet}
+                    disabled={isDownloadingPdf}
+                    onClick={handleDownloadGuidePdf}
                     className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-orange-500 md:hover:bg-orange-600 dark:bg-orange-600 lya:bg-lya-primary text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 outline-none disabled:opacity-60"
                   >
-                    {isDownloadingSheet ? (
+                    {isDownloadingPdf ? (
                       <>
                         <Loader2 size={18} className="animate-spin" />
-                        <span>Generando Hoja...</span>
+                        <span>Generando PDF...</span>
                       </>
                     ) : (
                       <>
-                        <Download size={18} strokeWidth={2.5} />
-                        <span>Descargar Hoja</span>
+                        <FileDown size={18} strokeWidth={2.5} />
+                        <span>Descargar PDF</span>
                       </>
                     )}
                   </motion.button>
