@@ -13,13 +13,10 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'Device ID es requerido para seguridad.' });
     }
 
-    // 🔥 Llave Maestra Combinada: Dispositivo + Usuario
     const normalizedUsername = (username || '').toLowerCase().trim();
     const securityKey = `${deviceId}:${normalizedUsername}`;
 
-    console.log(`Intento de acceso -> Usuario: "${normalizedUsername}" | Dispositivo: ${deviceId}`);
-
-    // 1. Verificar si ESTA cuenta en ESTE dispositivo está bloqueada
+    // 1. Verificar si ESTA cuenta en ESTE dispositivo está bloqueada por intentos fallidos
     const blockStatus = AuthSecurityService.checkBlock(securityKey);
     if (blockStatus.isBlocked) {
       return res.status(429).json({
@@ -52,12 +49,25 @@ export const login = async (req, res) => {
       }
 
       return res.status(401).json({ 
-        message: `Usuario o contraseña incorrectos. Intentos restantes: ${5 - secStatus.attempts}` 
+        message: 'Usuario o contraseña incorrectos.' 
       });
     }
 
-    // 4. Login exitoso -> Limpiamos historial de fallos de esta llave
+    // 🔥 4. VALIDACIÓN DE SESIÓN ÚNICA (CONCURRENCIA)
+    // Si el usuario ya tiene un dispositivo registrado distinto y no coincide con el actual
+    if (user.currentDeviceId && user.currentDeviceId !== deviceId) {
+      return res.status(409).json({
+        message: 'Ya hay una sesión activa con este usuario en otro equipo o navegador. Debes cerrar sesión en el otro equipo antes de ingresar aquí.',
+        isConcurrentSession: true
+      });
+    }
+
+    // 5. Login exitoso -> Limpiamos historial de fallos
     AuthSecurityService.reset(securityKey);
+
+    // Asignar el dispositivo actual y guardarlo en la base de datos
+    user.currentDeviceId = deviceId;
+    await user.save();
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
@@ -79,6 +89,28 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error("Error en login:", error);
     res.status(500).json({ message: 'Error en el servidor', error: error.message });
+  }
+};
+
+// 🔥 NUEVO: Endpoint para cerrar sesión explícitamente y liberar el dispositivo en la BD
+export const logout = async (req, res) => {
+  try {
+    const { userId, deviceId } = req.body;
+    
+    if (userId) {
+      const user = await User.findByPk(userId);
+      if (user) {
+        if (!deviceId || user.currentDeviceId === deviceId) {
+          user.currentDeviceId = null;
+          await user.save();
+        }
+      }
+    }
+    
+    return res.json({ message: 'Sesión cerrada correctamente.' });
+  } catch (error) {
+    console.error("Error en logout:", error);
+    res.status(500).json({ message: 'Error al cerrar sesión', error: error.message });
   }
 };
 

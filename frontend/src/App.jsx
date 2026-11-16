@@ -8,6 +8,7 @@ import { useTheme } from './hooks/useTheme';
 import { usePWA } from './hooks/usePWA';
 import { useUiSize } from './hooks/useUiSize';
 import { useNavigate } from 'react-router-dom';
+import client from './api/client'; // 🔥 IMPORTANTE: Instancia de Axios para conectar con el backend
 
 // 🔥 IMPORTACIÓN DEL SOCKET PARA EL KILL-SWITCH Y MONITOREO
 import { socket } from './api/socket'; 
@@ -186,9 +187,19 @@ function App() {
     localStorage.setItem('lya_active_tab', 'caja');
   };
 
-  const performCleanLogout = (message, isKickout = false) => {
+  // 🔥 ACTUALIZADO: Notifica al backend para liberar el currentDeviceId al salir
+  const performCleanLogout = async (message, isKickout = false) => {
     const hasToken = localStorage.getItem('lya_token');
-    if (!hasToken) return;
+    
+    // Notificamos al backend de forma limpia si hay usuario activo
+    if (user?.id) {
+      try {
+        const deviceId = localStorage.getItem('lyA_deviceId');
+        await client.post('/auth/logout', { userId: user.id, deviceId });
+      } catch (err) {
+        console.error("Error al notificar logout al servidor:", err);
+      }
+    }
 
     localStorage.removeItem('lya_pos_session');
     localStorage.removeItem('lya_token'); 
@@ -206,14 +217,14 @@ function App() {
         style: { background: '#fee2e2', color: '#991b1b', border: '1px solid #f87171' }
       });
     } else {
-      toast(message || "Tu sesión ha expirado por seguridad. Vuelve a ingresar.", {
-        icon: <div className="bg-amber-100 dark:bg-amber-900/30 p-1 rounded-full"><AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>,
+      toast(message || "Sesión cerrada correctamente.", {
+        icon: <div className="bg-emerald-100 dark:bg-emerald-900/30 p-1 rounded-full"><CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>,
       });
     }
   };
 
-  const handleLogout = () => {
-    performCleanLogout("Cierre de sesión manual", false);
+  const handleLogout = async () => {
+    await performCleanLogout("Cierre de sesión manual", false);
   };
 
   useEffect(() => {
@@ -236,7 +247,7 @@ function App() {
 
   // 🔥 MONITOREO DE RED GLOBAL CON BANNER PERSISTENTE
   useEffect(() => {
-    let disconnectTimeout; // 🔥 Variable para nuestro cronómetro de gracia
+    let disconnectTimeout; 
 
     const handleNetworkError = (e) => {
       setIsOffline(true);
@@ -251,8 +262,6 @@ function App() {
     window.addEventListener('network_timeout', handleNetworkTimeout);
 
     const handleSocketDisconnect = () => {
-      // 🔥 FIX: Período de gracia de 3 segundos. 
-      // Ignora los micro-cortes cuando el empleado apaga/enciende la pantalla.
       disconnectTimeout = setTimeout(() => {
         setIsOffline(true);
         toast.error('Sin conexión con el servidor. Trabajando en modo local/desconectado...', { 
@@ -264,7 +273,6 @@ function App() {
     };
 
     const handleSocketConnect = () => {
-      // 🔥 FIX: Si el socket se reconecta rápido, cancelamos la alarma
       clearTimeout(disconnectTimeout);
       
       if (isOffline) {
@@ -281,7 +289,7 @@ function App() {
       window.removeEventListener('network_timeout', handleNetworkTimeout);
       socket.off('disconnect', handleSocketDisconnect);
       socket.off('connect', handleSocketConnect);
-      clearTimeout(disconnectTimeout); // 🔥 Limpiamos el cronómetro al desmontar
+      clearTimeout(disconnectTimeout); 
     };
   }, [isOffline]);
 
@@ -870,7 +878,7 @@ function App() {
                             setIsLoggingOut(true);
                             try {
                               await new Promise(r => setTimeout(r, 800)); 
-                              handleLogout();
+                              await handleLogout();
                             } finally {
                               setIsLoggingOut(false);
                             }

@@ -1,9 +1,11 @@
+// backend/src/modules/auth/auth.routes.js
 import { Router } from 'express';
-import { login, registerTestUser } from './auth.controller.js';
+import { login, logout, registerTestUser } from './auth.controller.js';
 
 const router = Router();
 
 router.post('/login', login);
-router.post('/register', registerTestUser); // Solo para crear tu primer usuario de prueba
+router.post('/logout', logout); // 🔥 NUEVA RUTA
+router.post('/register', registerTestUser);
 
 export default router;

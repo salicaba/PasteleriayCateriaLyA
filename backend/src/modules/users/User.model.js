@@ -1,4 +1,4 @@
-// src/modules/users/User.model.js
+// backend/src/modules/users/User.model.js
 import { DataTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 
@@ -19,7 +19,7 @@ const User = sequelize.define('User', {
   },
   email: {
     type: DataTypes.STRING,
-    allowNull: true, // Permitimos nulos para no romper los usuarios que ya creaste antes
+    allowNull: true,
     validate: {
       isEmail: true
     }
@@ -36,6 +36,12 @@ const User = sequelize.define('User', {
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
+  },
+  // 🔥 Control de sesión única por dispositivo/equipo
+  currentDeviceId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: null
   }
 }, {
   timestamps: true,
