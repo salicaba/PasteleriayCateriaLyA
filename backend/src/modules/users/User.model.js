@@ -42,6 +42,15 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
     defaultValue: null
+  },
+  // 🔥 Control centralizado de intentos fallidos en BD (Anticipa borrado de caché)
+  loginAttempts: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  blockUntil: {
+    type: DataTypes.DATE,
+    allowNull: true,
   }
 }, {
   timestamps: true,

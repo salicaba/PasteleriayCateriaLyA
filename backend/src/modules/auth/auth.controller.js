@@ -16,16 +16,7 @@ export const login = async (req, res) => {
     const normalizedUsername = (username || '').toLowerCase().trim();
     const securityKey = `${deviceId}:${normalizedUsername}`;
 
-    // 1. Verificar si ESTA cuenta en ESTE dispositivo está bloqueada por intentos fallidos
-    const blockStatus = AuthSecurityService.checkBlock(securityKey);
-    if (blockStatus.isBlocked) {
-      return res.status(429).json({
-        message: 'Demasiados intentos en este equipo. Acceso bloqueado temporalmente.',
-        remainingMs: blockStatus.remainingMs
-      });
-    }
-
-    // 2. Buscar al usuario en la base de datos
+    // 1. Buscar al usuario en la base de datos (por username o email)
     const user = await User.findOne({ 
       where: { 
         [Op.or]: [
@@ -34,30 +25,58 @@ export const login = async (req, res) => {
         ]
       } 
     });
+
+    // 2. 🔥 Verificar si el usuario está bloqueado globalmente en la BD por intentos fallidos
+    if (user && user.blockUntil && new Date(user.blockUntil) > new Date()) {
+      const remainingMs = new Date(user.blockUntil).getTime() - Date.now();
+      return res.status(429).json({
+        message: 'Demasiados intentos fallidos. Cuenta bloqueada temporalmente por seguridad.',
+        remainingMs
+      });
+    }
+
+    // Limpiar bloqueo expirado si ya pasó el tiempo
+    if (user && user.blockUntil && new Date(user.blockUntil) <= new Date()) {
+      user.blockUntil = null;
+      user.loginAttempts = 0;
+      await user.save();
+    }
     
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
-    // 3. Si falla la validación (Usuario incorrecto, inactivo o contraseña errónea)
+    // 3. Si falla la validación
     if (!user || !user.isActive || !isMatch) {
-      const secStatus = AuthSecurityService.registerFailure(securityKey);
-
-      if (secStatus.blockedUntil) {
-        return res.status(429).json({
-          message: 'Límite de intentos excedido. Dispositivo bloqueado para esta cuenta.',
-          remainingMs: secStatus.blockedUntil - Date.now()
+      if (user) {
+        user.loginAttempts += 1;
+        
+        // Si llega a 5 intentos, bloqueamos por 30 minutos directamente en la BD
+        if (user.loginAttempts >= 5) {
+          user.blockUntil = new Date(Date.now() + 30 * 60 * 1000);
+          user.loginAttempts = 0; 
+          await user.save();
+          
+          return res.status(429).json({
+            message: 'Límite de intentos excedido. Cuenta bloqueada por seguridad.',
+            remainingMs: 30 * 60 * 1000
+          });
+        }
+        await user.save();
+        
+        const intentosRestantes = Math.max(0, 5 - user.loginAttempts);
+        return res.status(401).json({ 
+          message: `Usuario o contraseña incorrectos. Intentos restantes: ${intentosRestantes}` 
         });
       }
 
-      // 🔥 Calculamos cuántos intentos le quedan antes del bloqueo (asumiendo límite de 5)
-      const intentosRestantes = Math.max(0, 5 - secStatus.attempts);
-
+      // Si el usuario ni siquiera existe
+      const secStatus = AuthSecurityService.registerFailure(securityKey);
       return res.status(401).json({ 
-        message: `Usuario o contraseña incorrectos. Intentos restantes: ${intentosRestantes}` 
+        message: 'Usuario o contraseña incorrectos.' 
       });
     }
 
     // 🔥 4. VALIDACIÓN DE SESIÓN ÚNICA (CONCURRENCIA)
-    // Si el usuario ya tiene un dispositivo registrado distinto y no coincide con el actual
+    // Si ya tiene un dispositivo registrado distinto y activo
     if (user.currentDeviceId && user.currentDeviceId !== deviceId) {
       return res.status(409).json({
         message: 'Ya hay una sesión activa con este usuario en otro equipo o navegador. Debes cerrar sesión en el otro equipo antes de ingresar aquí.',
@@ -65,12 +84,13 @@ export const login = async (req, res) => {
       });
     }
 
-    // 5. Login exitoso -> Limpiamos historial de fallos
-    AuthSecurityService.reset(securityKey);
-
-    // Asignar el dispositivo actual y guardarlo en la base de datos
+    // 5. Login exitoso -> Reseteamos contadores de fallos y asignamos el dispositivo actual
+    user.loginAttempts = 0;
+    user.blockUntil = null;
     user.currentDeviceId = deviceId;
     await user.save();
+
+    AuthSecurityService.reset(securityKey);
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
@@ -95,7 +115,7 @@ export const login = async (req, res) => {
   }
 };
 
-// 🔥 NUEVO: Endpoint para cerrar sesión explícitamente y liberar el dispositivo en la BD
+// Endpoint para cerrar sesión explícitamente y liberar el dispositivo en la BD
 export const logout = async (req, res) => {
   try {
     const { userId, deviceId } = req.body;
