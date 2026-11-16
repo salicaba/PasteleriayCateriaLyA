@@ -37,7 +37,7 @@ export const login = async (req, res) => {
     
     const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
-    // 3. Si falla la validación
+    // 3. Si falla la validación (Usuario incorrecto, inactivo o contraseña errónea)
     if (!user || !user.isActive || !isMatch) {
       const secStatus = AuthSecurityService.registerFailure(securityKey);
 
@@ -48,8 +48,11 @@ export const login = async (req, res) => {
         });
       }
 
+      // 🔥 Calculamos cuántos intentos le quedan antes del bloqueo (asumiendo límite de 5)
+      const intentosRestantes = Math.max(0, 5 - secStatus.attempts);
+
       return res.status(401).json({ 
-        message: 'Usuario o contraseña incorrectos.' 
+        message: `Usuario o contraseña incorrectos. Intentos restantes: ${intentosRestantes}` 
       });
     }
 
