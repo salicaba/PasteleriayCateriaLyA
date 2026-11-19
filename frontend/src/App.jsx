@@ -599,7 +599,7 @@ function App() {
             >
               <div className="w-[240px] flex flex-col h-full relative">
                 {/* 🎨 Decoración ambiental fija del espacio vacío */}
-                <SidebarArtwork />
+                <SidebarArtwork hasExpandedMenu={expandedGroups.length > 0} />
 
                 <div className="relative h-16 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
                   <div className="flex items-center">
@@ -707,7 +707,7 @@ function App() {
             </motion.aside>
 
             {/* 🎨 Wrapper maestro derecho: mantiene el fondo fijo incluso con globalScroll = true */}
-            <div className="relative flex-1 h-full overflow-hidden flex flex-col w-full md:w-auto md:shrink">
+            <div className="relative flex-1 h-full overflow-hidden flex flex-col w-full md:w-auto md:shrink bg-gray-50 dark:bg-gray-950 lya:bg-lya-bg transition-colors duration-300">
               <WorkspaceBackdrop />
 
               {/* ⚠️ Sin z-index aquí para NO atrapar los modales (fixed) detrás del sidebar */}
@@ -773,7 +773,7 @@ function App() {
                   </div>
                 </header>
 
-                <main className={`flex-1 relative transition-colors ${globalScroll ? 'overflow-visible' : 'overflow-hidden'}`}>
+                <main className={`lya-workspace-main flex-1 relative transition-colors ${globalScroll ? 'overflow-visible' : 'overflow-hidden'}`}>
                   {activeTab === 'mesas' && <MesasPage globalScroll={globalScroll} />}
                   {activeTab === 'qr' && <QrControlPage />}
                   {activeTab === 'cocina' && <KitchenPage />}
