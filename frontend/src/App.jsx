@@ -13,6 +13,9 @@ import client from './api/client'; // 🔥 IMPORTANTE: Instancia de Axios para c
 // 🔥 IMPORTACIÓN DEL SOCKET PARA EL KILL-SWITCH Y MONITOREO
 import { socket } from './api/socket'; 
 
+// 🎨 Decoraciones ambientales adaptativas (Sidebar + Fondo global derecho)
+import { SidebarArtwork, WorkspaceBackdrop } from './components/SystemVisuals';
+
 // Vistas
 import { MesasPage } from './modules/cafeteria/views/MesasPage';
 import { KitchenPage } from './modules/kitchen/views/KitchenPage';
@@ -594,8 +597,11 @@ function App() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed top-0 bottom-0 left-0 w-[240px] md:relative h-full bg-white dark:bg-gray-800 lya:bg-lya-surface md:border-r border-gray-200 dark:border-gray-800 lya:border-lya-border/40 shadow-2xl md:shadow-none z-[50] md:z-30 shrink-0 overflow-hidden transition-colors duration-300 flex flex-col"
             >
-              <div className="w-[240px] flex flex-col h-full">
-                <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
+              <div className="w-[240px] flex flex-col h-full relative">
+                {/* 🎨 Decoración ambiental fija del espacio vacío */}
+                <SidebarArtwork />
+
+                <div className="relative h-16 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 shrink-0">
                   <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/20 dark:border-gray-600 lya:border-lya-primary shadow-sm bg-white flex items-center justify-center shrink-0">
                       <img 
@@ -619,7 +625,7 @@ function App() {
                   )}
                 </div>
 
-                <nav className="flex-1 py-4 flex flex-col gap-1.5 px-3 overflow-y-auto custom-scrollbar">
+                <nav className="relative flex-1 py-4 flex flex-col gap-1.5 px-3 overflow-y-auto custom-scrollbar">
                   {visibleMenuConfig.map((item) => {
                     if (item.isGroup) {
                       const isExpanded = expandedGroups.includes(item.id);
@@ -672,7 +678,7 @@ function App() {
                   })}
                 </nav>
 
-                <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/50 dark:bg-gray-800/50 lya:bg-lya-surface space-y-3">
+                <div className="relative p-4 border-t border-gray-100 dark:border-gray-700/50 lya:border-lya-border/30 bg-gray-50/75 dark:bg-gray-800/80 lya:bg-lya-surface/90 backdrop-blur-sm space-y-3">
                   
                   {!isStandalone && isInstallable && (
                     <motion.button
@@ -700,207 +706,213 @@ function App() {
               </div>
             </motion.aside>
 
-            <div className={`flex flex-col relative w-full flex-1 md:w-auto md:shrink ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full flex-1 overflow-hidden'}`}>
-              
-              <header className={`h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors duration-300 relative ${globalScroll ? 'z-10' : 'z-10 sticky top-0'}`}>
-                <div className="flex items-center gap-2 sm:gap-4">
-                   <motion.button
-                     whileTap={{ scale: 0.95 }}
-                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                     className="md:hidden p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-100 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-lg transition-colors shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 outline-none"
-                   >
-                     <Menu size={20} />
-                   </motion.button>
+            {/* 🎨 Wrapper maestro derecho: mantiene el fondo fijo incluso con globalScroll = true */}
+            <div className="relative flex-1 h-full overflow-hidden flex flex-col w-full md:w-auto md:shrink">
+              <WorkspaceBackdrop />
 
-                   <div className="flex items-center ml-1">
-                     <span 
-                       className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text pb-1 font-bold"
-                       style={{ letterSpacing: '-0.11em', transform: 'scaleX(0.95)' }}
+              {/* ⚠️ Sin z-index aquí para NO atrapar los modales (fixed) detrás del sidebar */}
+              <div className={`flex flex-col relative w-full flex-1 ${globalScroll ? 'h-full overflow-y-auto custom-scrollbar' : 'h-full overflow-hidden'}`}>
+                
+                <header className={`h-16 bg-white/50 dark:bg-gray-800/50 lya:bg-lya-surface/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 lya:border-lya-border/30 flex items-center justify-between px-3 sm:px-6 shrink-0 transition-colors duration-300 relative ${globalScroll ? 'z-10' : 'z-10 sticky top-0'}`}>
+                  <div className="flex items-center gap-2 sm:gap-4">
+                     <motion.button
+                       whileTap={{ scale: 0.95 }}
+                       onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                       className="md:hidden p-2 bg-white dark:bg-gray-800 lya:bg-lya-bg md:hover:bg-gray-100 dark:md:hover:bg-gray-700 lya:md:hover:bg-lya-surface text-gray-600 dark:text-gray-300 lya:text-lya-text rounded-lg transition-colors shadow-sm border border-gray-200 dark:border-gray-700 lya:border-lya-border/30 outline-none"
                      >
-                       𝓛𝔂α
+                       <Menu size={20} />
+                     </motion.button>
+
+                     <div className="flex items-center ml-1">
+                       <span 
+                         className="text-2xl sm:text-3xl text-gray-900 dark:text-white lya:text-lya-text pb-1 font-bold"
+                         style={{ letterSpacing: '-0.11em', transform: 'scaleX(0.95)' }}
+                       >
+                         𝓛𝔂α
+                       </span>
+                     </div>
+
+                     <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-700 lya:bg-lya-border/40 mx-1"></div>
+
+                     <h2 className="text-lg font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 capitalize hidden sm:block">
+                       {menuConfig.find(g => g.id === activeTab)?.label || 
+                        menuConfig.reduce((encontrado, grupo) => encontrado || grupo.children?.find(c => c.id === activeTab), null)?.label ||
+                        'Sistema'}
+                     </h2>
+                  </div>
+
+                  <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none w-max">
+                     <div className="flex items-center gap-1 sm:gap-1.5 text-gray-900 dark:text-gray-100 lya:text-lya-text">
+                       <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500 lya:text-lya-secondary" />
+                       <span className="text-sm sm:text-lg font-bold leading-none">{formattedTime}</span>
+                     </div>
+                     <span className="text-[9px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/50 capitalize mt-0.5 hidden min-[380px]:block">
+                       {formattedDate}
                      </span>
-                   </div>
+                  </div>
 
-                   <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-700 lya:bg-lya-border/40 mx-1"></div>
-
-                   <h2 className="text-lg font-medium text-gray-500 dark:text-gray-400 lya:text-lya-text/60 capitalize hidden sm:block">
-                     {menuConfig.find(g => g.id === activeTab)?.label || 
-                      menuConfig.reduce((encontrado, grupo) => encontrado || grupo.children?.find(c => c.id === activeTab), null)?.label ||
-                      'Sistema'}
-                   </h2>
-                </div>
-
-                <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none w-max">
-                   <div className="flex items-center gap-1 sm:gap-1.5 text-gray-900 dark:text-gray-100 lya:text-lya-text">
-                     <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500 lya:text-lya-secondary" />
-                     <span className="text-sm sm:text-lg font-bold leading-none">{formattedTime}</span>
-                   </div>
-                   <span className="text-[9px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 lya:text-lya-text/50 capitalize mt-0.5 hidden min-[380px]:block">
-                     {formattedDate}
-                   </span>
-                </div>
-
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <motion.div whileTap={{ scale: 0.98 }} className="flex items-center gap-3 bg-white dark:bg-gray-700/50 lya:bg-lya-bg px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 shadow-sm transition-colors cursor-pointer md:hover:bg-gray-50 dark:md:hover:bg-gray-600 lya:md:hover:opacity-80">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-none">
-                        {user?.fullName ? user.fullName.split(' ')[0] : (user?.username || 'Admin')}
-                      </p>
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 lya:text-lya-text/50">
-                        {user?.role || 'Administrador'}
-                      </p>
-                    </div>
-                    
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border-2 border-white dark:border-gray-600 lya:border-lya-surface shadow-sm shrink-0 flex items-center justify-center text-white text-xs font-bold uppercase ${
-                      user?.role === 'Administrador' 
-                        ? 'bg-purple-600 dark:bg-purple-500' 
-                        : 'bg-blue-600 lya:bg-lya-primary'
-                    }`}>
-                      {getInitials(user?.fullName || user?.username)}
-                    </div>
-                  </motion.div>
-                </div>
-              </header>
-
-              <main className={`flex-1 relative transition-colors ${globalScroll ? 'overflow-visible' : 'overflow-hidden'}`}>
-                {activeTab === 'mesas' && <MesasPage globalScroll={globalScroll} />}
-                {activeTab === 'qr' && <QrControlPage />}
-                {activeTab === 'cocina' && <KitchenPage />}
-                {activeTab === 'pedidos' && <PasteleriaDashboard />} 
-                {activeTab === 'agenda' && <PasteleriaCalendar />} 
-                {activeTab === 'catalogo' && <PasteleriaConfigPage />}
-                {activeTab === 'ajustes' && <MenuManagerPage />} 
-                {activeTab === 'caja' && <CashRegisterPage user={user} />}
-                
-                {activeTab === 'inventario' && <InventoryPage />}
-                {activeTab === 'arqueo' && <InventoryReconciliationPage />}
-                
-                {activeTab === 'egresos' && <ExpensesPage />}
-                {activeTab === 'dashboard' && <NetProfitDashboard />} 
-                
-                {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
-                  <SettingsPage 
-                    uiSize={uiSize} 
-                    setUiSize={setUiSize} 
-                    activeTab={activeTab} 
-                    globalScroll={globalScroll} 
-                    setGlobalScroll={setGlobalScroll}
-                  />
-                )}
-                
-                {activeTab === 'reportes' && <ReportsPage />}
-              </main>
-
-              {/* MODAL DE ACTUALIZACIÓN DE SISTEMA */}
-              <AnimatePresence>
-                {needRefresh && (
-                  <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                      className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-blue-500/20 dark:border-blue-500/30 lya:border-lya-primary/30 text-center flex flex-col items-center"
-                    >
-                      <div className="w-16 h-16 bg-blue-100 dark:bg-blue-500/20 text-blue-500 lya:text-lya-primary rounded-full flex items-center justify-center mb-4">
-                        <RefreshCw size={32} strokeWidth={2.5} />
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    <motion.div whileTap={{ scale: 0.98 }} className="flex items-center gap-3 bg-white dark:bg-gray-700/50 lya:bg-lya-bg px-2 sm:px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700 lya:border-lya-border/30 shadow-sm transition-colors cursor-pointer md:hover:bg-gray-50 dark:md:hover:bg-gray-600 lya:md:hover:opacity-80">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-xs font-bold text-gray-700 dark:text-gray-200 lya:text-lya-text leading-none">
+                          {user?.fullName ? user.fullName.split(' ')[0] : (user?.username || 'Admin')}
+                        </p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 lya:text-lya-text/50">
+                          {user?.role || 'Administrador'}
+                        </p>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">
-                        ¡Actualización del Sistema!
-                      </h3>
-                      <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm text-center px-2">
-                        Hay una nueva versión de LyA POS con mejoras en rendimiento. Por favor, actualiza ahora para seguir operando sin problemas.
-                      </p>
-                      <motion.button
-                        whileTap={!isUpdating ? { scale: 0.95 } : {}}
-                        onClick={async () => {
-                          if (isUpdating) return; 
-                          setIsUpdating(true);
-                          try {
-                            await new Promise(resolve => setTimeout(resolve, 600));
-                            await updateServiceWorker(true);
-                          } catch (error) {
-                            console.error("Error al actualizar la PWA:", error);
-                            setIsUpdating(false); 
-                            toast.error("Error al actualizar. Intenta recargar manualmente.");
-                          }
-                        }}
-                        disabled={isUpdating}
-                        className="w-full py-3 rounded-2xl font-bold text-white bg-blue-500 lya:bg-lya-primary md:hover:bg-blue-600 lya:md:hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
-                      >
-                        {isUpdating ? (
-                          <>
-                            <Loader2 size={20} className="animate-spin" />
-                            <span>Actualizando sistema...</span>
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw size={20} />
-                            <span>Actualizar Ahora</span>
-                          </>
-                        )}
-                      </motion.button>
+                      
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border-2 border-white dark:border-gray-600 lya:border-lya-surface shadow-sm shrink-0 flex items-center justify-center text-white text-xs font-bold uppercase ${
+                        user?.role === 'Administrador' 
+                          ? 'bg-purple-600 dark:bg-purple-500' 
+                          : 'bg-blue-600 lya:bg-lya-primary'
+                      }`}>
+                        {getInitials(user?.fullName || user?.username)}
+                      </div>
                     </motion.div>
                   </div>
-                )}
-              </AnimatePresence>
+                </header>
 
-              {/* MODAL DE CERRAR SESIÓN */}
-              <AnimatePresence>
-                {showLogoutModal && (
-                  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                      className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 text-center flex flex-col items-center"
-                    >
-                      <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-4">
-                        <LogOut size={32} strokeWidth={2.5} />
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">
-                        ¿Cerrar Sesión?
-                      </h3>
-                      <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm text-center px-2">
-                        Tendrás que volver a ingresar tus credenciales para acceder al sistema POS.
-                      </p>
-                      <div className="flex gap-3 w-full">
+                <main className={`flex-1 relative transition-colors ${globalScroll ? 'overflow-visible' : 'overflow-hidden'}`}>
+                  {activeTab === 'mesas' && <MesasPage globalScroll={globalScroll} />}
+                  {activeTab === 'qr' && <QrControlPage />}
+                  {activeTab === 'cocina' && <KitchenPage />}
+                  {activeTab === 'pedidos' && <PasteleriaDashboard />} 
+                  {activeTab === 'agenda' && <PasteleriaCalendar />} 
+                  {activeTab === 'catalogo' && <PasteleriaConfigPage />}
+                  {activeTab === 'ajustes' && <MenuManagerPage />} 
+                  {activeTab === 'caja' && <CashRegisterPage user={user} />}
+                  
+                  {activeTab === 'inventario' && <InventoryPage />}
+                  {activeTab === 'arqueo' && <InventoryReconciliationPage />}
+                  
+                  {activeTab === 'egresos' && <ExpensesPage />}
+                  {activeTab === 'dashboard' && <NetProfitDashboard />} 
+                  
+                  {['usuarios', 'interfaz', 'cuentas', 'hardware'].includes(activeTab) && (
+                    <SettingsPage 
+                      uiSize={uiSize} 
+                      setUiSize={setUiSize} 
+                      activeTab={activeTab} 
+                      globalScroll={globalScroll} 
+                      setGlobalScroll={setGlobalScroll}
+                    />
+                  )}
+                  
+                  {activeTab === 'reportes' && <ReportsPage />}
+                </main>
+
+                {/* MODAL DE ACTUALIZACIÓN DE SISTEMA */}
+                <AnimatePresence>
+                  {needRefresh && (
+                    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-blue-500/20 dark:border-blue-500/30 lya:border-lya-primary/30 text-center flex flex-col items-center"
+                      >
+                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-500/20 text-blue-500 lya:text-lya-primary rounded-full flex items-center justify-center mb-4">
+                          <RefreshCw size={32} strokeWidth={2.5} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">
+                          ¡Actualización del Sistema!
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm text-center px-2">
+                          Hay una nueva versión de LyA POS con mejoras en rendimiento. Por favor, actualiza ahora para seguir operando sin problemas.
+                        </p>
                         <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => !isLoggingOut && setShowLogoutModal(false)}
-                          disabled={isLoggingOut}
-                          className="flex-1 py-3 rounded-2xl font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300 bg-gray-100 md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors disabled:opacity-50 outline-none"
-                        >
-                          Cancelar
-                        </motion.button>
-                        <motion.button
-                          whileTap={!isLoggingOut ? { scale: 0.95 } : {}}
+                          whileTap={!isUpdating ? { scale: 0.95 } : {}}
                           onClick={async () => {
-                            setIsLoggingOut(true);
+                            if (isUpdating) return; 
+                            setIsUpdating(true);
                             try {
-                              await new Promise(r => setTimeout(r, 800)); 
-                              await handleLogout();
-                            } finally {
-                              setIsLoggingOut(false);
+                              await new Promise(resolve => setTimeout(resolve, 600));
+                              await updateServiceWorker(true);
+                            } catch (error) {
+                              console.error("Error al actualizar la PWA:", error);
+                              setIsUpdating(false); 
+                              toast.error("Error al actualizar. Intenta recargar manualmente.");
                             }
                           }}
-                          disabled={isLoggingOut}
-                          className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 md:hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
+                          disabled={isUpdating}
+                          className="w-full py-3 rounded-2xl font-bold text-white bg-blue-500 lya:bg-lya-primary md:hover:bg-blue-600 lya:md:hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
                         >
-                          {isLoggingOut ? (
+                          {isUpdating ? (
                             <>
                               <Loader2 size={20} className="animate-spin" />
-                              <span>Saliendo...</span>
+                              <span>Actualizando sistema...</span>
                             </>
                           ) : (
-                            'Sí, salir'
+                            <>
+                              <RefreshCw size={20} />
+                              <span>Actualizar Ahora</span>
+                            </>
                           )}
                         </motion.button>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
 
+                {/* MODAL DE CERRAR SESIÓN */}
+                <AnimatePresence>
+                  {showLogoutModal && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="bg-white dark:bg-gray-800 lya:bg-lya-surface rounded-[2.5rem] shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-700 lya:border-lya-border/40 text-center flex flex-col items-center"
+                      >
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-4">
+                          <LogOut size={32} strokeWidth={2.5} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white lya:text-lya-text mb-2 text-center">
+                          ¿Cerrar Sesión?
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400 lya:text-lya-text/60 mb-6 text-sm text-center px-2">
+                          Tendrás que volver a ingresar tus credenciales para acceder al sistema POS.
+                        </p>
+                        <div className="flex gap-3 w-full">
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => !isLoggingOut && setShowLogoutModal(false)}
+                            disabled={isLoggingOut}
+                            className="flex-1 py-3 rounded-2xl font-bold text-gray-700 dark:bg-gray-700 dark:text-gray-300 bg-gray-100 md:hover:bg-gray-200 dark:md:hover:bg-gray-600 transition-colors disabled:opacity-50 outline-none"
+                          >
+                            Cancelar
+                          </motion.button>
+                          <motion.button
+                            whileTap={!isLoggingOut ? { scale: 0.95 } : {}}
+                            onClick={async () => {
+                              setIsLoggingOut(true);
+                              try {
+                                await new Promise(r => setTimeout(r, 800)); 
+                                await handleLogout();
+                              } finally {
+                                setIsLoggingOut(false);
+                              }
+                            }}
+                            disabled={isLoggingOut}
+                            className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 md:hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed outline-none"
+                          >
+                            {isLoggingOut ? (
+                              <>
+                                <Loader2 size={20} className="animate-spin" />
+                                <span>Saliendo...</span>
+                              </>
+                            ) : (
+                              'Sí, salir'
+                            )}
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
+
+              </div>
             </div>
 
           </div>

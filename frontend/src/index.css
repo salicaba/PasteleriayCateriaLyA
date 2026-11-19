@@ -67,3 +67,41 @@
   scrollbar-width: none !important; /* Firefox */
   -ms-overflow-style: none !important; /* IE y Edge */
 }
+
+/* =========================================================================
+   🔥 FONDOS AMBIENTALES ADAPTATIVOS (Claro / Oscuro / LyA)
+   ========================================================================= */
+:root {
+  --canvas-glow-1: rgba(249, 115, 22, 0.08);      /* Brillo naranja cálido */
+  --canvas-glow-2: rgba(99, 102, 241, 0.05);      /* Profundidad índigo suave */
+  --canvas-pattern-color: rgba(107, 114, 128, 0.065);
+  --sidebar-glow: rgba(249, 115, 22, 0.11);
+  --sidebar-dot-color: rgba(107, 114, 128, 0.14);
+}
+
+.dark {
+  --canvas-glow-1: rgba(249, 115, 22, 0.09);      /* Brillo ámbar/naranja */
+  --canvas-glow-2: rgba(99, 102, 241, 0.09);      /* Halo índigo nocturno */
+  --canvas-pattern-color: rgba(255, 255, 255, 0.045);
+  --sidebar-glow: rgba(249, 115, 22, 0.12);
+  --sidebar-dot-color: rgba(255, 255, 255, 0.08);
+}
+
+.theme-lya {
+  --canvas-glow-1: rgba(244, 154, 194, 0.24);     /* Rosa Betún (#F49AC2) */
+  --canvas-glow-2: rgba(114, 206, 195, 0.22);     /* Verde Turquesa (#72CEC3) */
+  --canvas-pattern-color: rgba(74, 43, 41, 0.075);/* Marrón Espresso (#4A2B29) */
+  --sidebar-glow: rgba(244, 154, 194, 0.20);
+  --sidebar-dot-color: rgba(212, 163, 115, 0.22); /* Beige oscuro (#D4A373) */
+}
+
+/* Mosaico SVG minimalista (taza, pastel, grano de café, cupcake, croissant y destellos) */
+.lya-canvas-pattern {
+  background-color: var(--canvas-pattern-color);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='rotate(-10 34 38)'%3E%3Cpath d='M24 34h20v10a10 10 0 0 1-20 0z'/%3E%3Cpath d='M44 37h3a4 4 0 0 1 0 8h-3'/%3E%3Cpath d='M20 49h28'/%3E%3Cpath d='M30 28q2-3 0-6M37 27q2-3 0-6'/%3E%3C/g%3E%3Cg transform='rotate(8 118 42)'%3E%3Cpath d='M105 42h25v13h-25z'/%3E%3Cpath d='M105 49h25'/%3E%3Cpath d='M105 42l15-10 10 10'/%3E%3Ccircle cx='120' cy='29' r='2.5'/%3E%3C/g%3E%3Cg transform='rotate(30 78 78)'%3E%3Cellipse cx='78' cy='78' rx='6' ry='9'/%3E%3Cpath d='M78 69c2 4-2 10 0 18'/%3E%3C/g%3E%3Cg transform='rotate(-8 38 120)'%3E%3Cpath d='M28 122l3 13h14l3-13z'/%3E%3Cpath d='M26 122c0-5 4-7 6-10 1-4 5-6 8-6 3 0 6 2 6 6 2 2 4 5 4 10z'/%3E%3Ccircle cx='39' cy='103' r='2'/%3E%3C/g%3E%3Cg transform='rotate(-6 122 124)'%3E%3Cpath d='M109 128c4-11 22-11 26 0-4 4-8 2-13 2s-9 2-13-2z'/%3E%3Cpath d='M117 120v9M127 120v9'/%3E%3C/g%3E%3Cpath d='M82 18v8M78 22h8M18 78v8M14 82h8M142 78v8M138 82h8M82 138v8M78 142h8'/%3E%3Ccircle cx='60' cy='58' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='138' cy='24' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='64' cy='116' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='106' cy='92' r='1.3' fill='black' stroke='none'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='rotate(-10 34 38)'%3E%3Cpath d='M24 34h20v10a10 10 0 0 1-20 0z'/%3E%3Cpath d='M44 37h3a4 4 0 0 1 0 8h-3'/%3E%3Cpath d='M20 49h28'/%3E%3Cpath d='M30 28q2-3 0-6M37 27q2-3 0-6'/%3E%3C/g%3E%3Cg transform='rotate(8 118 42)'%3E%3Cpath d='M105 42h25v13h-25z'/%3E%3Cpath d='M105 49h25'/%3E%3Cpath d='M105 42l15-10 10 10'/%3E%3Ccircle cx='120' cy='29' r='2.5'/%3E%3C/g%3E%3Cg transform='rotate(30 78 78)'%3E%3Cellipse cx='78' cy='78' rx='6' ry='9'/%3E%3Cpath d='M78 69c2 4-2 10 0 18'/%3E%3C/g%3E%3Cg transform='rotate(-8 38 120)'%3E%3Cpath d='M28 122l3 13h14l3-13z'/%3E%3Cpath d='M26 122c0-5 4-7 6-10 1-4 5-6 8-6 3 0 6 2 6 6 2 2 4 5 4 10z'/%3E%3Ccircle cx='39' cy='103' r='2'/%3E%3C/g%3E%3Cg transform='rotate(-6 122 124)'%3E%3Cpath d='M109 128c4-11 22-11 26 0-4 4-8 2-13 2s-9 2-13-2z'/%3E%3Cpath d='M117 120v9M127 120v9'/%3E%3C/g%3E%3Cpath d='M82 18v8M78 22h8M18 78v8M14 82h8M142 78v8M138 82h8M82 138v8M78 142h8'/%3E%3Ccircle cx='60' cy='58' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='138' cy='24' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='64' cy='116' r='1.3' fill='black' stroke='none'/%3E%3Ccircle cx='106' cy='92' r='1.3' fill='black' stroke='none'/%3E%3C/svg%3E");
+  -webkit-mask-size: 180px 180px;
+  mask-size: 180px 180px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
