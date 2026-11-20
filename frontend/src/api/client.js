@@ -29,7 +29,11 @@ client.interceptors.request.use(
 
 // Interceptor de Respuestas
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // 🔥 Si el backend respondió con éxito, avisamos que sí hay conexión real
+    window.dispatchEvent(new CustomEvent('network_ok'));
+    return response;
+  },
   (error) => {
     const status = error.response?.status;
     const isKickout = error.response?.data?.isKickout;

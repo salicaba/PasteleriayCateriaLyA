@@ -8,13 +8,16 @@ export const initSocket = (server) => {
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:4173',
+    'http://localhost',
+    'https://localhost',
+    'capacitor://localhost',
     'https://pasteleriay-cateria-ly-a-q2rr.vercel.app'
   ];
 
   io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        // Permitir si no hay origen (ej. Postman local), si está en la lista exacta, o si es CUALQUIER subdominio de Vercel
+        // Permitir si no hay origen (ej. Postman o APK nativo), si está en la lista exacta, o si es CUALQUIER subdominio de Vercel
         if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
           callback(null, true);
         } else {
@@ -24,7 +27,13 @@ export const initSocket = (server) => {
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true
     },
-    pingTimeout: 60000, 
+    pingInterval: 25000,
+    pingTimeout: 60000,
+    // 🔥 Recuperación suave de sesión tras cambios rápidos de app o microcortes
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 2 * 60 * 1000,
+      skipMiddlewares: true,
+    },
   });
 
   io.on('connection', (socket) => {

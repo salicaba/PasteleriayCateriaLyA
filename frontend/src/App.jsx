@@ -1,7 +1,7 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react';
-// 🔥 Agregamos Shield, AlertTriangle y AlertCircle para notificaciones Premium Neo-Bento
-import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield, AlertTriangle, AlertCircle, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+// 🔥 Agregamos Shield, AlertTriangle, AlertCircle y CheckCircle2 para notificaciones Premium Neo-Bento
+import { LayoutGrid, ChefHat, Cake, Menu, PieChart, BookOpenCheck, Clock, LogOut, QrCode, Coffee, ChevronDown, Calendar, ShoppingBasket, Settings, Palette, Landmark, Printer, Users, Tags, Wallet, Package, ClipboardCheck, Briefcase, Loader2, Download, RefreshCw, Shield, AlertTriangle, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast'; 
 import { useTheme } from './hooks/useTheme';
@@ -247,54 +247,152 @@ function App() {
   }, [user]);
 
   const [isOffline, setIsOffline] = useState(false);
+  const isOfflineRef = useRef(false);
 
-  // 🔥 MONITOREO DE RED GLOBAL CON BANNER PERSISTENTE
+  // 🔥 MONITOREO DE RED GLOBAL INTELIGENTE (A prueba de cambios de app en PWA/APK)
   useEffect(() => {
-    let disconnectTimeout; 
+    let disconnectTimeout = null;
+
+    const clearPendingWarning = () => {
+      if (disconnectTimeout) {
+        clearTimeout(disconnectTimeout);
+        disconnectTimeout = null;
+      }
+    };
+
+    const markOnline = (showSuccessToast = true) => {
+      clearPendingWarning();
+      if (isOfflineRef.current) {
+        isOfflineRef.current = false;
+        setIsOffline(false);
+        toast.dismiss('socket-err');
+        toast.dismiss('net-err');
+        toast.dismiss('net-time');
+        if (showSuccessToast) {
+          toast.success('¡Conexión restablecida con éxito!', { id: 'socket-ok', duration: 2500 });
+        }
+      }
+    };
+
+    const scheduleOfflineWarning = (delayMs = 8000) => {
+      // Si la app está minimizada / en otra pantalla, NO disparamos falsas alarmas
+      if (document.hidden) return;
+
+      clearPendingWarning();
+      disconnectTimeout = setTimeout(() => {
+        // Doble verificación antes de mostrar el banner rojo
+        if (document.hidden || socket.connected) return;
+
+        if (!isOfflineRef.current) {
+          isOfflineRef.current = true;
+          setIsOffline(true);
+          toast.error('Sin conexión con el servidor. Trabajando en modo local/desconectado...', {
+            id: 'socket-err',
+            icon: '🔌',
+            duration: 4000,
+          });
+        }
+      }, delayMs);
+    };
 
     const handleNetworkError = (e) => {
+      if (document.hidden) return; // Ignora peticiones abortadas al minimizar
+      isOfflineRef.current = true;
       setIsOffline(true);
-      toast.error(e.detail.message, { id: 'net-err', duration: 5000 });
+      toast.error(e.detail?.message || 'Error de conexión con el servidor', { id: 'net-err', duration: 5000 });
     };
+
     const handleNetworkTimeout = (e) => {
+      if (document.hidden) return;
+      isOfflineRef.current = true;
       setIsOffline(true);
-      toast.error(e.detail.message, { id: 'net-time', duration: 5000 });
+      toast.error(e.detail?.message || 'Tiempo de espera agotado', { id: 'net-time', duration: 5000 });
     };
 
-    window.addEventListener('network_error', handleNetworkError);
-    window.addEventListener('network_timeout', handleNetworkTimeout);
+    const handleNetworkOk = () => {
+      // Si el backend ya respondió por HTTP, aseguramos despertar el socket y quitar el banner
+      if (!socket.connected) {
+        socket.connect();
+      }
+      if (isOfflineRef.current) {
+        markOnline(true);
+      }
+    };
 
-    const handleSocketDisconnect = () => {
-      disconnectTimeout = setTimeout(() => {
-        setIsOffline(true);
-        toast.error('Sin conexión con el servidor. Trabajando en modo local/desconectado...', { 
-          id: 'socket-err', 
-          icon: '🔌', 
-          duration: 4000 
-        });
-      }, 3000);
+    const handleSocketDisconnect = (reason) => {
+      if (reason === 'io client disconnect') return;
+      // Margen de 8s para microcortes o reconexiones silenciosas sin parpadear la barra roja
+      scheduleOfflineWarning(8000);
     };
 
     const handleSocketConnect = () => {
-      clearTimeout(disconnectTimeout);
-      
-      if (isOffline) {
-        toast.success('¡Conexión restablecida con éxito!', { id: 'socket-ok' });
-      }
-      setIsOffline(false);
+      markOnline(true);
     };
+
+    // 🔥 AL VOLVER A LA APP (cambio de pantalla/app en tablet, PWA o APK)
+    const handleWakeUp = () => {
+      if (document.hidden) {
+        // Al salir de la app, cancelamos cualquier temporizador pendiente
+        clearPendingWarning();
+        return;
+      }
+
+      if (socket.connected) {
+        // Si ya está conectado, limpiamos cualquier banner que hubiera quedado
+        markOnline(true);
+      } else {
+        // Despertamos el socket de inmediato y damos 7s de gracia antes de avisar
+        socket.connect();
+        scheduleOfflineWarning(7000);
+      }
+    };
+
+    const handleBrowserOffline = () => {
+      scheduleOfflineWarning(2000);
+    };
+
+    // 🔥 RESPALDO ANTI-BLOQUEO: si el banner está visible, verifica cada 4s y fuerza reconexión
+    const recoveryInterval = setInterval(() => {
+      if (!isOfflineRef.current || document.hidden) return;
+      if (socket.connected) {
+        markOnline(true);
+      } else if (navigator.onLine) {
+        socket.connect();
+      }
+    }, 4000);
+
+    window.addEventListener('network_error', handleNetworkError);
+    window.addEventListener('network_timeout', handleNetworkTimeout);
+    window.addEventListener('network_ok', handleNetworkOk);
+    window.addEventListener('online', handleWakeUp);
+    window.addEventListener('offline', handleBrowserOffline);
+    window.addEventListener('focus', handleWakeUp);
+    window.addEventListener('pageshow', handleWakeUp);
+    document.addEventListener('visibilitychange', handleWakeUp);
 
     socket.on('disconnect', handleSocketDisconnect);
     socket.on('connect', handleSocketConnect);
 
+    // Si al montar el componente el socket ya venía conectado, aseguramos estado limpio
+    if (socket.connected) {
+      markOnline(false);
+    }
+
     return () => {
+      clearPendingWarning();
+      clearInterval(recoveryInterval);
       window.removeEventListener('network_error', handleNetworkError);
       window.removeEventListener('network_timeout', handleNetworkTimeout);
+      window.removeEventListener('network_ok', handleNetworkOk);
+      window.removeEventListener('online', handleWakeUp);
+      window.removeEventListener('offline', handleBrowserOffline);
+      window.removeEventListener('focus', handleWakeUp);
+      window.removeEventListener('pageshow', handleWakeUp);
+      document.removeEventListener('visibilitychange', handleWakeUp);
       socket.off('disconnect', handleSocketDisconnect);
       socket.off('connect', handleSocketConnect);
-      clearTimeout(disconnectTimeout); 
     };
-  }, [isOffline]);
+  }, []);
 
   useEffect(() => {
     const handleAuthError = (e) => {
