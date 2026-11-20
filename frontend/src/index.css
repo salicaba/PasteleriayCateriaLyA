@@ -102,3 +102,8 @@
 .lya-workspace-main > :where(div, section):not(.fixed) > :where(div, section):not(.fixed) > :where(div, section):not(.fixed):not(.sticky):not(.absolute):not([class*="rounded-"]):not([class*="shadow"]):is([class*="bg-gray-50"], [class*="bg-gray-100"], [class*="bg-gray-900"], [class*="bg-gray-950"], [class*="bg-slate-50"], [class*="bg-slate-900"], [class*="bg-slate-950"], [class*="bg-lya-bg"]) {
   background-color: transparent !important;
 }
+
+/* 🔥 Destapa también pantallas de carga a pantalla completa (absolute inset-0) sin tocar modales ni blurs */
+.lya-workspace-main > div.absolute.inset-0:not([class*="backdrop-blur"]):not([class*="rounded-"]):is([class*="bg-gray-50"], [class*="bg-gray-900"], [class*="bg-gray-950"], [class*="bg-lya-bg"]) {
+  background-color: transparent !important;
+}
